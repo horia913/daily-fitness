@@ -57,6 +57,7 @@ import WorkoutTemplateService, {
 import { usePathname } from "next/navigation";
 import { fetchApi } from "@/lib/apiClient";
 import { getCurrentWorkoutFromProgress } from "@/lib/programProgressService";
+import { resolveInstanceWeekForAssignment } from "@/lib/programInstanceResolver";
 
 type WorkoutSummaryPayload = {
   avatarUrl: string | null;
@@ -469,8 +470,7 @@ export default function EnhancedClientWorkouts({
             program_id,
             coach_id,
             name,
-            description,
-            duration_weeks
+            description
           `
             )
             .eq("client_id", clientId)
@@ -637,7 +637,7 @@ export default function EnhancedClientWorkouts({
                 `
               *,
               program:workout_programs(
-                id, name, description, duration_weeks, difficulty_level, coach_id
+                id, name, description, difficulty_level, coach_id
               )
             `
               )
@@ -671,17 +671,19 @@ export default function EnhancedClientWorkouts({
         }
 
         if (!programError && programData) {
-          // Calculate estimated week from current_day_number (assuming ~7 workouts per week)
-          const estimatedWeek = programMetrics?.current_day_number
-            ? Math.ceil(programMetrics.current_day_number / 7)
-            : 1;
+          const weekRes = await resolveInstanceWeekForAssignment(
+            supabase,
+            activeProgramAssignment.id,
+          );
+          const totalWeeks = weekRes?.totalWeeks ?? 0;
+          const currentWeek = weekRes?.currentWeek ?? 1;
 
           setCurrentProgram({
             id: programData.id,
             name: programData.name,
             description: programData.description,
-            current_week: estimatedWeek,
-            total_weeks: programData.duration_weeks,
+            current_week: currentWeek,
+            total_weeks: totalWeeks,
             progress_percentage: programMetrics?.completion_percentage || 0,
             difficulty_level: programData.difficulty_level,
             coach_name:
@@ -859,7 +861,6 @@ export default function EnhancedClientWorkouts({
                     id: assignment.program_id,
                     name: assignment.name,
                     description: assignment.description,
-                    duration_weeks: assignment.duration_weeks,
                   }
                 : null;
 
@@ -869,7 +870,6 @@ export default function EnhancedClientWorkouts({
                 id: assignment.program_id,
                 name: "Program",
                 description: null,
-                duration_weeks: assignment.duration_weeks,
               };
             }
 
@@ -885,7 +885,6 @@ export default function EnhancedClientWorkouts({
                     id: programSnapshot.id,
                     name: programSnapshot.name,
                     description: programSnapshot.description,
-                    duration_weeks: programSnapshot.duration_weeks,
                   }
                 : null,
               profiles: coach,
@@ -1573,7 +1572,9 @@ export default function EnhancedClientWorkouts({
                 action={
                   <button
                     type="button"
-                    onClick={() => router.push("/client/progress/workout-logs")}
+                    onClick={() =>
+                      router.push("/client/progress/workout-logs?from=train")
+                    }
                     className="fc-btn fc-btn-secondary fc-press h-8 px-4 text-xs rounded-xl"
                   >
                     View All Logs
@@ -1606,7 +1607,9 @@ export default function EnhancedClientWorkouts({
                   type="button"
                   variant="fc-secondary"
                   className="mt-4 h-10 w-full"
-                  onClick={() => router.push("/client/progress/workout-logs")}
+                  onClick={() =>
+                    router.push("/client/progress/workout-logs?from=train")
+                  }
                 >
                   View All Logs
                 </Button>
@@ -1646,7 +1649,7 @@ export default function EnhancedClientWorkouts({
             <section>
               <SectionHeader title="Competitive" />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Link href="/client/progress/leaderboard">
+                <Link href="/client/progress/leaderboard?from=workouts">
                   <ClientGlassCard className="p-5 cursor-pointer fc-hover-rise transition-all">
                     <div className="flex items-center gap-3 mb-2">
                       <Trophy className="w-6 h-6 fc-text-warning" />

@@ -59,7 +59,7 @@ export function ExtraTraining({
                 accent.border,
               )}
               onClick={() => {
-                window.location.href = `/client/workouts/${workout.id}/details`;
+                window.location.href = `/client/workouts/${workout.id}/start`;
               }}
             >
               <div
@@ -93,7 +93,7 @@ export function ExtraTraining({
           className="mt-3 h-11 w-full gap-2 rounded-xl border-[color:var(--fc-glass-border)] font-semibold fc-text-primary"
           onClick={() => setShowAll(true)}
         >
-          <ChevronDown className="h-4 w-4 text-cyan-400" />
+          <ChevronDown className="h-4 w-4 text-[color:var(--fc-group-c)]" />
           Show more ({hiddenCount} more)
         </Button>
       )}

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Coach — Clients (collection card)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root{
+    --bg:#0A0B0D; --card:#0B0C0F; --raised:#101318;
+    --hairline:rgba(255,255,255,.07); --hairline-2:rgba(255,255,255,.12);
+    --accent:#2E7BFF; --good:#22E56A; --warn:#FFB020; --bad:#FF5A4D;
+    --text:#EEF1F5; --dim:#98A2B3; --subtle:#5C6470;
+    --f-display:'Archivo',sans-serif; --f-body:'Inter',sans-serif; --f-mono:'JetBrains Mono',monospace;
+  }
+  body{ background:var(--bg); color:var(--text); font-family:var(--f-body); -webkit-font-smoothing:antialiased; }
+  .disp{ font-family:var(--f-display); font-stretch:125%; }
+  .page{ max-width:1200px; margin:0 auto; padding:24px 40px 70px; }
+
+  .note{ font-size:12.5px; line-height:1.65; color:var(--dim); border-left:2px solid var(--warn); padding-left:14px; margin-bottom:14px; }
+  .note b{ color:var(--text); } .note .warn{ color:var(--warn); font-weight:700; }
+  .caption{ font-family:var(--f-mono); font-size:10px; letter-spacing:.05em; color:var(--subtle); margin:22px 0 10px; text-transform:uppercase; }
+
+  .stack{ display:flex; flex-direction:column; gap:12px; }
+
+  .card{ position:relative; display:flex; gap:20px; background:var(--card); border:1px solid rgba(255,255,255,.09); border-radius:16px; padding:20px 22px 18px 26px; overflow:hidden; }
+  .card::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--hue,var(--subtle)); z-index:3; }
+  .card::after{ content:""; position:absolute; right:0; top:0; bottom:0; width:46%; z-index:1; pointer-events:none; background:radial-gradient(120% 90% at 100% 50%, color-mix(in srgb, var(--hue,var(--subtle)) 28%, transparent), transparent 62%); }
+
+  .body{ flex:1; min-width:0; display:flex; flex-direction:column; gap:11px; position:relative; z-index:2; }
+  .toprow{ display:flex; align-items:center; gap:12px; }
+  .avatar{ width:30px; height:30px; border-radius:50%; background:var(--raised); border:1px solid var(--hairline-2); display:flex; align-items:center; justify-content:center; font-family:var(--f-mono); font-size:11px; font-weight:700; color:var(--dim); flex-shrink:0; }
+  .name{ font-size:18px; font-weight:700; letter-spacing:-.01em; }
+  .status{ display:inline-flex; align-items:center; gap:6px; font-family:var(--f-mono); font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; padding:4px 9px; border-radius:999px; }
+  .status .d{ width:5px; height:5px; border-radius:50%; }
+  .status.good{ color:var(--good); background:rgba(34,229,106,.1); } .status.good .d{ background:var(--good); }
+  .status.warn{ color:var(--warn); background:rgba(255,176,32,.1); } .status.warn .d{ background:var(--warn); }
+  .status.bad{ color:var(--bad); background:rgba(255,90,77,.1); } .status.bad .d{ background:var(--bad); }
+  .status.mute{ color:var(--dim); background:rgba(255,255,255,.05); } .status.mute .d{ background:var(--dim); }
+
+  .meta{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-family:var(--f-mono); font-size:11px; color:var(--dim); letter-spacing:.03em; padding-left:42px; }
+  .meta .sep{ color:var(--subtle); } .meta .v{ color:var(--text); }
+
+  .side{ display:flex; flex-direction:column; align-items:flex-end; justify-content:space-between; gap:14px; flex-shrink:0; position:relative; z-index:2; }
+  .ring{ position:relative; width:48px; height:48px; }
+  .ring svg{ transform:rotate(-90deg); }
+  .ring .val{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:var(--f-mono); font-size:14px; font-weight:700; }
+  .ring .sub{ position:absolute; left:0; right:0; top:52px; text-align:center; font-family:var(--f-mono); font-size:8px; letter-spacing:.08em; text-transform:uppercase; color:var(--subtle); }
+  .nostat{ font-family:var(--f-mono); font-size:20px; font-weight:700; color:var(--subtle); text-align:center; }
+  .nostat .sub{ display:block; font-size:8px; letter-spacing:.1em; color:var(--subtle); margin-top:3px; }
+  .stale{ margin-top:2px; font-family:var(--f-mono); font-size:8px; letter-spacing:.06em; text-transform:uppercase; color:var(--warn); }
+
+  .actions{ display:flex; gap:4px; }
+  .ib{ width:32px; height:32px; border-radius:9px; border:1px solid var(--hairline); background:transparent; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--dim); }
+  .i{ width:15px; height:15px; stroke:currentColor; stroke-width:1.8; fill:none; }
+  .illus{ font-family:var(--f-mono); font-size:9px; letter-spacing:.06em; text-transform:uppercase; color:var(--warn); margin-left:8px; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute"><defs>
+  <symbol id="ic-view" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></symbol>
+  <symbol id="ic-pause" viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></symbol>
+</defs></svg>
+
+<div class="page">
+
+  <div class="note"><b>Client card — Element 16 with real data.</b> Same shell as Programs/nutrition; no structure strip. The rail + glow encode <b>attention</b> (green on-track · amber behind · red missed · gray no-program), so a coach scans severity by color. <span class="warn">The score ring is the open question</span> — see the notes on each card.</div>
+
+  <div class="caption">Real states from your roster</div>
+  <div class="stack">
+
+    <!-- Popescu: on program, active, but STALE score -->
+    <div class="card" style="--hue:var(--good)">
+      <div class="body">
+        <div class="toprow"><span class="avatar">CP</span><span class="name">Client Popescu</span><span class="status good"><span class="d"></span>On track</span></div>
+        <div class="meta"><span class="v">test nou 1</span><span class="sep">·</span><span>Week <span class="v">1</span> of 13</span><span class="sep">·</span><span>Active <span class="v">4d</span> ago</span><span class="sep">·</span><span>Check-in <span class="v">7wk</span> ago</span></div>
+      </div>
+      <div class="side">
+        <div style="text-align:center">
+          <div class="ring">
+            <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="19" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="4"/><circle cx="24" cy="24" r="19" fill="none" stroke="var(--bad)" stroke-width="4" stroke-linecap="round" stroke-dasharray="119" stroke-dashoffset="119"/></svg>
+            <span class="val" style="color:var(--bad)">0</span>
+          </div>
+          <div class="stale">⚠ stale · May 15</div>
+        </div>
+        <div class="actions"><button class="ib"><svg class="i"><use href="#ic-pause"/></svg></button><button class="ib"><svg class="i"><use href="#ic-view"/></svg></button></div>
+      </div>
+    </div>
+    <div class="note" style="border-color:var(--bad);margin:2px 0 0"><b>The staleness problem, live.</b> Popescu reads <b>On track</b> from fresh July training data, but his score ring shows a stale <b>0 "benched"</b> from May (the cron hasn't recomputed since his new program started). Showing that 0 is actively misleading.</div>
+
+    <!-- Roxana: great but old score, no current program -->
+    <div class="card" style="--hue:var(--subtle)">
+      <div class="body">
+        <div class="toprow"><span class="avatar">RM</span><span class="name">Roxana Micu</span><span class="status mute"><span class="d"></span>No program</span></div>
+        <div class="meta"><span>No active program</span><span class="sep">·</span><span>Active <span class="v">2wk</span> ago</span></div>
+      </div>
+      <div class="side">
+        <div style="text-align:center">
+          <div class="ring">
+            <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="19" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="4"/><circle cx="24" cy="24" r="19" fill="none" stroke="var(--good)" stroke-width="4" stroke-linecap="round" stroke-dasharray="119" stroke-dashoffset="0"/></svg>
+            <span class="val" style="color:var(--good)">100</span>
+          </div>
+          <div class="stale">May 15</div>
+        </div>
+        <div class="actions"><button class="ib"><svg class="i"><use href="#ic-view"/></svg></button></div>
+      </div>
+    </div>
+
+    <!-- Sparse: no score, no program -->
+    <div class="card" style="--hue:var(--subtle)">
+      <div class="body">
+        <div class="toprow"><span class="avatar">LU</span><span class="name">Luminița</span><span class="status mute"><span class="d"></span>No program</span></div>
+        <div class="meta"><span>No active program</span><span class="sep">·</span><span>Active <span class="v">—</span></span></div>
+      </div>
+      <div class="side">
+        <div class="nostat">—<span class="sub">no score</span></div>
+        <div class="actions"><button class="ib"><svg class="i"><use href="#ic-view"/></svg></button></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="caption">The attention states (illustrative — no client is currently "behind")</div>
+  <div class="stack">
+    <div class="card" style="--hue:var(--warn)">
+      <div class="body">
+        <div class="toprow"><span class="avatar">EX</span><span class="name">Behind example</span><span class="status warn"><span class="d"></span>Behind</span><span class="illus">illustrative</span></div>
+        <div class="meta"><span class="v">Powerbuilding II</span><span class="sep">·</span><span>Week <span class="v">3</span> of 16</span><span class="sep">·</span><span>Active <span class="v">6d</span> ago</span></div>
+      </div>
+      <div class="side">
+        <div style="text-align:center">
+          <div class="ring">
+            <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="19" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="4"/><circle cx="24" cy="24" r="19" fill="none" stroke="var(--warn)" stroke-width="4" stroke-linecap="round" stroke-dasharray="119" stroke-dashoffset="65"/></svg>
+            <span class="val" style="color:var(--warn)">45</span>
+          </div>
+        </div>
+        <div class="actions"><button class="ib"><svg class="i"><use href="#ic-pause"/></svg></button><button class="ib"><svg class="i"><use href="#ic-view"/></svg></button></div>
+      </div>
+    </div>
+    <div class="card" style="--hue:var(--bad)">
+      <div class="body">
+        <div class="toprow"><span class="avatar">EX</span><span class="name">Missed-week example</span><span class="status bad"><span class="d"></span>Missed week</span><span class="illus">illustrative</span></div>
+        <div class="meta"><span class="v">Athlete Off-Season</span><span class="sep">·</span><span>Week <span class="v">2</span> of 13</span><span class="sep">·</span><span>Active <span class="v">11d</span> ago</span></div>
+      </div>
+      <div class="side">
+        <div style="text-align:center">
+          <div class="ring">
+            <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="19" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="4"/><circle cx="24" cy="24" r="19" fill="none" stroke="var(--bad)" stroke-width="4" stroke-linecap="round" stroke-dasharray="119" stroke-dashoffset="95"/></svg>
+            <span class="val" style="color:var(--bad)">20</span>
+          </div>
+        </div>
+        <div class="actions"><button class="ib"><svg class="i"><use href="#ic-pause"/></svg></button><button class="ib"><svg class="i"><use href="#ic-view"/></svg></button></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body></html>

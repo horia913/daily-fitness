@@ -5,7 +5,7 @@ import hub from './coachAnalyticsHub.module.css'
 
 const TIERS = [
   { key: 'excellent', label: 'Excellent', range: '90%+', colorVar: 'var(--good)' },
-  { key: 'good', label: 'Good', range: '75–89%', colorVar: 'var(--cyan)' },
+  { key: 'good', label: 'Good', range: '75–89%', colorVar: 'var(--fc-accent)' },
   { key: 'fair', label: 'Fair', range: '60–74%', colorVar: 'var(--warning)' },
   { key: 'poor', label: 'Poor', range: '50–59%', colorVar: '#F59E42' },
   { key: 'critical', label: 'Critical', range: '<50%', colorVar: 'var(--critical)' },
@@ -68,7 +68,7 @@ export function DistributionViz({
               <span
                 className="w-8 shrink-0 text-right text-[14px] font-bold leading-none"
                 style={{
-                  fontFamily: 'var(--f-display, "Big Shoulders Display", sans-serif)',
+                  fontFamily: 'var(--f-display, var(--f-display), sans-serif)',
                   color:
                     s.count > 0
                       ? s.key === 'critical'

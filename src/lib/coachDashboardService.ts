@@ -4,10 +4,12 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { CoachAthleteScoreSummary } from '@/types/coachAthleteScore';
 import { supabase } from './supabase';
 import { dbToUiScale } from './wellnessService';
-import { computeCurrentProgramWeekForAssignment } from '@/lib/programWeekCalendar';
+import {
+  resolveInstanceWeeksForAssignments,
+  isCoachSkipNote,
+} from '@/lib/programInstanceResolver';
 
 /** Compute program end date from start_date + duration_weeks (program_assignments has no end_date column). */
 function computeProgramEndDate(start_date: string | null, duration_weeks: number | null): string | null {
@@ -36,7 +38,7 @@ export async function getCoachStats(coachId: string): Promise<CoachStats> {
       { data: mealPlansData, error: mealPlansError },
     ] = await Promise.all([
       supabase.from('clients').select('client_id, status').eq('coach_id', coachId),
-      supabase.from('workout_templates').select('id').eq('coach_id', coachId).eq('is_active', true),
+      supabase.from('workout_templates').select('id').eq('coach_id', coachId).eq('is_active', true).eq('kind', 'library'),
       supabase.from('meal_plans').select('id').eq('coach_id', coachId).eq('is_active', true),
     ]);
 
@@ -118,765 +120,6 @@ export async function getRecentClients(coachId: string, limit: number = 5): Prom
   }
 }
 
-/**
- * Client Alert interface for morning briefing
- */
-export interface ClientAlert {
-  clientId: string;
-  clientName: string;
-  detail: string;
-  type: 'highStress' | 'highSoreness' | 'lowSleep' | 'noCheckIn3Days' | 'missedWorkouts' | 'programEnding' | 'noProgram' | 'noMealPlan' | 'overdueCheckIn' | 'achievementUnlocked';
-  severity: 'high' | 'medium' | 'low';
-}
-
-/**
- * Client Summary interface for morning briefing
- */
-export interface ClientSummary {
-  clientId: string;
-  firstName: string;
-  lastName: string;
-  status: string;
-  avatarUrl: string | null;
-  trainedToday: boolean;
-  checkedInToday: boolean;
-  checkinStreak: number;
-  lastWorkoutDate: string | null;
-  lastCheckinDate: string | null;
-  programCompliance: number | null;
-  latestSleep: number | null;
-  latestStress: number | null;
-  latestSoreness: number | null;
-  athleteScore: CoachAthleteScoreSummary | null;
-  hasActiveProgram: boolean;
-  hasActiveMealPlan: boolean;
-  /** Coach-managed progression: week complete, awaiting coach review */
-  weekReviewNeeded: boolean;
-  completedWeekNumber: number | null;
-  activeProgramId: string | null;
-  activeProgramAssignmentId: string | null;
-}
-
-/**
- * Morning Briefing interface
- */
-export interface MorningBriefing {
-  totalClients: number;
-  activeClients: number;
-  clientsTrainedToday: number;
-  clientsCheckedInToday: number;
-  avgProgramCompliance: number;
-  avgCheckinCompliance: number;
-  alerts: {
-    noCheckIn3Days: ClientAlert[];
-    highStress: ClientAlert[];
-    highSoreness: ClientAlert[];
-    lowSleep: ClientAlert[];
-    missedWorkouts: ClientAlert[];
-    programEnding: ClientAlert[];
-    noProgram: ClientAlert[];
-    noMealPlan: ClientAlert[];
-    overdueCheckIn: ClientAlert[];
-    achievementUnlocked: ClientAlert[];
-  };
-  clientSummaries: ClientSummary[];
-}
-
-/**
- * Get morning briefing data for all coach's clients
- * Optimized with batch queries to avoid N+1 problems
- */
-export async function getMorningBriefing(coachId: string, supabaseClient?: SupabaseClient): Promise<MorningBriefing> {
-  const db = supabaseClient ?? supabase;
-  try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayStr = today.toISOString().split('T')[0];
-    const todayStart = `${todayStr}T00:00:00.000Z`;
-    const todayEnd = `${todayStr}T23:59:59.999Z`;
-    
-    // Calculate date ranges
-    const threeDaysAgo = new Date(today);
-    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-    const threeDaysAgoStr = threeDaysAgo.toISOString().split('T')[0];
-    
-    const sevenDaysAgo = new Date(today);
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
-    
-    const weekStart = new Date(today);
-    const day = weekStart.getUTCDay();
-    const monOffset = day === 0 ? -6 : 1 - day;
-    weekStart.setUTCDate(weekStart.getUTCDate() + monOffset);
-    weekStart.setUTCHours(0, 0, 0, 0);
-    const weekStartStr = weekStart.toISOString().split('T')[0];
-    
-    const sevenDaysFromNow = new Date(today);
-    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
-    const sevenDaysFromNowStr = sevenDaysFromNow.toISOString().split('T')[0];
-
-    // 1. Get all coach's clients with profiles
-    const { data: clientsData, error: clientsError } = await db
-      .from('clients')
-      .select('client_id, status')
-      .eq('coach_id', coachId);
-
-    if (clientsError || !clientsData) {
-      console.error('Error fetching clients:', clientsError);
-      return getEmptyBriefing();
-    }
-
-    const totalClients = clientsData.length;
-    const activeClients = clientsData.filter((c) => c.status === 'active');
-    const activeClientIds = activeClients.map((c) => c.client_id);
-    const allClientIds = clientsData.map((c) => c.client_id);
-
-    if (allClientIds.length === 0) {
-      return getEmptyBriefing();
-    }
-
-    // 2–13, 15–16: Run in parallel (only step 14 depends on step 13)
-    const [
-      { data: profilesData, error: profilesError },
-      { data: todayWorkouts, error: workoutsError },
-      { data: todayCheckins, error: checkinsError },
-      { data: recentWellnessLogs, error: recentWellnessError },
-      { data: weekWellnessLogs, error: weekWellnessError },
-      { data: lastWorkouts, error: lastWorkoutsError },
-      { data: lastCheckins, error: lastCheckinsError },
-      { data: activePrograms, error: programsError },
-      { data: activeMealPlans, error: mealPlansError },
-      { data: athleteScores, error: scoresError },
-      { data: recentAssignments, error: assignmentsError },
-      { data: clientRecords, error: clientRecordsError },
-      { data: allWellnessLogsEver, error: allWellnessEverError },
-    ] = await Promise.all([
-      db.from('profiles').select('id, first_name, last_name, avatar_url').in('id', allClientIds),
-      db.from('workout_logs').select('client_id, completed_at').in('client_id', allClientIds).not('completed_at', 'is', null).gte('completed_at', todayStart).lte('completed_at', todayEnd),
-      db.from('daily_wellness_logs').select('client_id, log_date').in('client_id', allClientIds).eq('log_date', todayStr),
-      db.from('daily_wellness_logs').select('client_id, log_date, sleep_hours, stress_level, soreness_level').in('client_id', activeClientIds).gte('log_date', threeDaysAgoStr).lte('log_date', todayStr).order('log_date', { ascending: false }),
-      db.from('daily_wellness_logs').select('client_id, log_date').in('client_id', activeClientIds).gte('log_date', weekStartStr).lte('log_date', todayStr),
-      db.from('workout_logs').select('client_id, completed_at').in('client_id', allClientIds).not('completed_at', 'is', null).order('completed_at', { ascending: false }),
-      db.from('daily_wellness_logs').select('client_id, log_date').in('client_id', allClientIds).order('log_date', { ascending: false }),
-      db.from('program_assignments').select('client_id, id, program_id, start_date, duration_weeks, progression_mode, pause_status, paused_at, pause_accumulated_days, timezone_snapshot').in('client_id', activeClientIds).eq('status', 'active').order('updated_at', { ascending: false }),
-      db.from('meal_plan_assignments').select('client_id').in('client_id', activeClientIds).eq('is_active', true),
-      db.from('athlete_scores').select('client_id, score, tier').in('client_id', activeClientIds).order('calculated_at', { ascending: false }),
-      db.from('workout_assignments').select('id, client_id, scheduled_date, status').in('client_id', activeClientIds).gte('scheduled_date', sevenDaysAgoStr).lte('scheduled_date', todayStr).in('status', ['assigned', 'in_progress']),
-      db.from('clients').select('client_id, created_at').in('client_id', activeClientIds),
-      db.from('daily_wellness_logs').select('client_id, log_date').in('client_id', activeClientIds).order('log_date', { ascending: false }),
-    ]);
-
-    if (profilesError) {
-      console.error('Error fetching profiles:', profilesError);
-      return getEmptyBriefing();
-    }
-
-    const profilesMap = new Map((profilesData || []).map((p) => [p.id, p]));
-    const trainedTodaySet = new Set((todayWorkouts || []).map((w) => w.client_id));
-    const clientsTrainedToday = trainedTodaySet.size;
-    const checkedInTodaySet = new Set((todayCheckins || []).map((c) => c.client_id));
-    const clientsCheckedInToday = checkedInTodaySet.size;
-
-    if (workoutsError) console.error('Error fetching today workouts:', workoutsError);
-    if (checkinsError) console.error('Error fetching today checkins:', checkinsError);
-    if (recentWellnessError) console.error('Error fetching recent wellness logs:', recentWellnessError);
-    if (weekWellnessError) console.error('Error fetching week wellness logs:', weekWellnessError);
-    if (lastWorkoutsError) console.error('Error fetching last workouts:', lastWorkoutsError);
-    if (lastCheckinsError) console.error('Error fetching last checkins:', lastCheckinsError);
-    if (programsError) console.error('Error fetching active programs:', programsError);
-    if (mealPlansError) console.error('Error fetching active meal plans:', mealPlansError);
-    if (scoresError) console.error('Error fetching athlete scores:', scoresError);
-    if (assignmentsError) console.error('Error fetching recent assignments:', assignmentsError);
-    if (clientRecordsError) console.error('Error fetching client creation dates:', clientRecordsError);
-    if (allWellnessEverError) console.error('Error fetching all wellness logs:', allWellnessEverError);
-
-    const lastWorkoutMap = new Map<string, string>();
-    (lastWorkouts || []).forEach((w) => {
-      if (!lastWorkoutMap.has(w.client_id)) {
-        const dateStr = w.completed_at.split('T')[0];
-        lastWorkoutMap.set(w.client_id, dateStr);
-      }
-    });
-    const lastCheckinMap = new Map<string, string>();
-    (lastCheckins || []).forEach((c) => {
-      if (!lastCheckinMap.has(c.client_id)) {
-        lastCheckinMap.set(c.client_id, c.log_date);
-      }
-    });
-    const activeProgramMap = new Map<
-      string,
-      {
-        id: string;
-        end_date: string | null;
-        program_id: string;
-        progression_mode: string | null;
-        start_date: string | null;
-        duration_weeks: number | null;
-        pause_status: string | null;
-        paused_at: string | null;
-        pause_accumulated_days: number | null;
-        timezone_snapshot: string | null;
-      }
-    >();
-    (activePrograms || []).forEach((p: any) => {
-      if (!activeProgramMap.has(p.client_id)) {
-        const end_date = computeProgramEndDate(p.start_date, p.duration_weeks);
-        activeProgramMap.set(p.client_id, {
-          id: p.id,
-          end_date,
-          program_id: p.program_id,
-          progression_mode: p.progression_mode ?? null,
-          start_date: p.start_date ?? null,
-          duration_weeks: p.duration_weeks ?? null,
-          pause_status: p.pause_status ?? null,
-          paused_at: p.paused_at ?? null,
-          pause_accumulated_days: p.pause_accumulated_days ?? 0,
-          timezone_snapshot: p.timezone_snapshot ?? null,
-        });
-      }
-    });
-
-    // Batch fetch program compliance data (current week, schedule, completions) for per-client %
-    const assignmentIdsForCompliance = Array.from(activeProgramMap.values()).map((p) => p.id);
-    const programIdsForCompliance = [...new Set(Array.from(activeProgramMap.values()).map((p) => p.program_id))];
-    let currentWeekMap = new Map<string, number>();
-    let scheduleByProgram = new Map<string, Array<{ id: string; program_id: string; week_number: number; day_number: number; is_optional?: boolean }>>();
-    let completionRowsCompliance: Array<{ program_assignment_id: string; program_schedule_id: string }> = [];
-    if (assignmentIdsForCompliance.length > 0) {
-      const [
-        { data: scheduleRows },
-        { data: completionRowsComp },
-      ] = await Promise.all([
-        db.from('program_schedule').select('id, program_id, week_number, day_number, is_optional').in('program_id', programIdsForCompliance).order('week_number', { ascending: true }).order('day_number', { ascending: true }),
-        db.from('program_day_completions').select('program_assignment_id, program_schedule_id').in('program_assignment_id', assignmentIdsForCompliance),
-      ]);
-      for (const p of (activePrograms || []) as any[]) {
-        if (!p?.id) continue;
-        const week = computeCurrentProgramWeekForAssignment(
-          {
-            start_date: p.start_date ?? null,
-            pause_accumulated_days: p.pause_accumulated_days ?? 0,
-            pause_status: p.pause_status ?? null,
-            paused_at: p.paused_at ?? null,
-            timezone_snapshot: p.timezone_snapshot ?? null,
-            duration_weeks: p.duration_weeks ?? null,
-          },
-          'UTC'
-        ).week;
-        currentWeekMap.set(p.id, week);
-      }
-      for (const s of scheduleRows ?? []) {
-        const list = scheduleByProgram.get(s.program_id) ?? [];
-        list.push({ id: s.id, program_id: s.program_id, week_number: s.week_number, day_number: s.day_number ?? 1, is_optional: s.is_optional ?? false });
-        scheduleByProgram.set(s.program_id, list);
-      }
-      completionRowsCompliance = (completionRowsComp ?? []) as typeof completionRowsCompliance;
-    }
-
-    const reviewNeededByAssignment = new Map<string, number>();
-    const coachManagedAssignments = (activePrograms || []).filter(
-      (p: any) => p.progression_mode === 'coach_managed',
-    ) as Array<{
-      id: string;
-      client_id: string;
-      program_id: string;
-      start_date: string | null;
-      duration_weeks: number | null;
-      pause_status: string | null;
-      paused_at: string | null;
-      pause_accumulated_days: number | null;
-      timezone_snapshot: string | null;
-    }>;
-    for (const a of coachManagedAssignments) {
-      const currentWeek = computeCurrentProgramWeekForAssignment(
-        {
-          start_date: a.start_date ?? null,
-          pause_accumulated_days: a.pause_accumulated_days ?? 0,
-          pause_status: a.pause_status ?? null,
-          paused_at: a.paused_at ?? null,
-          timezone_snapshot: a.timezone_snapshot ?? null,
-          duration_weeks: a.duration_weeks ?? null,
-        },
-        'UTC'
-      ).week;
-      const slots = (scheduleByProgram.get(a.program_id) ?? []).filter((s) => s.week_number === currentWeek);
-      const required = slots.filter((s) => !s.is_optional);
-      if (required.length === 0) continue;
-      const completedIds = new Set(
-        completionRowsCompliance
-          .filter((c) => c.program_assignment_id === a.id)
-          .map((c) => c.program_schedule_id),
-      );
-      if (required.every((s) => completedIds.has(s.id))) {
-        reviewNeededByAssignment.set(a.id, currentWeek);
-      }
-    }
-
-    const activeMealPlanSet = new Set((activeMealPlans || []).map((m) => m.client_id));
-    const athleteScoreMap = new Map<string, { score: number; tier: string }>();
-    (athleteScores || []).forEach((s: { client_id: string; score: number; tier: string }) => {
-      if (!athleteScoreMap.has(s.client_id)) {
-        athleteScoreMap.set(s.client_id, { score: s.score, tier: s.tier });
-      }
-    });
-    const clientCreatedAtMap = new Map<string, string>();
-    (clientRecords || []).forEach((c: any) => {
-      clientCreatedAtMap.set(c.client_id, c.created_at);
-    });
-    const hasEverCheckedInSet = new Set((allWellnessLogsEver || []).map((l: any) => l.client_id));
-
-    // 14. Batch fetch completed workout logs for those assignments (depends on step 13)
-    const assignmentIds = (recentAssignments || []).map((a: any) => a.id);
-    let completedLogs: any[] = [];
-    if (assignmentIds.length > 0) {
-      const { data, error: logsError } = await db
-        .from('workout_logs')
-        .select('workout_assignment_id, completed_at')
-        .in('workout_assignment_id', assignmentIds)
-        .not('completed_at', 'is', null);
-      if (logsError) {
-        console.error('Error fetching completed workout logs:', logsError);
-      } else {
-        completedLogs = data || [];
-      }
-    }
-    const completedAssignmentIds = new Set(completedLogs.map((l: any) => l.workout_assignment_id));
-
-    // Group wellness logs by client for alert calculations
-    const wellnessByClient = new Map<string, Array<{ log_date: string; sleep_hours: number | null; stress_level: number | null; soreness_level: number | null }>>();
-    (recentWellnessLogs || []).forEach((log: any) => {
-      if (!wellnessByClient.has(log.client_id)) {
-        wellnessByClient.set(log.client_id, []);
-      }
-      wellnessByClient.get(log.client_id)!.push({
-        log_date: log.log_date,
-        sleep_hours: log.sleep_hours,
-        stress_level: log.stress_level,
-        soreness_level: log.soreness_level,
-      });
-    });
-
-    // Group week check-ins by client
-    const checkinsByClient = new Map<string, Set<string>>();
-    (weekWellnessLogs || []).forEach((log: any) => {
-      if (!checkinsByClient.has(log.client_id)) {
-        checkinsByClient.set(log.client_id, new Set());
-      }
-      checkinsByClient.get(log.client_id)!.add(log.log_date);
-    });
-
-    // Batch fetch check-in configs and last body_metrics for overdueCheckIn alerts
-    let checkInConfigByClient = new Map<string, number>();
-    let lastBodyMetricDateByClient = new Map<string, string>();
-    if (activeClientIds.length > 0) {
-      const [configsRes, bodyMetricsRes] = await Promise.all([
-        db.from('check_in_configs').select('client_id, frequency_days').eq('coach_id', coachId),
-        db.from('body_metrics').select('client_id, measured_date').in('client_id', activeClientIds).order('measured_date', { ascending: false }),
-      ]);
-      const configs = (configsRes.data ?? []) as Array<{ client_id: string | null; frequency_days: number }>;
-      const clientSpecific = configs.filter((c) => c.client_id != null);
-      const defaultConfig = configs.find((c) => c.client_id == null);
-      const defaultFreq = defaultConfig?.frequency_days ?? 30;
-      for (const id of activeClientIds) {
-        const row = clientSpecific.find((c) => c.client_id === id);
-        checkInConfigByClient.set(id, row?.frequency_days ?? defaultFreq);
-      }
-      const bodyMetrics = (bodyMetricsRes.data ?? []) as Array<{ client_id: string; measured_date: string }>;
-      for (const row of bodyMetrics) {
-        if (!lastBodyMetricDateByClient.has(row.client_id)) {
-          const d = typeof row.measured_date === 'string' ? row.measured_date.split('T')[0] : row.measured_date;
-          lastBodyMetricDateByClient.set(row.client_id, d);
-        }
-      }
-    }
-
-    // Recent achievement unlocks (last 24h) for coach's clients
-    const twentyFourHoursAgo = new Date();
-    twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
-    const recentAchievementsRes = await db
-      .from('user_achievements')
-      .select('id, client_id, tier, earned_at, achievement_templates(name)')
-      .in('client_id', allClientIds)
-      .gte('earned_at', twentyFourHoursAgo.toISOString())
-      .order('earned_at', { ascending: false });
-    type RecentAchievementRow = {
-      client_id: string;
-      tier: string | null;
-      achievement_templates: { name: string } | null;
-    };
-    const recentAchievements = (recentAchievementsRes.data ?? []) as unknown as Array<RecentAchievementRow>;
-
-    // Calculate alerts and summaries
-    const alerts: MorningBriefing['alerts'] = {
-      noCheckIn3Days: [],
-      highStress: [],
-      highSoreness: [],
-      lowSleep: [],
-      missedWorkouts: [],
-      programEnding: [],
-      noProgram: [],
-      noMealPlan: [],
-      overdueCheckIn: [],
-      achievementUnlocked: recentAchievements.map((r) => {
-        const profile = profilesMap.get(r.client_id);
-        const clientName = profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() || 'Client' : 'Client';
-        const name = r.achievement_templates?.name ?? 'Achievement';
-        const tierLabel = r.tier ? ` — ${r.tier.charAt(0).toUpperCase() + r.tier.slice(1)}` : '';
-        return {
-          clientId: r.client_id,
-          clientName,
-          detail: `Earned ${name}${tierLabel}`,
-          type: 'achievementUnlocked' as const,
-          severity: 'low' as const,
-        };
-      }),
-    };
-
-    const clientSummaries: ClientSummary[] = [];
-    let totalCheckinCompliance = 0;
-    let clientsWithCheckins = 0;
-
-    // Calculate grace period threshold (7 days ago)
-    const gracePeriodDate = new Date(today);
-    gracePeriodDate.setDate(gracePeriodDate.getDate() - 7);
-    const gracePeriodStr = gracePeriodDate.toISOString().split('T')[0];
-
-    for (const client of activeClients) {
-      const clientId = client.client_id;
-      const profile = profilesMap.get(clientId);
-      if (!profile) continue;
-
-      const firstName = profile.first_name || '';
-      const lastName = profile.last_name || '';
-      const clientName = `${firstName} ${lastName}`.trim() || 'Client';
-
-      // Check if client is new (within grace period)
-      const clientCreatedAt = clientCreatedAtMap.get(clientId);
-      const isNewClient = clientCreatedAt && clientCreatedAt >= gracePeriodStr;
-
-      // Calculate check-in streak
-      let checkinStreak = 0;
-      const clientCheckins = checkinsByClient.get(clientId) || new Set();
-      if (clientCheckins.has(todayStr)) {
-        checkinStreak = 1;
-        let checkDate = new Date(today);
-        checkDate.setDate(checkDate.getDate() - 1);
-        for (let i = 0; i < 365; i++) {
-          const dateStr = checkDate.toISOString().split('T')[0];
-          if (clientCheckins.has(dateStr)) {
-            checkinStreak++;
-            checkDate.setDate(checkDate.getDate() - 1);
-          } else {
-            break;
-          }
-        }
-      }
-
-      // Get latest wellness values
-      const clientWellness = wellnessByClient.get(clientId) || [];
-      const latestWellness = clientWellness[0] || null;
-      const latestSleep = latestWellness?.sleep_hours ?? null;
-      const latestStressDb = latestWellness?.stress_level ?? null;
-      const latestSorenessDb = latestWellness?.soreness_level ?? null;
-      const latestStress = latestStressDb != null ? dbToUiScale(latestStressDb) : null;
-      const latestSoreness = latestSorenessDb != null ? dbToUiScale(latestSorenessDb) : null;
-
-      // Get last 3 wellness log entries (for stress/soreness/sleep alerts)
-      const last3Logs = clientWellness.slice(0, 3).filter((l) => l.log_date >= threeDaysAgoStr);
-      
-      // Calculate averages from last 3 entries only
-      const stressValues = last3Logs
-        .map((l) => l.stress_level != null ? dbToUiScale(l.stress_level) : null)
-        .filter((v): v is number => v != null);
-      const avgStress = stressValues.length > 0
-        ? stressValues.reduce((sum, v) => sum + v, 0) / stressValues.length
-        : null;
-
-      const sorenessValues = last3Logs
-        .map((l) => l.soreness_level != null ? dbToUiScale(l.soreness_level) : null)
-        .filter((v): v is number => v != null);
-      const avgSoreness = sorenessValues.length > 0
-        ? sorenessValues.reduce((sum, v) => sum + v, 0) / sorenessValues.length
-        : null;
-
-      const sleepValues = last3Logs
-        .map((l) => l.sleep_hours)
-        .filter((v): v is number => v != null);
-      const avgSleep = sleepValues.length > 0
-        ? sleepValues.reduce((sum, v) => sum + v, 0) / sleepValues.length
-        : null;
-
-      // ALERT: No check-in 3+ days
-      // Only alert if: client has checked in at least once ever AND not a new client
-      const hasEverCheckedIn = hasEverCheckedInSet.has(clientId);
-      const lastCheckinDate = lastCheckinMap.get(clientId);
-      if (hasEverCheckedIn && !isNewClient) {
-        if (!lastCheckinDate || lastCheckinDate < threeDaysAgoStr) {
-          const daysSince = lastCheckinDate
-            ? Math.floor((today.getTime() - new Date(lastCheckinDate + 'T12:00:00Z').getTime()) / (1000 * 60 * 60 * 24))
-            : 999;
-          if (daysSince >= 3) {
-            alerts.noCheckIn3Days.push({
-              clientId,
-              clientName,
-              detail: `No check-in for ${daysSince} day${daysSince !== 1 ? 's' : ''}`,
-              type: 'noCheckIn3Days',
-              severity: 'medium',
-            });
-          }
-        }
-      }
-
-      // ALERT: High stress (avg >= 4 in last 3 entries)
-      if (avgStress != null && avgStress >= 4 && last3Logs.length >= 1) {
-        alerts.highStress.push({
-          clientId,
-          clientName,
-          detail: `Avg stress ${avgStress.toFixed(1)}/5 over last ${last3Logs.length} check-in${last3Logs.length !== 1 ? 's' : ''}`,
-          type: 'highStress',
-          severity: 'high',
-        });
-      }
-
-      // ALERT: High soreness (avg >= 4 in last 3 entries)
-      if (avgSoreness != null && avgSoreness >= 4 && last3Logs.length >= 1) {
-        alerts.highSoreness.push({
-          clientId,
-          clientName,
-          detail: `Avg soreness ${avgSoreness.toFixed(1)}/5 over last ${last3Logs.length} check-in${last3Logs.length !== 1 ? 's' : ''}`,
-          type: 'highSoreness',
-          severity: 'high',
-        });
-      }
-
-      // ALERT: Low sleep (avg < 6h in last 3 entries)
-      if (avgSleep != null && avgSleep < 6 && last3Logs.length >= 1) {
-        alerts.lowSleep.push({
-          clientId,
-          clientName,
-          detail: `Avg sleep ${avgSleep.toFixed(1)}h over last ${last3Logs.length} night${last3Logs.length !== 1 ? 's' : ''}`,
-          type: 'lowSleep',
-          severity: 'high',
-        });
-      }
-
-      // ALERT: Missed workouts (assignments without completed logs)
-      // Only check if not a new client
-      if (!isNewClient) {
-        const clientAssignments = (recentAssignments || []).filter((a: any) => a.client_id === clientId);
-        const missedAssignments = clientAssignments.filter((a: any) => {
-          // Assignment must be scheduled in the past (not today or future)
-          const assignmentDate = a.scheduled_date.split('T')[0];
-          if (assignmentDate >= todayStr) return false; // Future assignment, not missed yet
-          
-          // Check if this assignment has a completed workout_log
-          return !completedAssignmentIds.has(a.id);
-        });
-        if (missedAssignments.length > 0) {
-          alerts.missedWorkouts.push({
-            clientId,
-            clientName,
-            detail: `Missed ${missedAssignments.length} scheduled workout${missedAssignments.length !== 1 ? 's' : ''} this week`,
-            type: 'missedWorkouts',
-            severity: 'medium',
-          });
-        }
-      }
-
-      // ALERT: Program ending (within 7 days)
-      const program = activeProgramMap.get(clientId);
-      if (program?.end_date) {
-        const endDate = new Date(program.end_date + 'T12:00:00Z');
-        const daysUntil = Math.floor((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        if (daysUntil >= 0 && daysUntil <= 7) {
-          alerts.programEnding.push({
-            clientId,
-            clientName,
-            detail: `Program ends in ${daysUntil} day${daysUntil !== 1 ? 's' : ''}`,
-            type: 'programEnding',
-            severity: 'low',
-          });
-        }
-      }
-
-      // ALERT: No active program
-      if (!program) {
-        alerts.noProgram.push({
-          clientId,
-          clientName,
-          detail: 'No active program assigned',
-          type: 'noProgram',
-          severity: 'low',
-        });
-      }
-
-      // ALERT: No meal plan
-      if (!activeMealPlanSet.has(clientId)) {
-        alerts.noMealPlan.push({
-          clientId,
-          clientName,
-          detail: 'No meal plan assigned',
-          type: 'noMealPlan',
-          severity: 'low',
-        });
-      }
-
-      // ALERT: Overdue scheduled check-in (has body_metrics before; now past frequency_days)
-      const lastMeasuredDate = lastBodyMetricDateByClient.get(clientId);
-      if (lastMeasuredDate) {
-        const frequencyDays = checkInConfigByClient.get(clientId) ?? 30;
-        const lastDate = new Date(lastMeasuredDate + 'T12:00:00Z');
-        const daysSinceLast = Math.floor((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
-        if (daysSinceLast > frequencyDays) {
-          const overdueDays = daysSinceLast - frequencyDays;
-          alerts.overdueCheckIn.push({
-            clientId,
-            clientName,
-            detail: `Scheduled check-in overdue by ${overdueDays} day${overdueDays !== 1 ? 's' : ''}`,
-            type: 'overdueCheckIn',
-            severity: 'medium',
-          });
-        }
-      }
-
-      // Calculate check-in compliance (days checked in / 7)
-      const checkinDays = checkinsByClient.get(clientId)?.size || 0;
-      const checkinCompliance = (checkinDays / 7) * 100;
-      if (checkinDays > 0) {
-        totalCheckinCompliance += checkinCompliance;
-        clientsWithCheckins++;
-      }
-
-      // Per-client program compliance: completed this week / total required scheduled this week (reuse program from above)
-      let programCompliance: number | null = null;
-      if (program) {
-        const assignmentId = program.id;
-        const programId = program.program_id;
-        const currentWeek = currentWeekMap.get(assignmentId) ?? 1;
-        const slots = scheduleByProgram.get(programId) ?? [];
-        const requiredSlotsThisWeek = slots.filter((s) => s.week_number === currentWeek && !s.is_optional);
-        const scheduleIdsThisWeek = requiredSlotsThisWeek.map((s) => s.id);
-        const total = scheduleIdsThisWeek.length;
-        const completedThisWeek = completionRowsCompliance.filter(
-          (c) => c.program_assignment_id === assignmentId && scheduleIdsThisWeek.includes(c.program_schedule_id)
-        ).length;
-        programCompliance = total > 0 ? Math.round((completedThisWeek / total) * 100) : 0;
-      }
-
-      const reviewWeek = program ? reviewNeededByAssignment.get(program.id) : undefined;
-
-      clientSummaries.push({
-        clientId,
-        firstName,
-        lastName,
-        status: client.status,
-        avatarUrl: profile.avatar_url,
-        trainedToday: trainedTodaySet.has(clientId),
-        checkedInToday: checkedInTodaySet.has(clientId),
-        checkinStreak,
-        lastWorkoutDate: lastWorkoutMap.get(clientId) || null,
-        lastCheckinDate: lastCheckinMap.get(clientId) || null,
-        programCompliance,
-        latestSleep,
-        latestStress,
-        latestSoreness,
-        athleteScore: (() => {
-          const entry = athleteScoreMap.get(clientId);
-          if (!entry) return null;
-          return {
-            score: entry.score,
-            tier: entry.tier,
-            paused: program?.pause_status === 'paused',
-          };
-        })(),
-        hasActiveProgram: !!program,
-        hasActiveMealPlan: activeMealPlanSet.has(clientId),
-        weekReviewNeeded: reviewWeek != null,
-        completedWeekNumber: reviewWeek ?? null,
-        activeProgramId: program?.program_id ?? null,
-        activeProgramAssignmentId: program?.id ?? null,
-      });
-    }
-
-    // Calculate average check-in compliance
-    const avgCheckinCompliance = clientsWithCheckins > 0
-      ? Math.round(totalCheckinCompliance / clientsWithCheckins)
-      : 0;
-
-    // Get program compliance from control room (we'll fetch it separately or pass it in)
-    // For now, we'll set it to null and let the page fetch it from control room API
-    const avgProgramCompliance = 0; // Will be fetched from control room API
-
-    return {
-      totalClients,
-      activeClients: activeClients.length,
-      clientsTrainedToday,
-      clientsCheckedInToday,
-      avgProgramCompliance,
-      avgCheckinCompliance,
-      alerts,
-      clientSummaries: clientSummaries.sort((a, b) => {
-        // Sort by: trained today first, then checked in today, then by name
-        if (a.trainedToday !== b.trainedToday) return a.trainedToday ? -1 : 1;
-        if (a.checkedInToday !== b.checkedInToday) return a.checkedInToday ? -1 : 1;
-        return `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
-      }),
-    };
-  } catch (error) {
-    console.error('Error getting morning briefing:', error);
-    return getEmptyBriefing();
-  }
-}
-
-function getEmptyBriefing(): MorningBriefing {
-  return {
-    totalClients: 0,
-    activeClients: 0,
-    clientsTrainedToday: 0,
-    clientsCheckedInToday: 0,
-    avgProgramCompliance: 0,
-    avgCheckinCompliance: 0,
-    alerts: {
-      noCheckIn3Days: [],
-      highStress: [],
-      highSoreness: [],
-      lowSleep: [],
-      missedWorkouts: [],
-      programEnding: [],
-      noProgram: [],
-      noMealPlan: [],
-      overdueCheckIn: [],
-      achievementUnlocked: [],
-    },
-    clientSummaries: [],
-  };
-}
-
-/**
- * Sort alerts by severity (high → medium → low), then by recency
- * This function is used by the dashboard to display alerts in priority order
- */
-export function sortAlertsByPriority(alerts: ClientAlert[]): ClientAlert[] {
-  const severityOrder = { high: 0, medium: 1, low: 2 };
-  return alerts.sort((a, b) => {
-    const severityDiff = severityOrder[a.severity] - severityOrder[b.severity];
-    if (severityDiff !== 0) return severityDiff;
-    // Within same severity, sort by type (health alerts first)
-    const typeOrder: Record<string, number> = {
-      highStress: 0,
-      highSoreness: 1,
-      lowSleep: 2,
-      noCheckIn3Days: 3,
-      missedWorkouts: 4,
-      overdueCheckIn: 5,
-      programEnding: 6,
-      noProgram: 7,
-      noMealPlan: 8,
-      achievementUnlocked: 9,
-    };
-    return (typeOrder[a.type] || 99) - (typeOrder[b.type] || 99);
-  });
-}
 
 /**
  * Client Metrics interface for client list page
@@ -906,9 +149,9 @@ export interface ClientMetrics {
   activeProgramId: string | null;
   /** The assignment ID (needed for review modal) */
   activeProgramAssignmentId: string | null;
-  /** Nearest active membership end date from clipcards (subscription UX). */
+  /** Retired subscription field — always null until a replacement exists. */
   subscriptionEndDate: string | null;
-  /** True when subscription ends within 7 days and not cancelled. */
+  /** Retired subscription field — always false until a replacement exists. */
   subscriptionExpiringSoon: boolean;
 }
 
@@ -981,7 +224,7 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
     // Batch fetch active programs (first row per client via order + dedupe below)
     const { data: activePrograms, error: programsError } = await db
       .from('program_assignments')
-      .select('id, client_id, program_id, name, start_date, duration_weeks, status, progression_mode, pause_status, paused_at, pause_accumulated_days, timezone_snapshot')
+      .select('id, client_id, program_id, name, start_date, status, progression_mode, pause_status, paused_at, pause_accumulated_days, timezone_snapshot')
       .in('client_id', clientIds)
       .eq('status', 'active')
       .order('updated_at', { ascending: false });
@@ -996,7 +239,6 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
       program_id: string;
       name: string | null;
       start_date: string;
-      duration_weeks: number | null;
       status: string;
       progression_mode: string | null;
       pause_status: string | null;
@@ -1013,7 +255,7 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
     const assignmentIds = [...new Set([...firstProgramByClient.values()].map((r) => r.id))];
 
     const programIdsForNames = [...new Set([...firstProgramByClient.values()].map((r) => r.program_id).filter(Boolean))];
-    const [{ data: programNameRows }, { data: mealCompletionRows }, { data: clipRows }] = await Promise.all([
+    const [{ data: programNameRows }, { data: mealCompletionRows }] = await Promise.all([
       programIdsForNames.length
         ? db.from('workout_programs').select('id, name').in('id', programIdsForNames)
         : Promise.resolve({ data: [] as { id: string; name: string }[] | null }),
@@ -1022,47 +264,16 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
         .select('client_id, completed_at')
         .in('client_id', clientIds)
         .gte('completed_at', sevenDaysAgoStart),
-      db
-        .from('clipcards')
-        .select('client_id, end_date, is_active, subscription_status')
-        .in('client_id', clientIds)
-        .eq('is_active', true),
     ]);
 
     const programNameById = new Map((programNameRows || []).map((p: { id: string; name: string }) => [p.id, p.name]));
+    // Canonical Week X of N per assignment (client tz, N = instance phases).
+    const instanceWeekByAssignment = await resolveInstanceWeeksForAssignments(
+      db,
+      programRows.map((r) => r.id),
+    );
     const currentWeekByAssignment = new Map<string, number>();
-    for (const row of programRows) {
-      currentWeekByAssignment.set(
-        row.id,
-        computeCurrentProgramWeekForAssignment(
-          {
-            start_date: row.start_date ?? null,
-            pause_accumulated_days: row.pause_accumulated_days ?? 0,
-            pause_status: row.pause_status ?? null,
-            paused_at: row.paused_at ?? null,
-            timezone_snapshot: row.timezone_snapshot ?? null,
-            duration_weeks: row.duration_weeks ?? null,
-          },
-          'UTC'
-        ).week
-      );
-    }
-
-    const nearestSubByClient = new Map<string, { end_date: string; cancelled: boolean }>();
-    for (const row of clipRows || []) {
-      const r = row as {
-        client_id: string;
-        end_date: string;
-        subscription_status?: string | null;
-      };
-      if (!r.client_id || !r.end_date) continue;
-      if (r.end_date < todayUtcStr) continue;
-      const cancelled = String(r.subscription_status || '').toLowerCase() === 'cancelled';
-      const prev = nearestSubByClient.get(r.client_id);
-      if (!prev || r.end_date < prev.end_date) {
-        nearestSubByClient.set(r.client_id, { end_date: r.end_date, cancelled });
-      }
-    }
+    for (const [aid, wk] of instanceWeekByAssignment) currentWeekByAssignment.set(aid, wk.currentWeek);
 
     const mealDaysByClient = new Map<string, Set<string>>();
     for (const row of mealCompletionRows || []) {
@@ -1077,40 +288,34 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
     const reviewNeededByAssignment = new Map<string, number>(); // assignment_id -> completed week number
     if (coachManagedAssignments.length > 0) {
       const cmIds = coachManagedAssignments.map(a => a.id);
-      const cmProgramIds = [...new Set(coachManagedAssignments.map(a => a.program_id))];
       const [{ data: scheduleRows }, { data: completionRows }] = await Promise.all([
-        db.from('program_schedule').select('id, program_id, week_number, is_optional').in('program_id', cmProgramIds),
-        db.from('program_day_completions').select('program_assignment_id, program_schedule_id').in('program_assignment_id', cmIds),
+        db.from('program_day_assignments').select('id, program_assignment_id, week_number, is_optional').in('program_assignment_id', cmIds),
+        db.from('program_day_completions').select('program_assignment_id, program_day_assignment_id, notes').in('program_assignment_id', cmIds),
       ]);
-      const scheduleByProgram = new Map<string, typeof scheduleRows>();
+      const scheduleByAssignment = new Map<string, typeof scheduleRows>();
       for (const s of (scheduleRows ?? [])) {
-        const list = scheduleByProgram.get(s.program_id) ?? [];
+        const list = scheduleByAssignment.get(s.program_assignment_id) ?? [];
         list.push(s);
-        scheduleByProgram.set(s.program_id, list);
+        scheduleByAssignment.set(s.program_assignment_id, list);
       }
-      const completionsByAssignment = new Map<string, Set<string>>();
+      const completionsByAssignment = new Map<string, { done: Set<string>; skipped: Set<string> }>();
       for (const c of (completionRows ?? [])) {
-        const set = completionsByAssignment.get(c.program_assignment_id) ?? new Set();
-        set.add(c.program_schedule_id);
-        completionsByAssignment.set(c.program_assignment_id, set);
+        const entry = completionsByAssignment.get(c.program_assignment_id) ?? { done: new Set<string>(), skipped: new Set<string>() };
+        if (c.program_day_assignment_id) {
+          if (isCoachSkipNote(c.notes)) entry.skipped.add(c.program_day_assignment_id);
+          else entry.done.add(c.program_day_assignment_id);
+        }
+        completionsByAssignment.set(c.program_assignment_id, entry);
       }
       for (const a of coachManagedAssignments) {
-        const currentWeek = computeCurrentProgramWeekForAssignment(
-          {
-            start_date: a.start_date ?? null,
-            pause_accumulated_days: a.pause_accumulated_days ?? 0,
-            pause_status: a.pause_status ?? null,
-            paused_at: a.paused_at ?? null,
-            timezone_snapshot: a.timezone_snapshot ?? null,
-            duration_weeks: a.duration_weeks ?? null,
-          },
-          'UTC'
-        ).week;
-        const slots = (scheduleByProgram.get(a.program_id) ?? []).filter(s => s.week_number === currentWeek);
+        const currentWeek = currentWeekByAssignment.get(a.id) ?? 1;
+        const slots = (scheduleByAssignment.get(a.id) ?? []).filter(s => s.week_number === currentWeek);
         const required = slots.filter(s => !s.is_optional);
         if (required.length === 0) continue;
-        const completed = completionsByAssignment.get(a.id) ?? new Set();
-        const allDone = required.every(s => completed.has(s.id));
+        const comp = completionsByAssignment.get(a.id) ?? { done: new Set<string>(), skipped: new Set<string>() };
+        const effectiveRequired = required.filter(s => !comp.skipped.has(s.id));
+        if (effectiveRequired.length === 0) continue;
+        const allDone = effectiveRequired.every(s => comp.done.has(s.id));
         if (allDone) {
           reviewNeededByAssignment.set(a.id, currentWeek);
         }
@@ -1174,17 +379,17 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
 
     const programsByClient = new Map<
       string,
-      { end_date: string | null; assignmentId: string; programId: string; assignmentName: string | null; durationWeeks: number | null }
+      { end_date: string | null; assignmentId: string; programId: string; assignmentName: string | null }
     >();
     for (const p of programRows) {
       if (!programsByClient.has(p.client_id)) {
-        const end_date = computeProgramEndDate(p.start_date, p.duration_weeks);
+        const totalWeeks = instanceWeekByAssignment.get(p.id)?.totalWeeks ?? null;
+        const end_date = computeProgramEndDate(p.start_date, totalWeeks);
         programsByClient.set(p.client_id, {
           end_date,
           assignmentId: p.id,
           programId: p.program_id,
           assignmentName: p.name,
-          durationWeeks: p.duration_weeks,
         });
       }
     }
@@ -1289,7 +494,7 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
           programNameById.get(progAssignmentRow.program_id) ?? progAssignmentRow.name ?? null;
         const cw = currentWeekByAssignment.get(progAssignmentRow.id);
         programCurrentWeek = cw ?? null;
-        programDurationWeeks = progAssignmentRow.duration_weeks ?? null;
+        programDurationWeeks = instanceWeekByAssignment.get(progAssignmentRow.id)?.totalWeeks ?? null;
       }
 
       const mealDays = mealDaysByClient.get(clientId);
@@ -1301,12 +506,8 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
       const assignmentRow = firstProgramByClient.get(clientId);
       const reviewWeek = assignmentRow ? reviewNeededByAssignment.get(assignmentRow.id) : undefined;
 
-      const sub = nearestSubByClient.get(clientId);
-      const subEnd = sub && !sub.cancelled ? sub.end_date : null;
-      const subExpiring =
-        !!subEnd &&
-        new Date(subEnd + 'T12:00:00Z') >= now &&
-        new Date(subEnd + 'T12:00:00Z') <= new Date(sevenDaysFromNowStr + 'T12:00:00Z');
+      const subEnd: string | null = null;
+      const subExpiring = false;
 
       metricsMap.set(clientId, {
         clientId,

@@ -41,7 +41,7 @@ function milestoneConfettiColors(
     return ["#FFD700", "#FFA500", "#FFEC8B", "#F59E0B", "#FFFFFF"];
   }
   if (labCelebrationTier === "platinum") {
-    return ["#06b6d4", "#22d3ee", "#a5f3fc", "#ffffff", "#EC4899"];
+    return ["#06b6d4", "#22D3EE", "#a5f3fc", "#ffffff", "#EC4899"];
   }
   switch (tier) {
     case "platinum":
@@ -133,9 +133,9 @@ function AchievementUnlockContent({
         : labCelebrationTier === "platinum"
           ? {
               rarity: {
-                color: "#22d3ee",
+                color: "#22D3EE",
                 gradient: ["#06b6d4", "#a5f3fc", "#ffffff"],
-                glow: "#22d3ee",
+                glow: "#22D3EE",
               },
               tierName: "Platinum" as const,
               tierGrad: ["#06b6d4", "#e0f2fe"] as string[],

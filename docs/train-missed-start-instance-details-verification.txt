@@ -1,0 +1,138 @@
+================================================================================
+VERIFICATION — Train: missed Start + instance details + naming fix
+================================================================================
+Date: 2026-07-11
+Scope: Code-only. No schema, RPC, guard, or migration changes.
+
+================================================================================
+FILES CHANGED
+================================================================================
+
+1. src/components/client/train/TrainWeekDayList.tsx
+   - Exported canStartMissedTrainDay() (~L61–70): missed + incomplete + scheduleId.
+   - Props onStartWorkout, isStarting, startingScheduleId (~L54–57).
+   - Row-level compact Start → on missed rows (~L175–192), stopPropagation.
+   - Expand panel dayExpandActions: Start + Open workout (~L218–244).
+   - Loader2 spinner while starting that row.
+
+2. src/components/client/train/trainPage.module.css
+   - .dayExpandActions (~L567–572): flex action row in expand.
+   - .rowStartLink (~L574–593): mono ghost Start (subordinated vs .primaryCta).
+
+3. src/app/client/train/page.tsx (~L409–418)
+   - TrainWeekDayList wired to existing handleStartWorkout(scheduleId),
+     isStarting, startingScheduleId.
+
+4. src/lib/trainPageDataMapper.ts (~L198–258, ~L327–345, ~L362–378)
+   - rpcSlotMeta from get_train_page_data schedule rows (template_name,
+     estimated_duration) — preferred first.
+   - masterTemplateIds: slots without program_instance_workout_id → workout_templates
+     batch (only ids not already in RPC meta).
+   - instanceWorkoutIds: batched program_instance_workouts lookup for names/durations.
+   - resolveSlotMeta() used by toDayCard + overdueSlots.
+
+5. src/app/client/workouts/[id]/details/page.tsx
+   - AssignmentInfo.isInstancePreview (~L162).
+   - Instance branch BEFORE legacy (~L260–330):
+     program_instance_workouts by id → program_assignments.client_id ownership →
+     loadInstanceWorkoutForCanvas → mapInstanceCanvasToSetEntries.
+   - Legacy workout_assignments path unchanged when id is not an owned instance
+     (~L332–378); legacy fallback error text unified to "Workout not found".
+   - Removed console.warn "assignment not found by ID, trying template fallback"
+     on instance ids (instance checked first).
+   - Blocks: instance uses mapInstanceCanvasToSetEntries; legacy uses
+     WorkoutBlockService.getWorkoutBlocks (workout_set_entries path).
+   - Begin Workout sticky CTA hidden for isInstancePreview (~L1575) — start from
+     Train via program_day_assignment_id, not /workouts/{instanceId}/start.
+
+================================================================================
+INSTANCE BRANCH — OWNERSHIP RESOLUTION
+================================================================================
+
+URL param id → program_instance_workouts.eq('id', id).maybeSingle()
+
+If row exists:
+  program_assignments.eq('id', program_assignment_id)
+                    .eq('client_id', auth.uid())
+  If no match → throw "Workout not found" (no legacy fallback noise).
+
+If owned:
+  get_instance_workout_canvas via loadInstanceWorkoutForCanvas (existing RPC).
+  Content → mapInstanceCanvasToSetEntries (no get_workout_blocks, no
+  workout_templates / workout_set_entries reads).
+
+If id is not an instance row → fall through to workout_assignments id lookup,
+then workout_template_id fallback (standalone assignments unchanged).
+
+================================================================================
+START ON MISSED — HANDLER REUSED
+================================================================================
+
+Handler: page.tsx handleStartWorkout (~L218–272)
+  → startProgramWorkout({ programDayAssignmentId: scheduleId })
+  → POST /api/program-workouts/start-from-progress
+
+scheduleId = program_day_assignments.id (e.g. dbdfd7fb-ad07-4333-984c-af903d5e99a2).
+
+Start appears when:
+  getTrainDayRowStatus === "missed"
+  && !day.isCompleted
+  && day.scheduleId && day.templateId
+
+Not shown: done, rest, upcoming, today (today uses hero TrainPrimaryCta).
+
+OverdueWorkouts component: NOT re-mounted (single missed UI per fence).
+
+================================================================================
+NAMING — MAPPER SOURCE ORDER
+================================================================================
+
+For each slot.template_id (master template OR instance id):
+
+  1. get_train_page_data.schedule[].template_name / estimated_duration (RPC)
+  2. If master slot (no program_instance_workout_id): workout_templates batch
+  3. If instance slot: program_instance_workouts batch (id, name, estimated_duration)
+
+Fixes "Workout / 0 min" when template_id was program_instance_workouts.id.
+
+================================================================================
+FENCE CONFIRMATION
+================================================================================
+
+[✓] No DB / RPC / guard / migration changes
+[✓] get_workout_blocks guard untouched; details instance path does not call it
+[✓] Instance loads: loadInstanceWorkoutForCanvas + mapInstanceCanvasToSetEntries
+[✓] Legacy workout_assignments details path intact for non-instance ids
+[✓] One missed-workout UI (inline Start on week list only; OverdueWorkouts not added)
+[✓] tsc --noEmit → exit 0
+
+================================================================================
+BROWSER VERIFICATION CHECKLIST (manual — Popescu)
+================================================================================
+
+1. Train screen: missed rows show Start →; names/durations real (e.g. "Andreea
+   test - Day 1", not "Workout / 0 min").
+
+2. Tap Start on missed workout (dbdfd7fb-…) → session opens via start-from-progress
+   → complete → program_day_completions registers.
+
+3. Open workout details on instance 96aa425a-d2a2-498f-bd83-f93e046cb810 → page
+   renders blocks; no "Workout assignment not found"; no misleading console warn.
+
+4. Today's / next workout: hero START WORKOUT still works; complete normally.
+
+5. Coach station instance prescription edit → visible at client start time
+   (spine Step-13 / get_instance_workout_canvas freshness check).
+
+================================================================================
+REPRO IDS (unchanged)
+================================================================================
+
+Client:           af9325e2-76e7-4df6-8ed7-9effd9c764d8
+Assignment:       3ffc6a7a-71d0-4fee-ab74-cffc66c327c5
+Instance workout: 96aa425a-d2a2-498f-bd83-f93e046cb810
+Day assignment:   dbdfd7fb-ad07-4333-984c-af903d5e99a2
+
+================================================================================
+END
+================================================================================

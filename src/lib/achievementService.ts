@@ -556,6 +556,29 @@ export class AchievementService {
         }
       })()
 
+      try {
+        const { notifyClientAchievement } = await import('@/lib/inAppNotificationEvents')
+        ;(async () => {
+          try {
+            const { data: template } = await supabase
+              .from('achievement_templates')
+              .select('name')
+              .eq('id', templateId)
+              .maybeSingle()
+            notifyClientAchievement({
+              clientId,
+              achievementName: template?.name ?? 'Achievement',
+              templateId,
+              tier,
+            })
+          } catch (e) {
+            console.warn('In-app achievement notification failed:', e)
+          }
+        })()
+      } catch {
+        /* non-blocking */
+      }
+
       return data
     } catch (error) {
       console.error('Error unlocking achievement:', error)

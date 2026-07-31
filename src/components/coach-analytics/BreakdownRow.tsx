@@ -48,7 +48,7 @@ export function BreakdownRow({
             <span
               className="shrink-0 text-[14px] font-bold leading-none"
               style={{
-                fontFamily: 'var(--f-display, "Big Shoulders Display", sans-serif)',
+                fontFamily: 'var(--f-display, var(--f-display), sans-serif)',
                 color: valueColor,
               }}
             >

@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { computeCurrentProgramWeekForAssignment } from '@/lib/programWeekCalendar'
+import {
+  resolveInstanceWeeksForAssignments,
+  computeInstanceAdherenceForWeek,
+  type InstanceScheduleSlot,
+  type InstanceCompletionRow,
+} from '@/lib/programInstanceResolver'
 import { dbToUiScale } from '@/lib/wellnessService'
-
-const DEFAULT_CLIENT_TZ = 'Europe/Bucharest'
 
 type ActiveProgramAssignment = {
   id: string
   client_id: string
   program_id: string
   start_date: string | null
-  duration_weeks: number | null
   pause_accumulated_days: number | null
   pause_status: string | null
   paused_at: string | null
@@ -123,7 +125,7 @@ export async function GET(req: NextRequest) {
       supabase
         .from('program_assignments')
         .select(
-          'id, client_id, program_id, start_date, duration_weeks, pause_accumulated_days, pause_status, paused_at, timezone_snapshot, status, updated_at'
+          'id, client_id, program_id, start_date, pause_accumulated_days, pause_status, paused_at, timezone_snapshot, status, updated_at'
         )
         .in('client_id', clientIds)
         .eq('status', 'active')
@@ -178,56 +180,42 @@ export async function GET(req: NextRequest) {
       programId: string
       weekNum: number
     }
+    const assignmentIdsAll = [...assignmentByClientId.values()].map((pa) => pa.id)
+    // Canonical Week X of N per assignment (N = instance phases, X in client tz).
+    const weekByAssign = await resolveInstanceWeeksForAssignments(supabase, assignmentIdsAll)
     const weekTargets: WeekTarget[] = []
     for (const [clientId, pa] of assignmentByClientId) {
-      const prof = profileMap.get(clientId)
-      const tzFallback =
-        prof?.timezone && String(prof.timezone).trim().length > 0
-          ? String(prof.timezone).trim()
-          : DEFAULT_CLIENT_TZ
-      const { week: weekNum } = computeCurrentProgramWeekForAssignment(
-        {
-          start_date: pa.start_date ?? null,
-          duration_weeks: pa.duration_weeks ?? null,
-          pause_accumulated_days: pa.pause_accumulated_days ?? 0,
-          pause_status: pa.pause_status ?? null,
-          paused_at: pa.paused_at ?? null,
-          timezone_snapshot: pa.timezone_snapshot ?? null,
-        },
-        tzFallback
-      )
       weekTargets.push({
         clientId,
         assignmentId: pa.id,
         programId: pa.program_id,
-        weekNum,
+        weekNum: weekByAssign.get(pa.id)?.currentWeek ?? 1,
       })
     }
 
-    const uniqueProgramIds = [...new Set(weekTargets.map((t) => t.programId))]
     const assignmentIds = weekTargets.map((t) => t.assignmentId)
 
     let scheduleRows: Array<{
       id: string
-      program_id: string
+      program_assignment_id: string
       week_number: number
       is_optional?: boolean | null
     }> = []
     let completionRows: Array<{
       program_assignment_id: string
-      program_schedule_id: string
+      program_day_assignment_id: string | null
       notes?: string | null
     }> = []
 
-    if (uniqueProgramIds.length > 0 && assignmentIds.length > 0) {
+    if (assignmentIds.length > 0) {
       const [schedRes, compRes] = await Promise.all([
         supabase
-          .from('program_schedule')
-          .select('id, program_id, week_number, is_optional, day_of_week')
-          .in('program_id', uniqueProgramIds),
+          .from('program_day_assignments')
+          .select('id, program_assignment_id, week_number, is_optional')
+          .in('program_assignment_id', assignmentIds),
         supabase
           .from('program_day_completions')
-          .select('program_assignment_id, program_schedule_id, notes')
+          .select('program_assignment_id, program_day_assignment_id, notes')
           .in('program_assignment_id', assignmentIds),
       ])
       scheduleRows = (schedRes.data ?? []) as typeof scheduleRows
@@ -235,43 +223,32 @@ export async function GET(req: NextRequest) {
     }
 
     /**
-     * CANONICAL adherence: program-week required slots vs program_day_completions.
-     * Mirrors /coach/clients/[id]/progress (OptimizedAdherenceTracking) and
-     * /api/coach/analytics/adherence.
-     *
-     * Clamp the effective week to the maximum authored week so an over-running
-     * assignment (e.g. duration_weeks = null) doesn't return 0 required slots.
+     * CANONICAL adherence: instance-keyed required slots (program_day_assignments)
+     * vs instance-keyed completions (program_day_assignment_id). Coach-skipped
+     * slots are excluded from the denominator. X is already clamped to N by the
+     * resolver, so no per-program authored-week clamp is needed.
      */
-    const maxWeekByProgram = new Map<string, number>()
+    const slotsByAssignment = new Map<string, InstanceScheduleSlot[]>()
     for (const s of scheduleRows) {
-      const cur = maxWeekByProgram.get(s.program_id) ?? 0
-      if (s.week_number > cur) maxWeekByProgram.set(s.program_id, s.week_number)
+      const list = slotsByAssignment.get(s.program_assignment_id) ?? []
+      list.push({ id: s.id, week_number: s.week_number, is_optional: s.is_optional ?? null })
+      slotsByAssignment.set(s.program_assignment_id, list)
+    }
+    const compsByAssignment = new Map<string, InstanceCompletionRow[]>()
+    for (const c of completionRows) {
+      const list = compsByAssignment.get(c.program_assignment_id) ?? []
+      list.push({ program_day_assignment_id: c.program_day_assignment_id, notes: c.notes })
+      compsByAssignment.set(c.program_assignment_id, list)
     }
 
     const adherenceByClientId = new Map<string, number>()
     for (const t of weekTargets) {
-      const maxAuthored = maxWeekByProgram.get(t.programId) ?? t.weekNum
-      const effectiveWeek = Math.min(t.weekNum, maxAuthored)
-      const requiredScheduleIds = new Set(
-        scheduleRows
-          .filter(
-            (s) =>
-              s.program_id === t.programId &&
-              s.week_number === effectiveWeek &&
-              !s.is_optional
-          )
-          .map((s) => s.id)
+      const { required, completed } = computeInstanceAdherenceForWeek(
+        slotsByAssignment.get(t.assignmentId) ?? [],
+        compsByAssignment.get(t.assignmentId) ?? [],
+        t.weekNum,
       )
-      const assigned = requiredScheduleIds.size
-      const completedForWeek = completionRows.filter(
-        (c) =>
-          c.program_assignment_id === t.assignmentId &&
-          requiredScheduleIds.has(c.program_schedule_id) &&
-          !String(c.notes ?? '').startsWith('Skipped by coach')
-      )
-      const completedRequired = completedForWeek.length
-      const completed = Math.min(assigned, completedRequired)
-      const pct = assigned > 0 ? Math.round((completed / assigned) * 100) : 0
+      const pct = required > 0 ? Math.round((completed / required) * 100) : 0
       adherenceByClientId.set(t.clientId, pct)
     }
 

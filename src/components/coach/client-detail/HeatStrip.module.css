@@ -11,7 +11,7 @@
   border-radius: 8px;
   border: 1px solid var(--fc-glass-border);
   background: transparent;
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 10px;
   color: var(--fc-text-subtle);
   cursor: pointer;
@@ -31,7 +31,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  background: var(--fc-glass-soft);
+  background: transparent;
   border: 1px solid var(--fc-divider);
   border-radius: 11px;
   padding: 10px;
@@ -62,7 +62,7 @@
 }
 
 .cellEmpty {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
 }
 
 .cellL1 {
@@ -82,7 +82,7 @@
   justify-content: space-between;
   align-items: center;
   margin-top: 6px;
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 9.5px;
   color: var(--fc-text-quaternary);
 }

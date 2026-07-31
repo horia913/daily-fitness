@@ -1,0 +1,353 @@
+AUDIT — Client Workout EXECUTION (/client/workouts/[id]/start)
+Model drift + max-configuration reality (read-only)
+Date: 2026-07-14
+Sources: live Supabase (MCP execute_sql) + codebase (file:line)
+
+REPRO NOTE
+----------
+Requested: client af9325e2-76e7-4df6-8ed7-9effd9c764d8, assignment 3ffc6a7a-71d0-4fee-ab74-cffc66c327c5.
+Live DB: assignment UUID not found (workout_assignments / program_day_assignments both empty).
+Popescu client exists; latest assigned workout_assignment:
+  id=7e0b8908-0218-45d2-8032-5efec7ccda1c
+  program_instance_workout_id=3e54eac4-17c0-44f5-8f9e-89e6c1b215a8
+  /client/workouts/7e0b8908-0218-45d2-8032-5efec7ccda1c/start
+
+================================================================================
+PART 1 — MAXIMUM A COACH CAN PRESCRIBE (design input)
+================================================================================
+
+1.1 Per-set prescription fields (schema + canvas UI)
+----------------------------------------------------
+DB tables (identical shape):
+  program_instance_set_prescriptions  (instance path)
+  workout_set_prescriptions           (template path)
+Columns (information_schema, live):
+  slot_id, set_number,
+  reps (varchar), weight_kg, load_percentage, rir, tempo,
+  work_seconds, distance_meters
+  — NO rest_seconds column on prescription rows.
+
+Independently settable PER SET (canvas PrescriptionTable + schema):
+  reps | work_seconds | distance_meters  (one primary measurement column per row, driven by slot.measurement)
+  load: weight_kg OR load_percentage (mutually exclusive per row edit — PrescriptionTable.tsx:174-191)
+  rir, tempo
+
+Per-set NOT in schema / canvas table:
+  rest (slot-level rest_after_exercise or group rest_seconds only)
+  technique params (drop %, cluster reps, pause seconds — slot-level, see 1.2)
+  drop chain rows: coach CAN add multiple prescription rows; for drop_set technique, extra rows represent drop steps (buildSegments.ts:94-115 uses rows.slice(1) as drop chain)
+
+Canvas add-set rule: only when rounds_driver is fixed or for_time (PrescriptionTable.tsx:46,317-320).
+
+1.2 Exercise-level (slot) fields
+--------------------------------
+program_instance_set_entry_exercises / workout_set_entry_exercises:
+  exercise_id, exercise_order, exercise_letter
+  measurement: reps | time | distance (NOT NULL, default reps)
+  technique: text NOT NULL default 'none' (canvas types: none | drop_set | cluster | rest_pause — types.ts:5)
+  sets, reps, weight_kg, load_percentage, rir, tempo, rest_seconds, notes
+  work_seconds, distance_meters
+  target_time_seconds, target_pace_seconds_per_km, target_speed_pct
+  hr_zone, target_hr_pct
+  drop_percentage, max_drops
+  reps_per_cluster, clusters_per_set, intra_cluster_rest_seconds
+  rest_pause_seconds, max_rest_pauses
+  is_optional (slot-level boolean)
+
+Canvas enabledProperties (session + persisted when values exist): load, rir, tempo, rest_after_exercise, drop_set, cluster, rest_pause (propertyLabels.ts:17-18).
+
+1.3 Group / set-entry level
+---------------------------
+program_instance_set_entries / workout_set_entries:
+  set_order, set_name, set_notes
+  set_type (legacy enum; canvas derives this — see drift)
+  total_sets, reps_per_set, rest_seconds, duration_seconds
+  rounds_driver: fixed | amrap | interval | for_time (types.ts:3; WorkoutCanvas.tsx:449-452)
+  interval_seconds (EMOM/interval)
+  time_cap_seconds (for_time)
+  is_optional (group-level; used in program week compliance, NOT executor skip UI)
+
+Multi-exercise groups: unlimited slots in canvas (CanvasGroup.slots[] — canvasTypes.ts:47; DnD in WorkoutCanvas.tsx:458+). deriveSetType:
+  2 slots + all time → tabata
+  2 slots + reps → superset
+  3+ slots → giant_set (deriveSetType.ts:37-40)
+
+Live instance data today: max 2 slots per group observed; 0 groups with 3+ slots. Capability exists; not exercised in prod data.
+
+rounds_driver live counts (program_instance_set_entries): fixed=435, amrap/interval/for_time=0. Canvas supports all four; prod instance content is 100% fixed rounds.
+
+1.4 Techniques / protocols — physical behavior + config + reachability
+--------------------------------------------------------------------
+CANVAS-REACHABLE (coach UI + deriveSetType + toLegacyBlockShape):
+
+| Derived set_type | How coach configures | Client physical behavior | Config data |
+|------------------|----------------------|--------------------------|-------------|
+| straight_set | 1 slot, reps, fixed rounds | N sets × reps, rest between sets | per-set rx + slot/group rest |
+| superset | 2 slots, fixed rounds | Alternate A→B per round; one log per round | exercise_letter A/B; total_sets = rounds |
+| giant_set | 3+ slots | All exercises per round; one log per round | letters A/B/C…; giant_set_exercises JSON log |
+| drop_set | slot technique drop_set | Initial weight/reps then reduce weight within set | drop_percentage, max_drops; multi-row rx = drop chain |
+| cluster_set | slot technique cluster | Weight × clusters × reps/cluster with intra-rest | reps_per_cluster, clusters_per_set, intra_cluster_rest_seconds |
+| rest_pause | slot technique rest_pause | Initial reps, brief pause, more reps same weight | rest_pause_seconds, max_rest_pauses |
+| amrap | rounds_driver amrap | Max reps in duration | duration_seconds, per-set reps/load |
+| emom | rounds_driver interval | Work each interval_seconds for duration | interval_seconds, duration_seconds |
+| for_time | rounds_driver for_time | Complete work under cap | time_cap_seconds, per-set reps |
+| tabata | 2+ slots all measurement=time | Timed work/rest alternation | work_seconds per slot, total_sets rounds |
+| timed_set | 1 slot measurement=time | Sets × work_seconds | work_seconds per row |
+| speed_work | 1 slot distance, total_sets>1 | Repeated distance intervals | distance_meters rows, target_speed_pct, target_pace… |
+| endurance | 1 slot distance, total_sets=1 | Continuous distance target | distance_meters, hr_zone, target_time_seconds |
+
+DEAD / NOT CANVAS-REACHABLE (Postgres workout_set_type enum but NOT in deriveSetType or canvas):
+  pyramid_set, ladder, emom_reps, circuit, hr_sets (pg_enum query; deriveSetType.ts has no branches)
+
+pre_exhaustion: enum + PreExhaustionExecutor exist; canvas maps 2-slot groups to superset (deriveSetType comment line 13; mapCanvasToExerciseDisplay.ts:88).
+
+Live technique counts (program_instance_set_entry_exercises): none=399, drop_set=41, cluster=0, rest_pause=0.
+
+1.5 WORST CASE (schema-legitimate, constructible today)
+-------------------------------------------------------
+Synthetic but valid canvas payload — mockup stress test:
+
+Group G3 (set_order=3):
+  rounds_driver: for_time
+  total_sets: 4
+  time_cap_seconds: 900
+  rest_seconds: 120
+  is_optional: false
+
+Slots (giant set × technique mix):
+  Slot A1 — Back Squat: measurement=reps, technique=none
+    prescriptions: [{set:1,reps:5,weight:100,rir:3,tempo:3010},
+                    {set:2,reps:4,weight:105,rir:2,tempo:3010},
+                    {set:3,reps:3,weight:110,rir:1,tempo:30X0},
+                    {set:4,reps:2,weight:115,rir:0,tempo:30X0}]
+    rest_seconds: 90
+  Slot A2 — RDL: measurement=reps, technique=drop_set, drop_percentage=15, max_drops=2
+    prescriptions: [{set:1,reps:8,weight:80},
+                    {set:2,reps:8,weight:68},  // drop chain row
+                    {set:3,reps:6,weight:85},
+                    {set:4,reps:6,weight:72}]
+  Slot A3 — Walking Lunge: measurement=reps, technique=cluster, reps_per_cluster=3, clusters_per_set=4, intra_cluster_rest_seconds=15
+    prescriptions: [{set:1,reps:12},{set:2,reps:10},{set:3,reps:10},{set:4,reps:8}]
+
+Client expectation: 4 rounds of A1→A2(drop-aware)→A3(cluster-aware), per-round targets differ, for-time cap 15:00, group rest 2:00. Element 15 grammar: "4 × 5/4/3/2 · … · drop … · clusters · cap 15:00".
+
+================================================================================
+PART 2 — WHAT THE EXECUTOR CONSUMES TODAY
+================================================================================
+
+2.1 Load path
+-------------
+start/page.tsx loadAssignment (line 1481+):
+
+Program assignment (has program_assignment_id):
+  loadWorkoutBlocksByContentId(supabase, program_instance_workout_id, {preferInstance:true})
+    → loadInstanceWorkoutForCanvas → RPC get_instance_workout_canvas (instanceCanvasLoad.ts:13-14)
+    → mapInstanceCanvasToSetEntries (instanceWorkoutBlocksMapper.ts:75-78)
+
+Standalone workout_assignment:
+  RPC get_workout_blocks({p_template_id}) (page.tsx:1948-1950)
+  → mapWorkoutBlocksRpcToSetEntries
+
+Both paths end as WorkoutSetEntry[] → ClientBlockRecord → workoutBlocksConverted → liveSetEntry for LiveWorkoutSetEntryExecutor.
+
+CRITICAL FLATTEN (instanceWorkoutBlocksMapper.ts:36-48):
+  For each slot, ONLY prescriptions[0] (firstRx) copied to exercise scalar fields:
+    reps, weight_kg, load_percentage, rir, tempo, work_seconds, distance_meters
+  prescriptions array attached to slot row (line 68) but toLegacyBlockShape mapSlotToExercise (toLegacyBlockShape.ts:22-52) NEVER reads prescriptions[] — only slot-level scalars (which are first-row values after mapper).
+
+page.tsx clientBlocks mapping (2025-2045) also does NOT pass prescriptions.
+
+CONFIRMED for Popescu instance workout 3e54eac4…:
+  CMJ: rx set1 weight=5kg, sets 2-3 weight=null in program_instance_set_prescriptions — executor shows single exercise.reps="3" for all rows (StraightSetExecutor.tsx:177-180,423-425).
+  Box Squat: rir=5 per set in DB — executor shows rir from exercise.rir (flattened from slot, same all sets).
+
+Verdict: executor consumes ONE target per exercise (first prescription row + slot-level technique fields), NOT per-set prescription table.
+
+2.2 Set-type branching (drift map)
+---------------------------------
+deriveSetType (canvas → legacy set_type) then LiveWorkoutSetEntryExecutor switch (line 1051-1083):
+
+| set_type | Executor | Notes |
+|----------|----------|-------|
+| straight_set | StraightSetExecutor | default fallthrough |
+| superset | SupersetExecutor | |
+| giant_set | GiantSetExecutor | |
+| drop_set | DropSetExecutor | |
+| cluster_set | ClusterSetExecutor | |
+| rest_pause | RestPauseExecutor | |
+| pre_exhaustion | PreExhaustionExecutor | canvas never emits |
+| amrap | AmrapExecutor | |
+| emom | EmomExecutor | |
+| tabata | TabataExecutor | |
+| for_time | ForTimeExecutor | |
+| speed_work | SpeedWorkExecutor | |
+| endurance | EnduranceExecutor | |
+| timed_set | TimedSetExecutor | |
+| (unknown) | StraightSetExecutor | fallthrough 1083 |
+
+13 dedicated executors + 1 default. Branch key is set_type enum, NOT canvas group model directly.
+
+Console drift signal: page.tsx:2060 logs "[loadAssignment] exercise ids by block (set_type + exercise_ids)".
+
+SetTypeBadge shows decorative "STRAIGHT SET" etc. (PrescriptionCard.tsx:232; SetTypeBadge.tsx:35-38) — conflicts with locked intent (A1/A2 conveys grouping).
+
+2.3 Technique rendering — what client actually sees
+----------------------------------------------------
+| Technique / protocol | Executor sees | Client UI | Gap |
+|----------------------|---------------|-----------|-----|
+| Per-set differing reps/weight/RIR | prescriptions in DB | Single repsDisplay + identical row prefills (StraightSetExecutor 177-207,423-425) | BROKEN — flattened |
+| drop_set | deriveSetType → DropSetExecutor; synthetic drop_sets[1] from slot scalars (toLegacyBlockShape 54-66) | MAX_DROPS hardcoded 5 (DropSetExecutor 104,273); ignores coach drop_percentage/max_drops; 2-row rx drop chain ignored | MISREPRESENTS — live drop_set slots have 2 rx rows + drop_percentage=20 (DB sample 03fd8b1a…) |
+| cluster_set | cluster_sets synthetic from slot (toLegacyBlockShape 69-81) | ClusterSetExecutor reads cluster_sets[0] (lines 82-94) | Reachable in code; 0 live instance rows |
+| rest_pause | rest_pause_sets synthetic (toLegacyBlockShape 84-95) | RestPauseExecutor | Reachable in code; 0 live rows |
+| superset | 2 slots → superset | SupersetExecutor: A/B side-by-side rows, one log per round (exerciseA/B 91-92) | Round model OK; per-set rx still flat |
+| giant_set | 3+ slots | GiantSetExecutor handleLogRound (528+) logs all exercises; uses exercise_letter in labels (766) | Round model OK; no 3-slot live data |
+| amrap/emom/for_time/tabata | rounds_driver on group | Dedicated executors + time_protocols synthesized | 0 live instance rounds_driver ≠ fixed |
+| speed_work/endurance | measurement distance | SpeedWorkExecutor / EnduranceExecutor | Template enum exists; rare in instance |
+| pyramid/ladder/circuit/hr_sets | — | Falls to StraightSetExecutor | DEAD enum values |
+
+2.4 Logging path
+----------------
+Tap flow (straight set, typical):
+  1. Edit weight/reps in SetRowShell row (or ± steppers in row fields)
+  2. Tap round check / log button on row (SetRowShell 51-58) OR LogSetButton in legacy single-set path
+  3. Optional: "Fill remaining with target" (SetRowsListPanel 17,45; useSetRowsState fillRemaining)
+  4. useSetLoggingOrchestrator.logSet → sessionStorage idempotency (goldenLogSet.ts)
+  5. Background POST /api/log-set → buildLogSetInsertData (per set_type) → workout_set_logs
+  6. Inline RPE: LoggedSetsList "How hard was that?" + SetEffortPicker (LoggedSetsList 10-11)
+  7. RestTimerModal (orchestrator shouldOpenRestTimer — parallel to sync, not gated)
+
+workout_set_logs shape: wide type-specific columns (set_number, weight, reps, rpe, superset_*, giant_set_exercises jsonb, dropset_*, cluster_number, rest_pause_*, amrap_*, emom_*, etc.) — schema query above.
+
+Interactions to log one straight set (row-based path): ~3-6 taps (weight adjust, reps adjust, log, optional RPE tier, optional dismiss rest timer).
+
+RPE: stored on workout_set_logs.rpe; inline per logged row (not modal — useSetLoggingOrchestrator showRpeModal deprecated line 62-63).
+
+2.5 Superset / giant-set handling
+---------------------------------
+Superset: presents both exercises in one block; logs one workout_set_logs row per round with superset_exercise_a/b fields (buildLogSetInsertData 73-85). NOT sequential separate blocks. Does NOT show A1/A2 badges in header — uses combined title or "EXERCISE 1 OF 2" hint (BaseBlockExecutor 129-132). exercise_letter in DB (e.g. Kettlebell Swing A / Mountain Climber B — live fb7ca0ee…) not shown as Element 15 badges.
+
+Giant set: round-based logging (round_number + giant_set_exercises array). exercise_letter used only in row labels (GiantSetExecutor 766).
+
+================================================================================
+PART 3 — CURRENT UX INVENTORY (start screen)
+================================================================================
+
+Hierarchy (outer → inner):
+  PAGE SHELL (page.tsx 4409-4430)
+    Back link + ExecProgressSegments (exercise progress bar) — ESSENTIAL context
+  LiveWorkoutSetEntryExecutor → BaseBlockExecutorLayout
+    PrescriptionCard (PrescriptionCard.tsx 192-400) — PRIMARY SURFACE (glass card mx-4)
+      Eyebrow "Exercise · Up now" / multi-exercise hint — context
+      H2 exercise name (26px) — ESSENTIAL mid-set
+      SetTypeBadge "STRAIGHT SET" + muscle pill — NOISE (locked intent: drop badge)
+      --- divider ---
+      "Last session" + ProgressionNudge embedded — CONTEXT (competes mid-set)
+      --- divider ---
+      "Your target today" 2×2 stat grid (28px Sets/Reps/Rest/RIR) — ESSENTIAL but WRONG when per-set differs
+      --- divider ---
+      Coach notes panel (cyan border) — CONTEXT (pre-read)
+      --- divider ---
+      LOG SET nested footer (own gradient + border, -mx-5) — CARD IN CARD
+        SetRowsListPanel → SetRowShell rows (each mini-card border) — ESSENTIAL
+        Fill remaining link — affordance
+        LogSetButton — ESSENTIAL
+    aboveStickyContent: LoggedSetsList (logged history + RPE picker) — mixed ESSENTIAL post-set / NOISE mid-set
+    NavigationControls (prev/next block) — CONTEXT
+    LastSessionSetsSection (separate history card below) — DUPLICATE of in-card last session — NOISE
+
+Nested-card problem (concrete):
+  PrescriptionCard (rounded-28 glass)
+    └─ Log set region (second rounded surface, inset gradient)  [lines 372-397]
+         └─ SetRowShell per set (third bordered surface)  [SetRowShell 27-33]
+  Plus LastSessionSetsSection as fourth surface below executor.
+
+Attention competition mid-set: exercise name, STRAIGHT SET badge, last session stats, target grid, coach notes, 3-4 set rows, log CTA, logged sets list, bottom history — flat weight; eye has no single "do this now" anchor.
+
+================================================================================
+PART 4 — ELEMENT 15 REALITY CHECK
+================================================================================
+
+Canonical: src/components/exercise-display/*
+  - buildPrescriptionSegments(slot, group) — per-set aware grammar (buildSegments.ts 44-62: "3 × 12/6/6")
+  - mapCanvasGroupToExerciseGroupDisplay — A1/A2 badges, group meta (mapCanvasToExerciseDisplay.ts)
+  - size: 'list' | 'executor' (types.ts:16) — nameExecutor 22px, prescription mono 11px (exerciseDisplay.module.css:59-76)
+  - CANVAS_PROTOCOL_SEGMENT_MAP documents 13 protocols (mapCanvasToExerciseDisplay.ts:81-96)
+
+Can executor reuse ExerciseDisplay for targets?
+  YES for READ grammar if fed CanvasGroup/CanvasExercise (or prescriptions[]), NOT WorkoutSetEntry:
+    - Element 15 already expresses per-set reps, drop chains, cluster extras, AMRAP/EMOM caps
+    - Group letters match locked A1/A2 intent
+
+  NO without variant work for:
+    - Per-set LOG ROWS (Element 15 is read-only one-line; executor needs editable rows per set_number)
+    - Mid-set legibility: prescription line is 11px mono vs PrescriptionCard 28px stats — mockup question answered: one-line is NOT arm's-length; need executor variant (larger segments OR hybrid: Element 15 summary + per-set row targets)
+    - Logging state (done/tick), RPE, rest timer — not in ExerciseDisplay
+    - Input path still needs set_number → prescription map; current WorkoutSetEntry lacks prescriptions field
+
+Transfer plan: mapInstanceCanvasToSetEntries should STOP flattening OR executor loads canvas in parallel; display uses mapCanvasEntryToExerciseDisplay({size:'executor'}); logging uses prescriptions[set_number-1].
+
+================================================================================
+PART 5 — VERDICT & SCOPE
+================================================================================
+
+5.1 Model drift — YES, genuinely outdated shape
+-----------------------------------------------
+Evidence chain:
+  1. Coach saves per-set rows to *_set_prescriptions (canvas save path)
+  2. instanceWorkoutBlocksMapper.ts:37-48 keeps only firstRx on exercise scalars
+  3. toLegacyBlockShape ignores prescriptions array entirely
+  4. Executors branch on derived set_type and read exercise.reps / exercise.rir once
+  5. deriveSetType collapses canvas composition into single enum (loses simultaneous e.g. giant_set + drop_set on one slot)
+
+Must re-plumb:
+  - Load: pass CanvasGroup[] or prescriptions[] through to executor (or skip legacy flatten)
+  - Display: per-set targets from prescriptions[set_number]
+  - Technique: in-set instructions from slot.technique + slot technique fields (not SetTypeBadge)
+  - deriveSetType: demote to logging adapter only, not UI router
+  - Drop: read drop_percentage, max_drops, multi-row rx — not MAX_DROPS=5 constant
+
+5.2 Scope call — RE-PLUMB + REDESIGN (not layout-only)
+------------------------------------------------------
+Data in DB is fine and richer than executor consumes. UI nesting is also a problem but secondary. Layout-only reskin on current WorkoutSetEntry shape cannot show per-set prescriptions or canvas-native techniques.
+
+5.3 Risks / fences (do not break)
+---------------------------------
+| Area | Load-bearing code |
+|------|-------------------|
+| Session resume | page.tsx restore from workout_set_logs + workout_set_entry_completions (762+); workout_sessions progress persist (207+) |
+| Offline-ish sync | useSetLoggingOrchestrator + goldenLogSet sessionStorage rehydrate (goldenLogSet.ts 168+) |
+| Completion | completeWorkoutService.ts — program_day_completions, totals from workout_set_logs |
+| Progression | clientProgressionService suggestions (page.tsx 2553+); ProgressionNudge |
+| PR / achievements | /api/log-set pr_detected; PRCelebrationModal / AchievementUnlockModal (page.tsx 6793+) |
+| Log schema | buildLogSetInsertData + resolveLogSetType — wide per-type columns must remain |
+| Adherence / analytics | set_type on workout_set_logs; coach adherence services read logs |
+
+5.4 Parked "set logging UX visual polish"
+---------------------------------------
+Partially alive inside workout-exec-v6 tokens:
+  PrescriptionCard, SetEffortPicker, LoggedSetsList, SetRowShell, LastSessionSetsSection (grep workout-exec-v6 in workout-execution/ui/*)
+  ui-rollout-plan.md Phase 1: straight set baseline; Phase 3: other 11 executors.
+
+Survives post-v6: effort tier colors, row-based all-sets-visible logging, inline RPE, fill-remaining, lime log checkmarks.
+Dead / to replace: SetTypeBadge, PrescriptionCard mega-card nesting, set_type-first executor routing, single aggregate "Your target today" grid without per-set fidelity.
+
+================================================================================
+EVIDENCE INDEX (key file:line)
+================================================================================
+instanceWorkoutBlocksMapper firstRx flatten     :37-48
+toLegacyBlockShape ignores prescriptions        :22-52
+deriveSetType                                   :15-44
+loadAssignment program path                     :1907-1914
+loadAssignment template path                    :1948-1950
+set_type executor switch                        :LiveWorkoutSetEntryExecutor.tsx 1051-1083
+StraightSet single reps target                  :177-180,423-425
+DropSet MAX_DROPS=5                             :DropSetExecutor.tsx 104,273
+PrescriptionCard nesting + badge                :192-397,232
+SetTypeBadge uppercase                          :SetTypeBadge.tsx 35-38
+buildPrescriptionSegments per-set               :buildSegments.ts 44-62
+Element 15 prescription 11px                    :exerciseDisplay.module.css 69-76
+completeWorkoutService entry                    :completeWorkoutService.ts 1-24
+Popescu per-set rx in DB                       :MCP program_instance_workout 3e54eac4…
+drop_set live: 2 rx rows + drop_percentage 20   :MCP slot 03fd8b1a…
+
+END

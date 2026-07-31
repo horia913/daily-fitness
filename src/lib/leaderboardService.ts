@@ -1,10 +1,12 @@
 /**
  * Leaderboard Service
- * Handles PR rankings, BW multiples, and tonnage leaderboards with privacy controls
+ * Handles PR rankings, BW multiples, and tonnage leaderboards with privacy controls.
+ * Reads are explicitly scoped to the viewer's coach roster (RLS is the backstop).
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+import { getLatestClientWeight } from './metrics/body';
 
 export interface LeaderboardEntry {
   id: string;
@@ -21,20 +23,106 @@ export interface LeaderboardEntry {
 
 export type LeaderboardType = 'pr_1rm' | 'pr_3rm' | 'pr_5rm' | 'bw_multiple' | 'tonnage_week' | 'tonnage_month' | 'tonnage_all_time';
 export type TimeWindow = 'this_week' | 'this_month' | 'all_time';
+export type LeaderboardVisibility = 'public' | 'anonymous' | 'hidden';
+
+const COACH_ROLES = new Set(['coach', 'admin', 'super_coach', 'supercoach']);
+
+/** UI shorthand → canonical exercise name in the library */
+const LEADERBOARD_EXERCISE_ALIASES: Record<string, string> = {
+  Squat: 'Back Squat',
+  Deadlift: 'Conventional Deadlift',
+};
 
 /**
- * Get leaderboard rankings
+ * Resolve the coach whose roster the viewer should see.
+ * Client → their coach via clients.coach_id; coach/admin → self.
+ */
+export async function resolveViewerCoachId(
+  viewerId?: string,
+  db: SupabaseClient = supabase,
+): Promise<string | null> {
+  let uid = viewerId;
+  if (!uid) {
+    const { data: auth } = await db.auth.getUser();
+    uid = auth.user?.id;
+  }
+  if (!uid) return null;
+
+  const { data: profile } = await db
+    .from('profiles')
+    .select('role')
+    .eq('id', uid)
+    .maybeSingle();
+
+  const role = (profile?.role as string | undefined) ?? '';
+  if (COACH_ROLES.has(role)) {
+    return uid;
+  }
+
+  const { data: clientRow } = await db
+    .from('clients')
+    .select('coach_id')
+    .eq('client_id', uid)
+    .maybeSingle();
+
+  return (clientRow?.coach_id as string | undefined) ?? null;
+}
+
+/**
+ * Resolve a leaderboard filter label to an exercises.id.
+ * Prefers canonical aliases (Squat → Back Squat) before fuzzy match so
+ * "%Squat%" does not land on Anderson Squat with zero entries.
+ */
+export async function resolveLeaderboardExerciseId(
+  exerciseLabel: string,
+): Promise<string | undefined> {
+  const label = exerciseLabel.trim();
+  if (!label) return undefined;
+
+  const candidates = [
+    LEADERBOARD_EXERCISE_ALIASES[label],
+    label,
+  ].filter((name): name is string => Boolean(name));
+
+  for (const name of candidates) {
+    const { data } = await supabase
+      .from('exercises')
+      .select('id')
+      .ilike('name', name)
+      .limit(1)
+      .maybeSingle();
+    if (data?.id) return data.id;
+  }
+
+  const { data: fuzzyMatch } = await supabase
+    .from('exercises')
+    .select('id')
+    .ilike('name', `%${label}%`)
+    .limit(1)
+    .maybeSingle();
+
+  return fuzzyMatch?.id;
+}
+
+/**
+ * Get leaderboard rankings for the viewer's coach roster.
+ * @param coachId - optional explicit coach; otherwise resolved from the authenticated viewer
  */
 export async function getLeaderboard(
   type: LeaderboardType,
   exerciseId?: string,
   timeWindow: TimeWindow = 'this_month',
-  limit: number = 50
+  limit: number = 50,
+  coachId?: string | null,
 ): Promise<LeaderboardEntry[]> {
   try {
+    const resolvedCoachId = coachId ?? (await resolveViewerCoachId());
+    if (!resolvedCoachId) return [];
+
     let query = supabase
       .from('leaderboard_entries')
       .select('*')
+      .eq('coach_id', resolvedCoachId)
       .eq('leaderboard_type', type)
       .order('rank', { ascending: true })
       .limit(limit);
@@ -100,19 +188,21 @@ export async function getClientRank(
 }
 
 /**
- * Get leaderboard filtered by sex (joins profiles to filter by sex)
+ * Get leaderboard filtered by sex (joins profiles to filter by sex).
+ * Base list is already coach-roster scoped.
  */
 export async function getLeaderboardBySex(
   type: LeaderboardType,
   exerciseId?: string,
   timeWindow: TimeWindow = 'this_month',
   sex?: 'M' | 'F' | null,
-  limit: number = 50
+  limit: number = 50,
+  coachId?: string | null,
 ): Promise<LeaderboardEntry[]> {
-  if (!sex) return getLeaderboard(type, exerciseId, timeWindow, limit);
+  if (!sex) return getLeaderboard(type, exerciseId, timeWindow, limit, coachId);
 
   try {
-    const entries = await getLeaderboard(type, exerciseId, timeWindow, 200);
+    const entries = await getLeaderboard(type, exerciseId, timeWindow, 200, coachId);
     if (entries.length === 0) return [];
 
     const clientIds = entries.map(e => e.client_id);
@@ -133,21 +223,80 @@ export async function getLeaderboardBySex(
   }
 }
 
+function championCategoryLabel(
+  leaderboardType: string,
+  exerciseName: string | null,
+): string {
+  if (exerciseName) return exerciseName;
+  if (leaderboardType.startsWith('tonnage')) return 'Tonnage';
+  return leaderboardType.replace(/^pr_/, '').toUpperCase();
+}
+
 /**
- * Get current champions (rank 1 per category)
+ * Get current champions (rank 1 per leaderboard partition) for the viewer's coach roster.
+ * Reads live leaderboard_entries; current_champions view / leaderboard_rankings are unused.
  */
-export async function getCurrentChampions(limit: number = 5): Promise<any[]> {
+export async function getCurrentChampions(
+  limit: number = 5,
+  coachId?: string | null,
+): Promise<any[]> {
   try {
-    const { data, error } = await supabase
-      .from('current_champions')
-      .select('*')
-      .limit(limit);
+    const resolvedCoachId = coachId ?? (await resolveViewerCoachId());
+    if (!resolvedCoachId) return [];
+
+    const { data: entries, error } = await supabase
+      .from('leaderboard_entries')
+      .select('display_name, leaderboard_type, exercise_id, score, rank')
+      .eq('coach_id', resolvedCoachId)
+      .eq('rank', 1)
+      .order('score', { ascending: false })
+      .limit(limit * 3);
 
     if (error) {
       console.error('Error fetching champions:', error);
       return [];
     }
-    return data ?? [];
+    if (!entries?.length) return [];
+
+    const exerciseIds = [
+      ...new Set(
+        entries
+          .map((e) => e.exercise_id as string | null)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const exerciseNames = new Map<string, string>();
+    if (exerciseIds.length > 0) {
+      const { data: exercises } = await supabase
+        .from('exercises')
+        .select('id, name')
+        .in('id', exerciseIds);
+      for (const row of exercises ?? []) {
+        exerciseNames.set(row.id, row.name ?? 'Exercise');
+      }
+    }
+
+    const seen = new Set<string>();
+    const champions: Array<{ name: string; category: string; score: number }> =
+      [];
+    for (const row of entries) {
+      const key = `${row.leaderboard_type}|${row.exercise_id ?? 'tonnage'}|${row.rank}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const exerciseName = row.exercise_id
+        ? exerciseNames.get(row.exercise_id as string) ?? null
+        : null;
+      champions.push({
+        name: row.display_name ?? 'Champion',
+        category: championCategoryLabel(
+          row.leaderboard_type as string,
+          exerciseName,
+        ),
+        score: Number(row.score),
+      });
+      if (champions.length >= limit) break;
+    }
+    return champions;
   } catch (error) {
     console.error('Error in getCurrentChampions:', error);
     return [];
@@ -224,21 +373,13 @@ export async function calculateBWMultiple(
   repTarget: 1 | 3 | 5
 ): Promise<number | null> {
   try {
-    // Get latest bodyweight
-    const { data: measurement } = await supabase
-      .from('body_metrics')
-      .select('weight_kg')
-      .eq('client_id', clientId)
-      .order('measured_date', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (!measurement) return null;
+    const latest = await getLatestClientWeight(clientId);
+    if (!latest) return null;
 
     const pr = await calculatePRForExercise(clientId, exerciseId, repTarget);
     if (!pr) return null;
 
-    return Math.round((pr / measurement.weight_kg) * 100) / 100;
+    return Math.round((pr / latest.weightKg) * 100) / 100;
   } catch (error) {
     console.error('Error calculating BW multiple:', error);
     return null;
@@ -302,11 +443,15 @@ export async function calculateTonnage(
 }
 
 /**
- * Update leaderboard privacy setting
+ * Update leaderboard privacy setting and sync table state.
+ * - hidden: delete this client's leaderboard_entries, then recalc roster ranks
+ * - anonymous: keep rows; set display_name + is_anonymous on existing rows
+ * - public: update existing rows to real name (if any). After hidden, rows are
+ *   gone — they repopulate on the next workout completion / PR log-set.
  */
 export async function updateLeaderboardVisibility(
   clientId: string,
-  visibility: 'public' | 'anonymous' | 'hidden'
+  visibility: LeaderboardVisibility
 ): Promise<boolean> {
   try {
     const { error } = await supabase
@@ -319,6 +464,31 @@ export async function updateLeaderboardVisibility(
       return false;
     }
 
+    const {
+      deleteClientLeaderboardEntriesAndRecalc,
+      syncClientLeaderboardDisplay,
+    } = await import('./leaderboardPopulationService');
+
+    if (visibility === 'hidden') {
+      await deleteClientLeaderboardEntriesAndRecalc(clientId);
+      return true;
+    }
+
+    if (visibility === 'anonymous') {
+      await syncClientLeaderboardDisplay(clientId, 'Anonymous', true);
+      return true;
+    }
+
+    // public — refresh name on any lingering rows (e.g. was anonymous)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('first_name, last_name')
+      .eq('id', clientId)
+      .maybeSingle();
+    const displayName =
+      [profile?.first_name, profile?.last_name].filter(Boolean).join(' ').trim() ||
+      'Athlete';
+    await syncClientLeaderboardDisplay(clientId, displayName, false);
     return true;
   } catch (error) {
     console.error('Error in updateLeaderboardVisibility:', error);

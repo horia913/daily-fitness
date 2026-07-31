@@ -1,9 +1,9 @@
 /**
  * Progress Photo Storage (record-scoped attachments)
  * Upload/delete photos for arbitrary records by recordType + recordId.
- * Returns storage path only; caller stores path in their own record (e.g. mobility_metrics, FMS).
+ * Returns storage path only; caller stores path in their own record.
  * Path pattern: {recordType}/{clientId}/{recordId}/{fileName}.
- * Used by: MobilityFormFields, coach FMS page. Not the same as progressPhotoService (client timeline).
+ * Not the same as progressPhotoService (client timeline).
  */
 import { supabase } from './supabase'
 
@@ -16,7 +16,7 @@ export class ProgressPhotoStorage {
   static async uploadPhoto(
     file: File,
     clientId: string,
-    recordType: 'body-metrics' | 'mobility' | 'fms',
+    recordType: 'body-metrics' | 'mobility',
     recordId: string,
     fileName?: string
   ): Promise<string> {
@@ -67,7 +67,7 @@ export class ProgressPhotoStorage {
   static async deletePhoto(
     photoUrlOrPath: string,
     clientId: string,
-    recordType: 'body-metrics' | 'mobility' | 'fms',
+    recordType: 'body-metrics' | 'mobility',
     recordId: string
   ): Promise<boolean> {
     try {
@@ -104,7 +104,7 @@ export class ProgressPhotoStorage {
   static async deleteAllPhotos(
     photos: string[],
     clientId: string,
-    recordType: 'body-metrics' | 'mobility' | 'fms',
+    recordType: 'body-metrics' | 'mobility',
     recordId: string
   ): Promise<boolean> {
     try {

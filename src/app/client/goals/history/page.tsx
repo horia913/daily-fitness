@@ -4,29 +4,31 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "@/contexts/ThemeContext";
-import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
-import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import {
   ClientPageShell,
-  ClientGlassCard,
-  SectionHeader,
-  IconButton,
-  Eyebrow,
 } from "@/components/client-ui";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
-import { ArrowLeft, Filter } from "lucide-react";
+import {
+  PsHero,
+  PsSegmented,
+  PsSectionEyebrow,
+  progressSuiteV1Styles as ps,
+} from "@/components/client/progress-suite";
+import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 
-type CategoryFilter = "all" | "training" | "nutrition" | "lifestyle";
+type PillarFilter = "all" | "training" | "nutrition" | "checkins" | "lifestyle";
+type GoalPillar = "training" | "nutrition" | "lifestyle" | "checkins" | "general";
+
 type GoalRow = {
   id: string;
   title: string;
   description?: string | null;
   category: string;
+  pillar: GoalPillar;
   status: string;
   target_value?: number | null;
   target_unit?: string | null;
@@ -34,42 +36,64 @@ type GoalRow = {
   created_at: string;
 };
 
-const CATEGORY_KEYWORDS: Record<string, string[]> = {
-  training: ["workout", "training", "strength", "weight", "lift", "exercise"],
-  nutrition: ["nutrition", "calorie", "protein", "macro", "diet", "food", "water"],
-  lifestyle: ["habit", "sleep", "lifestyle", "activity"],
-};
-
-function inferCategory(title: string, category: string): CategoryFilter {
-  const c = (category || "").toLowerCase();
-  if (c === "training" || c === "workout" || c === "strength" || c === "endurance" || c === "performance") return "training";
-  if (c === "nutrition" || c === "diet" || c === "food") return "nutrition";
-  if (c === "lifestyle" || c === "habit") return "lifestyle";
-
-  const t = (title || "").toLowerCase();
-  for (const [key, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
-    if (keywords.some((k) => t.includes(k))) return key as CategoryFilter;
+/** Align with Goals page `sectionPillarForGoal` — prefer real pillar, fall back via category. */
+function resolvePillar(goal: {
+  pillar?: string | null;
+  category?: string | null;
+}): GoalPillar {
+  const cat = (goal.category || "").toLowerCase();
+  if (cat === "behavioral") return "lifestyle";
+  switch (cat) {
+    case "body_composition":
+    case "weight_loss":
+    case "muscle_gain":
+      return "checkins";
+    case "nutrition":
+      return "nutrition";
+    case "outcome":
+      return "lifestyle";
+    case "performance":
+    case "strength":
+    case "endurance":
+    case "mobility":
+      return "training";
+    default:
+      break;
   }
-  return "all";
+  const p = (goal.pillar || "").toLowerCase();
+  if (
+    p === "training" ||
+    p === "nutrition" ||
+    p === "lifestyle" ||
+    p === "checkins" ||
+    p === "general"
+  ) {
+    return p;
+  }
+  return "general";
 }
 
-function categoryLabel(cat: string): string {
-  return cat.charAt(0).toUpperCase() + cat.slice(1);
+function pillarLabel(pillar: string): string {
+  if (pillar === "checkins") return "Body";
+  if (pillar === "general") return "Other";
+  return pillar.charAt(0).toUpperCase() + pillar.slice(1);
 }
 
 function goalStatusBadgeVariant(
   status: string,
 ): "status-info" | "status-success" | "outline" {
   const s = (status || "").toLowerCase();
-  if (s === "active") return "status-info";
+  if (s === "active" || s === "in_progress") return "status-info";
   if (s === "completed" || s === "complete") return "status-success";
   return "outline";
 }
 
 function formatStatusLabel(status: string): string {
   const s = (status || "").toLowerCase();
-  if (s === "active") return "Active";
+  if (s === "active" || s === "in_progress") return "Active";
   if (s === "completed" || s === "complete") return "Completed";
+  if (s === "paused") return "Paused";
+  if (s === "cancelled") return "Cancelled";
   if (s === "abandoned") return "Abandoned";
   return s ? s.replace(/_/g, " ") : "—";
 }
@@ -77,10 +101,10 @@ function formatStatusLabel(status: string): string {
 export default function GoalHistoryPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const { performanceSettings } = useTheme();
   const [goals, setGoals] = useState<GoalRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [pillarFilter, setPillarFilter] = useState<PillarFilter>("all");
   const [activeOnly, setActiveOnly] = useState(false);
 
   useEffect(() => {
@@ -88,231 +112,208 @@ export default function GoalHistoryPage() {
     let cancelled = false;
     (async () => {
       setLoading(true);
+      setLoadError(null);
       try {
         const { data, error } = await supabase
           .from("goals")
-          .select("id, title, description, category, status, target_value, target_unit, current_value, created_at")
+          .select(
+            "id, title, description, category, pillar, status, target_value, target_unit, current_value, created_at",
+          )
           .eq("client_id", user.id)
           .order("created_at", { ascending: false });
 
         if (cancelled) return;
         if (error) {
           console.error("Error loading goals:", error);
+          setLoadError("Could not load goal history.");
           setGoals([]);
         } else {
-          setGoals((data || []).map((g) => ({ ...g, category: g.category || "other" })));
+          setGoals(
+            (data || []).map((g) => ({
+              ...g,
+              category: g.category || "other",
+              pillar: resolvePillar(g),
+            })),
+          );
         }
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [user?.id]);
 
   const filtered = goals.filter((g) => {
-    const inferred = inferCategory(g.title, g.category);
-    if (categoryFilter !== "all" && inferred !== categoryFilter) return false;
-    if (activeOnly && g.status !== "active") return false;
+    if (pillarFilter !== "all" && g.pillar !== pillarFilter) return false;
+    if (
+      activeOnly &&
+      g.status !== "active" &&
+      g.status !== "in_progress"
+    ) {
+      return false;
+    }
     return true;
   });
 
-  const byCategory = filtered.reduce<Record<string, GoalRow[]>>((acc, g) => {
-    const c = inferCategory(g.title, g.category);
-    const key = c === "all" ? "other" : c;
+  const byPillar = filtered.reduce<Record<string, GoalRow[]>>((acc, g) => {
+    const key = g.pillar === "general" ? "other" : g.pillar;
     if (!acc[key]) acc[key] = [];
     acc[key].push(g);
     return acc;
   }, {});
 
-  const orderedCategories = ["training", "nutrition", "lifestyle", "other"].filter((c) => (byCategory[c]?.length ?? 0) > 0);
+  const orderedPillars = [
+    "training",
+    "nutrition",
+    "checkins",
+    "lifestyle",
+    "other",
+  ].filter((c) => (byPillar[c]?.length ?? 0) > 0);
+
+  const pillarCounts = {
+    all: goals.length,
+    training: goals.filter((g) => g.pillar === "training").length,
+    nutrition: goals.filter((g) => g.pillar === "nutrition").length,
+    checkins: goals.filter((g) => g.pillar === "checkins").length,
+    lifestyle: goals.filter((g) => g.pillar === "lifestyle").length,
+  };
 
   return (
     <ProtectedRoute requiredRole="client">
-      <AnimatedBackground>
-        {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
-          <div className="flex items-center gap-4 mb-4">
-            <IconButton
-              size="md"
-              variant="filled"
-              className="fc-glass hover:opacity-80"
-              aria-label="Back to Goals"
-              onClick={() => router.push("/client/goals")}
-            >
-              <ArrowLeft className="h-5 w-5 fc-text-primary" />
-            </IconButton>
-            <div>
-              <h1 className="text-xl font-bold fc-text-primary mb-4">Goal History</h1>
-              <p className="text-sm fc-text-dim">All goals across Training, Nutrition, Lifestyle</p>
-            </div>
-          </div>
+      <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
+        <div className={cn(ps.psV1, "space-y-4")}>
+          <PsHero
+            glow="action"
+            onBack={() => router.push("/client/goals")}
+            backAriaLabel="Back to Goals"
+            eyebrow="Me · goals · history"
+            eyebrowColor="var(--fc-accent)"
+            title="Goal history"
+            subtitle="All goals across Training, Nutrition, Body, Lifestyle"
+          />
 
-          <ClientGlassCard className="p-4 mb-4">
-            <div className="flex flex-wrap items-center gap-1.5 mb-3" role="tablist" aria-label="Goal category">
-              <Filter className="w-4 h-4 fc-text-dim shrink-0" />
-              <span className="text-sm fc-text-dim shrink-0">Filter:</span>
-              {(["all", "training", "nutrition", "lifestyle"] as const).map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  role="tab"
-                  aria-selected={categoryFilter === c}
-                  onClick={() => setCategoryFilter(c)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider border transition-colors ${
-                    categoryFilter === c
-                      ? "fc-glass border-[color:var(--fc-glass-border-strong)] fc-text-primary"
-                      : "border-[color:var(--fc-glass-border)] fc-text-subtle hover:fc-text-primary"
-                  }`}
-                >
-                  {c === "all" ? "All" : c.charAt(0).toUpperCase() + c.slice(1)}
-                </button>
-              ))}
-            </div>
-            <label htmlFor="goals-history-active-only" className="flex items-center gap-2 text-sm fc-text-dim cursor-pointer">
-              <Checkbox
-                id="goals-history-active-only"
-                checked={activeOnly}
-                onCheckedChange={(checked) => setActiveOnly(checked === true)}
-              />
-              Active only
-            </label>
-          </ClientGlassCard>
+          <PsSegmented<PillarFilter>
+            value={pillarFilter}
+            onChange={setPillarFilter}
+            ariaLabel="Filter goals by pillar"
+            options={[
+              { value: "all", label: "All", count: pillarCounts.all },
+              { value: "training", label: "Train", count: pillarCounts.training },
+              { value: "nutrition", label: "Fuel", count: pillarCounts.nutrition },
+              { value: "checkins", label: "Body", count: pillarCounts.checkins },
+              { value: "lifestyle", label: "Life", count: pillarCounts.lifestyle },
+            ]}
+          />
+
+          <label
+            htmlFor="goals-history-active-only"
+            className="flex items-center gap-2 text-sm fc-text-dim cursor-pointer"
+          >
+            <Checkbox
+              id="goals-history-active-only"
+              checked={activeOnly}
+              onCheckedChange={(checked) => setActiveOnly(checked === true)}
+            />
+            Active only
+          </label>
 
           {loading ? (
             <PageSkeleton variant="list" />
-          ) : filtered.length === 0 ? (
-            <div className="py-8 px-4 text-center">
-              <p className="text-sm fc-text-dim mb-2">No goals found</p>
-              <p className="text-sm fc-text-dim mb-6">Create goals from the Goals page to see them here.</p>
+          ) : loadError ? (
+            <div className="rounded-[13px] border border-[color:var(--fc-hairline)] px-4 py-8 text-center">
+              <p className="mb-4 text-sm fc-text-dim">{loadError}</p>
               <Button
                 type="button"
                 variant="fc-secondary"
-                className="h-10 w-auto"
+                onClick={() => window.location.reload()}
+              >
+                Retry
+              </Button>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="rounded-[13px] border border-dashed border-[color:var(--fc-hairline)] px-4 py-8 text-center">
+              <p className="mb-2 text-sm fc-text-dim">No goals found</p>
+              <p className="mb-6 text-sm fc-text-subtle">
+                Create goals from the Goals page to see them here.
+              </p>
+              <Button
+                type="button"
+                variant="fc-secondary"
                 onClick={() => router.push("/client/goals")}
               >
                 Open Goals
               </Button>
             </div>
           ) : (
-            <div className="flex flex-col">
-              {orderedCategories.map((cat) => (
-                <section key={cat} className="mb-6 last:mb-0">
-                  <SectionHeader title={categoryLabel(cat)} />
-                  <div className="mt-2 space-y-3">
-                    {byCategory[cat].map((g) => {
-                      const dateStr = new Date(g.created_at).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      });
-                      const targetNum = (() => {
-                        const v = g.target_value;
-                        if (v == null) return null;
-                        const n = typeof v === "number" ? v : Number(v);
-                        return Number.isFinite(n) ? n : null;
-                      })();
-                      const currentNum = (() => {
-                        const v = g.current_value;
-                        if (v == null) return null;
-                        const n = typeof v === "number" ? v : Number(v);
-                        return Number.isFinite(n) ? n : null;
-                      })();
-                      const showProgressBar =
-                        targetNum != null && targetNum > 0 && currentNum != null;
-                      const progressPct = showProgressBar
-                        ? Math.min(100, Math.max(0, (currentNum / targetNum) * 100))
-                        : 0;
-                      const targetDisplay =
-                        g.target_value != null
-                          ? `${String(g.target_value)}${g.target_unit ?? ""}`
+            <div className="space-y-6">
+              {orderedPillars.map((pillarKey) => (
+                <section key={pillarKey} className="space-y-2">
+                  <PsSectionEyebrow accent="action">
+                    {pillarLabel(pillarKey)}
+                  </PsSectionEyebrow>
+                  <div className="space-y-2">
+                    {byPillar[pillarKey].map((goal) => {
+                      const progress =
+                        goal.target_value != null &&
+                        goal.target_value > 0 &&
+                        goal.current_value != null
+                          ? Math.min(
+                              100,
+                              Math.round(
+                                (goal.current_value / goal.target_value) * 100,
+                              ),
+                            )
                           : null;
-                      const currentDisplay =
-                        g.current_value != null ? String(g.current_value) : null;
-
-                      const statusVariant = goalStatusBadgeVariant(g.status);
                       return (
-                        <ClientGlassCard
-                          key={g.id}
-                          className="p-4 text-left"
+                        <div
+                          key={goal.id}
+                          className="rounded-[13px] border border-[color:var(--fc-hairline)] bg-transparent p-3"
                         >
-                          <div className="mb-1 flex items-start justify-between gap-2">
-                            <h3 className="min-w-0 flex-1 text-[17px] font-semibold tracking-tight fc-text-primary">
-                              {g.title}
-                            </h3>
-                            <Badge
-                              variant={statusVariant}
-                              className={
-                                statusVariant === "outline"
-                                  ? "shrink-0 border-[color:var(--fc-glass-border)] bg-[color-mix(in_srgb,var(--fc-text-subtle)_20%,transparent)] text-[10px] font-bold uppercase tracking-[0.1em] fc-text-subtle"
-                                  : "shrink-0"
-                              }
-                            >
-                              {formatStatusLabel(g.status)}
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p
+                                className="truncate text-sm font-bold fc-text-primary"
+                                style={{ fontFamily: "var(--f-display)" }}
+                              >
+                                {goal.title}
+                              </p>
+                              {goal.description ? (
+                                <p className="mt-0.5 line-clamp-2 text-xs fc-text-dim">
+                                  {goal.description}
+                                </p>
+                              ) : null}
+                              <p
+                                className="mt-1 text-[11px] fc-text-subtle"
+                                style={{ fontFamily: "var(--f-mono)" }}
+                              >
+                                {new Date(goal.created_at).toLocaleDateString(
+                                  undefined,
+                                  {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "numeric",
+                                  },
+                                )}
+                                {goal.target_value != null
+                                  ? ` · Target ${goal.current_value ?? 0}/${goal.target_value}${goal.target_unit ? ` ${goal.target_unit}` : ""}`
+                                  : ""}
+                              </p>
+                              {progress != null ? (
+                                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[color:var(--fc-surface-tint)]">
+                                  <div
+                                    className="h-full rounded-full bg-[color:var(--fc-accent)]"
+                                    style={{ width: `${progress}%` }}
+                                  />
+                                </div>
+                              ) : null}
+                            </div>
+                            <Badge variant={goalStatusBadgeVariant(goal.status)}>
+                              {formatStatusLabel(goal.status)}
                             </Badge>
                           </div>
-                          {g.description ? (
-                            <p className="mb-2 mt-1 text-sm leading-relaxed fc-text-dim line-clamp-2">
-                              {g.description}
-                            </p>
-                          ) : null}
-                          <div
-                            className={`flex flex-wrap items-baseline gap-x-1 text-xs fc-text-dim mb-0 ${g.description ? "" : "mt-2"}`}
-                          >
-                            <Eyebrow
-                              as="span"
-                              tone="cyan"
-                              density="section"
-                              className="!mb-0 !text-[10px] !font-medium"
-                            >
-                              {categoryLabel(cat)}
-                            </Eyebrow>
-                            <span className="fc-text-subtle" aria-hidden>
-                              ·
-                            </span>
-                            <span className="tabular-nums">{dateStr}</span>
-                            {!showProgressBar && targetDisplay != null ? (
-                              <>
-                                <span className="fc-text-subtle" aria-hidden>
-                                  ·
-                                </span>
-                                <span>
-                                  Target{" "}
-                                  <span className="tabular-nums">{targetDisplay}</span>
-                                </span>
-                              </>
-                            ) : null}
-                            {!showProgressBar && currentDisplay != null ? (
-                              <>
-                                <span className="fc-text-subtle" aria-hidden>
-                                  ·
-                                </span>
-                                <span>
-                                  Current{" "}
-                                  <span className="tabular-nums">{currentDisplay}</span>
-                                </span>
-                              </>
-                            ) : null}
-                          </div>
-                          {showProgressBar && currentNum != null && targetNum != null ? (
-                            <div className="mt-3">
-                              <div className="mb-1 flex items-baseline justify-between gap-2">
-                                <span className="text-sm font-semibold tabular-nums fc-text-primary">
-                                  {String(currentNum)}
-                                </span>
-                                <span className="text-xs tabular-nums fc-text-dim">
-                                  / {String(targetNum)}
-                                  {g.target_unit ?? ""}
-                                </span>
-                              </div>
-                              <div className="h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--fc-glass-border)]">
-                                <div
-                                  className="h-full rounded-full bg-[color:var(--fc-accent-cyan)]"
-                                  style={{ width: `${progressPct}%` }}
-                                />
-                              </div>
-                            </div>
-                          ) : null}
-                        </ClientGlassCard>
+                        </div>
                       );
                     })}
                   </div>
@@ -320,8 +321,8 @@ export default function GoalHistoryPage() {
               ))}
             </div>
           )}
-        </ClientPageShell>
-      </AnimatedBackground>
+        </div>
+      </ClientPageShell>
     </ProtectedRoute>
   );
 }

@@ -1,0 +1,153 @@
+# PHASE B — COACH PROGRAMS LIST (Collection Card) — Report
+**Date:** 2026-07-05  
+**Route:** `/coach/programs`  
+**Spec:** `design/mockups/coach-03-programs.html` (header/chrome) + Element 16 `CollectionCard`
+
+---
+
+## 1. Files created / modified / unmounted
+
+| Path | Action |
+|------|--------|
+| `src/lib/programs/masterProgramBlocksBatch.ts` | **Created** — batched `training_blocks` fetch |
+| `src/lib/programs/mapProgramBlockPhaseSegments.ts` | **Created** — phase-color mapper util |
+| `src/lib/programs/programListDisplayUtils.ts` | **Created** — hue, initials, periodization/difficulty labels |
+| `src/components/coach/programs/coachProgramsWorkspace.module.css` | **Created** — page header, chips, modals, empty state |
+| `src/app/api/coach/programs/route.ts` | **Modified** — additive `blocks`, `assignedPreview`; enriched assignments query |
+| `src/components/coach/ProgramsDashboardContent.tsx` | **Modified** — full presentation rebuild |
+| `src/app/coach/programs/page.tsx` | **Modified** — `canvas-full`, removed `FloatingParticles`, back link moved into content |
+
+**Unmounted on this page (not deleted):**
+- `ProgramCard` — no longer imported/rendered in `ProgramsDashboardContent`
+- `FloatingParticles` — removed from programs page shell
+- `EmptyState` / `BookOpen` — replaced with slim open empty line
+- Generic gray Dashboard `Link` in `page.tsx` — replaced by mono eyebrow in content
+
+**Not resurrected:** `ProgramTimeline`, `ProgramVolumeCalculator`
+
+**Not deleted:** `src/components/features/programs/ProgramCard.tsx` (still used in dev UI gallery)
+
+---
+
+## 2. API extension
+
+### Additive fields (per program in `programs[]`)
+
+| Field | Source |
+|-------|--------|
+| `blocks` | `getMasterProgramBlocksBatch()` — `{ name, phase_label, duration_weeks, block_order }[]` ordered by `block_order` |
+| `assignedPreview` | `{ count, initials[] }` — count matches existing tally; up to 3 initials from profiles |
+| `periodization_style` | Already in `select('*')` on `workout_programs` — passes through unchanged |
+
+### New helper
+
+**`getMasterProgramBlocksBatch`** (`src/lib/programs/masterProgramBlocksBatch.ts`)
+- Single query: `training_blocks` WHERE `program_id IN (…)` SELECT name, phase_label, duration_weeks, block_order
+- Returns `Map<programId, MasterProgramBlockRow[]>`
+- **Does not modify** `getMasterProgramTotalWeeksBatch`
+
+### Assignments enrichment
+
+- Was: `select('program_id')` → count only
+- Now: `select('program_id, client_id, created_at')` ordered desc
+- Count logic **unchanged** (increment per row)
+- Preview: first 3 unique `client_id` per program → batch `profiles` query → initials via `clientInitialsFromProfile`
+
+### Preserved behavior
+
+- Filter: `filter=active|all`, default active
+- Ordering: `created_at desc`
+- `is_active` filter when active
+- `totalWeeks` via `getMasterProgramTotalWeeksBatch` (unchanged)
+- `target_audience` default
+- Top-level `assignmentCountByProgram` object (unchanged shape)
+
+---
+
+## 3. Phase mapper + structure strip
+
+**File:** `src/lib/programs/mapProgramBlockPhaseSegments.ts`
+
+**Exports:**
+- `mapProgramBlocksToPhaseSegments(blocks)` → `{ label, weeks, level }[]`
+- `mapProgramBlocksToStructureSegments(blocks)` → `CollectionCardStructureSegment[]`
+
+**Rules (priority):**
+1. Deload override — recovery keywords in `phase_label` or `name` → `deload`
+2. Keyword by meaning — light / mod / hard dictionaries
+3. Order-based ramp on non-deload blocks — 1→mod, 2→light+mod, 3→light+mod+hard, 4+→distributed light→mod→hard (last→hard)
+
+**Strip rendering:** `structure` prop passed **only when `blocks.length > 1`**. Single-block programs omit the strip.
+
+**Label:** `phase_label` if non-empty, else `name`. Duration sublabel: `{n} week(s)`. Width ∝ `duration_weeks`.
+
+---
+
+## 4. Card prop mapping
+
+| Prop | Source |
+|------|--------|
+| `hue` | `programCollectionHue(program.id)` — stable hash over `COLLECTION_HUES` |
+| `name` | `program.name` |
+| `status` | `is_active` → active/inactive |
+| `meta` | **Real fields only:** difficulty chip · `{totalWeeks} wks` · periodization label (if `periodization_style` set). **No** Fixed / days-per-week (not on `workout_programs`) |
+| `structure` | Mapper output when `blocks.length > 1` |
+| `rightStat` | `CollectionCardAssignedStat` — count from `assignedPreview.count`; avatars from initials + `avatarHueByIndex` |
+| `actions` | View → `/coach/programs/[id]`, Assign → `openAssignModal`, Edit → `/coach/programs/[id]/edit`, Delete → delete modal |
+
+---
+
+## 5. Diff table vs `coach-03-programs.html` CSS
+
+| Mockup element | Mockup CSS | Implementation | Match |
+|----------------|------------|----------------|-------|
+| Page title | `.h1` Archivo 27px 800 | `.h1` in `coachProgramsWorkspace.module.css` | ✓ |
+| Sub stats | `.sub` mono 11px dim | `.sub` mono line `{n} programs · …` | ✓ |
+| Refresh | `.ghost` 40px, border, uppercase | `.ghostBtn` | ✓ |
+| Create CTA | `.cta` accent + glow | `.primaryCta` `--fc-accent` + `--fc-accent-glow` | ✓ |
+| Filter chips | `.chip.on/off` mono uppercase | `.chip` + `.chipOn`/`.chipOff` | ✓ |
+| List body | Open **table** rows 54px | **Collection cards** (Element 16 stack) — intentional per Phase B spec | ✓ (spec override) |
+| Card anatomy | N/A in table mockup | `CollectionCard` — rail, glow, meta, optional strip, assigned stat, icon actions | ✓ Element 16 |
+| Level column | Table chip | Meta line difficulty chip | ✓ (relocated) |
+| Length | Table mono column | Meta `{totalWeeks} wks` | ✓ |
+| Assigned | Accent when >0 | `CollectionCardAssignedStat` + avatars | ✓ |
+| Actions | View ghost + icon buttons | `CollectionCardIconAction` ×4 | ✓ |
+| Empty | Not shown | Slim `No programs yet.` + Create CTA, no box | ✓ |
+| Shell width | 1360px frame | `CoachPageShell canvas-full` | ✓ |
+| Back / eyebrow | `.eyebrow` mono accent | `.back` mono uppercase accent link | ✓ |
+| Floating particles | N/A | Removed | ✓ |
+
+**Note:** Mockup file title says "open table" but this build follows the user's Phase B prompt (collection card stack). Header/filter/chrome align with mockup; list body uses Element 16 cards.
+
+---
+
+## 6. Logic-untouched confirmation
+
+| Fence | Status |
+|-------|--------|
+| `WorkoutTemplateService.assignProgramToClients` → `assign_program_instance` RPC | **Unchanged** — same call in `doAssignAndClose` |
+| `getClientsWithActiveProgram` + replace confirm | **Unchanged** — `submitAssign` branching intact |
+| `'auto' \| 'coach_managed'` progression mode | **Unchanged** — passed to assign RPC |
+| `WorkoutTemplateService.deleteProgram` | **Unchanged** — `handleDelete` |
+| Create flow link | **Unchanged** — `/coach/programs/create` |
+| `getMasterProgramTotalWeeksBatch` | **Unchanged** — file not modified |
+| `GET /api/coach/programs` filter/order/counts/totalWeeks | **Unchanged** — additive fields only |
+| Edit link | **Unchanged target** — `/coach/programs/[id]/edit` (station) |
+
+---
+
+## 7. Modal reskin (shells only)
+
+All three modals (assign, replace confirm, delete) restyled via `coachProgramsWorkspace.module.css`:
+- System scrim: `color-mix` on `--fc-bg-deep` — **no backdrop-blur**
+- Borderless underline inputs (`.fieldInput`)
+- Ghost cancel + single glow primary per modal (assign confirm, replace confirm, delete confirm)
+- Handlers, payloads, branching, RPC calls — **identical**
+
+---
+
+## 8. TypeScript
+
+```
+npx tsc --noEmit → exit 0
+```

@@ -1,3 +1,7 @@
+# NOTE: Stale as of 2026-05-30 — workout_logs and workout_sessions have
+# program_assignment_id / program_schedule_id columns in production
+# that are missing here. Live DB (information_schema.columns) is
+# authoritative; re-export pending.
 table_schema,table_name,column_name,data_type,is_nullable,column_default
 public,achievement_templates,id,uuid,NO,gen_random_uuid()
 public,achievement_templates,name,text,NO,null

@@ -1,5 +1,6 @@
 import type { BlockGroupLite, ExerciseSummaryModel } from "./types";
 import type { WorkoutSetLog } from "./workoutSetLogTypes";
+import { dropTechniqueNote } from "./setLinesFromLogs";
 
 function formatBlockLabel(blockType: string): string {
   return blockType
@@ -105,6 +106,7 @@ export function buildExerciseSummaryRows(
         sets: subset,
         blockType: block.set_type,
         exerciseNames: block.exerciseNames,
+        techniqueNote: dropTechniqueNote(subset),
       });
       continue;
     }
@@ -124,6 +126,7 @@ export function buildExerciseSummaryRows(
         sets: subset,
         blockType: block.set_type,
         exerciseNames: block.exerciseNames,
+        techniqueNote: dropTechniqueNote(subset),
       });
     }
   }

@@ -1,0 +1,116 @@
+programWeekStateBuilder — programs → workout_programs fix
+Date: 2026-07-13
+Scope: code only — no DB/SQL/git
+
+================================================================================
+1. What the two queries do, consumers, visible symptom
+================================================================================
+
+FILE: src/lib/programWeekStateBuilder.ts (not src/lib/programs/…)
+
+QUERY A — L118–120 (completed-program branch)
+  When: no active assignment; recently completed assignment exists;
+        completedAssignment.name is empty AND program_id is set.
+  Does:  .select('name').eq('id', program_id).maybeSingle()
+  Feeds: programName on ProgramWeekState returned by buildProgramWeekState.
+
+QUERY B — L239–241 (active-assignment branch)
+  When: state.assignment.name is empty AND program_id is set.
+  Does:  same select/filter.
+  Feeds: programName on ProgramWeekState.
+
+BUILDER ENTRY: buildProgramWeekState() L79 — exported state shape ProgramWeekState.
+
+CONSUMERS (direct):
+  GET /api/client/program-week
+    src/app/api/client/program-week/route.ts:50 → returns JSON state.
+
+CONSUMERS (indirect / types only on Train):
+  Train UI imports ProgramWeekState types from this file but loads data via
+  get_train_page_data RPC + trainPageDataMapper.ts (NOT buildProgramWeekState).
+  ActiveProgramCard.tsx:182 — programName header (Train RPC path).
+  ProgramCompletedCard.tsx:14–26 — completion banner programName.
+
+  program-week API caller:
+    src/app/client/programs/[id]/details/page.tsx:508–518
+    Uses displayWeekNumber / currentUnlockedWeek only for week outline expand —
+    does NOT render programName from this API.
+
+CURRENT RUNTIME BEHAVIOR (before fix):
+  .from('programs') → PostgREST error (table does not exist; MCP confirms
+  programs_exists=false, workout_programs_exists=true).
+  Error is NOT checked; destructured data is null → program?.name undefined →
+  fallback programName = 'Training Program'.
+  No thrown exception; API still returns 200.
+
+VISIBLE SYMPTOM:
+  Mostly SILENT today: all 6 active/completed program_assignments in live DB have
+  non-empty assignment.name, so the lookup branch is skipped and correct names
+  already show on Train (via RPC programName, not this builder).
+
+  When assignment.name IS empty (future/migrated rows):
+    - programName would show generic "Training Program" / "Your program" instead
+      of workout_programs.name.
+    - Browser console/network: failed GET …/programs?select=name… (404).
+
+  Console check is the reliable before/after for Popescu today; name on Train
+  unchanged because RPC path already supplies programName.
+
+================================================================================
+2. Live column-mapping verification
+================================================================================
+
+Queried columns used by fix:
+  SELECT name WHERE id = :program_id
+
+workout_programs (live MCP information_schema):
+  id          uuid       ✓ join key (= program_assignments.program_id)
+  name        text       ✓ same semantic as intended programs.name
+
+No duration_weeks / total_weeks selected here — totalWeeks in this builder
+comes from resolveInstanceWeekForAssignment() (L114–115, L155–169), matching
+established app source of truth. No second derivation introduced.
+
+Mismatch: NONE. Safe to swap table name only.
+
+================================================================================
+3. Exact change
+================================================================================
+
+BEFORE L119:
+  supabase.from('programs').select('name').eq('id', completedAssignment.program_id)
+
+AFTER L119:
+  supabase.from('workout_programs').select('name').eq('id', completedAssignment.program_id)
+
+BEFORE L240:
+  supabase.from('programs').select('name').eq('id', state.assignment.program_id)
+
+AFTER L240:
+  supabase.from('workout_programs').select('name').eq('id', state.assignment.program_id)
+
+No other lines changed. No dead fallback removed (fallback 'Training Program'
+still valid when name truly missing).
+
+================================================================================
+4. tsc --noEmit
+================================================================================
+
+Command: npx tsc --noEmit
+Result:  EXIT 0
+
+================================================================================
+5. Browser check for user
+================================================================================
+
+Primary check (console):
+  Open DevTools → Network or Console while loading a page that hits
+  GET /api/client/program-week (e.g. Client → Programs → [active program]
+  details). Confirm NO request to /rest/v1/programs and NO 404 for that table.
+
+Visible UI (only if assignment.name is blank):
+  Program completed banner (ProgramCompletedCard) or program-week-driven header
+  should show the real workout_programs.name instead of "Training Program".
+
+For Popescu today (assignment.name = "test nou 1"): expect NO visible UI
+change — verification is console-only (error gone if branch ever runs).

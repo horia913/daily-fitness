@@ -1,0 +1,89 @@
+/* Mockup .srow — thin set/unit rows outside the active log */
+
+.srow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 18px 8px 18px;
+  border-top: 1px solid var(--fc-hairline, rgba(255, 255, 255, 0.07));
+  width: 100%;
+  margin: 0;
+  background: transparent;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: default;
+}
+
+button.srow {
+  cursor: pointer;
+}
+
+button.srow:hover .sn,
+button.srow:hover .sxMuted {
+  color: var(--fc-text-dim, #98a2b3);
+}
+
+.tick {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid var(--fc-hairline-strong, rgba(255, 255, 255, 0.13));
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--fc-text-subtle, #5c6470);
+}
+
+.done .tick {
+  background: var(--fc-status-success, #22e56a);
+  border-color: var(--fc-status-success, #22e56a);
+  color: #04240f;
+}
+
+.sn {
+  font-family: var(--f-mono, ui-monospace, monospace);
+  font-size: 10.5px;
+  color: var(--fc-text-dim, #98a2b3);
+  width: 46px;
+  flex-shrink: 0;
+}
+
+.sx {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--f-mono, ui-monospace, monospace);
+  font-size: 11.5px;
+  color: var(--fc-text-primary, #eef1f5);
+}
+
+.done .sx {
+  color: var(--fc-text-subtle, #5c6470);
+}
+
+.sxAccent {
+  color: var(--fc-status-success, #22e56a);
+}
+
+.sxMuted {
+  color: var(--fc-text-subtle, #5c6470);
+}
+
+.effortEasy {
+  color: var(--fc-effort-easy);
+}
+.effortMedium {
+  color: var(--fc-effort-medium);
+}
+.effortHard {
+  color: var(--fc-effort-hard);
+}
+.effortMax {
+  color: var(--fc-effort-max);
+}

@@ -121,7 +121,7 @@ export async function fetchCoachClientListTrainingPayload(
   const { data: paRows, error: paErr } = await db
     .from("program_assignments")
     .select(
-      "id, client_id, pause_status, timezone_snapshot, start_date, duration_weeks, pause_accumulated_days, paused_at",
+      "id, client_id, pause_status, timezone_snapshot, start_date, pause_accumulated_days, paused_at",
     )
     .in("client_id", clientIds)
     .eq("status", "active")
@@ -142,7 +142,6 @@ export async function fetchCoachClientListTrainingPayload(
     pause_status: string | null;
     timezone_snapshot: string | null;
     start_date: string | null;
-    duration_weeks: number | null;
     pause_accumulated_days: number | null;
     paused_at: string | null;
   };
@@ -244,7 +243,7 @@ export async function fetchCoachClientListTrainingPayload(
     string,
     Array<{
       program_assignment_id: string | null;
-      program_schedule_id: string | null;
+      program_day_assignment_id: string | null;
       completed_at: string;
     }>
   >();
@@ -252,11 +251,11 @@ export async function fetchCoachClientListTrainingPayload(
   if (globalMinUtc !== Infinity && globalMaxUtc > 0) {
     const { data: logRows, error: logErr } = await db
       .from("workout_logs")
-      .select("client_id, program_assignment_id, program_schedule_id, completed_at")
+      .select("client_id, program_assignment_id, program_day_assignment_id, completed_at")
       .in("client_id", clientIds)
       .in("program_assignment_id", assignmentIds)
       .not("completed_at", "is", null)
-      .not("program_schedule_id", "is", null)
+      .not("program_day_assignment_id", "is", null)
       .gte("completed_at", new Date(globalMinUtc).toISOString())
       .lte("completed_at", new Date(globalMaxUtc).toISOString());
 
@@ -269,8 +268,8 @@ export async function fetchCoachClientListTrainingPayload(
         arr.push({
           program_assignment_id:
             (row as { program_assignment_id?: string | null }).program_assignment_id ?? null,
-          program_schedule_id:
-            (row as { program_schedule_id?: string | null }).program_schedule_id ?? null,
+          program_day_assignment_id:
+            (row as { program_day_assignment_id?: string | null }).program_day_assignment_id ?? null,
           completed_at: (row as { completed_at: string }).completed_at,
         });
         logsByClient.set(cid, arr);
@@ -325,7 +324,7 @@ export async function fetchCoachClientListTrainingPayload(
     const currentCompleted = new Set<string>();
     for (const log of logs) {
       if (log.program_assignment_id !== assignment.id) continue;
-      const sid = log.program_schedule_id;
+      const sid = log.program_day_assignment_id;
       if (!sid || !log.completed_at) continue;
       if (isoCompletedLocalYmdInRange(log.completed_at, tz, priorMonday, priorSunday)) {
         priorCompleted.add(sid);

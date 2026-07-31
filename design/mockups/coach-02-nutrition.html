@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Coach Nutrition — Workspace (open)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Archivo+Expanded:wght@700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root {
+    --bg:#0A0B0D; --surface:#1B1E24; --raised:#22262E;
+    --hairline:rgba(255,255,255,0.07); --border:rgba(255,255,255,0.10);
+    --text:#F7F6F1; --dim:#9B9C90; --mute:#63645B;
+    --accent:#2E7BFF; --accent-dim:rgba(46,123,255,0.16); --accent-glow:rgba(46,123,255,0.30);
+    --good:#22E56A; --good-dim:rgba(34,229,106,0.15);
+    --warn:#FFB020; --warn-dim:rgba(255,176,32,0.15);
+    --bad:#FF5A4D; --bad-dim:rgba(255,90,77,0.15);
+    --track:rgba(255,255,255,0.08);
+  }
+  body { font-family:'Inter',sans-serif; background:#050504; color:var(--text); padding:28px 12px 60px; display:flex; flex-direction:column; align-items:center; gap:14px; }
+  .note { max-width:1360px; width:100%; color:var(--dim); font-size:13px; line-height:1.55; }
+  .note b { color:var(--text); } .note .blue { color:var(--accent); }
+  .frame { width:1360px; background:var(--bg); border:1px solid rgba(255,255,255,0.1); border-radius:18px; overflow:hidden; display:flex; min-height:780px; }
+  .sidebar { width:188px; flex-shrink:0; background:#0D0F13; border-right:1px solid var(--hairline); padding:20px 12px; display:flex; flex-direction:column; gap:3px; }
+  .logo { font-family:'Archivo Expanded','Archivo'; font-weight:900; font-size:15px; letter-spacing:-0.5px; padding:0 10px 18px; }
+  .ni { display:flex; align-items:center; gap:9px; padding:9px 10px; border-radius:10px; color:var(--dim); font-size:13px; font-weight:600; cursor:pointer; }
+  .ni.on { background:var(--accent-dim); color:var(--accent); }
+  .ni .ic { width:16px; text-align:center; font-size:13px; }
+  .coach { margin-top:auto; display:flex; align-items:center; gap:8px; padding:8px 10px; color:var(--mute); font-size:12px; }
+  .coach .cav { width:26px; height:26px; border-radius:8px; background:var(--raised); display:flex; align-items:center; justify-content:center; font-family:'Archivo'; font-weight:800; font-size:11px; color:var(--accent); }
+  .main { flex:1; padding:26px 32px 36px; overflow:auto; }
+  .eyebrow { font-family:'JetBrains Mono'; font-size:9px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:var(--accent); }
+  .h1 { font-family:'Archivo Expanded','Archivo'; font-weight:800; font-size:27px; letter-spacing:-1px; }
+  .h1 .thin { color:var(--dim); }
+  .sub { font-family:'JetBrains Mono'; font-size:11px; color:var(--dim); letter-spacing:0.3px; }
+  .cta { height:40px; padding:0 16px; border-radius:12px; background:var(--accent); color:#fff; display:inline-flex; align-items:center; gap:7px; font-family:'Archivo'; font-weight:800; font-size:12px; letter-spacing:0.3px; text-transform:uppercase; box-shadow:0 4px 20px var(--accent-glow); cursor:pointer; white-space:nowrap; }
+  .ghost { height:40px; padding:0 14px; border-radius:12px; background:transparent; border:1px solid var(--border); color:var(--text); display:inline-flex; align-items:center; gap:7px; font-family:'Archivo'; font-weight:700; font-size:12px; letter-spacing:0.3px; text-transform:uppercase; cursor:pointer; white-space:nowrap; }
+  .chip { display:inline-flex; align-items:center; gap:5px; padding:5px 11px; border-radius:8px; font-family:'JetBrains Mono'; font-size:9.5px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; cursor:pointer; }
+  .chip.on { background:var(--accent-dim); color:var(--accent); }
+  .chip.off { background:var(--surface); color:var(--dim); }
+  .pill { display:inline-flex; align-items:center; gap:5px; padding:4px 9px; border-radius:7px; font-family:'JetBrains Mono'; font-size:8.5px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; }
+  .pill .pd { width:5px; height:5px; border-radius:50%; background:currentColor; }
+  .pill.good { background:var(--good-dim); color:var(--good); }
+  .pill.warn { background:var(--warn-dim); color:var(--warn); }
+  .pill.bad { background:var(--bad-dim); color:var(--bad); }
+  .pill.mute { background:var(--surface); color:var(--mute); }
+  .sect { font-family:'Archivo'; font-weight:800; font-size:14px; display:flex; align-items:center; gap:8px; }
+  .sect::before { content:''; width:3px; height:13px; border-radius:2px; background:var(--accent); }
+  .mono { font-family:'JetBrains Mono'; }
+  /* open stat strip (replaces surface tiles) */
+  .statstrip { display:grid; grid-template-columns:repeat(6,1fr); border-top:1px solid var(--hairline); border-bottom:1px solid var(--hairline); margin:22px 0 26px; }
+  .stat { padding:16px 0 15px 22px; border-left:1px solid var(--hairline); }
+  .stat:first-child { border-left:none; padding-left:2px; }
+  .stat .sv { font-family:'Archivo Expanded','Archivo'; font-weight:900; font-size:30px; letter-spacing:-1.5px; line-height:1; }
+  .stat .sv .sden { font-size:14px; color:var(--mute); font-weight:700; letter-spacing:-0.5px; }
+  .stat .sl { font-family:'JetBrains Mono'; font-size:8.5px; font-weight:600; letter-spacing:0.9px; text-transform:uppercase; color:var(--dim); margin-top:7px; }
+  /* open table */
+  .thead { padding:0 2px 10px; border-bottom:1px solid var(--hairline); }
+  .th { font-family:'JetBrains Mono'; font-size:8.5px; font-weight:600; letter-spacing:1px; text-transform:uppercase; color:var(--dim); }
+  .trow { align-items:center; padding:0 2px; border-bottom:1px solid var(--hairline); cursor:pointer; }
+  .trow:hover { background:rgba(255,255,255,0.015); }
+  .tname { font-family:'Archivo'; font-weight:800; font-size:14.5px; letter-spacing:-0.2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tmono { font-family:'JetBrains Mono'; font-size:11px; font-weight:600; letter-spacing:0.3px; color:var(--dim); }
+  .icb { height:32px; width:34px; border-radius:9px; background:transparent; border:1px solid var(--border); color:var(--dim); display:inline-flex; align-items:center; justify-content:center; font-size:11.5px; cursor:pointer; }
+  .ghost.sm { height:32px; font-size:10px; padding:0 12px; }
+
+  .tabs { display:flex; gap:26px; border-bottom:1px solid var(--hairline); margin:20px 0 18px; }
+  .tab { font-family:'JetBrains Mono'; font-size:11px; font-weight:700; letter-spacing:0.8px; text-transform:uppercase; color:var(--dim); padding:0 2px 12px; cursor:pointer; position:relative; }
+  .tab .tc { color:var(--mute); margin-left:5px; }
+  .tab.on { color:var(--accent); }
+  .tab.on::after { content:''; position:absolute; left:0; right:0; bottom:-1px; height:2px; background:var(--accent); border-radius:1px; }
+  .searchrow { display:flex; align-items:center; gap:14px; margin-bottom:18px; }
+  .search { flex:1; display:flex; align-items:center; gap:9px; border-bottom:1.5px solid var(--border); padding:6px 2px 9px; color:var(--mute); font-size:13px; }
+</style></head>
+<body>
+<div class="note"><b>Coach Nutrition — open workspace.</b> Meal plans as an <b>open dense table</b> (rows on the background, hairlines — no grey cards), per the system law + desktop paradigm. Create = primary CTA, Generator = secondary, Assignments + Food DB = tabs. Plan names are sample data.</div>
+<div class="frame">
+  <div class="sidebar">
+    <div class="logo">DailyFitness</div>
+    <div class="ni"><span class="ic">⌂</span>Home</div>
+    <div class="ni"><span class="ic">◉</span>Clients</div>
+    <div class="ni"><span class="ic">▲</span>Training</div>
+    <div class="ni on"><span class="ic">◐</span>Nutrition</div>
+    <div class="ni"><span class="ic">▥</span>Insights</div>
+    <div class="coach"><span class="cav">N</span>Coach</div>
+  </div>
+  <div class="main">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;">
+      <div>
+        <div class="h1">Nutrition</div>
+        <div class="sub" style="margin-top:7px;">6 meal plans &nbsp;·&nbsp; 4 active assignments &nbsp;·&nbsp; 312 foods</div>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <div class="ghost">⚡ Generator</div>
+        <div class="cta">＋ Create meal plan</div>
+      </div>
+    </div>
+    <div class="tabs">
+      <div class="tab on">Meal plans<span class="tc">6</span></div>
+      <div class="tab">Assignments<span class="tc">4</span></div>
+      <div class="tab">Food database<span class="tc">312</span></div>
+    </div>
+    <div class="searchrow">
+      <div class="search">⌕ &nbsp;Search meal plans…</div>
+      <div class="chip on">All 6</div>
+      <div class="chip off">Active 4</div>
+      <div class="chip off">Draft 2</div>
+    </div>
+    <div class="thead" style="display:grid;grid-template-columns:minmax(0,1.1fr) 110px 320px 100px 90px 200px;gap:12px;">
+      <span class="th">Plan</span><span class="th">Status</span><span class="th">Targets</span><span class="th">Meals</span><span class="th">Clients</span><span class="th">Actions</span>
+    </div><div class="trow" style="display:grid;grid-template-columns:minmax(0,1.1fr) 110px 320px 100px 90px 200px;gap:12px;height:56px;">
+      <span class="tname">Lean Mass 2800</span>
+      <span><span class="pill good"><span class="pd"></span>Active</span></span>
+      <span class="tmono"><b style="color:var(--text)">2,800 kcal</b><span style="color:var(--mute)"> · </span>P 200g<span style="color:var(--mute)"> · </span>C 320g<span style="color:var(--mute)"> · </span>F 85g</span>
+      <span class="tmono">5/day</span>
+      <span class="tmono" style="color:var(--accent);">3</span>
+      <span style="display:flex;gap:6px;"><span class="ghost sm">View</span><span class="icb">◉+</span><span class="icb">✎</span><span class="icb">🗑</span></span>
+    </div><div class="trow" style="display:grid;grid-template-columns:minmax(0,1.1fr) 110px 320px 100px 90px 200px;gap:12px;height:56px;">
+      <span class="tname">Cut — High Protein</span>
+      <span><span class="pill good"><span class="pd"></span>Active</span></span>
+      <span class="tmono"><b style="color:var(--text)">1,900 kcal</b><span style="color:var(--mute)"> · </span>P 190g<span style="color:var(--mute)"> · </span>C 150g<span style="color:var(--mute)"> · </span>F 60g</span>
+      <span class="tmono">4/day</span>
+      <span class="tmono" style="color:var(--accent);">1</span>
+      <span style="display:flex;gap:6px;"><span class="ghost sm">View</span><span class="icb">◉+</span><span class="icb">✎</span><span class="icb">🗑</span></span>
+    </div><div class="trow" style="display:grid;grid-template-columns:minmax(0,1.1fr) 110px 320px 100px 90px 200px;gap:12px;height:56px;">
+      <span class="tname">Maintenance Base</span>
+      <span><span class="pill good"><span class="pd"></span>Active</span></span>
+      <span class="tmono"><b style="color:var(--text)">2,300 kcal</b><span style="color:var(--mute)"> · </span>P 170g<span style="color:var(--mute)"> · </span>C 250g<span style="color:var(--mute)"> · </span>F 75g</span>
+      <span class="tmono">4/day</span>
+      <span class="tmono" style="color:var(--accent);">2</span>
+      <span style="display:flex;gap:6px;"><span class="ghost sm">View</span><span class="icb">◉+</span><span class="icb">✎</span><span class="icb">🗑</span></span>
+    </div><div class="trow" style="display:grid;grid-template-columns:minmax(0,1.1fr) 110px 320px 100px 90px 200px;gap:12px;height:56px;">
+      <span class="tname">Contest Prep W1–4</span>
+      <span><span class="pill mute">Draft</span></span>
+      <span class="tmono"><b style="color:var(--text)">1,700 kcal</b><span style="color:var(--mute)"> · </span>P 185g<span style="color:var(--mute)"> · </span>C 120g<span style="color:var(--mute)"> · </span>F 55g</span>
+      <span class="tmono">5/day</span>
+      <span class="tmono" style="">0</span>
+      <span style="display:flex;gap:6px;"><span class="ghost sm">View</span><span class="icb">◉+</span><span class="icb">✎</span><span class="icb">🗑</span></span>
+    </div><div class="trow" style="display:grid;grid-template-columns:minmax(0,1.1fr) 110px 320px 100px 90px 200px;gap:12px;height:56px;">
+      <span class="tname">Off-Season Builder</span>
+      <span><span class="pill good"><span class="pd"></span>Active</span></span>
+      <span class="tmono"><b style="color:var(--text)">3,100 kcal</b><span style="color:var(--mute)"> · </span>P 210g<span style="color:var(--mute)"> · </span>C 360g<span style="color:var(--mute)"> · </span>F 95g</span>
+      <span class="tmono">6/day</span>
+      <span class="tmono" style="">0</span>
+      <span style="display:flex;gap:6px;"><span class="ghost sm">View</span><span class="icb">◉+</span><span class="icb">✎</span><span class="icb">🗑</span></span>
+    </div><div class="trow" style="display:grid;grid-template-columns:minmax(0,1.1fr) 110px 320px 100px 90px 200px;gap:12px;height:56px;">
+      <span class="tname">Vegetarian Balance</span>
+      <span><span class="pill mute">Draft</span></span>
+      <span class="tmono"><b style="color:var(--text)">2,100 kcal</b><span style="color:var(--mute)"> · </span>P 150g<span style="color:var(--mute)"> · </span>C 260g<span style="color:var(--mute)"> · </span>F 70g</span>
+      <span class="tmono">4/day</span>
+      <span class="tmono" style="">0</span>
+      <span style="display:flex;gap:6px;"><span class="ghost sm">View</span><span class="icb">◉+</span><span class="icb">✎</span><span class="icb">🗑</span></span>
+    </div>
+  </div>
+</div>
+</body></html>

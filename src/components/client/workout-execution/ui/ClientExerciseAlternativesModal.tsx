@@ -18,7 +18,7 @@ const REASON_LABEL: Record<ExerciseAlternative["reason"], string> = {
 
 const REASON_BADGE_CLASS: Record<ExerciseAlternative["reason"], string> = {
   equipment:
-    "border-cyan-500/30 bg-cyan-500/15 text-[10px] font-medium uppercase text-cyan-300",
+    "border-[color-mix(in_srgb,var(--fc-group-c)_30%,transparent)] bg-[color-mix(in_srgb,var(--fc-group-c)_15%,transparent)] text-[10px] font-medium uppercase text-[color-mix(in_srgb,var(--fc-group-c)_70%,white)]",
   difficulty:
     "border-amber-500/30 bg-amber-500/15 text-[10px] font-medium uppercase text-amber-300",
   injury:
@@ -81,19 +81,19 @@ export default function ClientExerciseAlternativesModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-      <div className="max-h-[min(85vh,32rem)] w-full max-w-sm overflow-y-auto rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4 backdrop-blur-md">
+      <div className="max-h-[min(85vh,32rem)] w-full max-w-sm overflow-y-auto rounded-xl border border-[color-mix(in_srgb,var(--fc-group-c)_20%,transparent)] bg-[color-mix(in_srgb,var(--fc-group-c)_5%,transparent)] p-4 backdrop-blur-md">
         <div className="mb-2 flex items-center justify-between">
           <Eyebrow
             tone="cyan"
             density="section"
-            className="!mb-0 !text-cyan-300"
+            className="!mb-0 !text-[color-mix(in_srgb,var(--fc-group-c)_70%,white)]"
           >
             SWAP EXERCISE
           </Eyebrow>
           <IconButton
             size="sm"
             variant="ghost"
-            className="text-cyan-100 hover:bg-white/10"
+            className="text-[color-mix(in_srgb,var(--fc-group-c)_35%,white)] hover:bg-white/10"
             aria-label="Close"
             onClick={onClose}
           >
@@ -105,7 +105,7 @@ export default function ClientExerciseAlternativesModal({
           Currently: {exercise.name}
         </p>
 
-        <div className="my-3 h-px bg-cyan-500/15" />
+        <div className="my-3 h-px bg-[color-mix(in_srgb,var(--fc-group-c)_15%,transparent)]" />
 
         {loading ? (
           <p className="py-6 text-center text-sm text-gray-400">

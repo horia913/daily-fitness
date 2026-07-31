@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rest modal + effort picker — v6</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;}
+  :root{
+    --bg:#0A0B0D; --hairline:rgba(255,255,255,.07); --hairline-2:rgba(255,255,255,.13);
+    --good:#22E56A; --warn:#FFB020; --orange:#FF7A2F; --bad:#FF5A4D; --accent:#2E7BFF; --cyan:#22D3EE;
+    --text:#EEF1F5; --dim:#98A2B3; --subtle:#5C6470;
+    --fb-sans:ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    --fb-mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+    --f-display:'Archivo',var(--fb-sans); --f-body:'Inter',var(--fb-sans); --f-mono:'JetBrains Mono',var(--fb-mono);
+  }
+  body{background:#07080A;color:var(--text);font-family:var(--f-body);-webkit-font-smoothing:antialiased;padding:26px 20px 70px;display:flex;gap:34px;flex-wrap:wrap;justify-content:center;align-items:flex-start;}
+  .disp{font-family:var(--f-display);font-stretch:125%;}
+  .col{width:375px;}
+  .cap{font-family:var(--f-mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--subtle);margin-bottom:10px;text-align:center;}
+  .cap b{color:var(--text);}
+
+  .stage{width:375px;background:#050607;border-radius:24px;border:1px solid var(--hairline-2);padding:22px 14px;min-height:300px;display:flex;align-items:center;justify-content:center;}
+
+  /* ===== REST MODAL — v6 ===== */
+  .rest{width:100%;background:var(--bg);border:1px solid var(--hairline-2);border-radius:18px;overflow:hidden;}
+  .rhead{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 11px 16px;border-bottom:1px solid var(--hairline);}
+  .rhead .l{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--cyan);font-weight:700;}
+  .rhead .x{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--subtle);font-size:15px;}
+  .rbody{padding:16px 16px 6px;text-align:center;}
+  .rnext{font-family:var(--f-mono);font-size:10px;letter-spacing:.06em;color:var(--dim);}
+  .rnext b{color:var(--text);}
+  .rlast{font-family:var(--f-mono);font-size:10px;color:var(--subtle);margin-top:4px;}
+  .rtime{font-family:var(--f-display);font-stretch:125%;font-size:62px;font-weight:900;line-height:1;letter-spacing:-.03em;margin:14px 0 4px;font-variant-numeric:tabular-nums;}
+  .rbar{height:3px;border-radius:2px;background:rgba(255,255,255,.1);overflow:hidden;margin:12px 0 0;}
+  .rbar i{display:block;height:100%;width:62%;background:var(--cyan);border-radius:2px;}
+  .radj{display:flex;gap:8px;padding:14px 16px 0;}
+  .radj button{flex:1;height:40px;border-radius:11px;background:#050608;border:1px solid var(--hairline-2);color:var(--dim);font-family:var(--f-mono);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+  .rskip{margin:9px 16px 16px;height:44px;border-radius:11px;border:1px solid color-mix(in srgb, var(--accent) 45%, transparent);color:var(--accent);background:transparent;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:7px;}
+
+  /* ===== EFFORT PICKER — v6 (flat, no nested card) ===== */
+  .logged{width:100%;background:transparent;border:1px solid var(--hairline-2);border-radius:15px;overflow:hidden;}
+  .lhd{display:flex;align-items:center;justify-content:space-between;padding:11px 14px 10px 16px;border-bottom:1px solid var(--hairline);}
+  .lhd .t{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--subtle);font-weight:700;}
+  .setrow{display:flex;align-items:center;gap:9px;padding:11px 14px 0 16px;}
+  .setrow .ck{width:16px;height:16px;border-radius:50%;background:var(--good);color:#04240F;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;flex-shrink:0;}
+  .setrow .v{font-size:13.5px;font-weight:700;flex:1;}
+  .setrow .kebab{color:var(--subtle);font-size:15px;letter-spacing:1px;}
+  .ask{font-family:var(--f-mono);font-size:8px;letter-spacing:.13em;text-transform:uppercase;color:var(--subtle);padding:11px 16px 7px 41px;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:0 16px 14px 41px;}
+  .opt{height:44px;border-radius:11px;background:#050608;border:1px solid var(--hairline-2);display:flex;align-items:center;justify-content:center;font-family:var(--f-display);font-stretch:125%;font-size:14px;font-weight:900;letter-spacing:-.01em;}
+  .opt.easy{color:var(--good);} .opt.med{color:var(--warn);} .opt.hard{color:var(--orange);} .opt.max{color:var(--bad);}
+  .opt.sel{background:color-mix(in srgb, currentColor 14%, #050608);border-color:currentColor;}
+
+  .note{width:375px;font-size:11.5px;line-height:1.7;color:var(--subtle);border-left:2px solid var(--good);padding-left:12px;}
+  .note b{color:var(--text);} .note .x{color:var(--bad);font-weight:700;} .note .k{color:var(--good);font-weight:700;}
+</style></head>
+<body>
+
+<div class="col">
+  <div class="cap"><b>Rest timer</b> — no glow, display numerals</div>
+  <div class="stage">
+    <div class="rest">
+      <div class="rhead"><span class="l">● Resting</span><span class="x">✕</span></div>
+      <div class="rbody">
+        <div class="rnext">Up next · <b>Set 2 of 3</b></div>
+        <div class="rlast">last set 6 × 10 kg</div>
+        <div class="rtime disp">1:46</div>
+        <div class="rbar"><i></i></div>
+      </div>
+      <div class="radj"><button>− 15s</button><button>+ 15s</button></div>
+      <div class="rskip">▶ Skip rest</div>
+    </div>
+  </div>
+</div>
+
+<div class="col">
+  <div class="cap"><b>Effort picker</b> — flat, stepped colours</div>
+  <div class="stage">
+    <div class="logged">
+      <div class="lhd"><span class="t">Logged sets · 1</span></div>
+      <div class="setrow"><span class="ck">✓</span><span class="v">Set 1 · 10 kg × 6 reps</span><span class="kebab">⋮</span></div>
+      <div class="ask">How hard was that?</div>
+      <div class="grid">
+        <span class="opt easy">Easy</span>
+        <span class="opt med">Medium</span>
+        <span class="opt hard">Hard</span>
+        <span class="opt max sel">Max</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="note">
+  <b>Rest timer — what changed:</b><br>
+  · <span class="x">Removed the glow</span> — v6 has no card glows; hairline border only.<br>
+  · Countdown in <b>Archivo display</b>, tabular numerals, so it doesn't jitter as digits change.<br>
+  · Copy: <b>"Up next · Set 2 of 3"</b> — the old line said "Next: Next Set — Set 2 of 3".<br>
+  · Last-set chip → plain mono line; ±15s → inset hairline buttons; <b>Skip rest</b> outlined in blue (= go forward), not a grey pill.<br>
+  · Cyan kept deliberately — it's <b>recovery</b> in your phase-intensity scale — and confined to the label and the progress bar.<br><br>
+  <b>Effort picker — what changed:</b><br>
+  · <span class="x">No card-in-card</span> — the prompt now sits directly in the logged-set card, indented under the set it belongs to. No milky inner panel.<br>
+  · <span class="k">Four distinct steps</span>: Easy green → Medium amber → <b>Hard orange</b> → Max red. Before, Medium and Hard were the same amber, so the scale had a hole in it.<br>
+  · Selected = tint of its own colour + full-strength border (Max shown selected).<br>
+  · Options in the display font, matching how effort words read everywhere else.<br><br>
+  <b>Note:</b> Hard uses a new <b>orange</b> step between amber and red. It's an addition to the palette — say if you'd rather keep three steps and have Medium/Hard share amber.
+</div>
+
+</body></html>

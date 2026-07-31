@@ -51,8 +51,8 @@ export function RestTimerOverlay({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-6 shadow-[0_0_40px_rgba(6,182,212,0.15)] backdrop-blur-md">
-        <p className="mb-2 text-xs uppercase tracking-wider text-cyan-300">REST TIMER</p>
+      <div className="w-full max-w-sm rounded-xl border border-[color-mix(in_srgb,var(--fc-group-c)_30%,transparent)] bg-[color-mix(in_srgb,var(--fc-group-c)_5%,transparent)] p-6 shadow-[0_0_40px_rgba(6,182,212,0.15)] backdrop-blur-md">
+        <p className="mb-2 text-xs uppercase tracking-wider text-[color-mix(in_srgb,var(--fc-group-c)_70%,white)]">REST TIMER</p>
         <p className="mb-4 text-sm text-gray-400">
           Next: {exerciseName || 'Exercise'} — Set {nextSet || 1} of {totalSets || 1}
         </p>
@@ -61,9 +61,9 @@ export function RestTimerOverlay({
           {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
         </div>
 
-        <div className="mb-4 h-2 w-full overflow-hidden rounded-full bg-cyan-900/30">
+        <div className="mb-4 h-2 w-full overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--fc-group-c)_30%,transparent)]">
           <div
-            className="h-full rounded-full bg-cyan-400 transition-all duration-700"
+            className="h-full rounded-full bg-[color:var(--fc-group-c)] transition-all duration-700"
             style={{ width: `${100 - progress}%` }}
           />
         </div>
@@ -72,7 +72,7 @@ export function RestTimerOverlay({
           <button
             type="button"
             onClick={() => setTimeLeft((v) => Math.max(0, v - 15))}
-            className="inline-flex items-center gap-1 rounded-full border border-cyan-500/30 px-3 py-1.5 text-xs font-medium text-cyan-200 hover:bg-cyan-500/10"
+            className="inline-flex items-center gap-1 rounded-full border border-[color-mix(in_srgb,var(--fc-group-c)_30%,transparent)] px-3 py-1.5 text-xs font-medium text-[color-mix(in_srgb,var(--fc-group-c)_35%,white)] hover:bg-[color-mix(in_srgb,var(--fc-group-c)_10%,transparent)]"
           >
             <Minus className="h-3.5 w-3.5" />
             15s
@@ -80,7 +80,7 @@ export function RestTimerOverlay({
           <button
             type="button"
             onClick={() => setTimeLeft((v) => v + 15)}
-            className="inline-flex items-center gap-1 rounded-full border border-cyan-500/30 px-3 py-1.5 text-xs font-medium text-cyan-200 hover:bg-cyan-500/10"
+            className="inline-flex items-center gap-1 rounded-full border border-[color-mix(in_srgb,var(--fc-group-c)_30%,transparent)] px-3 py-1.5 text-xs font-medium text-[color-mix(in_srgb,var(--fc-group-c)_35%,white)] hover:bg-[color-mix(in_srgb,var(--fc-group-c)_10%,transparent)]"
           >
             <Plus className="h-3.5 w-3.5" />
             15s

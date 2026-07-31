@@ -1,5 +1,7 @@
 # Design System — Coach/Client Training App (v4)
 
+> **SUPERSEDED.** Use [`design-system-v5.md`](./design-system-v5.md) — v4 contradicts the shipped client (lime-as-action, atmospheric layers, glass tiers, Big Shoulders). Kept for history only.
+
 > **Status:** v4 · Atomic + Composite pattern architecture for reliable cross-screen application.
 > **Scope:** Mobile-first (390px viewport baseline). Dark theme primary, light theme `[verify]`.
 > **Goal:** Athletic, energetic, information-dense interfaces. Visual register is "sports broadcast graphics" — not banking software, not meditation apps.

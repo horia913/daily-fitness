@@ -35,7 +35,7 @@ export interface PendingSetEntry {
   state: SetInstanceState;
 
   // --- Data captured at log time (optimistic) ---
-  blockId: string;
+  setEntryId: string;
   blockType: string;
   exerciseId: string;
   setNumber: number;
@@ -65,17 +65,17 @@ export type IdempotencyKey = string;
 /**
  * Build a deterministic idempotency key for a set instance.
  *
- * Format: `${sessionId}:${blockId}:${exerciseId}:${setNumber}:${YYYY-MM-DD}`
+ * Format: `${sessionId}:${setEntryId}:${exerciseId}:${setNumber}:${YYYY-MM-DD}`
  */
 export function buildIdempotencyKey(
   sessionId: string | null | undefined,
-  blockId: string,
+  setEntryId: string,
   exerciseId: string,
   setNumber: number,
 ): IdempotencyKey {
   const session = sessionId || "local";
   const date = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
-  return `${session}:${blockId}:${exerciseId}:${setNumber}:${date}`;
+  return `${session}:${setEntryId}:${exerciseId}:${setNumber}:${date}`;
 }
 
 // ---------------------------------------------------------------------------

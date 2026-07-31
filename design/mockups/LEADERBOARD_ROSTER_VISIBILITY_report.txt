@@ -1,0 +1,89 @@
+LEADERBOARD ROSTER-SCOPE + VISIBILITY — BUILD report (2026-07-19)
+================================================================
+No git. No migrations. DB coach_id / RLS / trigger assumed already applied.
+
+------------------------------------------------------------------------------
+1 · FILES MODIFIED
+------------------------------------------------------------------------------
+  src/lib/leaderboardPopulationService.ts
+  src/lib/leaderboardService.ts
+  src/lib/progressStatsService.ts   (getTotalAthletes coach-scoped)
+  src/app/client/profile/page.tsx   (Privacy → Leaderboard visibility UI)
+
+------------------------------------------------------------------------------
+2 · RANK PARTITION + VIEWER COACH RESOLUTION
+------------------------------------------------------------------------------
+recalcRanksForPartition now filters .eq('coach_id', coachId) before ordering
+by score and assigning ranks 1..n. Partition key is therefore:
+  (coach_id, leaderboard_type, exercise_id, time_window)
+
+updateLeaderboardForClient resolves coach via clients.coach_id
+(resolveClientCoachId). Upsert still omits coach_id (DB trigger fills it).
+If the client has no coach row, update is skipped.
+
+Reads (getLeaderboard, getLeaderboardBySex, getCurrentChampions) call
+resolveViewerCoachId():
+  • coach/admin/super_coach/supercoach → auth user id (self)
+  • client → clients.coach_id for that client_id
+Then .eq('coach_id', resolvedCoachId). Empty list if unresolved.
+RLS remains the guarantee; the filter is explicit intent.
+
+------------------------------------------------------------------------------
+3 · VISIBILITY BEHAVIOUR
+------------------------------------------------------------------------------
+updateLeaderboardVisibility(clientId, visibility):
+  1. Updates profiles.leaderboard_visibility
+  2. hidden  → deleteClientLeaderboardEntriesAndRecalc (delete all rows for
+               client, then recalc each affected coach partition so ranks
+               close gaps)
+  3. anonymous → syncClientLeaderboardDisplay: existing rows get
+               display_name='Anonymous', is_anonymous=true
+  4. public → sync existing rows to real name + is_anonymous=false.
+               If none remain (after hidden), board re-entry happens on the
+               next complete-workout / PR log-set / discard update path —
+               not immediately on flipping back to public.
+
+------------------------------------------------------------------------------
+4 · VISIBILITY CONTROL UI
+------------------------------------------------------------------------------
+Page: /client/profile (src/app/client/profile/page.tsx)
+Section: “Privacy” (above Account), when canEdit.
+Control: ProfileSelect — Public / Anonymous / Hidden, each with one-line hint.
+Hidden opens a confirm dialog before apply (explains delete + return after
+next completed workout). Applies immediately via updateLeaderboardVisibility
+(not the sticky profile Save bar). Current value loaded from
+profiles.leaderboard_visibility.
+
+------------------------------------------------------------------------------
+5 · ORPHANS (listed only — not deleted)
+------------------------------------------------------------------------------
+  src/components/progress/CommunityLeaderboard.tsx
+  src/lib/leaderboard.ts
+  src/components/ui/LeaderboardCard.tsx
+  getProgressHubCards() in progressHubCardsService.ts (includes a leaderboard
+  card fetch; never called)
+
+------------------------------------------------------------------------------
+6 · STILL GLOBAL / NOT REWIRED
+------------------------------------------------------------------------------
+  • Orphan CommunityLeaderboard / leaderboard.ts (PR aggregation across all
+    clients with sex/bodyweight — unmounted)
+  • Challenge leaderboards (challenge_participants) — intentionally separate
+  • Existing stored ranks only recompute when a write path runs; no one-shot
+    backfill job in this pass. New writes are coach-partitioned.
+  • getClientRank / achievement leaderboard_rank still key off client_id
+    (own rows) — fine under roster ranks.
+
+------------------------------------------------------------------------------
+7 · VERIFY
+------------------------------------------------------------------------------
+tsc: node node_modules/typescript/bin/tsc --noEmit → exit 0
+
+Browser: redirected to login at / (no session in automation browser).
+Could not exercise Hidden/Anonymous UI end-to-end without credentials.
+Code paths + tsc verified; recommend manual check while signed in as a client:
+  /client/progress/leaderboard → roster ranks + champions
+  /client/profile → Privacy control → Hidden (confirm) / Anonymous / Public
+
+SQL spot-check (read-only): tonnage partitions for the one live coach show
+contiguous ranks [1,2,3,4] for 4 clients.

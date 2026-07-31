@@ -1,40 +1,33 @@
 /* Coach exercise library v1 — v6 tokens (aligned with habit library / analytics hub) */
 .root {
-  --bg: #07101a;
-  --card: #0e1f2e;
-  --card-2: #0b1824;
-  --line: rgba(255, 255, 255, 0.08);
-  --line-2: rgba(255, 255, 255, 0.05);
-  --t1: #fff;
-  --t2: rgba(255, 255, 255, 0.65);
-  --t3: rgba(255, 255, 255, 0.42);
-  --t4: rgba(255, 255, 255, 0.26);
-  --cyan: #4fe3e8;
-  --cyan-soft: rgba(79, 227, 232, 0.12);
-  --cyan-dim: rgba(79, 227, 232, 0.18);
-  --lime: #c5ff4a;
-  --lime-2: #7fe89a;
-  --lime-soft: rgba(197, 255, 74, 0.14);
-  --lime-text: #0a1a18;
-  --good: #34d399;
-  --good-soft: rgba(52, 211, 153, 0.12);
-  --good-dim: rgba(52, 211, 153, 0.25);
-  --warning: #f5c242;
-  --warning-soft: rgba(245, 194, 66, 0.12);
-  --warning-dim: rgba(245, 194, 66, 0.28);
-  --critical: #ff5a5f;
-  --critical-soft: rgba(255, 90, 95, 0.12);
+  --bg: var(--fc-bg-deep);
+  --card: var(--fc-surface-card);
+  --card-2: var(--fc-glass-soft);
+  --line: var(--fc-glass-border);
+  --line-2: var(--fc-hairline);
+  --t1: var(--fc-text-primary);
+  --t2: var(--fc-text-dim);
+  --t3: var(--fc-text-subtle);
+  --t4: var(--fc-text-quaternary);
+  --good: var(--fc-status-success);
+  --good-soft: color-mix(in srgb, var(--fc-status-success) 14%, transparent);
+  --good-dim: color-mix(in srgb, var(--fc-status-success) 30%, transparent);
+  --warning: var(--fc-status-warning);
+  --warning-soft: color-mix(in srgb, var(--fc-status-warning) 14%, transparent);
+  --warning-dim: color-mix(in srgb, var(--fc-status-warning) 30%, transparent);
+  --critical: var(--fc-status-error);
+  --critical-soft: color-mix(in srgb, var(--fc-status-error) 14%, transparent);
   --purple: #a78bfa;
   --purple-soft: rgba(167, 139, 250, 0.12);
   --purple-dim: rgba(167, 139, 250, 0.22);
   --rose: #f472b6;
   --rose-soft: rgba(244, 114, 182, 0.12);
   --rose-dim: rgba(244, 114, 182, 0.22);
-  --f-head: "Bricolage Grotesque", var(--font-geist-sans, system-ui, sans-serif);
-  --f-body: var(--font-geist-sans, "Geist", system-ui, sans-serif);
-  --f-mono: var(--font-geist-mono, "Geist Mono", ui-monospace, monospace);
-  --f-display: "Big Shoulders Display", var(--font-geist-sans, system-ui, sans-serif);
-  color: var(--t1);
+  --f-head: var(--f-headline);
+  --f-body: var(--font-body);
+  --f-mono: var(--f-mono);
+  --f-display: var(--f-display);
+  color: var(--fc-text-primary);
 }
 
 .toolbarSearch {
@@ -69,7 +62,7 @@
 
 .kbdHint {
   padding: 2px 6px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
   border: 1px solid var(--line);
   border-radius: 5px;
   font-family: var(--f-mono);
@@ -108,9 +101,9 @@
 }
 
 .chipActive {
-  background: var(--cyan-soft);
-  border-color: var(--cyan-dim);
-  color: var(--cyan);
+  background: var(--fc-accent-dim);
+  border-color: var(--fc-accent-glow);
+  color: var(--fc-accent);
 }
 
 .chipBadge {
@@ -118,13 +111,13 @@
   font-size: 9px;
   padding: 1px 5px;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--fc-track);
   color: var(--t4);
 }
 
 .chipActive .chipBadge {
-  background: rgba(79, 227, 232, 0.16);
-  color: var(--cyan);
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
 }
 
 .resultsBar {
@@ -170,8 +163,8 @@
 }
 
 .viewBtnActive {
-  background: var(--cyan-soft);
-  color: var(--cyan);
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
 }
 
 .listCol {
@@ -203,7 +196,7 @@
 }
 
 .row:hover {
-  background: #10243a;
+  background: var(--fc-glass-soft);
   border-color: var(--line);
 }
 
@@ -226,7 +219,7 @@
 }
 
 .rowMain:focus-visible {
-  outline: 2px solid var(--cyan-dim);
+  outline: 2px solid var(--fc-accent-glow);
   outline-offset: 2px;
   border-radius: 10px;
 }
@@ -303,7 +296,7 @@
 }
 
 .menuBtn:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--fc-track);
   color: var(--t1);
 }
 
@@ -338,7 +331,7 @@
 }
 
 .menuItem:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
   color: var(--t1);
 }
 
@@ -375,9 +368,9 @@
   font-family: var(--f-body);
   font-weight: 600;
   font-size: 13px;
-  color: var(--lime-text);
-  background: linear-gradient(135deg, var(--lime) 0%, var(--lime-2) 100%);
-  box-shadow: 0 8px 20px rgba(197, 255, 74, 0.3);
+  color: var(--fc-ink);
+  background: linear-gradient(135deg, var(--fc-accent) 0%, var(--fc-accent) 100%);
+  box-shadow: none;
 }
 
 @media (min-width: 768px) {
@@ -402,9 +395,9 @@
     font-family: var(--f-body);
     font-weight: 600;
     font-size: 13px;
-    color: var(--lime-text);
-    background: linear-gradient(135deg, var(--lime) 0%, var(--lime-2) 100%);
-    box-shadow: 0 8px 20px rgba(197, 255, 74, 0.28);
+    color: var(--fc-ink);
+    background: linear-gradient(135deg, var(--fc-accent) 0%, var(--fc-accent) 100%);
+    box-shadow: none;
   }
 }
 
@@ -479,9 +472,9 @@
 }
 
 .laneStrength {
-  background: linear-gradient(135deg, rgba(79, 227, 232, 0.18), rgba(79, 227, 232, 0.04));
-  border: 1px solid var(--cyan-dim);
-  color: var(--cyan);
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.18), rgba(34, 211, 238, 0.04));
+  border: 1px solid rgba(34, 211, 238, 0.18);
+  color: #22D3EE;
 }
 .laneHypertrophy {
   background: linear-gradient(135deg, rgba(167, 139, 250, 0.2), rgba(167, 139, 250, 0.05));
@@ -491,7 +484,7 @@
 .laneAthletic {
   background: linear-gradient(135deg, rgba(197, 255, 74, 0.16), rgba(127, 232, 154, 0.06));
   border: 1px solid rgba(197, 255, 74, 0.28);
-  color: var(--lime);
+  color: #c5ff4a;
 }
 .laneMobility {
   background: linear-gradient(135deg, rgba(244, 114, 182, 0.16), rgba(244, 114, 182, 0.05));
@@ -505,9 +498,9 @@
 }
 
 .pillStrength {
-  background: var(--cyan-soft);
-  border: 1px solid var(--cyan-dim);
-  color: var(--cyan);
+  background: rgba(34, 211, 238, 0.12);
+  border: 1px solid rgba(34, 211, 238, 0.18);
+  color: #22D3EE;
 }
 .pillHypertrophy {
   background: var(--purple-soft);
@@ -515,9 +508,9 @@
   color: var(--purple);
 }
 .pillAthletic {
-  background: var(--lime-soft);
+  background: rgba(197, 255, 74, 0.14);
   border: 1px solid rgba(197, 255, 74, 0.28);
-  color: var(--lime);
+  color: #c5ff4a;
 }
 .pillMobility {
   background: var(--rose-soft);
@@ -587,13 +580,13 @@
 }
 
 .chipPanelItem:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
   color: var(--t1);
 }
 
 .chipPanelItemActive {
-  background: var(--cyan-soft);
-  color: var(--cyan);
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
 }
 
 .emptyMini {
@@ -624,14 +617,14 @@
   width: 8px;
   height: 3px;
   border-radius: 1px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--fc-track);
 }
 
 .diffSegCyan {
   width: 8px;
   height: 3px;
   border-radius: 1px;
-  background: var(--cyan);
+  background: var(--fc-accent);
 }
 
 .diffSegWarn {

@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { AthleteScoreRing } from "@/components/client-ui";
 import { ScoreBreakdown, type ScoreBreakdownComponent } from "@/components/client-ui/ScoreBreakdown";
 import { AthleteScoreExplainerModal } from "@/components/coach/AthleteScoreExplainerModal";
@@ -8,7 +9,6 @@ import { fetchApi } from "@/lib/apiClient";
 import type { CoachAthleteScoreBundle } from "@/types/coachAthleteScore";
 import {
   formatAthleteScoreWindowRange,
-  formatSteps,
   tierColorForKey,
   tierLabelForKey,
 } from "@/lib/coachAthleteScoreUi";
@@ -19,35 +19,33 @@ function deltaOrNull(current: number | null, prior: number | null): number | und
   return Math.round(current - prior);
 }
 
+async function fetchAthleteScoreBundle(
+  clientId: string,
+): Promise<CoachAthleteScoreBundle> {
+  const res = await fetchApi(`/api/coach/clients/${clientId}/athlete-score`);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body?.error ?? `Failed to load score (${res.status})`);
+  }
+  return body as CoachAthleteScoreBundle;
+}
+
 export function CoachScoreBreakdownBlock({ clientId }: { clientId: string }) {
-  const [bundle, setBundle] = useState<CoachAthleteScoreBundle | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [explainerOpen, setExplainerOpen] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetchApi(`/api/coach/clients/${clientId}/athlete-score`);
-        const body = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(body?.error ?? `Failed to load score (${res.status})`);
-        if (!cancelled) setBundle(body as CoachAthleteScoreBundle);
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Failed to load athlete score");
-          setBundle(null);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [clientId]);
+  const scoreQuery = useQuery({
+    queryKey: ["coach-client", clientId, "athlete-score"],
+    queryFn: () => fetchAthleteScoreBundle(clientId),
+    enabled: !!clientId,
+  });
+
+  const loading = scoreQuery.isLoading;
+  const error = scoreQuery.isError
+    ? scoreQuery.error instanceof Error
+      ? scoreQuery.error.message
+      : "Failed to load athlete score"
+    : null;
+  const bundle = scoreQuery.data ?? null;
 
   const scoreRow = bundle?.latest ?? null;
   const prior = bundle?.prior ?? null;
@@ -61,46 +59,28 @@ export function CoachScoreBreakdownBlock({ clientId }: { clientId: string }) {
 
   const components: ScoreBreakdownComponent[] = useMemo(() => {
     if (!scoreRow) return [];
-    const sleepHint =
-      bundle?.avgSleepHours != null
-        ? `avg ${bundle.avgSleepHours.toFixed(1)}h / ${bundle.sleepTargetHours}h target`
-        : "no sleep data this week";
-    const stepsHint =
-      bundle?.avgSteps != null
-        ? `avg ${formatSteps(bundle.avgSteps)} / ${formatSteps(bundle.stepsTarget)} target`
-        : "no steps data this week";
+
+    const adherence = scoreRow.training_completion_score;
+    const execution = scoreRow.training_execution_score;
 
     return [
       {
-        label: "Training",
-        value: scoreRow.training_score,
-        delta: deltaOrNull(scoreRow.training_score, prior?.training_score ?? null),
-        subRows: [
-          { label: "Completion", value: scoreRow.training_completion_score },
-          { label: "Execution", value: scoreRow.training_execution_score },
-        ],
+        label: "Adherence",
+        value: adherence,
+        delta: deltaOrNull(adherence, prior?.training_completion_score ?? null),
+        hint: "Required program workouts completed in the rolling 14-day window",
       },
       {
-        label: "Recovery",
-        value: scoreRow.recovery_score,
-        delta: deltaOrNull(scoreRow.recovery_score, prior?.recovery_score ?? null),
-        subRows: [
-          { label: "Sleep", value: scoreRow.recovery_sleep_score, hint: sleepHint },
-          { label: "Steps", value: scoreRow.recovery_steps_score, hint: stepsHint },
-        ],
-      },
-      {
-        label: "Nutrition",
-        value: scoreRow.nutrition_score,
-        delta: deltaOrNull(scoreRow.nutrition_score, prior?.nutrition_score ?? null),
-      },
-      {
-        label: "Extras",
-        value: scoreRow.extras_score,
-        delta: deltaOrNull(scoreRow.extras_score, prior?.extras_score ?? null),
+        label: "Execution",
+        value: execution,
+        delta: deltaOrNull(execution, prior?.training_execution_score ?? null),
+        hint:
+          execution != null
+            ? "Sets on target vs prescribed in the same rolling 14-day window"
+            : "Shows after logged sets with prescription data",
       },
     ];
-  }, [scoreRow, prior, bundle]);
+  }, [scoreRow, prior]);
 
   if (loading) {
     return (
@@ -135,7 +115,7 @@ export function CoachScoreBreakdownBlock({ clientId }: { clientId: string }) {
           <button
             type="button"
             onClick={() => setExplainerOpen(true)}
-            className="text-sm text-[color:var(--fc-accent-cyan)] hover:underline"
+            className="text-sm text-[color:var(--fc-accent)] hover:underline"
           >
             How is this calculated?
           </button>
@@ -160,7 +140,7 @@ export function CoachScoreBreakdownBlock({ clientId }: { clientId: string }) {
             </p>
             <p className="mt-2 text-sm">
               {prior == null ? (
-                <span className="text-muted-foreground">First week on record</span>
+                <span className="text-muted-foreground">First score window on record</span>
               ) : weekDelta != null && weekDelta !== 0 ? (
                 <span
                   className={
@@ -169,10 +149,10 @@ export function CoachScoreBreakdownBlock({ clientId }: { clientId: string }) {
                       : "text-[color:var(--fc-status-error)]"
                   }
                 >
-                  {weekDelta > 0 ? `▲ +${weekDelta}` : `▼ ${weekDelta}`} from last week
+                  {weekDelta > 0 ? `▲ +${weekDelta}` : `▼ ${weekDelta}`} vs prior window
                 </span>
               ) : (
-                <span className="text-muted-foreground">— same as last week</span>
+                <span className="text-muted-foreground">— same as prior window</span>
               )}
             </p>
           </div>

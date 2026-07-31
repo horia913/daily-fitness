@@ -1,0 +1,264 @@
+AUTHORING MODEL AUDIT — coach canvas → client instance
+Date: 2026-07-16
+Read-only. Evidence from code + live DB.
+
+================================================================================
+0 · THE FIVE CLAIMS — RIGHT / WRONG
+================================================================================
+
+1. Authoring is exercise-first (add exercise, then attach properties).
+   RIGHT. ADD_EXERCISE creates a solo group with one slot; properties/techniques
+   are toggled afterward via ADD_PROPERTY / PrescriptionTable. No set_type picker
+   in the canvas UI.
+
+2. Properties: sets count; per-set targets; rest; techniques; notes; grouping.
+   MOSTLY RIGHT, with granularity corrections:
+   - Per-set (prescription rows): reps | weight_kg | load_% | rir | tempo |
+     work_seconds | distance_meters
+   - Per-slot (exercise): measurement, technique + technique config, rest_seconds,
+     notes, HR/pace/speed targets
+   - Per-group: total_sets (rounds), rest after round, rounds_driver, duration,
+     interval_seconds, time_cap_seconds
+   - Rest is NOT per-set. Techniques are NOT per-set (slot-level only).
+   - Canvas technique list is only drop_set / cluster / rest_pause — not an open-ended "…"
+
+3. Grouping produces supersets / giant sets.
+   RIGHT in effect: GROUP_SELECTED merges solo groups into one multi-slot group.
+   set_type is then derived at save (2 slots → superset, 3+ → giant_set), not
+   stored as a coach choice named "superset".
+
+4. set_type is derived, not chosen — with the simple lone/drop/2/3+ rule.
+   PARTLY RIGHT. It is always derived (never picked in UI). The exact rule is
+   richer than the claim (see §2): techniques only win for single-slot groups;
+   rounds_driver and measurement also drive amrap/emom/for_time/tabata/timed/
+   speed/endurance. Drop on a multi-slot group does NOT yield drop_set.
+
+5. Client executes an instance copy of the authored program.
+   RIGHT. assign_program_instance deep-copies master → program_instance_* at
+   assignment time (snapshot). Client execution loads get_instance_workout_canvas
+   against that copy — not live-linked to the master template.
+
+================================================================================
+1 · THE AUTHORING MODEL IN PROSE
+================================================================================
+
+What the coach sees is a canvas, not a "pick a set type" wizard.
+
+Two entry points share the same core:
+
+  A. Library template editor
+     Route: /coach/workouts/templates/[id]/edit
+     Page → WorkoutTemplateEditor → WorkoutCanvasCore → WorkoutCanvas
+     Saves via saveWorkoutFromCanvas → RPC save_workout_canvas into
+     workout_templates + workout_set_entries / _entry_exercises /
+     workout_set_prescriptions.
+
+  B. Program Station day editor
+     Route: /coach/programs/[id]/edit (ProgramDayEditor embeds WorkoutCanvasCore)
+     Edits program_day kind workouts in the program draft; same canvas actions;
+     commit path still writes workout_templates / set-entry tables for that day's
+     workout id, then schedule links them.
+
+Mental model (Group model):
+
+  Workout (template)
+    └── Group  (one "set entry" — a block of work; may hold 1..N exercises)
+          └── Slot (one exercise in that group)
+                └── Prescriptions[] (one row per set_number)
+
+Flow in practice:
+
+  1. Coach adds an exercise → ADD_EXERCISE
+     Creates a new Group with one Slot (solo). Default measurement=reps,
+     technique=none, rounds_driver=fixed, a starting prescription row.
+
+  2. Coach opens the prescription table under that slot.
+     Sets group total_sets (how many set rows). Each row is editable:
+     measurement column (reps / work_seconds / distance_meters), optional
+     Load (% or kg), RIR, Tempo — toggled via "+ Add property".
+
+  3. Coach may attach a technique property (drop / cluster / rest-pause).
+     That sets slot.technique and seeds slot-level config (e.g. drop_percentage=20).
+     Technique columns appear in the table but values are slot-scoped, not per row
+     (editing drop % updates the slot, not one prescription).
+
+  4. Coach may set rest after the exercise (slot.rest_seconds) or rest after the
+     round / advanced driver on the group meta menu (rounds_driver, duration,
+     interval, time cap).
+
+  5. To make a superset/giant set: select 2+ solo groups (checkboxes) → Group (G).
+     GROUP_SELECTED merges slots into one group. Letters A/B/C are derived on save
+     from order. Ungroup / remove-from-group reverse it.
+
+  6. On save, canvasGroupToWritePayload calls deriveSetType(...) and persists
+     both the derived set_type and the full prescriptions[] per slot.
+
+The coach never chooses "Straight Set" or "Superset" as a primary control.
+Those labels, where shown, are consequences of composition.
+
+================================================================================
+2 · set_type DERIVATION — EXACT RULE
+================================================================================
+
+Source of truth: src/lib/groupModel/deriveSetType.ts:15-44
+Called at save from canvasGroupToWritePayload (canvasActions.ts:465-473)
+and for display summaries (formatSummary.ts).
+
+Inputs:
+  group.rounds_driver, group.total_sets
+  each slot.measurement, each slot.technique
+
+Rule (ordered):
+
+  IF exactly 1 slot:
+    IF technique === drop_set     → drop_set
+    IF technique === cluster      → cluster_set
+    IF technique === rest_pause   → rest_pause
+  ELSE fall through…
+
+  IF rounds_driver === amrap      → amrap
+  IF rounds_driver === interval   → emom
+  IF rounds_driver === for_time   → for_time
+
+  IF exactly 1 slot (again):
+    IF measurement === time       → timed_set
+    IF measurement === distance:
+      total_sets > 1              → speed_work
+      else                        → endurance
+    ELSE                          → straight_set
+
+  IF 2+ slots:
+    IF every slot measurement===time → tabata
+    IF exactly 2 slots               → superset
+    IF 3+ slots                      → giant_set
+
+  ELSE → straight_set
+
+Important corrections to claim #4:
+  • Technique is ignored once a group has 2+ slots (a drop on A in a pair still
+    saves as set_type=superset; technique remains on the slot).
+  • pre_exhaustion is never emitted (comment: maps to superset).
+  • Coach cannot pick set_type in UI; it is written only via deriveSetType on save.
+
+Claim #4's simple "lone / drop / 2 / 3+" story is the common fixed+reps path,
+not the full rule.
+
+================================================================================
+3 · TECHNIQUES & PER-SET PRESCRIPTIONS
+================================================================================
+
+Techniques (canvas-reachable)
+  SlotProperty TECHNIQUE_PROPERTIES = drop_set | cluster | rest_pause
+  (propertyLabels.ts:18)
+  Stored on workout_set_entry_exercises.technique (and instance twin).
+  Config on same row: drop_percentage, max_drops, reps_per_cluster,
+  clusters_per_set, intra_cluster_rest_seconds, rest_pause_seconds, max_rest_pauses.
+  Defaults seeded in techniqueConfigPatch (canvasActions.ts:102-144).
+  Granularity: SLOT-level, not per set_number.
+
+Per-set prescriptions
+  Tables: workout_set_prescriptions / program_instance_set_prescriptions
+  Columns: slot_id, set_number, reps, weight_kg, load_percentage, rir, tempo,
+           work_seconds, distance_meters
+  Write path: PrescriptionTable onChange → UPDATE_PRESCRIPTION / ADD_SET →
+  save payload buildPrescriptionRpcRow → save_workout_canvas.
+  Different weight on set 1 vs 2 vs 3 = different prescription rows for those
+  set_numbers on the same slot_id. That is the intended model.
+
+Not per-set: rest, technique, notes, measurement, group driver / caps.
+
+================================================================================
+4 · AUTHORING → INSTANCE FLOW + ENTITY MAP
+================================================================================
+
+Snapshot, not live-link.
+
+  Coach assigns program → WorkoutTemplateService.assignProgramToClients
+  → RPC assign_program_instance (workoutTemplateService.ts:1436-1484)
+
+  Comment in code: "deep copy of phases, workouts, set entries, exercises,
+  per-set prescriptions…" — each client gets a fresh owned instance (D8).
+  Later edits to the master template do not automatically rewrite an existing
+  client's instance (instance is the client's copy).
+
+Client execution then loads:
+  program_day_assignments.program_instance_workout_id
+  → get_instance_workout_canvas
+  → mapInstanceCanvasToSetEntries → LiveWorkoutSetEntryExecutor
+
+Two-sided map (authoring / master  →  instance / client):
+
+  workout_programs                 →  (assignment owns) program_assignments
+  workout_templates (kind program_day | library)
+                                   →  program_instance_workouts
+  workout_set_entries              →  program_instance_set_entries
+  workout_set_entry_exercises      →  program_instance_set_entry_exercises
+  workout_set_prescriptions        →  program_instance_set_prescriptions
+  program_schedule (master days)   →  program_day_assignments (client schedule)
+  (phases)                         →  program_instance_phases
+
+Entity vocabulary:
+  Program → Workout (template / instance workout)
+         → Set entry / Group (parent row)
+         → Slot / exercise (child row)
+         → Prescription (per set_number)
+
+================================================================================
+5 · WHICH set_type VALUES ARE REACHABLE FROM THE CURRENT BUILDER?
+================================================================================
+
+From deriveSetType + canvas UI controls, the builder CAN produce:
+
+  Action                                              → set_type
+  ----------------------------------------------------|-----------
+  1 slot, reps, fixed, technique none                 → straight_set
+  1 slot + technique drop_set                         → drop_set
+  1 slot + technique cluster                          → cluster_set
+  1 slot + technique rest_pause                       → rest_pause
+  Group meta rounds_driver amrap                      → amrap
+  Group meta rounds_driver interval                   → emom
+  Group meta rounds_driver for_time                   → for_time
+  1 slot measurement=time, fixed                      → timed_set
+  1 slot measurement=distance, total_sets=1           → endurance
+  1 slot measurement=distance, total_sets>1           → speed_work
+  2+ slots, all measurement=time                      → tabata
+  2 slots (not all-time)                              → superset
+  3+ slots (not all-time)                             → giant_set
+
+Never produced by current deriveSetType (legacy / dead for canvas):
+  pre_exhaustion, pyramid_set, ladder, circuit, emom_reps, hr_sets
+  (and any other enum leftovers not listed above)
+
+Live data (MCP counts):
+
+  Templates (workout_set_entries): broad mix — straight_set 1391, superset 90,
+  drop_set 75, cluster_set 26, emom 16, endurance 12, giant_set 9, tabata 9,
+  for_time 9, amrap 8, rest_pause 8, pre_exhaustion 8, speed_work 7.
+  → Confirms giant_set and protocol types exist on templates (some pre_exhaustion
+    rows are legacy — canvas no longer emits that type).
+
+  Instances (program_instance_set_entries): only straight_set 389, drop_set 41,
+  superset 5. No giant_set / cluster / amrap / etc. on instances today.
+  → Reachable in builder; sparse or unused so far on assigned copies.
+
+  Template rounds_driver includes fixed + amrap/interval/for_time;
+  instance rounds_driver was previously observed as fixed-only (435).
+
+So: giant_set and the protocol types are reachable from the current builder
+(via grouping / driver / measurement), not dead code — but live instance
+traffic is still dominated by straight_set + drop_set + rare supersets.
+
+================================================================================
+EVIDENCE INDEX
+================================================================================
+deriveSetType.ts:15-44
+canvasActions ADD_EXERCISE / GROUP_SELECTED / ADD_PROPERTY :152-224, 378-437
+canvasGroupToWritePayload derive + prescriptions          :465-517
+PrescriptionTable per-set fields                          :PrescriptionTable.tsx
+propertyLabels TECHNIQUE_PROPERTIES                       :17-18
+canvasSave save_workout_canvas                            :148-181
+assign_program_instance snapshot                          :workoutTemplateService.ts:1436-1484
+instance load get_instance_workout_canvas                 :instanceCanvasLoad.ts:13-14
+Routes: templates/[id]/edit ; programs/[id]/edit + ProgramDayEditor
+
+END

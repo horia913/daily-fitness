@@ -24,15 +24,30 @@ export const clientNavItems: AppNavItem[] = [
 ];
 
 export const coachNavItems: AppNavItem[] = [
-  { href: "/coach", icon: Home, label: "Home" },
+  { href: "/coach", icon: Home, label: "Briefing" },
   { href: "/coach/clients", icon: Users, label: "Clients" },
   { href: "/coach/training", icon: Dumbbell, label: "Training" },
   { href: "/coach/nutrition", icon: Apple, label: "Nutrition" },
-  { href: "/coach/analytics", icon: BarChart3, label: "Analytics" },
+  { href: "/coach/insights", icon: BarChart3, label: "Insights" },
 ];
 
-export function isSegmentActive(pathname: string, item: AppNavItem): boolean {
+/** True when a Progress workout-log screen was opened from Train (`?from=train`). */
+export function isWorkoutLogFromTrain(
+  pathname: string,
+  search: string = "",
+): boolean {
+  if (!pathname.startsWith("/client/progress/workout-logs")) return false;
+  const q = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(q).get("from") === "train";
+}
+
+export function isSegmentActive(
+  pathname: string,
+  item: AppNavItem,
+  search: string = typeof window !== "undefined" ? window.location.search : "",
+): boolean {
   const { href } = item;
+  const fromTrain = isWorkoutLogFromTrain(pathname, search);
 
   if (href === "/client" || href === "/coach") {
     return pathname === href;
@@ -45,7 +60,8 @@ export function isSegmentActive(pathname: string, item: AppNavItem): boolean {
   if (href === "/client/train") {
     return (
       pathname.startsWith("/client/train") ||
-      pathname.startsWith("/client/workouts")
+      pathname.startsWith("/client/workouts") ||
+      fromTrain
     );
   }
 
@@ -54,13 +70,18 @@ export function isSegmentActive(pathname: string, item: AppNavItem): boolean {
   }
 
   if (href === "/client/me") {
+    if (fromTrain) return false;
     return (
       pathname.startsWith("/client/me") ||
       pathname.startsWith("/client/profile") ||
+      pathname.startsWith("/client/privacy") ||
+      pathname.startsWith("/client/settings") ||
+      pathname.startsWith("/client/coach") ||
       pathname.startsWith("/client/progress") ||
       pathname.startsWith("/client/goals") ||
       pathname.startsWith("/client/habits") ||
-      pathname.startsWith("/client/challenges")
+      pathname.startsWith("/client/challenges") ||
+      pathname.startsWith("/client/activity")
     );
   }
 
@@ -72,7 +93,16 @@ export function isSegmentActive(pathname: string, item: AppNavItem): boolean {
       pathname.startsWith("/coach/exercises") ||
       pathname.startsWith("/coach/categories") ||
       pathname.startsWith("/coach/gym-console") ||
+      pathname.startsWith("/coach/testing") ||
       pathname.startsWith("/coach/challenges")
+    );
+  }
+
+  if (href === "/coach/insights") {
+    return (
+      pathname === "/coach/insights" ||
+      pathname.startsWith("/coach/analytics") ||
+      pathname.startsWith("/coach/compliance")
     );
   }
 

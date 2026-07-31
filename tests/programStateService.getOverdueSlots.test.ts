@@ -16,6 +16,7 @@ import type { ProgramScheduleSlot, CompletedSlot } from '../src/lib/programState
 
 const mkSlot = (id: string, week: number, dayNum: number, dayOfWeek: number): ProgramScheduleSlot => ({
   id,
+  program_day_assignment_id: id,
   program_id: 'p1',
   week_number: week,
   day_number: dayNum,
@@ -26,7 +27,7 @@ const mkSlot = (id: string, week: number, dayNum: number, dayOfWeek: number): Pr
 const mkCompleted = (scheduleId: string, week: number, dayNum: number): CompletedSlot => ({
   id: `c-${scheduleId}`,
   program_assignment_id: 'a1',
-  program_schedule_id: scheduleId,
+  program_day_assignment_id: scheduleId,
   completed_at: '2026-02-01T10:00:00Z',
   completed_by: 'u1',
   notes: null,

@@ -13,11 +13,12 @@ import {
   Dumbbell,
   Apple,
   BarChart3,
-  ShieldCheck,
+  FileText,
   BookOpen,
   Layers,
   Library,
   Activity,
+  ClipboardList,
   ChefHat,
   Utensils,
   UserPlus,
@@ -50,25 +51,26 @@ const SECTION_TRAINING = {
     { title: "Programs", description: "Create and manage workout programs", icon: BookOpen, href: "/coach/programs" },
     { title: "Workout Templates", description: "Create and manage workout templates", icon: Layers, href: "/coach/workouts/templates" },
     { title: "Exercise Library", description: "Manage exercises and create custom exercises", icon: Library, href: "/coach/exercises" },
-    { title: "Gym Console", description: "Mark workouts complete for clients in person", icon: Activity, href: "/coach/gym-console" },
+    { title: "Gym Console", description: "Clipboard of programmed workouts for clients on the floor", icon: Activity, href: "/coach/gym-console" },
+    { title: "Testing", description: "Mobility and other coach assessments (client views results)", icon: ClipboardList, href: "/coach/testing" },
   ],
 };
 
 const SECTION_NUTRITION = {
   title: "Nutrition",
   items: [
-    { title: "Meal Plans", description: "Create and manage meal plans", icon: ChefHat, href: "/coach/nutrition/meal-plans" },
+    { title: "Meal Plans", description: "Create and manage meal plans", icon: ChefHat, href: "/coach/nutrition" },
     { title: "Generator", description: "Auto-generate full-day meal plans with macro targets", icon: Wand2, href: "/coach/nutrition/generator" },
-    { title: "Food Database", description: "Manage food database", icon: Utensils, href: "/coach/nutrition/foods" },
-    { title: "Assignments", description: "Assign meal plans to clients", icon: Users, href: "/coach/nutrition/assignments" },
+    { title: "Food Database", description: "Manage food database", icon: Utensils, href: "/coach/nutrition?tab=foods" },
+    { title: "Assignments", description: "Assign meal plans to clients", icon: Users, href: "/coach/nutrition?tab=assignments" },
   ],
 };
 
 const SECTION_ANALYTICS = {
   title: "Analytics & Reports",
   items: [
-    { title: "Analytics", description: "View client progress and reporting", icon: BarChart3, href: "/coach/analytics" },
-    { title: "Compliance Dashboard", description: "Follow-through and at-risk clients", icon: ShieldCheck, href: "/coach/compliance" },
+    { title: "Insights", description: "Roster analysis and sortable metrics", icon: BarChart3, href: "/coach/insights" },
+    { title: "Reports", description: "Detailed reporting", icon: FileText, href: "/coach/reports" },
   ],
 };
 
@@ -107,7 +109,7 @@ export default function CoachMenu() {
           <GlassCard elevation={2} className="fc-card-shell p-6 sm:p-10">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent-cyan)]">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)]">
                   <Users className="w-7 h-7" aria-hidden />
                 </div>
                 <div>
@@ -137,7 +139,7 @@ export default function CoachMenu() {
                         className="fc-card-shell p-5 h-full transition-all hover:scale-[1.02] hover:shadow-xl"
                       >
                         <div className="flex items-center gap-4">
-                          <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-[color:var(--fc-aurora)]/15 text-[color:var(--fc-accent-cyan)]">
+                          <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-[color:var(--fc-aurora)]/15 text-[color:var(--fc-accent)]">
                             <Icon className="w-5 h-5" aria-hidden />
                           </div>
                           <div className="min-w-0 flex-1">
@@ -217,7 +219,7 @@ export default function CoachMenu() {
                   Workout Templates
                 </Button>
               </Link>
-              <Link href="/coach/nutrition/meal-plans">
+              <Link href="/coach/nutrition">
                 <Button className="fc-btn fc-btn-secondary">
                   <Apple className="w-4 h-4 mr-2" aria-hidden />
                   Meal Plans

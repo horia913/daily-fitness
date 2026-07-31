@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<title>Coach — adherence + progression charts</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;}
+  :root{
+    --page:#0A0B0D; --well:#050608;
+    --line:rgba(255,255,255,.07); --line-2:rgba(255,255,255,.13);
+    --accent:#2E7BFF; --accent-glow:rgba(46,123,255,.30);
+    --sets:#2E7BFF; --reps:#22D3EE;
+    --top:#22E56A; --setvol:#9D6BFF; --loadvol:#FFB020;
+    --warn:#FFB020; --bad:#FF5A4D; --gold:#F5C242;
+    --text:#F0F2F5; --dim:#8B93A1; --subtle:#5C6470; --faint:#3D434D;
+    --f-d:'Archivo',sans-serif; --f-b:'Inter',sans-serif; --f-m:'JetBrains Mono',monospace;
+  }
+  body{background:#070809;color:var(--text);font-family:var(--f-b);-webkit-font-smoothing:antialiased;padding:26px;font-size:13px;}
+  .d{font-family:var(--f-d);font-stretch:105%;}
+  svg{fill:none;stroke-linecap:round;stroke-linejoin:round;}
+  .wrap{max-width:1180px;margin:0 auto;}
+  .lbl{font-family:var(--f-m);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:0 0 10px;font-weight:700;}
+
+  .card{border:1px solid var(--line);border-radius:15px;padding:0;margin-bottom:18px;overflow:hidden;}
+  .chead{padding:18px 20px 15px;border-bottom:1px solid var(--line);}
+  .ch{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;}
+  .ch .t{font-family:var(--f-m);font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--dim);font-weight:700;}
+  .ch .n{font-family:var(--f-d);font-size:20px;font-weight:800;letter-spacing:-.015em;margin-top:6px;}
+  .ch .s{font-size:11.5px;color:var(--subtle);margin-top:5px;}
+  .ch .sp{flex:1;}
+  .sel{background:var(--well);border:1px solid var(--line-2);border-radius:10px;padding:9px 13px;font-size:12.5px;display:flex;align-items:center;gap:9px;}
+  .sel svg{width:12px;height:12px;stroke:var(--faint);stroke-width:2;}
+  .rng{display:flex;gap:5px;background:var(--well);border:1px solid var(--line);border-radius:10px;padding:4px;}
+  .rg{padding:7px 13px;border-radius:7px;font-family:var(--f-m);font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--dim);}
+  .rg.on{background:var(--accent);color:#fff;box-shadow:0 3px 12px -4px var(--accent-glow);}
+
+  /* headline stats inside header */
+  .kpis{display:flex;gap:26px;margin-top:16px;flex-wrap:wrap;}
+  .kp .k{font-family:var(--f-m);font-size:8px;letter-spacing:.15em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:6px;}
+  .kp .k i{width:7px;height:7px;border-radius:50%;}
+  .kp .v{font-family:var(--f-d);font-size:26px;font-weight:900;line-height:1;margin-top:7px;letter-spacing:-.03em;}
+  .kp .dl{font-family:var(--f-m);font-size:9.5px;margin-top:5px;}
+  .up{color:var(--top);} .dn{color:var(--bad);} .fl{color:var(--faint);}
+
+  .body{padding:16px 20px 18px;}
+  .togs{display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap;}
+  .tg{display:flex;align-items:center;gap:8px;border:1px solid var(--line-2);border-radius:999px;padding:7px 14px 7px 11px;
+      font-family:var(--f-m);font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text);}
+  .tg i{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+  .legend{font-family:var(--f-m);font-size:9.5px;color:var(--faint);margin:10px 0 4px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;}
+  .legend .ph{display:flex;align-items:center;gap:6px;}
+  .legend .ph i{width:12px;height:7px;border-radius:2px;}
+
+  .plot{position:relative;}
+  .hoverbox{position:absolute;top:10px;background:rgba(10,11,13,.97);border:1px solid var(--line-2);border-radius:12px;padding:12px 14px;pointer-events:none;
+            box-shadow:0 12px 34px -14px rgba(0,0,0,.9);}
+  .hoverbox .wk{font-family:var(--f-m);font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);margin-bottom:4px;}
+  .hoverbox .phz{font-family:var(--f-m);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;margin-bottom:10px;}
+  .hr{display:flex;align-items:center;gap:9px;margin-bottom:8px;}
+  .hr:last-child{margin-bottom:0;}
+  .hr i{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .hr .k{font-family:var(--f-m);font-size:9.5px;color:var(--dim);width:74px;}
+  .hr .v{font-family:var(--f-d);font-size:14px;font-weight:800;width:46px;text-align:right;}
+  .hr .ab{font-family:var(--f-m);font-size:9.5px;color:var(--faint);}
+
+  .note{max-width:1180px;margin:20px auto 0;font-size:12px;line-height:1.85;color:var(--subtle);border-left:2px solid var(--accent);padding-left:14px;}
+  .note b{color:var(--text);}
+</style></head>
+<body>
+<div class="wrap">
+
+<!-- ============ ADHERENCE ============ -->
+<div class="lbl">Chart 1 · Adherence — prescribed vs actual</div>
+<div class="card">
+  <div class="chead">
+    <div class="ch">
+      <span><div class="t">Adherence</div><div class="n d">Back Squat</div>
+        <div class="s">Did they do what was programmed?</div></span>
+      <span class="sp"></span>
+      <span class="sel">Back Squat <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span>
+      <span class="rng"><span class="rg">3M</span><span class="rg on">6M</span><span class="rg">1Y</span><span class="rg">ALL</span></span>
+    </div>
+    <div class="kpis">
+      <span class="kp"><div class="k"><i style="background:var(--sets)"></i>Sets · 6wk avg</div>
+        <div class="v d" style="color:var(--warn)">83%</div><div class="dl dn">▼ 14 pts vs first half</div></span>
+      <span class="kp"><div class="k"><i style="background:var(--reps)"></i>Reps · 6wk avg</div>
+        <div class="v d" style="color:var(--warn)">76%</div><div class="dl dn">▼ 17 pts vs first half</div></span>
+      <span class="kp"><div class="k">Sessions missed</div>
+        <div class="v d">4</div><div class="dl fl">of 26 scheduled</div></span>
+    </div>
+  </div>
+
+  <div class="body">
+    <div class="togs">
+      <span class="tg" style="border-color:color-mix(in srgb,var(--sets) 55%,transparent);background:color-mix(in srgb,var(--sets) 12%,transparent)"><i style="background:var(--sets);box-shadow:0 0 9px -1px var(--sets)"></i>Sets</span>
+      <span class="tg" style="border-color:color-mix(in srgb,var(--reps) 55%,transparent);background:color-mix(in srgb,var(--reps) 12%,transparent)"><i style="background:var(--reps);box-shadow:0 0 9px -1px var(--reps)"></i>Reps</span>
+    </div>
+    <div class="legend">
+      <span>% of prescribed completed · hover for raw counts</span>
+      <span class="ph"><i style="background:rgba(25,227,196,.16)"></i>Block 1</span>
+      <span class="ph"><i style="background:rgba(255,138,31,.16)"></i>Phase 2</span>
+      <span class="ph"><i style="background:rgba(255,90,77,.1)"></i>below 80%</span>
+    </div>
+
+    <div class="plot">
+      <svg viewBox="0 0 1100 268" style="width:100%;height:auto;display:block">
+        <defs>
+          <linearGradient id="gSets" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#2E7BFF" stop-opacity=".28"/><stop offset="100%" stop-color="#2E7BFF" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="gReps" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#22D3EE" stop-opacity=".22"/><stop offset="100%" stop-color="#22D3EE" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+
+        <!-- phase bands -->
+        <rect x="46" y="18" width="624" height="194" fill="rgba(25,227,196,.055)"/>
+        <rect x="670" y="18" width="415" height="194" fill="rgba(255,138,31,.06)"/>
+        <line x1="670" y1="18" x2="670" y2="212" stroke="rgba(255,138,31,.4)" stroke-width="1" stroke-dasharray="3 4"/>
+        <text x="58" y="32" fill="rgba(25,227,196,.75)" font-family="JetBrains Mono" font-size="8.5" letter-spacing="1.6">BLOCK 1</text>
+        <text x="682" y="32" fill="rgba(255,138,31,.8)" font-family="JetBrains Mono" font-size="8.5" letter-spacing="1.6">PHASE 2</text>
+
+        <!-- danger zone under 80% -->
+        <rect x="46" y="70" width="1039" height="142" fill="rgba(255,90,77,.05)"/>
+
+        <!-- gridlines -->
+        <line x1="46" y1="26"  x2="1085" y2="26"  stroke="rgba(255,255,255,.2)" stroke-dasharray="4 5"/>
+        <line x1="46" y1="70"  x2="1085" y2="70"  stroke="rgba(255,90,77,.22)" stroke-dasharray="3 5"/>
+        <line x1="46" y1="114" x2="1085" y2="114" stroke="rgba(255,255,255,.04)"/>
+        <line x1="46" y1="158" x2="1085" y2="158" stroke="rgba(255,255,255,.04)"/>
+        <line x1="46" y1="202" x2="1085" y2="202" stroke="rgba(255,255,255,.04)"/>
+        <text x="38" y="30"  text-anchor="end" fill="#8B93A1" font-family="JetBrains Mono" font-size="10">100%</text>
+        <text x="38" y="74"  text-anchor="end" fill="rgba(255,90,77,.6)" font-family="JetBrains Mono" font-size="10">80%</text>
+        <text x="38" y="118" text-anchor="end" fill="#3D434D" font-family="JetBrains Mono" font-size="10">60%</text>
+        <text x="38" y="162" text-anchor="end" fill="#3D434D" font-family="JetBrains Mono" font-size="10">40%</text>
+
+        <!-- area fills -->
+        <path d="M70,26 L148,26 L226,35 L304,26 L382,26 L460,44 L538,26 L616,26 L694,57 L772,75 L850,64 L928,86 L1006,75 L1084,93 L1084,212 L70,212 Z" fill="url(#gSets)"/>
+        <path d="M70,33 L148,40 L226,48 L304,37 L382,42 L460,61 L538,44 L616,50 L694,79 L772,101 L850,86 L928,112 L1006,101 L1084,121 L1084,212 L70,212 Z" fill="url(#gReps)"/>
+
+        <!-- lines -->
+        <polyline stroke="#2E7BFF" stroke-width="2.6"
+          points="70,26 148,26 226,35 304,26 382,26 460,44 538,26 616,26 694,57 772,75 850,64 928,86 1006,75 1084,93"
+          style="filter:drop-shadow(0 0 8px rgba(46,123,255,.5))"/>
+        <polyline stroke="#22D3EE" stroke-width="2.6"
+          points="70,33 148,40 226,48 304,37 382,42 460,61 538,44 616,50 694,79 772,101 850,86 928,112 1006,101 1084,121"
+          style="filter:drop-shadow(0 0 8px rgba(34,211,238,.5))"/>
+
+        <!-- data dots -->
+        <g fill="#0A0B0D" stroke="#2E7BFF" stroke-width="1.8">
+          <circle cx="70" cy="26" r="2.8"/><circle cx="148" cy="26" r="2.8"/><circle cx="226" cy="35" r="2.8"/><circle cx="304" cy="26" r="2.8"/>
+          <circle cx="382" cy="26" r="2.8"/><circle cx="460" cy="44" r="2.8"/><circle cx="538" cy="26" r="2.8"/><circle cx="616" cy="26" r="2.8"/>
+          <circle cx="694" cy="57" r="2.8"/><circle cx="772" cy="75" r="2.8"/><circle cx="928" cy="86" r="2.8"/><circle cx="1006" cy="75" r="2.8"/><circle cx="1084" cy="93" r="2.8"/>
+        </g>
+        <g fill="#0A0B0D" stroke="#22D3EE" stroke-width="1.8">
+          <circle cx="70" cy="33" r="2.8"/><circle cx="148" cy="40" r="2.8"/><circle cx="226" cy="48" r="2.8"/><circle cx="304" cy="37" r="2.8"/>
+          <circle cx="382" cy="42" r="2.8"/><circle cx="460" cy="61" r="2.8"/><circle cx="538" cy="44" r="2.8"/><circle cx="616" cy="50" r="2.8"/>
+          <circle cx="694" cy="79" r="2.8"/><circle cx="772" cy="101" r="2.8"/><circle cx="928" cy="112" r="2.8"/><circle cx="1006" cy="101" r="2.8"/><circle cx="1084" cy="121" r="2.8"/>
+        </g>
+
+        <!-- hover -->
+        <line x1="850" y1="18" x2="850" y2="212" stroke="rgba(255,255,255,.28)"/>
+        <circle cx="850" cy="64" r="5.5" fill="#0A0B0D" stroke="#2E7BFF" stroke-width="2.6"/>
+        <circle cx="850" cy="86" r="5.5" fill="#0A0B0D" stroke="#22D3EE" stroke-width="2.6"/>
+
+        <text x="70"   y="232" text-anchor="middle" fill="#3D434D" font-family="JetBrains Mono" font-size="9.5">W1</text>
+        <text x="304"  y="232" text-anchor="middle" fill="#3D434D" font-family="JetBrains Mono" font-size="9.5">W4</text>
+        <text x="538"  y="232" text-anchor="middle" fill="#3D434D" font-family="JetBrains Mono" font-size="9.5">W7</text>
+        <text x="772"  y="232" text-anchor="middle" fill="#3D434D" font-family="JetBrains Mono" font-size="9.5">W10</text>
+        <text x="1006" y="232" text-anchor="middle" fill="#3D434D" font-family="JetBrains Mono" font-size="9.5">W13</text>
+      </svg>
+
+      <div class="hoverbox" style="left:64%">
+        <div class="wk">Week 11 · 6–12 Oct</div>
+        <div class="phz" style="color:#FF8A1F">Phase 2</div>
+        <div class="hr"><i style="background:#2E7BFF"></i><span class="k">Sets</span><span class="v" style="color:#2E7BFF">88%</span><span class="ab">14 of 16</span></div>
+        <div class="hr"><i style="background:#22D3EE"></i><span class="k">Reps</span><span class="v" style="color:#22D3EE">81%</span><span class="ab">146 of 180</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PROGRESSION ============ -->
+<div class="lbl">Chart 2 · Progression — what was actually logged</div>
+<div class="card">
+  <div class="chead">
+    <div class="ch">
+      <span><div class="t">Progression</div><div class="n d">Back Squat</div>
+        <div class="s">What they actually lifted — logged values only</div></span>
+      <span class="sp"></span>
+      <span class="sel">Back Squat <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span>
+      <span class="rng"><span class="rg">3M</span><span class="rg on">6M</span><span class="rg">1Y</span><span class="rg">ALL</span></span>
+    </div>
+    <div class="kpis">
+      <span class="kp"><div class="k"><i style="background:var(--top)"></i>Top set</div>
+        <div class="v d" style="color:var(--top)">130<span style="font-size:13px;color:var(--dim)"> kg</span></div><div class="dl up">▲ 24% · from 105</div></span>
+      <span class="kp"><div class="k"><i style="background:var(--setvol)"></i>Set volume</div>
+        <div class="v d">14<span style="font-size:13px;color:var(--dim)"> /wk</span></div><div class="dl up">▲ 5% · from 13</div></span>
+      <span class="kp"><div class="k"><i style="background:var(--loadvol)"></i>Load volume</div>
+        <div class="v d">6,940<span style="font-size:13px;color:var(--dim)"> kg</span></div><div class="dl up">▲ 18% · from 5,880</div></span>
+      <span class="kp"><div class="k">Records set</div>
+        <div class="v d" style="color:var(--gold)">3</div><div class="dl fl">last · week 7</div></span>
+    </div>
+  </div>
+
+  <div class="body">
+    <div class="togs">
+      <span class="tg" style="border-color:color-mix(in srgb,var(--top) 55%,transparent);background:color-mix(in srgb,var(--top) 12%,transparent)"><i style="background:var(--top);box-shadow:0 0 9px -1px var(--top)"></i>Top set</span>
+      <span class="tg" style="border-color:color-mix(in srgb,var(--setvol) 55%,transparent);background:color-mix(in srgb,var(--setvol) 12%,transparent)"><i style="background:var(--setvol);box-shadow:0 0 9px -1px var(--setvol)"></i>Set volume</span>
+      <span class="tg" style="border-color:color-mix(in srgb,var(--loadvol) 55%,transparent);background:color-mix(in srgb,var(--loadvol) 12%,transparent)"><i style="background:var(--loadvol);box-shadow:0 0 9px -1px var(--loadvol)"></i>Load volume</span>
+    </div>
+    <div class="legend">
+      <span>indexed to 100 at window start · hover for absolutes</span>
+      <span class="ph"><i style="background:rgba(25,227,196,.16)"></i>Block 1</span>
+      <span class="ph"><i style="background:rgba(255,138,31,.16)"></i>Phase 2</span>
+      <span class="ph"><i style="background:var(--gold);width:7px;height:7px;border-radius:50%"></i>PR</span>
+    </div>
+
+    <div class="plot">
+      <svg viewBox="0 0 1100 286" style="width:100%;height:auto;display:block">
+        <defs>
+          <linearGradient id="gTop" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#22E56A" stop-opacity=".26"/><stop offset="100%" stop-color="#22E56A" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+
+        <rect x="46" y="16" width="624" height="212" fill="rgba(25,227,196,.055)"/>
+        <rect x="670" y="16" width="415" height="212" fill="rgba(255,138,31,.06)"/>
+        <line x1="670" y1="16" x2="670" y2="228" stroke="rgba(255,138,31,.4)" stroke-dasharray="3 4"/>
+        <text x="58" y="30" fill="rgba(25,227,196,.75)" font-family="JetBrains Mono" font-size="8.5" letter-spacing="1.6">BLOCK 1</text>
+        <text x="682" y="30" fill="rgba(255,138,31,.8)" font-family="JetBrains Mono" font-size="8.5" letter-spacing="1.6">PHASE 2</text>
+
+        <line x1="46" y1="42"  x2="1085" y2="42"  stroke="rgba(255,255,255,.04)"/>
+        <line x1="46" y1="96"  x2="1085" y2="96"  stroke="rgba(255,255,255,.04)"/>
+        <line x1="46" y1="150" x2="1085" y2="150" stroke="rgba(255,255,255,.2)" stroke-dasharray="4 5"/>
+        <line x1="46" y1="204" x2="1085" y2="204" stroke="rgba(255,255,255,.04)"/>
+        <text x="38" y="46"  text-anchor="end" fill="#3D434D" font-family="JetBrains Mono" font-size="10">150</text>
+        <text x="38" y="100" text-anchor="end" fill="#3D434D" font-family="JetBrains Mono" font-size="10">125</text>
+        <text x="38" y="154" text-anchor="end" fill="#8B93A1" font-family="JetBrains Mono" font-size="10">100</text>
+        <text x="38" y="208" text-anchor="end" fill="#3D434D" font-family="JetBrains Mono" font-size="10">75</text>
+
+        <path d="M70,150 L148,142 L226,133 L304,122 L382,113 L460,106 L538,97 L616,90 L694,88 L772,88 L850,86 L928,88 L1006,86 L1084,88 L1084,228 L70,228 Z" fill="url(#gTop)"/>
+
+        <polyline stroke="#FFB020" stroke-width="2.4" stroke-opacity=".9"
+          points="70,150 148,137 226,126 304,113 382,102 460,96 538,83 616,76 694,96 772,118 850,105 928,129 1006,120 1084,142"
+          style="filter:drop-shadow(0 0 7px rgba(255,176,32,.45))"/>
+        <polyline stroke="#9D6BFF" stroke-width="2.4" stroke-opacity=".9"
+          points="70,150 148,144 226,135 304,129 382,122 460,129 538,116 616,116 694,131 772,144 850,137 928,152 1006,146 1084,157"
+          style="filter:drop-shadow(0 0 7px rgba(157,107,255,.45))"/>
+        <polyline stroke="#22E56A" stroke-width="2.8"
+          points="70,150 148,142 226,133 304,122 382,113 460,106 538,97 616,90 694,88 772,88 850,86 928,88 1006,86 1084,88"
+          style="filter:drop-shadow(0 0 9px rgba(34,229,106,.55))"/>
+
+        <g fill="#0A0B0D" stroke="#22E56A" stroke-width="1.9">
+          <circle cx="70" cy="150" r="3"/><circle cx="148" cy="142" r="3"/><circle cx="226" cy="133" r="3"/><circle cx="304" cy="122" r="3"/>
+          <circle cx="382" cy="113" r="3"/><circle cx="460" cy="106" r="3"/><circle cx="538" cy="97" r="3"/><circle cx="616" cy="90" r="3"/>
+          <circle cx="694" cy="88" r="3"/><circle cx="772" cy="88" r="3"/><circle cx="928" cy="88" r="3"/><circle cx="1006" cy="86" r="3"/><circle cx="1084" cy="88" r="3"/>
+        </g>
+
+        <!-- PR markers with stems -->
+        <g stroke="rgba(245,194,66,.35)" stroke-width="1" stroke-dasharray="2 3">
+          <line x1="304" y1="122" x2="304" y2="252"/><line x1="538" y1="97" x2="538" y2="252"/><line x1="616" y1="90" x2="616" y2="252"/>
+        </g>
+        <g fill="#F5C242">
+          <circle cx="304" cy="256" r="4"/><circle cx="538" cy="256" r="4"/><circle cx="616" cy="256" r="4"/>
+        </g>
+
+        <line x1="850" y1="16" x2="850" y2="228" stroke="rgba(255,255,255,.28)"/>
+        <circle cx="850" cy="105" r="5.5" fill="#0A0B0D" stroke="#FFB020" stroke-width="2.6"/>
+        <circle cx="850" cy="137" r="5.5" fill="#0A0B0D" stroke="#9D6BFF" stroke-width="2.6"/>
+        <circle cx="850" cy="86"  r="5.5" fill="#0A0B0D" stroke="#22E56A" stroke-width="2.6"/>
+
+        <text x="70"   y="276" text-anchor="middle" fill="#3D434D" font-family="JetBrains Mono" font-size="9.5">W1</text>
+        <text x="304"  y="276" text-anchor="middle" fill="#3D434D" font-family="JetBrains Mono" font-size="9.5">W4</text>
+        <text x="538"  y="276" text-anchor="middle" fill="#3D434D" font-family="JetBrains Mono" font-size="9.5">W7</text>
+        <text x="772"  y="276" text-anchor="middle" fill="#3D434D" font-family="JetBrains Mono" font-size="9.5">W10</text>
+        <text x="1006" y="276" text-anchor="middle" fill="#3D434D" font-family="JetBrains Mono" font-size="9.5">W13</text>
+      </svg>
+
+      <div class="hoverbox" style="left:64%">
+        <div class="wk">Week 11 · 6–12 Oct</div>
+        <div class="phz" style="color:#FF8A1F">Phase 2</div>
+        <div class="hr"><i style="background:#22E56A"></i><span class="k">Top set</span><span class="v" style="color:#22E56A">124</span><span class="ab">130 kg × 3</span></div>
+        <div class="hr"><i style="background:#9D6BFF"></i><span class="k">Set volume</span><span class="v" style="color:#9D6BFF">105</span><span class="ab">14 sets</span></div>
+        <div class="hr"><i style="background:#FFB020"></i><span class="k">Load volume</span><span class="v" style="color:#FFB020">118</span><span class="ab">6,940 kg</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<div class="note">
+  <b>What's been added:</b><br>
+  · <b>Training phase bands</b> in the background, from the program's own phases (Block 1 teal, Phase 2 orange) — so you can see <i>which block</i> a change happened in. Here adherence falls apart exactly at the Phase 2 boundary, which is the actual finding. The hover card names the phase too.<br>
+  · <b>Gradient area fills</b> under the primary series, plus glow on the lines.<br>
+  · <b>Data-point dots</b> at every week, so you can see where real data exists versus interpolation.<br>
+  · <b>Headline KPIs in the card header</b> — current value, delta, and context — so the summary reads before you touch the chart. Adherence adds "sessions missed"; progression adds "records set · last week 7".<br>
+  · <b>An under-80% zone</b> shaded red on the adherence chart, with an 80% guide line — a visible threshold rather than a number you have to compute.<br>
+  · <b>PR markers with stems</b> connecting up to the top-set line, so a record reads against the lift that earned it.<br><br>
+  <b>Everything is still hand-rollable SVG</b> — gradients, rects for bands, circles for dots. No chart library needed.<br><br>
+  <b>Phase bands need one thing confirmed:</b> that program phases are queryable per week for a client (<code>program_instance_phases</code> exists). If a client has no phased program, the bands simply don't render.
+</div>
+
+</body></html>

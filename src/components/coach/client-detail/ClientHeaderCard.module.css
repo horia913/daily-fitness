@@ -2,33 +2,70 @@
   position: relative;
   overflow: hidden;
   border-radius: 18px;
-  padding: 14px;
-  border: 1px solid var(--fc-glass-border);
-  background: var(--fc-surface-card);
+  padding: 14px 14px 14px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  --status-hue: var(--fc-effort-easy);
 }
 
-.flagged {
-  border-left: 3px solid var(--fc-effort-max);
-}
-
-.flagged::before {
+.card::before {
   content: "";
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
-  width: 60%;
+  width: 3px;
+  background: var(--status-hue);
+  z-index: 3;
+}
+
+.card::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 65%;
   pointer-events: none;
+  z-index: 1;
   background: linear-gradient(
     90deg,
-    color-mix(in srgb, var(--fc-effort-max) 12%, transparent),
-    transparent
+    color-mix(in srgb, var(--status-hue) 18%, transparent),
+    transparent 72%
+  );
+}
+
+.toneGood {
+  --status-hue: var(--fc-effort-easy);
+}
+
+.toneWarn {
+  --status-hue: var(--fc-effort-medium);
+}
+
+.toneCrit {
+  --status-hue: var(--fc-effort-max);
+}
+
+.toneMuted {
+  --status-hue: rgba(255, 255, 255, 0.28);
+}
+
+.flagged {
+  /* Urgent keeps a stronger wash; rail already from ::before */
+}
+
+.flagged::after {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--fc-effort-max) 22%, transparent),
+    transparent 75%
   );
 }
 
 .inner {
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 .topRow {
@@ -48,21 +85,21 @@
   border-radius: 14px;
   display: grid;
   place-items: center;
-  font-family: var(--f-headline, var(--font-geist-sans));
+  font-family: var(--f-headline);
   font-weight: 700;
   font-size: 16px;
   color: var(--fc-ink);
 }
 
 .avatarDefault {
-  background: linear-gradient(135deg, var(--fc-set-type-straight), #2da8b0);
+  background: linear-gradient(135deg, var(--fc-set-type-straight), color-mix(in srgb, var(--fc-accent) 72%, black));
 }
 
 .avatarHealthy {
   background: linear-gradient(
     135deg,
-    var(--fc-accent-lime),
-    var(--fc-accent-lime-2)
+    var(--fc-accent),
+    var(--fc-accent)
   );
 }
 
@@ -77,7 +114,7 @@
   width: 13px;
   height: 13px;
   border-radius: 50%;
-  border: 2.5px solid var(--fc-surface-card);
+  border: 2.5px solid var(--fc-bg-deep, #0a0b0d);
 }
 
 .dotGood {
@@ -98,7 +135,7 @@
 }
 
 .name {
-  font-family: var(--f-headline, var(--font-geist-sans));
+  font-family: var(--f-headline);
   font-weight: 700;
   font-size: 18px;
   color: var(--fc-text-primary);
@@ -128,7 +165,7 @@
   width: 30px;
   height: 30px;
   border-radius: 10px;
-  border: 1px solid var(--fc-glass-border);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   display: grid;
   place-items: center;
   color: var(--fc-text-subtle);
@@ -156,7 +193,7 @@
 .pill {
   padding: 4px 9px;
   border-radius: 999px;
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 10px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -168,34 +205,34 @@
 }
 
 .pillMuted {
-  background: rgba(255, 255, 255, 0.05);
+  background: transparent;
   color: var(--fc-text-subtle);
-  border-color: var(--fc-glass-border);
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
 .pillWarn {
   background: var(--fc-effort-medium-soft);
   color: var(--fc-effort-medium);
-  border-color: rgba(245, 194, 66, 0.25);
+  border-color: color-mix(in srgb, var(--fc-status-warning) 25%, transparent);
 }
 
 .pillCrit {
   background: var(--fc-effort-max-soft);
   color: var(--fc-effort-max);
-  border-color: rgba(255, 90, 95, 0.3);
+  border-color: color-mix(in srgb, var(--fc-status-error) 30%, transparent);
 }
 
 .pillGood {
   background: var(--fc-effort-easy-soft);
   color: var(--fc-effort-easy);
-  border-color: rgba(52, 211, 153, 0.25);
+  border-color: color-mix(in srgb, var(--fc-status-success) 25%, transparent);
 }
 
 .alertBar {
   margin-top: 12px;
   padding: 10px 12px 10px 14px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 90, 95, 0.2);
+  border: 1px solid color-mix(in srgb, var(--fc-status-error) 20%, transparent);
   border-left: 3px solid var(--fc-effort-max);
   background: linear-gradient(
     90deg,
@@ -211,4 +248,13 @@
   font-size: 12px;
   line-height: 1.4;
   color: var(--fc-text-primary);
+}
+
+.reasonLine {
+  margin-top: 10px;
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  color: var(--fc-text-dim);
+  line-height: 1.45;
 }

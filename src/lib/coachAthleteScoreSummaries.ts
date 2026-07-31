@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CoachAthleteScoreSummary } from "@/types/coachAthleteScore";
+import { isAthleteScoreCurrent } from "@/lib/athleteScoreFreshness";
 
 /**
  * Latest athlete_scores row per client + paused flag from active program_assignments.
@@ -33,10 +34,20 @@ export async function fetchCoachAthleteScoreSummariesByClientIds(
     console.error("[coachAthleteScoreSummaries] program_assignments:", paError);
   }
 
-  const latestByClient = new Map<string, { score: number; tier: string }>();
+  const latestByClient = new Map<
+    string,
+    { score: number; tier: string; calculated_at: string }
+  >();
   for (const row of scoreRows ?? []) {
     if (!latestByClient.has(row.client_id)) {
-      latestByClient.set(row.client_id, { score: row.score, tier: row.tier });
+      if (!isAthleteScoreCurrent(row.calculated_at)) {
+        continue;
+      }
+      latestByClient.set(row.client_id, {
+        score: row.score,
+        tier: row.tier,
+        calculated_at: row.calculated_at,
+      });
     }
   }
 
@@ -57,6 +68,7 @@ export async function fetchCoachAthleteScoreSummariesByClientIds(
       score: entry.score,
       tier: entry.tier,
       paused: pausedClients.has(clientId),
+      calculated_at: entry.calculated_at,
     });
   }
 

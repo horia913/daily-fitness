@@ -97,14 +97,6 @@ async function clearRunDataForAssignment(
     return { ok: false, step: 'program_day_completions', message: pdcErr.message }
   }
 
-  const { error: progErr } = await supabaseAdmin
-    .from('program_progress')
-    .delete()
-    .eq('program_assignment_id', assignmentId)
-  if (progErr) {
-    return { ok: false, step: 'program_progress', message: progErr.message }
-  }
-
   const { error: reviewErr } = await supabaseAdmin
     .from('coach_week_reviews')
     .delete()

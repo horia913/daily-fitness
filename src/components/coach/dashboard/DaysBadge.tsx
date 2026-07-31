@@ -34,14 +34,14 @@ export function DaysBadge({
 }: DaysBadgeProps) {
   const soft =
     tier === "critical"
-      ? "bg-[color:color-mix(in_srgb,var(--fc-accent-cyan)_10%,transparent)] border border-[color:color-mix(in_srgb,var(--fc-accent-cyan)_20%,transparent)]"
+      ? "bg-[color:color-mix(in_srgb,var(--fc-accent)_10%,transparent)] border border-[color:color-mix(in_srgb,var(--fc-accent)_20%,transparent)]"
       : tier === "warning"
         ? "bg-[color:var(--fc-sev-warning-soft)] border border-[color:var(--fc-sev-warning-border)]"
         : "bg-[color:var(--fc-sev-new-soft)] border border-[color:var(--fc-sev-new-border)]";
 
   const color =
     tier === "critical"
-      ? "text-[color:var(--fc-accent-cyan)]"
+      ? "text-[color:var(--fc-accent)]"
       : tier === "warning"
         ? "text-[color:var(--fc-sev-warning)]"
         : "text-[color:var(--fc-sev-new)]";
@@ -80,7 +80,7 @@ export function DaysBadge({
         <span
           className={cn(
             "mt-0.5 text-[7.5px] font-bold uppercase tracking-[0.12em] opacity-90",
-            tier === "critical" && "text-[color:var(--fc-accent-cyan)]",
+            tier === "critical" && "text-[color:var(--fc-accent)]",
             tier === "warning" && "text-[color:var(--fc-sev-warning)]",
             tier === "new" && "text-[color:var(--fc-sev-new)]"
           )}

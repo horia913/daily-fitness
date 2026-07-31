@@ -1,3 +1,5 @@
+import { displayCoachStrengthTestNotes, isCoachStrengthTestNotes } from "@/lib/coachStrengthTest";
+
 type Props = {
   notes: string | null;
   overallDifficultyRating: number | null;
@@ -14,7 +16,7 @@ function Dots({ value }: { value: number | null }) {
         <span
           key={i}
           className={`w-2 h-2 rounded-full ${
-            i < value ? "bg-[color:var(--fc-accent-cyan)]" : "bg-[color:var(--fc-glass-border)]"
+            i < value ? "bg-[color:var(--fc-accent)]" : "bg-[color:var(--fc-glass-border)]"
           }`}
         />
       ))}
@@ -25,7 +27,16 @@ function Dots({ value }: { value: number | null }) {
 
 export function WorkoutLogSessionMeta(props: Props) {
   const { notes, overallDifficultyRating, perceivedEffort, energyLevel, muscleFatigueLevel } = props;
-  if ([notes, overallDifficultyRating, perceivedEffort, energyLevel, muscleFatigueLevel].every((v) => v == null)) return null;
+  const displayNotes = isCoachStrengthTestNotes(notes)
+    ? displayCoachStrengthTestNotes(notes)
+    : notes;
+  if (
+    [displayNotes, overallDifficultyRating, perceivedEffort, energyLevel, muscleFatigueLevel].every(
+      (v) => v == null,
+    )
+  ) {
+    return null;
+  }
 
   return (
     <div className="fc-card-shell p-3 space-y-2">
@@ -33,9 +44,9 @@ export function WorkoutLogSessionMeta(props: Props) {
       {perceivedEffort != null ? <div><span className="text-xs fc-text-dim mr-2">Effort</span><Dots value={perceivedEffort} /></div> : null}
       {energyLevel != null ? <div><span className="text-xs fc-text-dim mr-2">Energy</span><Dots value={energyLevel} /></div> : null}
       {muscleFatigueLevel != null ? <div><span className="text-xs fc-text-dim mr-2">Fatigue</span><Dots value={muscleFatigueLevel} /></div> : null}
-      {notes ? (
+      {displayNotes ? (
         <div className="p-3 rounded-lg bg-[color:var(--fc-surface-sunken)] border border-[color:var(--fc-glass-border)]">
-          <p className="text-xs fc-text-primary italic leading-relaxed">&ldquo;{notes}&rdquo;</p>
+          <p className="text-xs fc-text-primary italic leading-relaxed">&ldquo;{displayNotes}&rdquo;</p>
         </div>
       ) : null}
     </div>

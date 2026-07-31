@@ -461,7 +461,7 @@ export default function ExerciseForm({
               type="submit"
               form="coach-exercise-create-form"
               disabled={loading || !canSubmitCreate}
-              className={sheetStyles.btnPrimaryLime}
+              className={sheetStyles.btnPrimaryAction}
             >
               <CheckCircle size={16} strokeWidth={2} aria-hidden />
               Create exercise
@@ -591,7 +591,7 @@ export default function ExerciseForm({
 
           <div className={coachV6.section}>
             <div className={coachV6.sectionHead}>
-              <div className={cn(profileStyles.sectionIcon, profileStyles.sectionIconLime)}>
+              <div className={cn(profileStyles.sectionIcon, profileStyles.sectionIconAction)}>
                 <ListChecks size={16} strokeWidth={2} aria-hidden />
               </div>
               <div>

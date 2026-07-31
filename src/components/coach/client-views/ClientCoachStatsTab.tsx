@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useCoachClient } from "@/contexts/CoachClientContext";
@@ -84,16 +84,16 @@ export default function ClientCoachStatsTab({ clientId }: { clientId: string }) 
   if (loading) {
     return (
       <div className="space-y-3 animate-pulse">
-        <div className="h-36 rounded-[20px] bg-[color:var(--fc-glass-soft)] border border-[color:var(--fc-glass-border)]" />
-        <div className="h-64 rounded-[18px] bg-[color:var(--fc-glass-soft)] border border-[color:var(--fc-glass-border)]" />
-        <div className="h-48 rounded-[18px] bg-[color:var(--fc-glass-soft)] border border-[color:var(--fc-glass-border)]" />
+        <div className="h-36 rounded-[20px] bg-[color:var(--bg-transparent)] border border-[color:var(--fc-glass-border)]" />
+        <div className="h-64 rounded-[18px] bg-[color:var(--bg-transparent)] border border-[color:var(--fc-glass-border)]" />
+        <div className="h-48 rounded-[18px] bg-[color:var(--bg-transparent)] border border-[color:var(--fc-glass-border)]" />
       </div>
     );
   }
 
   if (err || !analytics) {
     return (
-      <div className="rounded-[18px] border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface-card)] p-6 text-sm text-[color:var(--fc-text-primary)]">
+      <div className="rounded-[18px] border border-[color:var(--fc-glass-border)] bg-transparent p-6 text-sm text-[color:var(--fc-text-primary)]">
         {err ?? "Could not load analytics."}
       </div>
     );
@@ -112,7 +112,7 @@ export default function ClientCoachStatsTab({ clientId }: { clientId: string }) 
             num: peakVol >= 1000 ? (peakVol / 1000).toFixed(1) : Math.round(peakVol),
             numSuffix: peakVol >= 1000 ? "t" : " kg",
             label: "Peak vol/wk",
-            tone: "lime",
+            tone: "action",
           },
           {
             num: daysActive,

@@ -1,3 +1,4 @@
+import { isEst1RmEligibleExercise } from "@/lib/strengthAnalytics";
 import { supabase as browserSupabase } from "./supabase";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -149,6 +150,10 @@ function improvementPct(
 /**
  * v2 PR detection: max_strength + strength_endurance (independent).
  * Inserts new `personal_records` rows and flips prior `is_current_record`.
+ *
+ * Strength PRs only for loaded, muscle-tagged resistance (same gate as volume
+ * rail / est-1RM). At most one row per (exercise, record_type) per workout log —
+ * later improving sets update the session row instead of inserting again.
  */
 export async function checkAndStorePR(
   clientId: string,
@@ -158,6 +163,25 @@ export async function checkAndStorePR(
   const result: PRDetectionResult = {};
   try {
     if (setData.weight <= 0 || setData.reps <= 0) {
+      return result;
+    }
+
+    const { data: exRow, error: exErr } = await supabase
+      .from("exercises")
+      .select("id, category, primary_muscle_group_id")
+      .eq("id", setData.exercise_id)
+      .maybeSingle();
+    if (exErr) {
+      console.error("Error fetching exercise for PR gate:", exErr);
+    }
+    if (
+      !isEst1RmEligibleExercise({
+        category: (exRow as { category?: string | null } | null)?.category,
+        primary_muscle_group_id: (
+          exRow as { primary_muscle_group_id?: string | null } | null
+        )?.primary_muscle_group_id,
+      })
+    ) {
       return result;
     }
 
@@ -179,7 +203,19 @@ export async function checkAndStorePR(
       notes: null as string | null,
     };
 
+    const sessionPrIds = await loadSessionPrIdsForExercise(
+      supabase,
+      clientId,
+      setData.exercise_id,
+      setData.workout_log_id ?? null,
+    );
+
     // ----- Max strength -----
+    const msSession = await findSessionPrRow(
+      supabase,
+      sessionPrIds,
+      "max_strength",
+    );
     const { data: curMs, error: msErr } = await supabase
       .from("personal_records")
       .select("*")
@@ -193,8 +229,43 @@ export async function checkAndStorePR(
       console.error("Error fetching max_strength PR:", msErr);
     }
 
-    const prevMs = curMs?.record_value != null ? Number(curMs.record_value) : null;
-    if (v2ShouldRecordMaxStrength(prevMs, setData.weight)) {
+    const prevMs =
+      curMs?.record_value != null ? Number(curMs.record_value) : null;
+
+    if (msSession) {
+      const existingVal = Number(msSession.record_value);
+      if (setData.weight > existingVal) {
+        const previousValue =
+          msSession.previous_record_value != null
+            ? Number(msSession.previous_record_value)
+            : prevMs != null && prevMs < setData.weight
+              ? prevMs
+              : existingVal;
+        const imp = improvementPct(previousValue, setData.weight);
+        const { error: upErr } = await supabase
+          .from("personal_records")
+          .update({
+            record_value: setData.weight,
+            weight_at_record: setData.weight,
+            reps_at_record: setData.reps,
+            workout_set_log_id: setData.workout_set_log_id ?? null,
+            improvement_percentage: imp,
+            previous_record_value: previousValue,
+            updated_at: nowIso,
+          })
+          .eq("id", msSession.id);
+        if (upErr) {
+          console.error("Error updating session max_strength PR:", upErr);
+        } else {
+          result.max_strength = {
+            record_id: msSession.id,
+            previous_value: previousValue,
+            new_value: setData.weight,
+            improvement_pct: imp,
+          };
+        }
+      }
+    } else if (v2ShouldRecordMaxStrength(prevMs, setData.weight)) {
       const previousValue = prevMs ?? 0;
       if (curMs?.id) {
         await supabase
@@ -229,6 +300,11 @@ export async function checkAndStorePR(
     }
 
     // ----- Strength endurance -----
+    const seSession = await findSessionPrRow(
+      supabase,
+      sessionPrIds,
+      "strength_endurance",
+    );
     const { data: curSe, error: seErr } = await supabase
       .from("personal_records")
       .select("*")
@@ -242,8 +318,53 @@ export async function checkAndStorePR(
       console.error("Error fetching strength_endurance PR:", seErr);
     }
 
-    const prevVol = curSe?.record_value != null ? Number(curSe.record_value) : null;
-    if (v2ShouldRecordStrengthEndurance(prevVol, volume)) {
+    const prevVol =
+      curSe?.record_value != null ? Number(curSe.record_value) : null;
+
+    if (seSession) {
+      const existingVal = Number(seSession.record_value);
+      if (volume > existingVal) {
+        const previousValue =
+          seSession.previous_record_value != null
+            ? Number(seSession.previous_record_value)
+            : prevVol != null && prevVol < volume
+              ? prevVol
+              : existingVal;
+        const imp = improvementPct(previousValue, volume);
+        const { error: upErr } = await supabase
+          .from("personal_records")
+          .update({
+            record_value: volume,
+            weight_at_record: setData.weight,
+            reps_at_record: setData.reps,
+            workout_set_log_id: setData.workout_set_log_id ?? null,
+            improvement_percentage: imp,
+            previous_record_value: previousValue,
+            updated_at: nowIso,
+          })
+          .eq("id", seSession.id);
+        if (upErr) {
+          console.error("Error updating session strength_endurance PR:", upErr);
+        } else {
+          result.strength_endurance = {
+            record_id: seSession.id,
+            previous_value: previousValue,
+            new_value: volume,
+            improvement_pct: imp,
+            weight: setData.weight,
+            reps: setData.reps,
+            previous_weight:
+              seSession.weight_at_record != null
+                ? Number(seSession.weight_at_record)
+                : null,
+            previous_reps:
+              seSession.reps_at_record != null
+                ? Number(seSession.reps_at_record)
+                : null,
+          };
+        }
+      }
+    } else if (v2ShouldRecordStrengthEndurance(prevVol, volume)) {
       const previousValue = prevVol ?? 0;
       if (curSe?.id) {
         await supabase
@@ -290,6 +411,104 @@ export async function checkAndStorePR(
     console.error("Error checking PR:", error);
     return result;
   }
+}
+
+type SessionPrRow = {
+  id: string;
+  record_type: string;
+  record_value: number | string;
+  previous_record_value?: number | string | null;
+  weight_at_record?: number | string | null;
+  reps_at_record?: number | string | null;
+};
+
+async function loadSessionPrIdsForExercise(
+  supabase: SupabaseClient,
+  clientId: string,
+  exerciseId: string,
+  workoutLogId: string | null,
+): Promise<string[]> {
+  if (!workoutLogId) return [];
+  const { data: setIds, error } = await supabase
+    .from("workout_set_logs")
+    .select("id")
+    .eq("workout_log_id", workoutLogId)
+    .eq("client_id", clientId);
+  if (error || !setIds?.length) return [];
+  const ids = setIds.map((r) => r.id as string);
+  const { data: rows, error: prErr } = await supabase
+    .from("personal_records")
+    .select("id")
+    .eq("client_id", clientId)
+    .eq("exercise_id", exerciseId)
+    .in("workout_set_log_id", ids);
+  if (prErr || !rows?.length) return [];
+  return rows.map((r) => r.id as string);
+}
+
+async function findSessionPrRow(
+  supabase: SupabaseClient,
+  prIds: string[],
+  recordType: "max_strength" | "strength_endurance",
+): Promise<SessionPrRow | null> {
+  if (prIds.length === 0) return null;
+  const { data, error } = await supabase
+    .from("personal_records")
+    .select(
+      "id, record_type, record_value, previous_record_value, weight_at_record, reps_at_record",
+    )
+    .in("id", prIds)
+    .eq("record_type", recordType);
+  if (error || !data?.length) return null;
+  const sorted = [...(data as SessionPrRow[])].sort(
+    (a, b) => Number(b.record_value) - Number(a.record_value),
+  );
+  return sorted[0] ?? null;
+}
+
+/**
+ * Session PR list for UI: drop non-strength-eligible exercises; keep best
+ * row per (exerciseId, recordType). Does not delete DB rows.
+ */
+export function filterSessionPersonalRecordsForDisplay<
+  T extends {
+    id: string;
+    exerciseId?: string | null;
+    exercise_id?: string | null;
+    recordType?: string;
+    record_type?: string;
+    recordValue?: number | string;
+    record_value?: number | string;
+    category?: string | null;
+    primaryMuscleGroupId?: string | null;
+    primary_muscle_group_id?: string | null;
+  },
+>(rows: T[]): T[] {
+  const eligible = rows.filter((r) =>
+    isEst1RmEligibleExercise({
+      category: r.category,
+      primaryMuscleGroupId: r.primaryMuscleGroupId,
+      primary_muscle_group_id: r.primary_muscle_group_id,
+    }),
+  );
+  const best = new Map<string, T>();
+  for (const r of eligible) {
+    const exId = String(r.exerciseId ?? r.exercise_id ?? "");
+    const rt = String(r.recordType ?? r.record_type ?? "");
+    if (!exId || !rt) continue;
+    const key = `${exId}|${rt}`;
+    const val = Number(r.recordValue ?? r.record_value);
+    const prev = best.get(key);
+    if (!prev) {
+      best.set(key, r);
+      continue;
+    }
+    const prevVal = Number(prev.recordValue ?? prev.record_value);
+    if (Number.isFinite(val) && (!Number.isFinite(prevVal) || val > prevVal)) {
+      best.set(key, r);
+    }
+  }
+  return Array.from(best.values());
 }
 
 /**

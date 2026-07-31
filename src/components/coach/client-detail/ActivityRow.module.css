@@ -3,7 +3,7 @@
   align-items: center;
   gap: 10px;
   padding: 10px;
-  background: var(--fc-glass-soft);
+  background: transparent;
   border: 1px solid var(--fc-glass-border);
   border-radius: 11px;
 }
@@ -32,7 +32,7 @@
 }
 
 .name {
-  font-family: var(--font-geist-sans, ui-sans-serif);
+  font-family: var(--font-body);
   font-weight: 500;
   font-size: 12.5px;
   color: var(--fc-text-primary);
@@ -45,7 +45,7 @@
   border-radius: 999px;
   border: 1px solid var(--fc-glass-border);
   color: var(--fc-text-subtle);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
 }
 
 .pillMod {
@@ -61,7 +61,7 @@
 }
 
 .stats {
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 10px;
   color: var(--fc-text-subtle);
   margin-top: 3px;

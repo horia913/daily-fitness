@@ -16,14 +16,17 @@ import {
   getOverdueSlots,
 } from './programStateService'
 import type { ProgramScheduleSlot } from './programStateService'
+import { resolveInstanceWeekForAssignment } from './programInstanceResolver'
 
 export interface ProgramWeekDayCard {
-  /** program_schedule.id when merged from master; null if snapshot has no master row (do not treat as FK). */
+  /** program_day_assignments.id — instance schedule key for start/complete payloads */
   scheduleId: string | null
   dayNumber: number
   dayLabel: string
   dayOfWeek: number // 0=Monday, 6=Sunday
   templateId: string
+  /** program_instance_workouts.id — preferred for lazy canvas load on Train. */
+  instanceWorkoutId?: string | null
   workoutName: string
   estimatedDuration: number
   isCompleted: boolean
@@ -59,6 +62,8 @@ export interface ProgramWeekState {
   completedCount: number
   totalSlots: number
   currentWeekNumber: number
+  /** Calendar week X from get_program_instance_week (display / phase context). */
+  displayWeekNumber: number
   progressionMode: 'auto' | 'coach_managed'
   isWeekCompleteAwaitingReview: boolean
   coachFeedback: { notes: string; reviewedAt: string } | null
@@ -92,6 +97,7 @@ export async function buildProgramWeekState(
     completedCount: 0,
     totalSlots: 0,
     currentWeekNumber: 1,
+    displayWeekNumber: 1,
     progressionMode: 'auto',
     isWeekCompleteAwaitingReview: false,
     coachFeedback: null,
@@ -105,11 +111,12 @@ export async function buildProgramWeekState(
     // No active program — check for recently completed (Fix D: show congratulations, not "No program")
     const completedAssignment = await getRecentlyCompletedProgramAssignment(supabase, clientId)
     if (completedAssignment) {
-      const totalWeeks = completedAssignment.duration_weeks ?? 1
+      const weekRes = await resolveInstanceWeekForAssignment(supabase, completedAssignment.id)
+      const totalWeeks = weekRes?.totalWeeks && weekRes.totalWeeks > 0 ? weekRes.totalWeeks : 1
       const totalSlots = completedAssignment.total_days ?? 0
       let programName = completedAssignment.name
       if (!programName && completedAssignment.program_id) {
-        const { data: program } = await supabase.from('programs').select('name').eq('id', completedAssignment.program_id).maybeSingle()
+        const { data: program } = await supabase.from('workout_programs').select('name').eq('id', completedAssignment.program_id).maybeSingle()
         programName = program?.name ?? 'Training Program'
       } else if (!programName) {
         programName = 'Training Program'
@@ -130,6 +137,7 @@ export async function buildProgramWeekState(
         completedCount: totalSlots,
         totalSlots,
         currentWeekNumber: totalWeeks,
+        displayWeekNumber: weekRes?.currentWeek ?? totalWeeks,
         progressionMode: completedAssignment.progression_mode ?? 'auto',
         isWeekCompleteAwaitingReview: false,
         coachFeedback: null,
@@ -140,14 +148,33 @@ export async function buildProgramWeekState(
     return empty
   }
 
-  const unlockedWeekMax = computeUnlockedWeekMax(state.slots, state.completedSlots, state.assignment ?? undefined)
+  // Canonical Week X of N from the resolver (X = calendar/pause clamped to N,
+  // N = SUM(instance phases)). Falls back to the calendar helper / distinct
+  // slot weeks only if the resolver has no row (e.g. missing phases).
+  const weekNumbers = [...new Set(state.slots.map(s => s.week_number))].sort((a, b) => a - b)
+  const resolved = await resolveInstanceWeekForAssignment(supabase, state.assignment.id)
+  const unlockedWeekMax =
+    resolved?.currentWeek ??
+    computeUnlockedWeekMax(state.slots, state.completedSlots, {
+      start_date: state.assignment?.start_date ?? null,
+      pause_accumulated_days: state.assignment?.pause_accumulated_days ?? 0,
+      pause_status: state.assignment?.pause_status ?? null,
+      paused_at: state.assignment?.paused_at ?? null,
+      timezone_snapshot: state.assignment?.timezone_snapshot ?? null,
+      progression_mode: state.assignment?.progression_mode,
+      coach_unlocked_week: state.assignment?.coach_unlocked_week ?? null,
+      totalWeeksCap: resolved?.totalWeeks ?? null,
+    })
+  const totalWeeks =
+    resolved?.totalWeeks && resolved.totalWeeks > 0 ? resolved.totalWeeks : weekNumbers.length
   const todaySlotRaw = getTodaySlot(state.slots, unlockedWeekMax, todayWeekday)
   const isRestDay = todaySlotRaw === null
 
-  const weekNumbers = [...new Set(state.slots.map(s => s.week_number))].sort((a, b) => a - b)
-  const totalWeeks = weekNumbers.length
   const currentWeekSlots = state.slots.filter(s => s.week_number === unlockedWeekMax)
-  const completedScheduleIds = new Set(state.completedSlots.map(c => c.program_schedule_id))
+  const completedKeys = new Set(
+    state.completedSlots.map(c => c.program_day_assignment_id).filter((id): id is string => !!id),
+  )
+  const slotKey = (slot: ProgramScheduleSlot): string | null => slot.program_day_assignment_id ?? null
 
   const templateIds = [...new Set(currentWeekSlots.map(s => s.template_id).filter(Boolean))]
   let templateMap = new Map<string, { name: string; estimated_duration: number }>()
@@ -173,9 +200,10 @@ export async function buildProgramWeekState(
       dayLabel: `Day ${slot.day_number}`,
       dayOfWeek: slot.day_of_week,
       templateId: slot.template_id,
+      instanceWorkoutId: slot.program_instance_workout_id ?? null,
       workoutName: template?.name || 'Workout',
       estimatedDuration: template?.estimated_duration || 0,
-      isCompleted: slot.id != null && completedScheduleIds.has(slot.id),
+      isCompleted: slotKey(slot) != null && completedKeys.has(slotKey(slot)!),
       isOptional: slot.is_optional ?? false,
     }
   }
@@ -202,14 +230,14 @@ export async function buildProgramWeekState(
       workoutId: slot.template_id,
       workoutName: template?.name || 'Workout',
       estimatedDuration: template?.estimated_duration || 0,
-      isCompleted: slot.id != null && completedScheduleIds.has(slot.id),
+      isCompleted: slotKey(slot) != null && completedKeys.has(slotKey(slot)!),
       isOptional: slot.is_optional ?? false,
     }
   })
 
   let programName = state.assignment.name
   if (!programName && state.assignment.program_id) {
-    const { data: program } = await supabase.from('programs').select('name').eq('id', state.assignment.program_id).maybeSingle()
+    const { data: program } = await supabase.from('workout_programs').select('name').eq('id', state.assignment.program_id).maybeSingle()
     programName = program?.name ?? 'Training Program'
   } else if (!programName) {
     programName = 'Training Program'
@@ -220,7 +248,7 @@ export async function buildProgramWeekState(
   // In coach_managed mode, check if all required slots in the current week are done
   const requiredCurrentWeekSlots = currentWeekSlots.filter(s => !s.is_optional)
   const allRequiredCurrentWeekComplete = requiredCurrentWeekSlots.length > 0 &&
-    requiredCurrentWeekSlots.every(s => s.id != null && completedScheduleIds.has(s.id))
+    requiredCurrentWeekSlots.every(s => slotKey(s) != null && completedKeys.has(slotKey(s)!))
   const isWeekCompleteAwaitingReview =
     progressionMode === 'coach_managed' && allRequiredCurrentWeekComplete && !state.isCompleted
 
@@ -258,7 +286,8 @@ export async function buildProgramWeekState(
     overdueSlots,
     completedCount: state.completedCount,
     totalSlots: state.totalSlots,
-    currentWeekNumber: state.currentWeekNumber,
+    currentWeekNumber: unlockedWeekMax,
+    displayWeekNumber: resolved?.currentWeek ?? unlockedWeekMax,
     progressionMode,
     isWeekCompleteAwaitingReview,
     coachFeedback,

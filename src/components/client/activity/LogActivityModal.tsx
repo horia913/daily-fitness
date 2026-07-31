@@ -123,8 +123,8 @@ export function LogActivityModal({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[color:var(--fc-glass-border)] shrink-0">
           <div className="flex items-center gap-3 min-w-0 pr-2">
-            <div className="w-10 h-10 rounded-xl bg-[color-mix(in_srgb,var(--fc-accent-cyan)_20%,transparent)] flex items-center justify-center shrink-0">
-              <Activity className="w-5 h-5 text-[color:var(--fc-accent-cyan)]" aria-hidden />
+            <div className="w-10 h-10 rounded-xl bg-[color-mix(in_srgb,var(--fc-accent)_20%,transparent)] flex items-center justify-center shrink-0">
+              <Activity className="w-5 h-5 text-[color:var(--fc-accent)]" aria-hidden />
             </div>
             <div className="min-w-0">
               <DialogTitle className="text-lg font-bold fc-text-primary">
@@ -160,7 +160,7 @@ export function LogActivityModal({
                   className={cn(
                     "flex flex-col items-center gap-1 p-2 rounded-xl border transition-all duration-150",
                     activityType === type
-                      ? "border-[color:var(--fc-accent-cyan)] bg-[color-mix(in_srgb,var(--fc-accent-cyan)_10%,transparent)] shadow-sm"
+                      ? "border-[color:var(--fc-accent)] bg-[color-mix(in_srgb,var(--fc-accent)_10%,transparent)] shadow-sm"
                       : "border-[color:var(--fc-glass-border)] fc-surface hover:opacity-80"
                   )}
                 >
@@ -237,7 +237,7 @@ export function LogActivityModal({
                     className={cn(
                       "flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl border text-xs font-medium transition-all",
                       intensity === key
-                        ? "border-[color:var(--fc-accent-cyan)] bg-[color-mix(in_srgb,var(--fc-accent-cyan)_10%,transparent)] fc-text-primary"
+                        ? "border-[color:var(--fc-accent)] bg-[color-mix(in_srgb,var(--fc-accent)_10%,transparent)] fc-text-primary"
                         : "border-[color:var(--fc-glass-border)] fc-surface fc-text-dim hover:opacity-80"
                     )}
                   >
@@ -278,7 +278,7 @@ export function LogActivityModal({
               onChange={(e) => setNotes(e.target.value)}
               placeholder="How did it go?"
               rows={2}
-              className="w-full rounded-xl px-3 py-2 text-sm fc-surface border border-[color:var(--fc-glass-border)] fc-text-primary placeholder:fc-text-dim resize-none focus:outline-none focus:border-[color:var(--fc-accent-cyan)] transition-colors"
+              className="w-full rounded-xl px-3 py-2 text-sm fc-surface border border-[color:var(--fc-glass-border)] fc-text-primary placeholder:fc-text-dim resize-none focus:outline-none focus:border-[color:var(--fc-accent)] transition-colors"
             />
           </div>
         </div>

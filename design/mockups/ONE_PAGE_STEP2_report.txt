@@ -1,0 +1,35 @@
+ONE-PAGE VIEW — Step 2: tap group to jump
+Date: 2026-07-19
+
+1. Files modified
+- src/components/client/workout-execution/ExecGroupList.tsx
+- src/components/client/workout-execution/execGroupList.module.css
+- src/components/client/workout-execution/WorkoutExecutionChromeContext.tsx
+- src/components/client/workout-execution/ui/NavigationControls.tsx
+- src/app/client/workouts/[id]/start/page.tsx
+
+(NavigationControls.tsx kept; only gated off on this route.)
+
+2. Tap-to-jump wiring
+- Done / upcoming headers are `<button>`s calling `onSelectGroup(index)`.
+- Page passes `onSelectGroup={handleSetEntryChange}` — the same function Prev/Next used via `onSetEntryChange(currentSetEntryIndex ± 1)`.
+- Same state change: `setCurrentSetEntryIndex` + reset that entry’s `currentExerciseIndex` to 0. No re-fetch, no extra session writes. Scroll-into-view still runs on `currentIndex` change (Step 1).
+
+3. Accessibility / hit area
+- Whole header row is the button; `min-height: 44px`.
+- `aria-label={`Go to ${name}`}` (e.g. “Go to Bench Press”).
+- Quiet hover/active background; `:focus-visible` outline with group hue. No chevrons/arrows.
+
+4. NavigationControls
+- Retired on this route via chrome `hideNavigationControls: true` (provider on the current slot). Component not deleted.
+- Dropped UI: Prev/Next buttons (replaced by list taps) and the inline “Exercise N of M” under the card.
+- Covered elsewhere: position in the workout is still in the exec header (`progressCurrent of progressTotal` + `ExecProgressSegments`). Nothing else from NavigationControls was unique.
+
+5. Jump back to a done group
+- Same as Prev: index change only; logged sets remain in `loggedSetsBySetEntryId` / `completedSets`. No new write on navigate. Re-logging still goes through the existing log path (idempotency / set_number behaviour unchanged from Prev/Next).
+
+6. Untouched
+- Logging, set-advance fix, rest timer logic, card internals, `resolveSetPrescriptionTargets`. Still one executor for the current group only.
+
+7. tsc
+- `node node_modules/typescript/bin/tsc --noEmit` → exit 0.

@@ -1,0 +1,29 @@
+SET ADVANCE FIX — client stuck on set 1
+Date: 2026-07-19
+
+1. Root cause
+After a successful log, sticky/suggested weight updated (`onWeightLogged` → `default_weight` / `weightFallback`). Those values were part of `useSetRowsState`’s `resetKey` in Straight / Drop / Superset / Giant.
+
+When `resetKey` changed, `useSetRowsState` (hooks/useSetRowsState.ts, rebuild effect on `[rowCount, resetKey]`) rebuilt every row via `createDefaultRow` with `done: false`. The companion effect that syncs `done` from `loggedCount` only depends on `[loggedCount]`, so it did **not** re-run on that rebuild.
+
+Net: `markDone` / first-incomplete advance was wiped; the active log stayed on set 1. Upcoming `SetUnitRow`s also had no `onSelect`, so taps did nothing.
+
+Rest timer was **not** the cause (status/glue only; `skipRest` does not touch row `done`).
+
+2. The fix
+- `useSetRowsState`: on rebuild, re-apply `loggedCount` done flags (preserve field values for already-logged rows).
+- Straight / Drop / Superset / Giant: `resetKey` is structural only (set entry + exercise ids) — no sticky/suggested weights.
+- After log, carry weight into the next Straight/Drop row (replaces the old resetKey-driven reseed).
+- Upcoming rows: tap-to-jump via `jumpRowIndex` + `SetUnitRow.onSelect`.
+
+3. Set rows tappable-to-jump
+Yes — upcoming (incomplete, non-active) rows are buttons; tap makes that set/round the active log. Cleared after a successful log.
+
+4. Rest timer
+Not implicated. Advance still comes from row `done` / `loggedCount`. Rest may show on the next set; field/button `skipRest` unchanged.
+
+5. Untouched
+Write paths, `/api/log-set`, `resolveSetPrescriptionTargets`, card layout, rest countdown behaviour otherwise.
+
+6. tsc
+- `node node_modules/typescript/bin/tsc --noEmit` → exit 0 (0 errors).

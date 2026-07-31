@@ -6,7 +6,7 @@ import styles from "./DetailGrid.module.css";
 
 export type DetailGridIconTone =
   | "cyan"
-  | "lime"
+  | "action"
   | "good"
   | "purple"
   | "warn"
@@ -23,8 +23,8 @@ export type DetailGridRow = {
 
 function iconClass(tone: DetailGridIconTone | undefined): string {
   switch (tone) {
-    case "lime":
-      return styles.iconLime;
+    case "action":
+      return styles.iconAction;
     case "good":
       return styles.iconGood;
     case "purple":

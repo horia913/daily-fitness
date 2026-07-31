@@ -1,13 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { GoalCreationPayload } from "@/lib/goalCreationService";
 import { WizardNotice } from "./WizardNotice";
 import { AUTO_TRACKING_DEFERRED_NOTICE } from "./wizardCopy";
+import {
+  WizardFieldLabel,
+  WizardFormActions,
+  WizardHint,
+  WizardOptionChip,
+  WizardSectionLabel,
+  wizardInputClass,
+  wizardTextareaClass,
+} from "./wizardUi";
 
 type NutSub = "calories" | "protein" | "water" | "meal_plan";
 type Dir = "increase" | "decrease" | "maintain";
@@ -92,7 +99,11 @@ export function NutritionForm({
     if (!t) return;
 
     const macro =
-      subType === "calories" ? "calories" : subType === "protein" ? "protein_g" : "water_l";
+      subType === "calories"
+        ? "calories"
+        : subType === "protein"
+          ? "protein_g"
+          : "water_l";
 
     await onSubmit({
       category: "nutrition",
@@ -111,46 +122,37 @@ export function NutritionForm({
     });
   };
 
-  const showMacroFields = subType === "calories" || subType === "protein" || subType === "water";
-  const showNotice = true;
+  const showMacroFields =
+    subType === "calories" || subType === "protein" || subType === "water";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <fieldset className="space-y-2">
-        <legend className="text-xs font-semibold uppercase tracking-wider fc-text-dim mb-2">Type</legend>
-        <div className="flex flex-col gap-2">
-          {(
-            [
-              ["calories", "Daily calorie target"],
-              ["protein", "Daily protein target"],
-              ["water", "Water intake"],
-              ["meal_plan", "Meal plan adherence"],
-            ] as const
-          ).map(([v, lab]) => (
-            <label
-              key={v}
-              className="flex items-center gap-2 rounded-lg border border-[color:var(--fc-glass-border)] px-3 py-2 cursor-pointer has-[:checked]:border-[color:var(--fc-accent-cyan)]"
-            >
-              <input
-                type="radio"
-                name="nut-sub"
-                checked={subType === v}
-                onChange={() => setSubType(v)}
-                className="accent-[color:var(--fc-accent-cyan)]"
-              />
-              <span className="text-sm fc-text-primary">{lab}</span>
-            </label>
-          ))}
-        </div>
+      <fieldset>
+        <WizardSectionLabel>Type</WizardSectionLabel>
+        <WizardOptionChip
+          name="nut-type"
+          value={subType}
+          onChange={setSubType}
+          options={[
+            { value: "calories", label: "Daily calories", hint: "kcal target" },
+            { value: "protein", label: "Daily protein", hint: "grams" },
+            { value: "water", label: "Water intake", hint: "liters" },
+            {
+              value: "meal_plan",
+              label: "Meal plan adherence",
+              hint: "Weekly %",
+            },
+          ]}
+        />
       </fieldset>
 
-      {showNotice ? <WizardNotice>{AUTO_TRACKING_DEFERRED_NOTICE}</WizardNotice> : null}
+      <WizardNotice>{AUTO_TRACKING_DEFERRED_NOTICE}</WizardNotice>
 
       {subType === "meal_plan" ? (
         <>
-          <p className="text-xs fc-text-dim">Window: last 7 days (locked for now).</p>
-          <div className="space-y-2">
-            <Label className="text-sm fc-text-subtle">Target percentage (0–100)</Label>
+          <WizardHint>Window: last 7 days (locked for now).</WizardHint>
+          <div>
+            <WizardFieldLabel>Target percentage (0–100)</WizardFieldLabel>
             <Input
               type="number"
               min={0}
@@ -159,11 +161,11 @@ export function NutritionForm({
               required
               value={targetValue}
               onChange={(e) => setTargetValue(e.target.value)}
-              className="rounded-xl border-[color:var(--fc-glass-border)]"
+              className={wizardInputClass}
             />
           </div>
-          <div className="space-y-2">
-            <Label className="text-sm fc-text-subtle">Title</Label>
+          <div>
+            <WizardFieldLabel>Title</WizardFieldLabel>
             <Input
               value={title}
               onChange={(e) => {
@@ -171,16 +173,14 @@ export function NutritionForm({
                 setTitle(e.target.value);
               }}
               required
-              className="rounded-xl border-[color:var(--fc-glass-border)]"
+              className={wizardInputClass}
             />
           </div>
         </>
       ) : (
         <>
-          <div className="space-y-2">
-            <Label className="text-sm fc-text-subtle">
-              Target value ({unitFor()})
-            </Label>
+          <div>
+            <WizardFieldLabel>Target value ({unitFor()})</WizardFieldLabel>
             <Input
               type="number"
               step="0.1"
@@ -188,41 +188,29 @@ export function NutritionForm({
               required
               value={targetValue}
               onChange={(e) => setTargetValue(e.target.value)}
-              className="rounded-xl border-[color:var(--fc-glass-border)]"
+              className={wizardInputClass}
             />
           </div>
 
           {showMacroFields ? (
-            <fieldset className="space-y-2">
-              <legend className="text-xs font-semibold uppercase tracking-wider fc-text-dim mb-2">Direction</legend>
-              <div className="flex flex-col gap-2">
-                {(
-                  [
-                    ["increase", "Increase"],
-                    ["decrease", "Decrease"],
-                    ["maintain", "Maintain"],
-                  ] as const
-                ).map(([v, lab]) => (
-                  <label
-                    key={v}
-                    className="flex items-center gap-2 rounded-lg border border-[color:var(--fc-glass-border)] px-3 py-2 cursor-pointer has-[:checked]:border-[color:var(--fc-accent-cyan)]"
-                  >
-                    <input
-                      type="radio"
-                      name="nut-dir"
-                      checked={direction === v}
-                      onChange={() => setDirection(v)}
-                      className="accent-[color:var(--fc-accent-cyan)]"
-                    />
-                    <span className="text-sm fc-text-primary">{lab}</span>
-                  </label>
-                ))}
-              </div>
+            <fieldset>
+              <WizardSectionLabel>Direction</WizardSectionLabel>
+              <WizardOptionChip
+                name="nut-dir"
+                value={direction}
+                onChange={setDirection}
+                columns={3}
+                options={[
+                  { value: "increase", label: "Increase" },
+                  { value: "decrease", label: "Decrease" },
+                  { value: "maintain", label: "Maintain" },
+                ]}
+              />
             </fieldset>
           ) : null}
 
-          <div className="space-y-2">
-            <Label className="text-sm fc-text-subtle">Title</Label>
+          <div>
+            <WizardFieldLabel>Title</WizardFieldLabel>
             <Input
               value={title}
               onChange={(e) => {
@@ -230,40 +218,33 @@ export function NutritionForm({
                 setTitle(e.target.value);
               }}
               required
-              className="rounded-xl border-[color:var(--fc-glass-border)]"
+              className={wizardInputClass}
             />
           </div>
         </>
       )}
 
-      <div className="space-y-2">
-        <Label className="text-sm fc-text-subtle">Target date (optional)</Label>
+      <div>
+        <WizardFieldLabel>Target date (optional)</WizardFieldLabel>
         <Input
           type="date"
           value={targetDate}
           onChange={(e) => setTargetDate(e.target.value)}
-          className="rounded-xl border-[color:var(--fc-glass-border)]"
+          className={wizardInputClass}
         />
       </div>
 
-      <div className="space-y-2">
-        <Label className="text-sm fc-text-subtle">Notes (optional)</Label>
+      <div>
+        <WizardFieldLabel>Notes (optional)</WizardFieldLabel>
         <Textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={3}
-          className="rounded-xl border-[color:var(--fc-glass-border)]"
+          className={wizardTextareaClass}
         />
       </div>
 
-      <div className="flex gap-2 pt-2">
-        <Button type="button" variant="outline" className="flex-1" onClick={onBack} disabled={submitting}>
-          Back
-        </Button>
-        <Button type="submit" className="flex-1 fc-btn fc-btn-primary" disabled={submitting}>
-          {submitting ? "Saving…" : "Create goal"}
-        </Button>
-      </div>
+      <WizardFormActions onBack={onBack} submitting={submitting} />
     </form>
   );
 }

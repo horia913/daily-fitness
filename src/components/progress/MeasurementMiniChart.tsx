@@ -89,13 +89,13 @@ export function MeasurementMiniChart({
       : "text-[color:var(--fc-status-warning)]";
 
   const lineColor = isGoodTrend
-    ? "rgb(34, 197, 94)" // green
+    ? "var(--fc-status-success)"
     : change === 0
-      ? "rgb(156, 163, 175)" // gray
-      : "rgb(234, 179, 8)"; // yellow
+      ? "var(--fc-text-subtle)"
+      : "var(--fc-status-warning)";
 
   const lineColor2 = getValue2
-    ? "rgb(59, 130, 246)" // blue for second line
+    ? "var(--fc-group-a)"
     : lineColor;
 
   const trendIcon =
@@ -186,9 +186,9 @@ export function MeasurementMiniChart({
               y1={label.y}
               x2={padding.left + chartWidth}
               y2={label.y}
-              stroke="currentColor"
+              stroke="var(--fc-hairline)"
               strokeWidth={0.5}
-              opacity={0.1}
+              opacity={1}
             />
           ))}
 
@@ -228,7 +228,7 @@ export function MeasurementMiniChart({
                 cy={y}
                 r={3}
                 fill={lineColor}
-                stroke="white"
+                stroke="var(--fc-bg-deep)"
                 strokeWidth={1}
               />
             );
@@ -245,7 +245,7 @@ export function MeasurementMiniChart({
                 cy={y}
                 r={3}
                 fill={lineColor2}
-                stroke="white"
+                stroke="var(--fc-bg-deep)"
                 strokeWidth={1}
               />
             );

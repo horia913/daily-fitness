@@ -5,7 +5,11 @@ import { createErrorResponse, handleApiError, validateRequiredFields } from '@/l
 import { createForbiddenResponse } from '@/lib/apiAuth'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { PerfCollector } from '@/lib/perfUtils'
-import { normalizeSetType } from '@/lib/setTypeUtils'
+import { buildLogSetInsertData } from '@/lib/setLogging/buildLogSetInsertData'
+import {
+  resolveCanonicalLogSetType,
+  type CanonicalLogSetType,
+} from '@/lib/setLogging/resolveLogSetType'
 import {
   checkAndStorePR,
   detectionResultToPrDetected,
@@ -80,7 +84,8 @@ export async function POST(req: NextRequest) {
 
     // Resolve canonical field names (prefer new names, fall back to old)
     const set_entry_id = bodySetEntryId ?? bodyBlockId
-    const incomingBlockType = bodySetType ?? bodyBlockType
+    const incomingSetTypeRaw = bodySetType ?? bodyBlockType
+    let blockType: CanonicalLogSetType = 'straight_set'
 
     // Validate session_id is a valid UUID if provided
     const isValidUuid = (value: string | null | undefined): boolean => {
@@ -138,47 +143,20 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Determine block type (default to straight_set for backwards compatibility)
-    // Accept both variants (e.g. dropset + drop_set); we store canonical (drop_set) to match templates
-    const validBlockTypes = [
-      'straight_set',
-      'superset',
-      'giant_set',
-      'amrap',
-      'dropset',
-      'drop_set',
-      'cluster_set',
-      'rest_pause',
-      'preexhaust',
-      'pre_exhaustion',
-      'emom',
-      'tabata',
-      'fortime',
-      'for_time',
-      'speed_work',
-      'endurance',
-      'timed_set',
-    ] as const
-
-    type BlockType = (typeof validBlockTypes)[number]
-
-    let blockType: BlockType = 'straight_set'
-
-    if (incomingBlockType) {
-      const normalized = normalizeSetType(incomingBlockType);
-      if (!(validBlockTypes as readonly string[]).includes(incomingBlockType) && !(validBlockTypes as readonly string[]).includes(normalized)) {
-        console.error("❌ Invalid set_type:", incomingBlockType, "Valid types:", validBlockTypes);
+    // Normalize set_type once at the boundary; all branches below use canonical values only.
+    if (incomingSetTypeRaw) {
+      const resolved = resolveCanonicalLogSetType(incomingSetTypeRaw)
+      if (!resolved) {
+        console.error('❌ Invalid set_type:', incomingSetTypeRaw)
         return NextResponse.json(
-          { 
-            error: `Invalid set_type: ${incomingBlockType}`,
-            details: `Must be one of: ${validBlockTypes.join(", ")}`,
-            received: incomingBlockType
+          {
+            error: `Invalid set_type: ${incomingSetTypeRaw}`,
+            received: incomingSetTypeRaw,
           },
-          { status: 400 }
+          { status: 400 },
         )
       }
-      // Store canonical form so logs match template set_type (e.g. drop_set not dropset)
-      blockType = (normalized || incomingBlockType) as BlockType;
+      blockType = resolved
     }
 
     // Step 1: Get or create workout_log_id (REQUIRED for workout_set_logs)
@@ -367,6 +345,16 @@ export async function POST(req: NextRequest) {
       if (finalExistingLog) {
         workoutLogId = finalExistingLog.id;
       } else {
+        // Program Spine Rebuild (step 4): stamp the instance schedule row id on
+        // the workout_log created here (the known "first set creates the log
+        // without program columns" gap). Resolved via the workout_assignment
+        // bridge set by the start route; null for standalone workouts.
+        const { resolveProgramDayAssignmentIdByWorkoutAssignment } = await import('@/lib/resolveInstanceScheduleRow')
+        const programDayAssignmentId = await resolveProgramDayAssignmentIdByWorkoutAssignment(
+          supabaseAdmin,
+          actualWorkoutAssignmentId
+        )
+
         // Include workout_session_id if we have a valid session
         const insertPayload: {
           client_id: string;
@@ -374,6 +362,7 @@ export async function POST(req: NextRequest) {
           started_at: string;
           completed_at: null;
           workout_session_id?: string;
+          program_day_assignment_id?: string;
         } = {
           client_id: effectiveClientId,
           workout_assignment_id: actualWorkoutAssignmentId,
@@ -383,6 +372,10 @@ export async function POST(req: NextRequest) {
         
         if (validSessionId) {
           insertPayload.workout_session_id = validSessionId;
+        }
+
+        if (programDayAssignmentId) {
+          insertPayload.program_day_assignment_id = programDayAssignmentId;
         }
 
         const { data: newLog, error: createError } = await (supabaseAdmin as any)
@@ -482,283 +475,19 @@ export async function POST(req: NextRequest) {
       return isNaN(num) ? null : num
     }
 
-    const blockTypeForPerformance = blockType as BlockType
+    const buildResult = buildLogSetInsertData(body, blockType, insertData)
+    if (!buildResult.ok) {
+      console.error('❌ Invalid log-set payload:', buildResult.error, buildResult.details)
+      return NextResponse.json(
+        { error: buildResult.error, details: buildResult.details },
+        { status: 400 },
+      )
+    }
 
-    switch (blockTypeForPerformance) {
-        case 'straight_set': {
-          const exerciseId = body.exercise_id as string | undefined
-          const weightNum = parseNumber(body.weight)
-          const repsNum = parseIntNumber(body.reps)
-
-          if (!exerciseId || !weightNum || !repsNum) {
-            console.error("❌ Missing required fields for straight_set:", {
-              has_exercise_id: !!exerciseId,
-              has_weight: weightNum !== null,
-              has_reps: repsNum !== null,
-            });
-            return NextResponse.json(
-              { 
-                error: 'Missing required fields for straight_set: exercise_id, weight, reps',
-                details: {
-                  exercise_id: exerciseId || 'missing',
-                  weight: weightNum !== null ? weightNum : 'missing or invalid',
-                  reps: repsNum !== null ? repsNum : 'missing or invalid',
-                  received: {
-                    exercise_id: body.exercise_id,
-                    weight: body.weight,
-                    reps: body.reps,
-                  }
-                }
-              },
-              { status: 400 }
-            )
-          }
-
-          insertData.exercise_id = exerciseId
-          insertData.weight = weightNum
-          insertData.reps = repsNum
-          insertData.set_number = body.set_number || 1
-
-          primaryExerciseId = exerciseId
-          primaryWeight = weightNum
-          primaryReps = repsNum
-          break
-        }
-
-        case 'superset': {
-          insertData.set_number = body.set_number || 1
-          insertData.superset_exercise_a_id = body.superset_exercise_a_id
-          insertData.superset_weight_a = parseNumber(body.superset_weight_a)
-          insertData.superset_reps_a = parseIntNumber(body.superset_reps_a)
-          insertData.superset_exercise_b_id = body.superset_exercise_b_id
-          insertData.superset_weight_b = parseNumber(body.superset_weight_b)
-          insertData.superset_reps_b = parseIntNumber(body.superset_reps_b)
-
-          // Use exercise A for e1RM
-          primaryExerciseId = typeof body.superset_exercise_a_id === 'string' ? body.superset_exercise_a_id : null
-          primaryWeight = parseNumber(body.superset_weight_a)
-          primaryReps = parseIntNumber(body.superset_reps_a)
-          break
-        }
-
-        case 'giant_set': {
-          insertData.round_number = body.round_number || 1
-          // Assume schema has JSONB column giant_set_exercises
-          insertData.giant_set_exercises = body.giant_set_exercises || null
-          break
-        }
-
-        case 'amrap': {
-          if (body.exercise_id) {
-            insertData.exercise_id = body.exercise_id
-          }
-          insertData.amrap_total_reps = parseIntNumber(body.amrap_total_reps)
-          insertData.amrap_duration_seconds = parseIntNumber(body.amrap_duration_seconds)
-          insertData.amrap_target_reps = parseIntNumber(body.amrap_target_reps) || null
-          break
-        }
-
-        case 'drop_set': {
-          insertData.set_number = body.set_number || 1
-          const dropsArray = Array.isArray(body.dropset_drops) ? body.dropset_drops : null
-          if (dropsArray && dropsArray.length >= 2) {
-            insertData.dropset_drops = dropsArray.map((d: { weight?: number; reps?: number }) => ({
-              weight: parseNumber(d.weight),
-              reps: parseIntNumber(d.reps),
-            }))
-            const first = dropsArray[0]
-            const last = dropsArray[dropsArray.length - 1]
-            insertData.dropset_initial_weight = parseNumber(first?.weight)
-            insertData.dropset_initial_reps = parseIntNumber(first?.reps)
-            insertData.dropset_final_weight = parseNumber(last?.weight)
-            insertData.dropset_final_reps = parseIntNumber(last?.reps)
-            insertData.dropset_percentage = insertData.dropset_initial_weight && insertData.dropset_final_weight
-              ? ((insertData.dropset_initial_weight - insertData.dropset_final_weight) / insertData.dropset_initial_weight) * 100
-              : null
-          } else {
-            insertData.dropset_initial_weight = parseNumber(body.dropset_initial_weight)
-            insertData.dropset_initial_reps = parseIntNumber(body.dropset_initial_reps)
-            insertData.dropset_final_weight = parseNumber(body.dropset_final_weight)
-            insertData.dropset_final_reps = parseIntNumber(body.dropset_final_reps)
-            insertData.dropset_percentage = parseNumber(body.dropset_percentage)
-          }
-
-          primaryExerciseId = body.exercise_id || null
-          primaryWeight = parseNumber(insertData.dropset_initial_weight)
-          primaryReps = parseIntNumber(insertData.dropset_initial_reps)
-          if (body.exercise_id) {
-            insertData.exercise_id = body.exercise_id
-          }
-          // Mirror first-segment load into generic columns (templates use dropset_* ;
-          // many readers aggregate weight/reps from these columns only.)
-          if (
-            primaryWeight !== null &&
-            primaryReps !== null &&
-            primaryWeight > 0 &&
-            primaryReps > 0
-          ) {
-            insertData.weight = primaryWeight
-            insertData.reps = primaryReps
-          }
-          break
-        }
-
-        case 'cluster_set': {
-          const exerciseId = body.exercise_id as string | undefined
-          const weightNum = parseNumber(body.weight)
-          const repsNum = parseIntNumber(body.reps)
-
-          insertData.exercise_id = exerciseId
-          insertData.weight = weightNum
-          insertData.reps = repsNum
-          insertData.set_number = body.set_number || 1
-          insertData.cluster_number = body.cluster_number || 1
-
-          primaryExerciseId = exerciseId || null
-          primaryWeight = weightNum
-          primaryReps = repsNum
-          break
-        }
-
-        case 'rest_pause': {
-          const exerciseId = body.exercise_id as string | undefined
-          insertData.exercise_id = exerciseId
-          // Only save rest_pause_initial_weight, not the generic weight field
-          insertData.rest_pause_initial_weight = parseNumber(body.rest_pause_initial_weight)
-          insertData.rest_pause_initial_reps = parseIntNumber(body.rest_pause_initial_reps)
-          insertData.rest_pause_reps_after = parseIntNumber(body.rest_pause_reps_after)
-          insertData.rest_pause_number = body.rest_pause_number || 1
-          insertData.set_number = body.set_number || 1
-          // Add rest_pause_duration and max_rest_pauses (from workout_rest_pause_sets)
-          insertData.rest_pause_duration = parseIntNumber(body.rest_pause_duration)
-          insertData.max_rest_pauses = parseIntNumber(body.max_rest_pauses)
-
-          primaryExerciseId = exerciseId || null
-          primaryWeight = parseNumber(body.rest_pause_initial_weight)
-          primaryReps = parseIntNumber(body.rest_pause_initial_reps)
-          break
-        }
-
-        case 'pre_exhaustion': {
-          insertData.set_number = body.set_number || 1
-          insertData.preexhaust_isolation_exercise_id = body.preexhaust_isolation_exercise_id
-          insertData.preexhaust_isolation_weight = parseNumber(body.preexhaust_isolation_weight)
-          insertData.preexhaust_isolation_reps = parseIntNumber(body.preexhaust_isolation_reps)
-          insertData.preexhaust_compound_exercise_id = body.preexhaust_compound_exercise_id
-          insertData.preexhaust_compound_weight = parseNumber(body.preexhaust_compound_weight)
-          insertData.preexhaust_compound_reps = parseIntNumber(body.preexhaust_compound_reps)
-          break
-        }
-
-        case 'emom': {
-          if (body.exercise_id) {
-            insertData.exercise_id = body.exercise_id
-          }
-          insertData.emom_minute_number = body.emom_minute_number
-          insertData.emom_total_reps_this_min = parseIntNumber(body.emom_total_reps_this_min)
-          insertData.emom_total_duration_sec = parseIntNumber(body.emom_total_duration_sec)
-          break
-        }
-
-        case 'tabata': {
-          if (body.exercise_id) {
-            insertData.exercise_id = body.exercise_id
-          }
-          insertData.tabata_rounds_completed = parseIntNumber(body.tabata_rounds_completed)
-          insertData.tabata_total_duration_sec = parseIntNumber(body.tabata_total_duration_sec)
-          break
-        }
-
-        case 'for_time': {
-          if (body.exercise_id) {
-            insertData.exercise_id = body.exercise_id
-          }
-          insertData.fortime_total_reps = parseIntNumber(body.fortime_total_reps)
-          insertData.fortime_time_taken_sec = parseIntNumber(body.fortime_time_taken_sec)
-          insertData.fortime_time_cap_sec = parseIntNumber(body.fortime_time_cap_sec)
-          insertData.fortime_target_reps = parseIntNumber(body.fortime_target_reps) || null
-          break
-        }
-
-        case 'speed_work': {
-          const exerciseId = body.exercise_id as string | undefined
-          const timeSec = parseIntNumber(body.actual_time_seconds)
-          if (!exerciseId || timeSec === null || timeSec <= 0) {
-            return NextResponse.json(
-              {
-                error: 'Missing required fields for speed_work: exercise_id, actual_time_seconds',
-                details: { exercise_id: exerciseId || 'missing', actual_time_seconds: timeSec },
-              },
-              { status: 400 }
-            )
-          }
-          insertData.exercise_id = exerciseId
-          insertData.set_number = body.set_number ?? 1
-          insertData.actual_time_seconds = timeSec
-          insertData.actual_distance_meters = parseNumber(body.actual_distance_meters)
-          insertData.actual_hr_avg = parseNumber(body.actual_hr_avg)
-          insertData.actual_speed_kmh = parseNumber(body.actual_speed_kmh)
-          primaryExerciseId = exerciseId
-          break
-        }
-
-        case 'endurance': {
-          const exerciseId = body.exercise_id as string | undefined
-          const distM = parseNumber(body.actual_distance_meters)
-          const timeSec = parseIntNumber(body.actual_time_seconds)
-          if (!exerciseId || distM === null || distM <= 0 || timeSec === null || timeSec <= 0) {
-            return NextResponse.json(
-              {
-                error: 'Missing required fields for endurance: exercise_id, actual_distance_meters, actual_time_seconds',
-                details: {
-                  exercise_id: exerciseId || 'missing',
-                  actual_distance_meters: distM,
-                  actual_time_seconds: timeSec,
-                },
-              },
-              { status: 400 }
-            )
-          }
-          insertData.exercise_id = exerciseId
-          insertData.set_number = body.set_number ?? 1
-          insertData.actual_distance_meters = distM
-          insertData.actual_time_seconds = timeSec
-          insertData.actual_hr_avg = parseNumber(body.actual_hr_avg)
-          insertData.actual_speed_kmh = parseNumber(body.actual_speed_kmh)
-          primaryExerciseId = exerciseId
-          break
-        }
-
-        case 'timed_set': {
-          const exerciseId = body.exercise_id as string | undefined
-          const durationSec = parseIntNumber(body.actual_duration_seconds)
-          if (!exerciseId || durationSec === null || durationSec <= 0) {
-            return NextResponse.json(
-              {
-                error:
-                  'Missing required fields for timed_set: exercise_id, actual_duration_seconds',
-                details: {
-                  exercise_id: exerciseId || 'missing',
-                  actual_duration_seconds: durationSec,
-                },
-              },
-              { status: 400 },
-            )
-          }
-          insertData.exercise_id = exerciseId
-          insertData.set_number = body.set_number ?? 1
-          insertData.actual_duration_seconds = durationSec
-          primaryExerciseId = exerciseId
-          break
-        }
-
-        default: {
-          return NextResponse.json(
-            { error: `Unhandled set_type: ${blockType}` },
-            { status: 500 }
-          )
-        }
-      }
+    Object.assign(insertData, buildResult.insertData)
+    primaryExerciseId = buildResult.primaryExerciseId
+    primaryWeight = buildResult.primaryWeight
+    primaryReps = buildResult.primaryReps
 
     // Golden Logging Flow: include RPE in the insert if provided (1-10)
     if (incomingRpe !== undefined && incomingRpe !== null) {
@@ -1165,6 +894,41 @@ export async function POST(req: NextRequest) {
               primaryReps,
               prDetectionSummary,
             )
+            try {
+              const prIds = [
+                prDetectionSummary.max_strength?.record_id,
+                prDetectionSummary.strength_endurance?.record_id,
+              ].filter(Boolean) as string[]
+              const {
+                notifyClientPr,
+                notifyCoachClientPr,
+              } = await import('@/lib/inAppNotificationEvents')
+              notifyClientPr({
+                clientId: effectiveClientId,
+                exerciseName: exercise.name,
+                weight: primaryWeight,
+                reps: primaryReps,
+                prIds,
+                admin: supabaseAdmin,
+              })
+              const { data: rawClientProfile } = await supabaseAdmin
+                .from('profiles')
+                .select('first_name')
+                .eq('id', effectiveClientId)
+                .maybeSingle()
+              const clientProfile = rawClientProfile as { first_name: string | null } | null
+              void notifyCoachClientPr({
+                clientId: effectiveClientId,
+                exerciseName: exercise.name,
+                weight: primaryWeight,
+                reps: primaryReps,
+                prIds,
+                clientName: clientProfile?.first_name ?? undefined,
+                admin: supabaseAdmin,
+              })
+            } catch (notifyErr) {
+              console.error('In-app PR notification failed (non-blocking):', notifyErr)
+            }
           }
         }
       } catch (prError) {

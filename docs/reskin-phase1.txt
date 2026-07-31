@@ -1,0 +1,102 @@
+RESKIN Phase 1 — client execution LiveCard v6
+Date: 2026-07-17
+No git. Instance row-executors; Straight wired; others deferred.
+
+================================================================================
+1. FILES CREATED / MODIFIED
+================================================================================
+Created (CSS module — matches exercise-display / trainPage convention):
+  src/components/client/workout-execution/live-card/liveCard.module.css
+  src/components/client/workout-execution/live-card/types.ts
+  src/components/client/workout-execution/live-card/formatLiveCard.ts
+  src/components/client/workout-execution/live-card/effortFromPrescribedRir.ts
+  src/components/client/workout-execution/live-card/LiveCard.tsx
+  src/components/client/workout-execution/live-card/LiveCardPrimary.tsx
+  src/components/client/workout-execution/live-card/LiveCardStats.tsx
+  src/components/client/workout-execution/live-card/LiveCardTechnique.tsx
+  src/components/client/workout-execution/live-card/LiveCardLog.tsx
+  src/components/client/workout-execution/live-card/LiveCardGroupedExercise.tsx
+  src/components/client/workout-execution/live-card/index.ts
+
+Modified:
+  src/app/dev/ui-gallery/page.tsx
+    — gallery entry “LiveCard v6 — Straight / Drop / Superset”
+  src/components/client/workout-execution/blocks/StraightSetExecutor.tsx
+    — PrescriptionCard / BaseBlockExecutorLayout → LiveCard; SetTypeBadge gone
+
+CSS convention: **CSS modules** under the feature folder (same as
+exerciseDisplay.module.css, trainPage.module.css). Tokens from ui-system.css
+(--fc-group-*, --fc-effort-*, --fc-hairline, --fc-status-success). No raw hex
+in TSX; module file uses token vars (with rare mockup-parity fallbacks only
+in CSS for border/field chrome matching the canonical HTML).
+
+================================================================================
+2. SHARED CARD LOCATION + GALLERY
+================================================================================
+Package: src/components/client/workout-execution/live-card/
+Exports: LiveCard shell, Primary, Stats, Technique, Log fields/button,
+         GroupedExercise, Glue, effortFromPrescribedRir, format helpers.
+
+Gallery: /dev/ui-gallery — PreviewCard
+  “LiveCard v6 — Straight / Drop / Superset”
+  Examples mirror mockup §2 Straight, Drop (technique), §3 Superset (logged collapse).
+
+================================================================================
+3. DIFF TABLE vs execution-screen-v6-CANONICAL.html
+================================================================================
+| Mockup piece              | Implemented? | Notes |
+|---------------------------|--------------|-------|
+| .live transparent + 1px border | Yes | liveCard.module.css .live |
+| 4px hue left rail         | Yes | ::before + --live-hue |
+| .lhead title + status     | Yes | logging / resting / complete |
+| .lhead .r.resting green   | Yes | class wired; Straight uses logging/complete |
+| .exname + optional badge  | Yes | LiveCardExerciseName |
+| .primary Target \| Effort | Yes | fixed 2-col 3fr/2fr |
+| Numbers reps × weight     | Yes | kind reps_weight |
+| Effort word + RPE         | Yes | effortFromPrescribedRir |
+| Effort colour by tier     | Yes | --fc-effort-* via tier class |
+| .stats Rest·Tempo·Last    | Yes | fixed 3-col; — when absent |
+| Iconed stats              | Yes | inline SVG (rest/tempo/last) |
+| .tech technique block     | Yes | component ready; Straight has no technique |
+| .log fields + green ✓     | Yes | LiveCardLogField / LogButton |
+| SetRowsListPanel in card  | Yes | LiveCardLog children slot (all-sets-visible) |
+| Grouped .gx / logged collapse | Yes | LiveCardGroupedExercise (gallery + ready) |
+| .glue shared rest         | Yes | LiveCardGlue (gallery + ready) |
+| Page header / progress bar| Out of Phase 1 | still page.tsx ExecProgressSegments |
+| SetTypeBadge              | Removed on Straight | not rendered |
+| Nested PrescriptionCard   | Removed on Straight | |
+| Hue cycle A/B/C/D         | Yes | maps to fc-group-a/c/d/b to match mockup cyan/amber |
+
+================================================================================
+4. RIR/RPE → WORD + COLOUR (REUSED — NOT INVENTED)
+================================================================================
+Path: src/lib/workoutEffortLabels.ts
+  rpeToEffortTier / clientEffortLabelFromStoredRpe
+Wrapper: live-card/effortFromPrescribedRir.ts
+Same mapping previously used by appendTargetEffortItem.ts (Easy≤4, Medium≤6,
+Hard≤8, Max≤10). Colours: --fc-effort-easy|medium|hard|max from ui-system.css.
+
+================================================================================
+5. EXECUTORS WIRED VS DEFERRED
+================================================================================
+Wired:   StraightSetExecutor
+Deferred (shared components ready; next prompt):
+  SupersetExecutor, GiantSetExecutor, DropSetExecutor
+Reason: escape hatch — Straight verified via tsc + gallery samples for Drop/
+Superset structure; avoid half-wiring three different log UIs in one pass.
+
+================================================================================
+6. UNTOUCHED CONFIRMATION
+================================================================================
+- Logging: useSetLoggingOrchestrator, /api/log-set, buildLogSetInsertData — unchanged
+- Re-plumb: resolveSetPrescriptionTargets / prescriptions plumbing — unchanged (consumed)
+- Standalone get_workout_blocks path — unchanged
+- Other executors (AMRAP…Endurance) — unchanged
+- deriveSetType, restoreWorkoutProgress, completeWorkoutService — unchanged
+
+================================================================================
+7. tsc
+================================================================================
+npx tsc --noEmit → exit 0
+
+END

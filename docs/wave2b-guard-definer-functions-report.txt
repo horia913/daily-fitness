@@ -1,0 +1,246 @@
+================================================================================
+WAVE 2B — Guard Unguarded SECURITY DEFINER Functions (SQL + Report)
+================================================================================
+Generated: 2026-07-10
+Read-only audit follow-up. SQL produced but NOT applied.
+
+Deliverables:
+  A. docs/wave2b-guard-definer-functions.sql  (~46 KB, paste-ready)
+  B. This report
+
+================================================================================
+SUMMARY
+================================================================================
+
+22 functions guarded (live pg_get_functiondef source, 2026-07-10).
+3 REVOKE statements restrict service-only / dead RPCs from anon/public.
+
+Idiom matches 20260409: v_caller := auth.uid(); Not authenticated / not authorized /
+Forbidden exceptions; self-or-coach via clients join; assignment ownership via
+program_assignments.
+
+NOT in scope (already GUARDED per Wave 2 audit):
+  - get_coach_dashboard()  (no-arg overload — uses auth.uid() + role)
+  - consume_invite_code    (code+coach_id scoped UPDATE)
+
+================================================================================
+STOP-AND-REPORT
+================================================================================
+
+1. create_user_profile(uuid, text, text)
+   - No .rpc('create_user_profile') in src/. Signup uses auth trigger
+     handle_new_user() which INSERTs profiles directly (confirmed live).
+   - SQL adds auth.uid() = user_id guard + REVOKE from PUBLIC/anon.
+   - If any external tool still calls this RPC with service role, it will fail
+     after REVOKE unless called as service_role (still has EXECUTE).
+   - Action: safe to apply; function appears legacy.
+
+2. complete_workout — app/code signature mismatch (informational, not a blocker)
+   - Live DB: complete_workout(p_assignment_progress_id, p_week_number,
+     p_program_day, p_template_id, ...)
+   - src/lib/workoutTemplateService.ts:1673 passes p_client_id, p_template_id
+     (different signature — likely dead/stale client path).
+   - Guard added on live signature via program_assignment_progress.client_id.
+   - Browser test: modern completion uses completeWorkoutService / API routes,
+     not this RPC with old params.
+
+3. get_client_compliance_scores / _simple — query body still lacks coach roster
+   filter (pre-existing logic bug). Guard only enforces coach_id_param = auth.uid().
+   Coach A cannot impersonate Coach B, but may still see global client rows if the
+   underlying query returns them. Fixing the query is out of scope (minimal diff).
+   Note for follow-up: add AND EXISTS (... clients c WHERE c.client_id = p.id
+   AND c.coach_id = coach_id_param) to both functions.
+
+4. Session booking RPCs (book_session, cancel_session, complete_session,
+   add_session_feedback) — no .rpc() references in src/ (grep 2026-07-10).
+   Guards added for defense-in-depth; no browser test path unless booking UI
+   calls them from an ungrepped path.
+
+5. deactivate_previous_program — no src/ .rpc() caller; likely invoked from
+   assign_program_instance or manual SQL. Guard: coach must own p_client_id.
+
+================================================================================
+PER-FUNCTION DETAIL
+================================================================================
+
+── get_workout_blocks(uuid) ──
+What: Returns full workout block tree for a template_id (DEFINER bypasses RLS).
+Callers:
+  - src/lib/loadWorkoutBlocksByContentId.ts:34 — client user session
+  - src/app/client/workouts/[id]/start/page.tsx:1949 — client workout start
+  - src/app/api/coach/pickup/next-workout/route.ts:55 — coach server session
+    (fallback when get_coach_pickup_workout unavailable)
+Guard added:
+  - auth.uid() required
+  - Allow if: template coach OR client with assignment OR client on active
+    program schedule OR coach's client on active program OR coach's client assignment
+  - Matches 20260409 + coach-roster extensions for pickup fallback
+Service-role: N/A (no service-role callers found)
+
+── get_coach_dashboard(uuid) ──
+What: Coach dashboard JSON (clients, sessions, alerts, compliance).
+Callers:
+  - src/app/api/coach/dashboard/route.ts:31 — authenticated coach, passes
+    p_coach_id: user.id from getUser()
+Guard added:
+  - IF p_coach_id IS DISTINCT FROM auth.uid() THEN RAISE 'not authorized'
+Service-role: route uses user session client, not service role
+
+── get_completed_programs(uuid) ──
+What: Completed program history for a client.
+Callers:
+  - src/lib/workoutTemplateService.ts:1691 — p_client_id from caller
+Guard added: self-or-coach (p_client_id = auth.uid() OR clients.coach_id)
+
+── get_client_compliance_scores(uuid) ──
+What: Coach compliance table (7-day workout adherence).
+Callers:
+  - src/components/coach/ComplianceSnapshot.tsx:110 — coach_id_param: user.id
+Guard added: coach_id_param = auth.uid()
+
+── get_client_compliance_scores_simple(uuid) ──
+What: Fallback simpler compliance query.
+Callers:
+  - src/components/coach/ComplianceSnapshot.tsx:117 — coach_id_param: user.id
+Guard added: coach_id_param = auth.uid()
+
+── complete_workout(...) ──
+What: Legacy program_assignment_progress completion writes.
+Callers: workoutTemplateService.ts (stale signature — see STOP-AND-REPORT)
+Guard added: after loading progress row, v_progress.client_id must equal
+  auth.uid() OR coach of that client
+
+── deactivate_previous_program(uuid, uuid) ──
+What: Sets prior active program_assignments to inactive.
+Callers: none in src/ (may be SQL-internal from assign flow)
+Guard added: EXISTS clients WHERE client_id = p_client_id AND coach_id = auth.uid()
+
+── get_next_incomplete_program_slot(uuid) ──
+What: Next program_day_assignments slot without completion.
+Callers: internal from get_client_dashboard, get_gym_console_status,
+  get_coach_pickup_workout (DEFINER chain preserves coach/client JWT)
+Guard added: converted sql → plpgsql; assignment ownership check before RETURN QUERY
+
+── check_and_complete_program(uuid) ──
+What: Marks program_assignments completed when ledger shows done.
+Callers: none direct in src/; may be trigger/cron
+Guard added: assignment ownership (client or coach)
+
+── calculate_adherence(uuid) / get_weekly_breakdown(uuid) ──
+What: Program analytics helpers.
+Callers: none in src/ grep
+Guard added: assignment ownership
+
+── book_session(uuid, uuid, text, text) ──
+What: Inserts booked_sessions for a time slot.
+Guard added: p_client_id = auth.uid()
+
+── cancel_session(uuid, uuid, text) ──
+What: Cancels booked session.
+Guard added: p_cancelled_by = auth.uid(); session must be client's or coach's
+
+── complete_session(uuid, text) ──
+What: Coach marks session completed.
+Guard added: booked_sessions.coach_id = auth.uid()
+
+── add_session_feedback(uuid, uuid, int, text) ──
+What: Client rates completed session.
+Guard added: p_client_id = auth.uid()
+
+── get_daily_workout(uuid, date) / generate_daily_workout(uuid, uuid, date) ──
+What: Cached/stub daily workout (legacy path).
+Callers: workoutTemplateService.ts:1803 generate_daily_workout
+Guard added: self-or-coach on p_client_id
+
+── get_available_time_slots(uuid, date) ──
+What: Lists open coach_time_slots for booking UI.
+Callers: none in src/
+Guard added: authenticated only (any logged-in user may read slots — booking UX)
+
+── extend_clipcard_validity(uuid, uuid, int) ──
+What: Extends clipcards.end_date.
+Callers: none in src/
+Guard added: p_coach_id = auth.uid()
+
+── rollback_invite_code(text) ──
+What: Decrements invite_codes.used_count on signup rollback.
+Callers:
+  - src/app/api/auth/signup/route.ts:137 — admin service-role client
+Guard added: auth.role() = 'service_role' OR reject if auth.uid() present
+REVOKE: EXECUTE FROM PUBLIC, anon, authenticated (service_role only)
+
+── cleanup_workout_cache() ──
+What: DELETE expired daily_workout_cache rows.
+Callers: none in src/
+Guard added: service_role OR is_admin(auth.uid())
+REVOKE: EXECUTE FROM PUBLIC, anon
+
+── create_user_profile(uuid, text, text) ──
+What: INSERT profiles row (legacy; trigger handle_new_user used instead).
+Callers: NONE in src/
+Guard added: user_id = auth.uid()
+REVOKE: EXECUTE FROM PUBLIC, anon
+
+================================================================================
+SERVICE-ROLE HANDLING
+================================================================================
+
+| Function              | Service-role caller?              | Guard strategy                    |
+|-----------------------|-----------------------------------|-----------------------------------|
+| rollback_invite_code  | YES — signup/route.ts admin client| auth.role() = 'service_role' only |
+| cleanup_workout_cache | INFER cron (none in src/)         | service_role OR is_admin()        |
+| All others            | NO confirmed in src/              | auth.uid() required + ownership   |
+
+Note: Server routes using createSupabaseServerClient() pass the user's JWT;
+auth.uid() is set. API coach/dashboard uses user session, not service role.
+
+================================================================================
+20260409 DRIFT (addressed by this SQL)
+================================================================================
+
+| Function in 20260409 migration | Was applied on live before Wave 2B? | In wave2b SQL? |
+|--------------------------------|-------------------------------------|----------------|
+| get_train_page_data            | YES                                 | (already ok)   |
+| get_client_nutrition_page      | YES                                 | (already ok)   |
+| get_coach_dashboard(uuid)      | NO                                  | YES            |
+| get_workout_blocks             | NO                                  | YES (+ coach)  |
+| get_workout_set_logs_for_resume| YES                                 | (already ok)   |
+| get_workout_session_data       | YES                                 | (already ok)   |
+
+================================================================================
+BROWSER TEST LIST (after pasting SQL)
+================================================================================
+
+Run as authenticated users in the app (not SQL). Expect no regressions:
+
+Coach flows
+  [ ] Coach home / dashboard loads (GET /api/coach/dashboard → get_coach_dashboard)
+  [ ] Coach clients list loads with athlete scores / compliance widgets if shown
+  [ ] ComplianceSnapshot card populates (get_client_compliance_scores*)
+  [ ] Gym console / pickup mode: open client next workout (get_workout_blocks fallback)
+  [ ] Coach assigns program to client (assign_program_instance — unchanged, should work)
+
+Client flows
+  [ ] Client dashboard loads (get_client_dashboard → calls get_next_incomplete_program_slot)
+  [ ] Client Train page loads (get_train_page_data — unchanged)
+  [ ] Start a workout session (get_workout_blocks on start page)
+  [ ] Complete workout end-to-end via current completion path (not legacy complete_workout RPC)
+  [ ] Client Fuel / nutrition page (get_client_nutrition_page — unchanged)
+  [ ] View completed programs history if UI exposes it (get_completed_programs)
+
+Signup / auth
+  [ ] Invite-code signup creates account (consume_invite_code service role — unchanged)
+  [ ] Signup failure rollback still works (rollback_invite_code via service role in API)
+  [ ] New user gets profile row (handle_new_user trigger — not create_user_profile)
+
+Optional / if features exist in UI
+  [ ] Book/cancel/complete a coaching session (session RPCs — no src callers found)
+  [ ] Extend clipcard (extend_clipcard_validity)
+
+Verification SQL (run after commit, paste results back):
+  See bottom of wave2b-guard-definer-functions.sql
+  Expected: all functions has_guard = true
+
+================================================================================
+END OF REPORT
+================================================================================

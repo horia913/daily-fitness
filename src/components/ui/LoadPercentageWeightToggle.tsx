@@ -48,7 +48,7 @@ export function LoadPercentageWeightToggle({
           onClick={() => onValueChange("load")}
           className={cn(
             "font-mono text-[10px] font-semibold leading-none bg-transparent border-none p-0 cursor-pointer",
-            isLoadMode ? "text-[#4fe3e8]" : "text-white/40",
+            isLoadMode ? "text-[color:var(--fc-group-c)]" : "text-white/40",
             disabled && "opacity-50 cursor-not-allowed",
           )}
         >
@@ -62,7 +62,7 @@ export function LoadPercentageWeightToggle({
           onClick={() => onValueChange(isLoadMode ? "weight" : "load")}
           className={cn(
             "relative h-3 w-[22px] shrink-0 rounded-full border-0 p-0 cursor-pointer transition-colors",
-            isLoadMode ? "bg-[rgba(79,227,232,0.35)]" : "bg-white/15",
+            isLoadMode ? "bg-[rgba(34, 211, 238, 0.35)]" : "bg-white/15",
             disabled && "opacity-50 cursor-not-allowed",
           )}
         >
@@ -77,7 +77,7 @@ export function LoadPercentageWeightToggle({
           onClick={() => onValueChange("weight")}
           className={cn(
             "font-mono text-[10px] font-semibold leading-none bg-transparent border-none p-0 cursor-pointer",
-            !isLoadMode ? "text-[#4fe3e8]" : "text-white/40",
+            !isLoadMode ? "text-[color:var(--fc-group-c)]" : "text-white/40",
             disabled && "opacity-50 cursor-not-allowed",
           )}
         >

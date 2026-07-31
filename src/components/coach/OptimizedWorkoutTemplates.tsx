@@ -30,7 +30,6 @@ import {
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import WorkoutTemplateForm from '@/components/WorkoutTemplateForm'
 import WorkoutAssignmentModal from '@/components/WorkoutAssignmentModal'
 import WorkoutDetailModal from '@/components/WorkoutDetailModal'
 
@@ -131,6 +130,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
           `)
           .eq('coach_id', user.id)
           .eq('is_active', true)
+          .eq('kind', 'library')
           .order('created_at', { ascending: false })
 
         if (error) throw error
@@ -142,7 +142,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
         }
         const [{ data: blocks }, assignmentsRes] = await Promise.all([
           supabase.from('workout_set_entries').select('id, template_id').in('template_id', templateIds),
-          supabase.from('workout_assignments').select('workout_template_id, assigned_date, scheduled_date').in('workout_template_id', templateIds)
+          supabase.from('workout_assignments').select('workout_template_id, assigned_date, scheduled_date').in('workout_template_id', templateIds).is('program_assignment_id', null)
         ])
         const blockIds = (blocks || []).map((b: { id: string }) => b.id)
         const exercisesRes = blockIds.length > 0
@@ -677,7 +677,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                   <Card 
                     key={template.id} 
                     className={`fc-card-shell transition-all duration-300 cursor-pointer group ${
-                      isSelected ? 'border-[color:var(--fc-accent-cyan)]/50 bg-[color:var(--fc-glass-soft)] scale-105' : 'hover:border-[color:var(--fc-glass-border-strong)] hover:scale-105'
+                      isSelected ? 'border-[color:var(--fc-accent)]/50 bg-[color:var(--fc-glass-soft)] scale-105' : 'hover:border-[color:var(--fc-glass-border-strong)] hover:scale-105'
                     }`}
                     onClick={() => toggleTemplateSelection(template.id)}
                   >
@@ -778,7 +778,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                             setEditingTemplate(template)
                             setShowCreateForm(true)
                           }}
-                          className="fc-btn fc-btn-ghost text-[color:var(--fc-accent-cyan)] p-2"
+                          className="fc-btn fc-btn-ghost text-[color:var(--fc-accent)] p-2"
                         >
                           <Edit className="w-3 h-3" />
                         </Button>
@@ -819,7 +819,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                   <Card 
                     key={template.id} 
                     className={`fc-card-shell transition-all duration-300 cursor-pointer group ${
-                      isSelected ? 'border-[color:var(--fc-accent-cyan)]/50 bg-[color:var(--fc-glass-soft)]' : 'hover:border-[color:var(--fc-glass-border-strong)]'
+                      isSelected ? 'border-[color:var(--fc-accent)]/50 bg-[color:var(--fc-glass-soft)]' : 'hover:border-[color:var(--fc-glass-border-strong)]'
                     }`}
                     onClick={() => toggleTemplateSelection(template.id)}
                   >
@@ -996,27 +996,12 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
           */}
           <button
             type="button"
-            onClick={() => setShowCreateForm(true)}
+            onClick={() => router.push('/coach/workouts/templates/create')}
             className="fab-action"
             aria-label="Create workout template"
           >
             <Plus />
           </button>
-
-          {/* Modals */}
-          <WorkoutTemplateForm
-            isOpen={showCreateForm}
-            onClose={() => {
-              setShowCreateForm(false)
-              setEditingTemplate(null)
-            }}
-            onSuccess={() => {
-              loadTemplates()
-              setShowCreateForm(false)
-              setEditingTemplate(null)
-            }}
-            template={editingTemplate || undefined}
-          />
 
           <WorkoutAssignmentModal
             isOpen={showAssignmentModal}

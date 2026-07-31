@@ -32,14 +32,12 @@ export const typography = {
     relaxed: 1.75,
   },
   
-  // Font stacks
+  // Font stacks — match globals.css / design-system-v5
   fontFamily: {
-    // SF Pro for numbers (rounded, friendly)
-    number: '-apple-system, BlinkMacSystemFont, "SF Pro Rounded", system-ui, sans-serif',
-    // SF Pro Text for body copy
-    body: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
-    // Monospace for technical data
-    mono: '"SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, monospace',
+    number: '"Archivo Expanded", "Archivo", system-ui, sans-serif',
+    body: '"Inter", -apple-system, system-ui, sans-serif',
+    display: '"Archivo Expanded", "Archivo", system-ui, sans-serif',
+    mono: '"JetBrains Mono", ui-monospace, monospace',
   },
 } as const;
 

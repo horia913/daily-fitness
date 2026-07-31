@@ -50,7 +50,7 @@ export function TopStatsPaired({
     goalPct >= 100
       ? "var(--good)"
       : goalPct > 0
-        ? "var(--lime)"
+        ? "var(--fc-accent)"
         : "var(--t4)";
 
   const bodyFatOk =
@@ -60,12 +60,12 @@ export function TopStatsPaired({
     <div className={v6.statsGrid}>
       <div className={v6.statPair}>
         <div className={v6.iconRow}>
-          <IconBadge colorVar="var(--cyan)" bgSoft="var(--cyan-soft)">
+          <IconBadge colorVar="var(--fc-accent)" bgSoft="var(--fc-accent-dim)">
             <Calendar className="h-3 w-3" strokeWidth={2.2} aria-hidden />
           </IconBadge>
           <span className={v6.eyebrowMono}>{weeksLabel}</span>
         </div>
-        <div className={v6.statNum} style={{ color: "var(--cyan)" }}>
+        <div className={v6.statNum} style={{ color: "var(--fc-accent)" }}>
           {workoutsLoggedInRange}
         </div>
         <div className={v6.statSub}>workouts logged</div>
@@ -73,7 +73,7 @@ export function TopStatsPaired({
 
       <div className={v6.statPair}>
         <div className={v6.iconRow}>
-          <IconBadge colorVar="var(--lime)" bgSoft="var(--lime-soft)">
+          <IconBadge colorVar="var(--fc-accent)" bgSoft="var(--fc-accent-dim)">
             <Target className="h-3 w-3" strokeWidth={2.2} aria-hidden />
           </IconBadge>
           <span className={v6.eyebrowMono}>Goals</span>

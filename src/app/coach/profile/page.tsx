@@ -11,15 +11,9 @@ import { DatabaseService } from "@/lib/database";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ChangePasswordDialog } from "@/components/auth/ChangePasswordDialog";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -54,7 +48,6 @@ import {
   LogOut,
   Trash2,
   AlertTriangle,
-  CheckCircle,
   Info,
   Star,
   Globe,
@@ -82,13 +75,6 @@ export default function CoachProfilePage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [passwordData, setPasswordData] = useState({
-    newPassword: '',
-    confirmPassword: ''
-  });
-  const [passwordError, setPasswordError] = useState('');
-  const [passwordSuccess, setPasswordSuccess] = useState(false);
-  const [changingPassword, setChangingPassword] = useState(false);
   const [notifications, setNotifications] = useState({
     clientMessages: true,
     workoutCompletions: true,
@@ -107,14 +93,6 @@ export default function CoachProfilePage() {
     bio: "",
     phone: "",
     date_of_birth: "",
-    specialization: [] as string[],
-    certifications: [] as string[],
-    experience_years: "",
-    location: "",
-    hourly_rate: "",
-    availability: "",
-    languages: [] as string[],
-    emergency_contact: "",
     medical_conditions: "",
     injuries: "",
   });
@@ -157,14 +135,6 @@ export default function CoachProfilePage() {
           bio: profileData?.bio || "",
           phone: profileData?.phone || "",
           date_of_birth: profileData?.date_of_birth || "",
-          specialization: profileData?.specialization || [],
-          certifications: profileData?.certifications || [],
-          experience_years: profileData?.experience_years || "",
-          location: profileData?.location || "",
-          hourly_rate: profileData?.hourly_rate || "",
-          availability: profileData?.availability || "",
-          languages: profileData?.languages || [],
-          emergency_contact: profileData?.emergency_contact || "",
           medical_conditions: profileData?.medical_conditions || "",
           injuries: profileData?.injuries || "",
         };
@@ -260,9 +230,21 @@ export default function CoachProfilePage() {
   const handleSave = async () => {
     try {
       setSaving(true);
+      // Only columns that exist on public.profiles — never send phantom marketing fields.
+      const payload = {
+        first_name: formData.first_name.trim() || null,
+        last_name: formData.last_name.trim() || null,
+        email: formData.email.trim() || null,
+        bio: formData.bio.trim() || null,
+        phone: formData.phone.trim() || null,
+        date_of_birth: formData.date_of_birth.trim() || null,
+        medical_conditions: formData.medical_conditions.trim() || null,
+        injuries: formData.injuries.trim() || null,
+        updated_at: new Date().toISOString(),
+      };
       const { error } = await supabase
         .from("profiles")
-        .update(formData)
+        .update(payload)
         .eq("id", user?.id);
 
       if (error) {
@@ -271,8 +253,9 @@ export default function CoachProfilePage() {
         return;
       }
 
-      setProfile({ ...profile, ...formData });
+      setProfile({ ...profile, ...payload });
       setEditing(false);
+      addToast({ title: "Profile saved", variant: "success" });
     } catch (error) {
       console.error("Error updating profile:", error);
       addToast({ title: "Couldn't update profile. Please try again.", variant: "destructive" });
@@ -289,110 +272,10 @@ export default function CoachProfilePage() {
       bio: profile?.bio || "",
       phone: profile?.phone || "",
       date_of_birth: profile?.date_of_birth || "",
-      specialization: profile?.specialization || [],
-      certifications: profile?.certifications || [],
-      experience_years: profile?.experience_years || "",
-      location: profile?.location || "",
-      hourly_rate: profile?.hourly_rate || "",
-      availability: profile?.availability || "",
-      languages: profile?.languages || [],
-      emergency_contact: profile?.emergency_contact || "",
       medical_conditions: profile?.medical_conditions || "",
       injuries: profile?.injuries || "",
     });
     setEditing(false);
-  };
-
-  const handlePasswordChange = async () => {
-    setPasswordError('');
-    setPasswordSuccess(false);
-
-    if (passwordData.newPassword.length < 6) {
-      setPasswordError('Password must be at least 6 characters');
-      return;
-    }
-
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setPasswordError('Passwords do not match');
-      return;
-    }
-
-    try {
-      setChangingPassword(true);
-      const { error } = await supabase.auth.updateUser({
-        password: passwordData.newPassword
-      });
-
-      if (error) {
-        setPasswordError(error.message);
-        return;
-      }
-
-      setPasswordSuccess(true);
-      setPasswordData({ newPassword: '', confirmPassword: '' });
-      
-      // Close modal after 2 seconds on success
-      setTimeout(() => {
-        setShowPasswordModal(false);
-        setPasswordSuccess(false);
-      }, 2000);
-    } catch (error: any) {
-      setPasswordError(error.message || 'Failed to change password');
-    } finally {
-      setChangingPassword(false);
-    }
-  };
-
-  const addSpecialization = (specialization: string) => {
-    if (specialization && !formData.specialization.includes(specialization)) {
-      setFormData((prev) => ({
-        ...prev,
-        specialization: [...prev.specialization, specialization],
-      }));
-    }
-  };
-
-  const removeSpecialization = (specializationToRemove: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      specialization: prev.specialization.filter(
-        (s) => s !== specializationToRemove
-      ),
-    }));
-  };
-
-  const addCertification = (certification: string) => {
-    if (certification && !formData.certifications.includes(certification)) {
-      setFormData((prev) => ({
-        ...prev,
-        certifications: [...prev.certifications, certification],
-      }));
-    }
-  };
-
-  const removeCertification = (certificationToRemove: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      certifications: prev.certifications.filter(
-        (c) => c !== certificationToRemove
-      ),
-    }));
-  };
-
-  const addLanguage = (language: string) => {
-    if (language && !formData.languages.includes(language)) {
-      setFormData((prev) => ({
-        ...prev,
-        languages: [...prev.languages, language],
-      }));
-    }
-  };
-
-  const removeLanguage = (languageToRemove: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      languages: prev.languages.filter((l) => l !== languageToRemove),
-    }));
   };
 
   if (loading) {
@@ -719,8 +602,8 @@ export default function CoachProfilePage() {
             <Card className="fc-card-shell rounded-3xl overflow-hidden">
               <CardHeader className="p-6 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[color-mix(in_srgb,var(--fc-accent-cyan)_18%,transparent)] border border-[color-mix(in_srgb,var(--fc-accent-cyan)_32%,transparent)]">
-                    <Palette className="w-7 h-7 text-[color:var(--fc-accent-cyan)]" aria-hidden />
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[color-mix(in_srgb,var(--fc-accent)_18%,transparent)] border border-[color-mix(in_srgb,var(--fc-accent)_32%,transparent)]">
+                    <Palette className="w-7 h-7 text-[color:var(--fc-accent)]" aria-hidden />
                   </div>
                   <div>
                     <CardTitle className="text-xl text-[color:var(--fc-text-primary)]">App Preferences</CardTitle>
@@ -769,236 +652,6 @@ export default function CoachProfilePage() {
               </CardContent>
             </Card>
 
-            {/* Professional Information */}
-            <Card className="fc-card-shell rounded-3xl overflow-hidden">
-              <CardHeader className="p-6 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[color-mix(in_srgb,var(--fc-domain-habits)_22%,transparent)] border border-[color-mix(in_srgb,var(--fc-domain-habits)_32%,transparent)]">
-                    <GraduationCap className="w-7 h-7 text-[color:var(--fc-domain-habits)]" aria-hidden />
-                  </div>
-                  <div>
-                    <CardTitle className="text-xl text-[color:var(--fc-text-primary)]">Professional Information</CardTitle>
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">Your coaching credentials and expertise</p>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="p-6 pt-0 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="experience_years" className="text-[color:var(--fc-text-primary)]">Years of Experience</Label>
-                    <Input
-                      id="experience_years"
-                      value={formData.experience_years}
-                      onChange={(e) =>
-                        setFormData((prev) => ({ ...prev, experience_years: e.target.value }))
-                      }
-                      disabled={!editing}
-                      placeholder="e.g., 5"
-                      className="fc-input rounded-2xl border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)] text-[color:var(--fc-text-primary)] placeholder:text-[color:var(--fc-text-subtle)]"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="hourly_rate" className="text-[color:var(--fc-text-primary)]">Hourly Rate</Label>
-                    <Input
-                      id="hourly_rate"
-                      value={formData.hourly_rate}
-                      onChange={(e) =>
-                        setFormData((prev) => ({ ...prev, hourly_rate: e.target.value }))
-                      }
-                      disabled={!editing}
-                      placeholder="e.g., $75/hour"
-                      className="fc-input rounded-2xl border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)] text-[color:var(--fc-text-primary)] placeholder:text-[color:var(--fc-text-subtle)]"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="location" className="text-[color:var(--fc-text-primary)]">Location</Label>
-                  <Input
-                    id="location"
-                    value={formData.location}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, location: e.target.value }))
-                    }
-                    disabled={!editing}
-                    placeholder="City, State/Country"
-                    className="fc-input rounded-2xl border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)] text-[color:var(--fc-text-primary)] placeholder:text-[color:var(--fc-text-subtle)]"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="availability" className="text-[color:var(--fc-text-primary)]">Availability</Label>
-                  <Textarea
-                    id="availability"
-                    value={formData.availability}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, availability: e.target.value }))
-                    }
-                    disabled={!editing}
-                    rows={2}
-                    placeholder="e.g., Monday-Friday 9AM-6PM, Weekends by appointment"
-                    className="fc-input rounded-2xl border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)] text-[color:var(--fc-text-primary)] placeholder:text-[color:var(--fc-text-subtle)]"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-[color:var(--fc-text-primary)]">Specializations</Label>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {formData.specialization.map((spec, index) => (
-                    <Badge
-                      key={index}
-                      variant="outline"
-                      className="flex items-center gap-1"
-                    >
-                      {spec}
-                      {editing && (
-                        <button
-                          type="button"
-                          onClick={() => removeSpecialization(spec)}
-                          className="ml-1 fc-text-error hover:opacity-80"
-                          aria-label={`Remove specialization ${spec}`}
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
-                    </Badge>
-                  ))}
-                </div>
-                {editing && (
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Add specialization..."
-                      onKeyPress={(e) => {
-                        if (e.key === "Enter") {
-                          addSpecialization(e.currentTarget.value);
-                          e.currentTarget.value = "";
-                        }
-                      }}
-                    />
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        const input = document.querySelector(
-                          'input[placeholder="Add specialization..."]'
-                        ) as HTMLInputElement;
-                        if (input?.value) {
-                          addSpecialization(input.value);
-                          input.value = "";
-                        }
-                      }}
-                    >
-                      Add
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-[color:var(--fc-text-primary)]">Certifications</Label>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {formData.certifications.map((cert, index) => (
-                    <Badge
-                      key={index}
-                      variant="outline"
-                      className="flex items-center gap-1"
-                    >
-                      {cert}
-                      {editing && (
-                        <button
-                          type="button"
-                          onClick={() => removeCertification(cert)}
-                          className="ml-1 fc-text-error hover:opacity-80"
-                          aria-label={`Remove certification ${cert}`}
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
-                    </Badge>
-                  ))}
-                </div>
-                {editing && (
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Add certification..."
-                      onKeyPress={(e) => {
-                        if (e.key === "Enter") {
-                          addCertification(e.currentTarget.value);
-                          e.currentTarget.value = "";
-                        }
-                      }}
-                    />
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        const input = document.querySelector(
-                          'input[placeholder="Add certification..."]'
-                        ) as HTMLInputElement;
-                        if (input?.value) {
-                          addCertification(input.value);
-                          input.value = "";
-                        }
-                      }}
-                    >
-                      Add
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-[color:var(--fc-text-primary)]">Languages</Label>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {formData.languages.map((lang, index) => (
-                    <Badge
-                      key={index}
-                      variant="outline"
-                      className="flex items-center gap-1"
-                    >
-                      {lang}
-                      {editing && (
-                        <button
-                          type="button"
-                          onClick={() => removeLanguage(lang)}
-                          className="ml-1 fc-text-error hover:opacity-80"
-                          aria-label={`Remove language ${lang}`}
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
-                    </Badge>
-                  ))}
-                </div>
-                {editing && (
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Add language..."
-                      onKeyPress={(e) => {
-                        if (e.key === "Enter") {
-                          addLanguage(e.currentTarget.value);
-                          e.currentTarget.value = "";
-                        }
-                      }}
-                    />
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        const input = document.querySelector(
-                          'input[placeholder="Add language..."]'
-                        ) as HTMLInputElement;
-                        if (input?.value) {
-                          addLanguage(input.value);
-                          input.value = "";
-                        }
-                      }}
-                    >
-                      Add
-                    </Button>
-                  </div>
-                )}
-              </div>
-              </CardContent>
-            </Card>
-
             {/* Health Information */}
             <Card className="fc-card-shell rounded-3xl overflow-hidden">
               <CardHeader className="p-6 pb-4">
@@ -1013,19 +666,6 @@ export default function CoachProfilePage() {
                 </div>
               </CardHeader>
               <CardContent className="p-6 pt-0 space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="emergency_contact" className="text-[color:var(--fc-text-primary)]">Emergency Contact</Label>
-                  <Input
-                    id="emergency_contact"
-                    value={formData.emergency_contact}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, emergency_contact: e.target.value }))
-                    }
-                    disabled={!editing}
-                    placeholder="Name and phone number"
-                    className="fc-input rounded-2xl border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)] text-[color:var(--fc-text-primary)] placeholder:text-[color:var(--fc-text-subtle)]"
-                  />
-                </div>
                 <div className="space-y-2">
                   <Label htmlFor="medical_conditions" className="text-[color:var(--fc-text-primary)]">Medical Conditions</Label>
                   <Textarea
@@ -1100,12 +740,12 @@ export default function CoachProfilePage() {
                           Professional Coach
                         </div>
                       </div>
-                    <Badge className="border border-[color-mix(in_srgb,var(--fc-status-info)_40%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-info)_12%,transparent)] fc-text-primary font-medium">
-                      Coach
-                    </Badge>
+                      <Badge className="border border-[color-mix(in_srgb,var(--fc-status-info)_40%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-info)_12%,transparent)] fc-text-primary font-medium">
+                        Coach
+                      </Badge>
+                    </div>
                   </div>
                 </div>
-              </div>
               </CardContent>
             </Card>
 
@@ -1210,89 +850,10 @@ export default function CoachProfilePage() {
             </Card>
         </CoachPageShell>
 
-        <Dialog
+        <ChangePasswordDialog
           open={showPasswordModal}
-          onOpenChange={(open) => {
-            setShowPasswordModal(open);
-            if (!open) {
-              setPasswordData({ newPassword: "", confirmPassword: "" });
-              setPasswordError("");
-              setPasswordSuccess(false);
-            }
-          }}
-        >
-          <DialogContent className="max-w-md border border-[color:var(--fc-glass-border)]">
-            <DialogHeader>
-              <DialogTitle className="fc-text-primary">Change Password</DialogTitle>
-            </DialogHeader>
-
-            {passwordSuccess ? (
-              <div className="text-center py-6">
-                <CheckCircle className="w-16 h-16 mx-auto mb-4 fc-text-success" aria-hidden />
-                <p className="text-lg font-semibold fc-text-success">Password changed successfully!</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="newPassword">New Password</Label>
-                  <Input
-                    id="newPassword"
-                    type="password"
-                    placeholder="Enter new password"
-                    value={passwordData.newPassword}
-                    onChange={(e) =>
-                      setPasswordData((prev) => ({ ...prev, newPassword: e.target.value }))
-                    }
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="confirmPassword">Confirm Password</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    placeholder="Confirm new password"
-                    value={passwordData.confirmPassword}
-                    onChange={(e) =>
-                      setPasswordData((prev) => ({ ...prev, confirmPassword: e.target.value }))
-                    }
-                    className="mt-1"
-                  />
-                </div>
-
-                {passwordError && (
-                  <div className="p-3 rounded-xl border border-[color-mix(in_srgb,var(--fc-status-error)_35%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-error)_12%,transparent)] fc-text-error text-sm">
-                    {passwordError}
-                  </div>
-                )}
-
-                <DialogFooter className="gap-2 sm:gap-2 pt-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="sm:flex-1"
-                    onClick={() => {
-                      setShowPasswordModal(false);
-                      setPasswordData({ newPassword: "", confirmPassword: "" });
-                      setPasswordError("");
-                      setPasswordSuccess(false);
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="button"
-                    className="fc-btn fc-btn-primary sm:flex-1"
-                    onClick={() => void handlePasswordChange()}
-                    disabled={changingPassword}
-                  >
-                    {changingPassword ? "Changing..." : "Change Password"}
-                  </Button>
-                </DialogFooter>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
+          onOpenChange={setShowPasswordModal}
+        />
       </AnimatedBackground>
     </ProtectedRoute>
   );

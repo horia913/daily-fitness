@@ -1,0 +1,56 @@
+ACTIVE-SET LOG + THIN SET ROWS
+Date: 2026-07-17
+No git. One-group-at-a-time navigation unchanged.
+
+================================================================================
+1. FILES MODIFIED
+================================================================================
+  src/components/client/workout-execution/ui/set-rows/SetUnitRow.tsx          (new)
+  src/components/client/workout-execution/ui/set-rows/setUnitRow.module.css  (new)
+  src/components/client/workout-execution/blocks/StraightSetExecutor.tsx
+  src/components/client/workout-execution/blocks/DropSetExecutor.tsx
+  src/components/client/workout-execution/blocks/SupersetExecutor.tsx
+  src/components/client/workout-execution/blocks/GiantSetExecutor.tsx
+
+  SetRowsListPanel / SetRowShell left in place (unused by these four) for
+  any other callers; not deleted.
+
+================================================================================
+2. ACTIVE-SET LOG + THIN ROWS
+================================================================================
+Replaced the in-card SetRowsListPanel (all sets as editable boxes +
+"N/M done · FILL REMAINING WITH TARGET" chrome) with:
+
+  Done sets     → SetUnitRow (mockup .srow.done) above the active log /
+                  grouped exercises — ✓ + logged value (green accent)
+  Active set    → LiveCardLog Weight/Reps + ✓ only (Straight/Drop);
+                  Superset/Giant keep per-exercise log slots on the
+                  active round only
+  Upcoming sets → SetUnitRow below (dim target summary from
+                  resolveSetPrescriptionTargets)
+
+Straight / Drop: one LiveCardLog for the first incomplete row.
+Superset / Giant: done srows → active gx logs → glue → upcoming srows.
+
+================================================================================
+3. "FILL REMAINING WITH TARGET"
+================================================================================
+KEPT as a small optional text button: "Prefill remaining targets"
+(under the upcoming rows). Same fillRemaining() factory as before —
+prefills row state only; does not auto-log. No longer the default
+panel chrome / all-rows editable surface.
+
+================================================================================
+4. UNTOUCHED CONFIRMATION
+================================================================================
+  - Navigation (Prev/Next) unchanged
+  - handleLogRow / handleLogSet / handleLogRound / confirmExercise write
+    paths unchanged
+  - resolveSetPrescriptionTargets, resume, RestTimerModal, protocols:
+    untouched
+  - No multi-group one-page list
+
+================================================================================
+5. TSC
+================================================================================
+  npx tsc --noEmit → 0 errors

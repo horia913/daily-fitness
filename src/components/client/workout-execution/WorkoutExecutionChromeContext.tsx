@@ -5,6 +5,8 @@ import React, { createContext, useContext } from "react";
 export type WorkoutExecutionChrome = {
   /** When true, hide the small chevron-only back in block layout (shell shows exec-top back row). */
   hideCompactBack: boolean;
+  /** When true, hide Prev/Next — group list is the navigator (one-page exec). */
+  hideNavigationControls?: boolean;
 };
 
 const WorkoutExecutionChromeContext = createContext<WorkoutExecutionChrome | null>(

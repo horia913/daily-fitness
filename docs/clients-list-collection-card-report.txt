@@ -1,0 +1,108 @@
+# CLIENTS LIST — list mode → collection card (client-forward)
+**Date:** 2026-07-06
+
+## 1. Files created / modified
+
+| Path | Change |
+|------|--------|
+| `src/app/api/coach/clients/route.ts` | **Modified** — additive `mealPlanName`, `scoreIsStale`; batched meal-plan name query |
+| `src/lib/coachAthleteScoreSummaries.ts` | **Modified** — additive `calculated_at` on summary (for staleness; no calc change) |
+| `src/types/coachAthleteScore.ts` | **Modified** — optional `calculated_at` on `CoachAthleteScoreSummary` |
+| `src/app/coach/clients/coachClientsTypes.ts` | **Modified** — `mealPlanName`, `scoreIsStale` on `Client` |
+| `src/app/coach/clients/coachClientListCardUtils.ts` | **Created** — attention hue/tone, status presentation, staleness helper |
+| `src/app/coach/clients/CoachClientListCard.tsx` | **Created** — list-mode `CollectionCard` wrapper |
+| `src/app/coach/clients/CoachClientListScoreChip.tsx` | **Modified** — exports shared `AthleteScoreRing` |
+| `src/app/coach/clients/page.tsx` | **Modified** — list mode → `CoachClientListCardStack`; grid unchanged |
+| `src/app/coach/clients/coachClients.module.css` | **Modified** — list card avatar + score stat styles |
+| `src/components/ui/CollectionCard.tsx` | **Modified** — additive `avatar` slot + `statusTone` prop only |
+| `src/components/ui/collectionCard.module.css` | **Modified** — `.leadAvatar`, `.statusTone*` classes |
+| `src/app/coach/clients/CoachClientListRow.tsx` | **Unmounted** from list mode (file retained for reference / grid parity) |
+| `src/app/coach/clients/CoachClientGridCard.tsx` | **Unchanged** (grid mode) |
+
+**CollectionCard change:** additive only — optional `avatar` leading slot and `statusTone` (`good` \| `warn` \| `bad` \| `muted` \| `default`). Existing Programs/nutrition rosters do not pass these props; behavior unchanged.
+
+---
+
+## 2. API extension + behavior preservation
+
+### `mealPlanName: string | null`
+
+- Batched query: `meal_plan_assignments` (`is_active = true`, newest per client) → `meal_plans.name`
+- One name per client; `null` when no active assignment
+
+### `scoreIsStale: boolean`
+
+- Computed in route via `computeScoreIsStale(athleteScore, metrics.lastActive)`:
+  - `true` when `athleteScore` exists **and** `calculated_at` date (YYYY-MM-DD) **<** `lastActive`
+  - `false` when `lastActive` is null (per spec)
+  - `false` when no score row
+- `calculated_at` added to `fetchCoachAthleteScoreSummariesByClientIds` return value (read-only pass-through from `athlete_scores`; **no recalculation**)
+
+### Preserved unchanged
+
+- `getClientMetrics`, `fetchCoachClientListTrainingPayload`, `computeClientTrainingStatus`
+- All existing client fields and join behavior
+- `calculateAthleteScore` / cron — **not touched**
+
+---
+
+## 3. List-card slot mapping
+
+| Slot | Implementation |
+|------|----------------|
+| **avatar** | `avatar_url` image or initials (`clientInitialsFromName`) in `CollectionCard` `avatar` slot |
+| `hue` | `coachClientAttentionHue(trainingStatus)`: on_track → `--fc-status-success` · behind → warning · missed_week → error · paused/no_program → subtle. Roster `inactive` → muted hue |
+| `name` | `client.name` |
+| `status` | Training pill via `statusLabel` + `statusTone`. Roster **inactive** → `cardStatus: inactive` + “Inactive”. **pending** → “Pending” (muted tone). Else training labels (On track / Behind / Missed week / Paused / No program) |
+| `meta` | Program name (or “No program”) · Week X of Y when both set · Active {relative} · Check-in {relative} · `mealPlanName` when present. Page `formatMetaPart` / `formatRelativeTime` reused |
+| `structure` | **Omitted** |
+| `rightStat` | `AthleteScoreRing` when `athleteScore != null && !scoreIsStale`; else muted **—** + sublabel **no score**. Never shows stale or fake 0 ring |
+| `actions` | `CollectionCardIconAction` View → `/coach/clients/[id]` · `CoachClientProgramPauseMenu` (unchanged) |
+
+Header, search, roster pills, quick filters, sort menu, list/grid toggle, Add + Bell — **unchanged** in `page.tsx`.
+
+---
+
+## 4. Grid mode + toggle
+
+- **Grid mode** still renders `CoachClientGridCard` when `viewMode === "grid"`.
+- **List/grid toggle** preserved (`localStorage` + toolbar buttons).
+- New API fields (`mealPlanName`, `scoreIsStale`) are on the shared `Client` type; grid ignores them harmlessly until follow-up harmonization.
+
+---
+
+## 5. Conformance + logic-untouched confirmations
+
+### Element 16 / mockup conformance (list mode)
+
+- Dark `CollectionCard` surface, attention-mapped left rail + right glow
+- Avatar + name in top row; training-status pill with tone colors
+- Real-fields-only meta line (program, week, activity, check-in, meal plan)
+- Score ring only when fresh; suppressed → **—** / no score
+- No structure strip
+
+### Logic fences
+
+| Fence | Status |
+|-------|--------|
+| `calculateAthleteScore` / cron | ✓ Untouched |
+| `getClientMetrics` | ✓ Untouched |
+| `fetchCoachClientListTrainingPayload` | ✓ Untouched |
+| `fetchCoachAthleteScoreSummariesByClientIds` | ✓ Additive `calculated_at` only |
+| Pause / Resume (`CoachClientProgramPauseMenu`) | ✓ Untouched |
+| Add client `/coach/clients/add` | ✓ Untouched |
+| Filter / sort pipeline | ✓ Untouched |
+| Detail navigation | ✓ Untouched |
+| Shell `data-7xl` | ✓ Untouched |
+| Message / edit / deactivate | ✓ Not wired |
+
+---
+
+## 6. `tsc` result
+
+```
+npx tsc --noEmit
+exit code: 0
+```
+
+No git commits. No migrations. No schema changes.

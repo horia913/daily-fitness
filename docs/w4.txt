@@ -1,0 +1,344 @@
+================================================================================
+WAVE 4 PRE-DROP VERIFICATION (READ-ONLY) — Final Drop List + Evidence
+================================================================================
+Generated: 2026-07-12 | Live Supabase MCP execute_sql + src/ grep
+Reference: docs/full-database-audit-live-db-x-code.txt Part D
+Schema baseline: docs/db-baseline-2026-07.txt (generated same session)
+Guardrails observed: read-only; no drops applied; wellness-keep excluded
+
+LOCKED PRODUCT DECISIONS
+  DEAD: booking / clipcards estate (whole feature)
+  KEEP: water_logs, sleep_logs, step_logs, supplement_logs, daily_wellness_logs
+
+================================================================================
+PART 1 — CANDIDATE ROSTER (live count(*), prior-audit class)
+================================================================================
+Source: dynamic SQL count(*) per table 2026-07-12
+
+TABLE                          | ROWS | LATEST TS (if any)              | PRIOR AUDIT
+-------------------------------|------|---------------------------------|------------
+assigned_meal_plans            | 0    | —                               | HIGH orphan
+assigned_workouts              | 0    | —                               | HIGH orphan
+booked_sessions                | 0    | —                               | RPC-only
+client_workout_block_exercises | 0  | —                               | HIGH orphan
+clip_cards (duplicate)         | 0    | —                               | typo duplicate
+clipcards                      | 18   | updated_at 2026-05-03         | RPC + code (DEAD product)
+clipcard_types                 | 2    | created_at 2025-09-13           | RPC-only
+coach_time_slots               | 1    | created_at 2026-01-12           | RPC-only
+coach_availability             | 5    | created_at 2025-09-13           | RPC + orphan file
+sessions (legacy booking)      | 1    | created_at 2026-01-12           | legacy + LIVE RPC
+program_days                   | 0    | —                               | superseded
+program_assignment_progress    | 1    | updated_at 2026-01-19           | legacy cache
+program_workout_completions    | 0    | —                               | RPC complete_workout
+workout_exercise_assignments   | 0    | —                               | pre-Group legacy
+workout_exercise_logs          | 0    | —                               | legacy chain
+workout_set_details            | 0    | —                               | legacy chain
+daily_workout_cache            | 0    | —                               | RPC get_daily_workout
+meal_plan_items                | 9    | created_at 2025-12-27           | legacy branch (Part 5)
+meal_items                     | 9    | —                               | Part D orphan; LIVE data
+leaderboard_rankings           | 0    | —                               | SQL-maintained
+leaderboard_titles             | 0    | —                               | SQL-maintained
+
+WELLNESS KEEP SET (excluded from all drop lists)
+  water_logs 0 | sleep_logs 0 | step_logs 0 | supplement_logs 0
+  daily_wellness_logs 38 (latest log_date 2026-05-17) — LIVE in src (coachInsightsBundle,
+    progressStatsService, ClientHabitsView, client summary API, etc.)
+
+Part D orphans NOT on drop roster (re-verified LIVE code):
+  workout_programs (20 rows) — src/app/coach/programs/[id]/page.tsx:102
+  client_activities, leaderboard_entries, user_achievements, achievement_templates,
+  exercise_equipment/instructions/muscle_groups/tips — all have live .from() or joins
+
+================================================================================
+PART 2 — THREE BLIND-SPOT CHECKS (per candidate)
+================================================================================
+
+2.1 DYNAMIC REFERENCES (tracking_sources.source_table)
+  Live rows: body_metrics, daily_wellness_logs, habit_logs, nutrition_logs,
+    program_day_completions, sleep_logs, step_logs, water_logs, workout_logs, workout_set_logs
+  NONE of the drop candidates appear. CLEAR for all candidates.
+
+2.2 FUNCTION-BODY REFERENCES (pg_get_functiondef, word-boundary / ILIKE)
+  Booking / clipcard estate:
+    booked_sessions: add_session_feedback, book_session, cancel_session(cancelled_by),
+      complete_session, get_available_time_slots, update_booked_sessions_updated_at
+    clipcards: book_session_with_clipcard, cancel_session(user_id), create_clipcard,
+      extend_clipcard_validity, use_clipcard_session
+    coach_time_slots: book_session, book_session_with_clipcard, cancel_session(user_id),
+      generate_time_slots_for_date, get_available_time_slots, mark_time_slot_unavailable,
+      update_coach_time_slots_updated_at
+    coach_availability: generate_time_slots_for_date
+    sessions (legacy, NOT workout_sessions): book_session_with_clipcard, cancel_session×2,
+      get_client_compliance_scores, get_client_compliance_scores_simple,
+      get_client_dashboard(), get_coach_dashboard() [no-arg overload only],
+      use_clipcard_session
+  Legacy program progress:
+    program_assignment_progress: complete_workout, deactivate_previous_program,
+      get_train_page_data [LIVE — client/train/page.tsx:129]
+    program_workout_completions: complete_workout
+    daily_workout_cache: cleanup_workout_cache, get_daily_workout
+  Leaderboard:
+    leaderboard_rankings: refresh_leaderboard_rankings, trigger_refresh_rankings
+    leaderboard_titles: calculate_title_duration (trigger only)
+  Zero function refs: assigned_meal_plans (mention only in compliance), assigned_workouts,
+    client_workout_block_exercises, clip_cards, meal_plan_items, meal_items,
+    workout_exercise_assignments/logs/set_details (no function body hits; FK chain only)
+
+  BLOCKERS FOUND:
+    • sessions — get_client_dashboard() LIVE (src/app/api/client/dashboard/route.ts:35,
+      clientDashboardPageData.ts:190) reads next scheduled session from sessions
+    • program_assignment_progress — get_train_page_data LIVE
+    • leaderboard_rankings — view current_champions LIVE (leaderboardService.ts:142)
+
+2.3 DEPENDENCY GRAPH (FKs, views, triggers)
+
+  Booking estate safe drop order (no CASCADE surprises onto non-drop tables):
+    1) DROP booked_sessions (triggers: booked_sessions_availability, booked_sessions_updated_at)
+    2) DROP coach_time_slots (trigger: coach_time_slots_updated_at)
+    3) DROP sessions (no inbound FKs; 1 legacy row)
+    4) DROP clipcards (trigger: update_clipcards_updated_at) — FK to clipcard_types, auth.users
+    5) DROP clipcard_types — FK to auth.users
+    6) DROP coach_availability — FK to auth.users
+    7) DROP clip_cards (empty duplicate, no FKs)
+    CASCADE risk: none onto kept tables (only profiles/auth.users parents remain)
+
+  program_days:
+    INBOUND: program_day_assignments.program_day_id -> program_days
+    All 92 program_day_assignments rows have program_day_id IS NULL (verified)
+    Action: ALTER TABLE program_day_assignments DROP CONSTRAINT program_day_assignments_program_day_id_fkey;
+            then DROP program_days. No CASCADE.
+
+  Legacy workout log chain (all 0 rows):
+    workout_set_details -> workout_exercise_logs -> workout_exercise_assignments -> workout_set_entry_exercises
+    Drop order: workout_set_details, workout_exercise_logs, workout_exercise_assignments
+
+  program_assignment_progress chain:
+    program_workout_completions -> program_assignment_progress
+    Drop order: program_workout_completions, program_assignment_progress
+    BLOCKED until get_train_page_data + deactivate_previous_program + complete_workout retired/rewritten
+
+  meal_plan_items: FK to meal_plans, foods, profiles — leaf table, no inbound FKs
+
+  meal_items: FK meal_items.meal_id -> meals — 9 rows on LIVE assigned plan (see Part 5)
+
+  leaderboard_rankings: VIEW current_champions = SELECT ... FROM leaderboard_rankings — DROP BLOCKED
+
+  Triggers on candidates:
+    booked_sessions (2), coach_time_slots (1), clipcards (1), program_assignment_progress (1),
+    leaderboard_titles (tr_title_duration)
+
+================================================================================
+PART 3 — FUNCTIONS RETIRED WITH DEAD FEATURES
+================================================================================
+
+3.1 Booking / clipcard RPCs — zero src/ callers (grep 2026-07-12)
+  book_session, book_session_with_clipcard, cancel_session (both overloads), complete_session,
+  add_session_feedback, get_available_time_slots, extend_clipcard_validity, create_clipcard,
+  use_clipcard_session, generate_time_slots_for_date, mark_time_slot_unavailable,
+  update_booked_sessions_updated_at, update_coach_time_slots_updated_at
+
+  DROP FUNCTION signatures (exact):
+    add_session_feedback(uuid, uuid, integer, text)
+    book_session(uuid, uuid, text, text)
+    book_session_with_clipcard(uuid, uuid, uuid, uuid)
+    cancel_session(uuid, uuid, text)
+    cancel_session(uuid, uuid)
+    complete_session(uuid, text)
+    create_clipcard(uuid, uuid, uuid)
+    extend_clipcard_validity(uuid, uuid, integer)
+    generate_time_slots_for_date(uuid, date, integer)
+    get_available_time_slots(uuid, date)
+    mark_time_slot_unavailable()
+    use_clipcard_session(uuid, uuid)
+    update_booked_sessions_updated_at()
+    update_coach_time_slots_updated_at()
+
+3.2 Compliance pair
+  get_client_compliance_scores(coach_id_param uuid)
+  get_client_compliance_scores_simple(coach_id_param uuid)
+  ComplianceSnapshot.tsx — NOT imported anywhere (grep: no route mount; /coach/compliance redirects)
+  Both RPCs read legacy sessions table.
+
+  RECOMMENDATION — RETIRE (do not rebuild now):
+    Drop both functions and delete src/components/coach/ComplianceSnapshot.tsx.
+    No mounted UI; rebuilding on workout_sessions/program_day_completions is scope creep.
+    Real compliance widget can ship later on live tables when product prioritizes it.
+
+3.3 Additional RPC patches required before dropping sessions
+  get_client_dashboard() — remove/replace v_next_session block that SELECTs FROM sessions.
+    Coach path uses get_coach_dashboard(p_coach_id uuid) which does NOT read sessions (verified).
+
+================================================================================
+PART 4 — PHANTOM CODE PATHS (re-verified)
+================================================================================
+Phantom = .from('X') where X is not a live public base table (views noted)
+
+FILE:LINE                              | TABLE                    | VERDICT
+---------------------------------------|--------------------------|----------------------------------
+src/lib/programWeekStateBuilder.ts:119 | programs                 | BROKEN — use workout_programs
+src/lib/programWeekStateBuilder.ts:240 | programs                 | BROKEN (LIVE via train API)
+src/components/BulkAssignment.tsx:252  | bulk_assignments         | DEAD CODE (not routed)
+src/components/BulkAssignment.tsx:275  | bulk_assignment_items    | DEAD CODE
+src/hooks/useGreetingPreferences.ts:61  | user_preferences         | DEAD CODE (GreetingSettings unmounted)
+src/hooks/useGreetingPreferences.ts:100| user_preferences         | DEAD CODE
+src/hooks/useGreetingPreferences.ts:178| user_preferences         | DEAD CODE
+src/components/HabitManager.tsx:103+   | user_habits              | DEAD CODE (component unmounted)
+src/components/HabitTracker.tsx:66+    | user_habits, habit_entries| DEAD CODE (habits page uses
+                                       |                          | client/HabitTracker.tsx + habits/habit_logs)
+src/lib/workoutGroupService.ts:20+     | workout_exercise_groups, | DEAD CODE (no imports)
+                                       | workout_template_exercises|
+src/components/ExerciseSetForm.tsx:63+ | workout_template_exercises| DEAD CODE (unmounted)
+src/lib/perfUtils.ts:7                 | table                    | COMMENT ONLY (false positive)
+src/lib/leaderboardService.ts:142      | current_champions        | WORKS — live VIEW
+
+Post-drop code cleanup (booking DEAD):
+  DELETE src/lib/schedulingService.ts (zero imports)
+  DELETE src/components/coach/client-views/CoachClientSubscriptionSection.tsx
+  REMOVE mount CoachProfileShell.tsx:170 + clipcards queries CoachProfileShell.tsx:108,
+    coachDashboardService.ts:1020, client/profile/page.tsx:305
+  REMOVE dead methods workoutTemplateService.ts:1670-1825 (completeWorkout, generateDailyWorkout,
+    clearWorkoutCache) — zero callers
+
+================================================================================
+PART 5 — meal_plan_items DECISION PACKAGE
+================================================================================
+9 rows, coach b6014e58-f696-4606-bc63-d7707a21d5f1
+
+PLAN "test 2" (8e12fb3a-…): 2 legacy items | 0 meals tree | 0 assignments — dev junk
+PLAN "test 3 " (c034da40-…): 7 legacy items | 1 meal | 1 assignment — low-value test data
+
+Legacy code branch (read-only fallback when meals tree empty):
+  src/components/meal-display/loadPlanBuilderMeals.ts:25-30
+  src/lib/mealPlans/loadMealPlanDraftBaseline.ts:23-28
+  src/lib/mealPlanService.ts:316-406 (getMealItems CRUD)
+  src/app/client/nutrition/meals/[id]/page.tsx:270
+
+OPTION (a) DROP table + remove legacy branch
+  Cost: ~4 files, delete meal_plan_items branches + MealPlanService.getMealItems*
+  Risk: test 3 assigned client loses 7 legacy-only foods until coach rebuilds plan in meals tree
+  Time: small (1 PR)
+
+OPTION (b) MIGRATE 9 rows into meals/meal_food_items then drop
+  Cost: one-time SQL insert (group by meal_type -> meals rows + meal_food_items) + same code removal
+  Risk: lowest — preserves test 3 assignment display
+  Time: small SQL + same code PR
+
+ONE-LINE PICK: (a) if test plans disposable; (b) if any assigned client still opens "test 3".
+
+SEPARATE: meal_items (9 rows) on "Sample Meal Plan" (24efa6af-…) with 1 LIVE assignment —
+  NOT same as meal_plan_items. Uses parallel meal_items table (FK to meals), 0 meal_food_items.
+  Dropping meal_items breaks assigned plan food display until migrated to meal_food_items.
+  Classify: EXCLUDED until meal_items -> meal_food_items migration decided.
+
+================================================================================
+PART 6 — SCHEMA BASELINE
+================================================================================
+Generated: docs/db-baseline-2026-07.txt
+Contents: 116 base tables + columns/types, 392 RLS policies (full expressions), indexes,
+  78 public functions (signatures + SECURITY DEFINER / search_path), extensions, views list.
+FK summary embedded; full 193 FK lines available via live pg_constraint export (see baseline).
+Purpose: closes migration-drift hole — live catalog in repo, not archaeology.
+
+================================================================================
+DELIVERABLE — THE DROP LIST
+================================================================================
+
+── SAFE TO DROP NOW (0 rows, blind-spot clear, no live src/.from, no blocking RPC) ──
+
+1. assigned_meal_plans
+   Rows: 0 | Prior: HIGH orphan
+   Blind spots: CLEAR (tracking_sources no; functions mention_only in dead compliance)
+   Blast: leaf table; drop standalone
+
+2. assigned_workouts
+   Rows: 0 | Prior: HIGH orphan
+   Blind spots: CLEAR
+   Blast: leaf table
+
+3. clip_cards (duplicate of clipcards)
+   Rows: 0 | Prior: typo duplicate
+   Blind spots: CLEAR
+   Blast: leaf table
+
+4. client_workout_block_exercises
+   Rows: 0 | Prior: HIGH orphan
+   Blind spots: CLEAR (no function refs)
+   Blast: FKs to clients, exercises, workout_assignments — drop table only
+
+5. workout_set_details -> workout_exercise_logs -> workout_exercise_assignments
+   Rows: 0 each | Prior: legacy chain
+   Blind spots: CLEAR
+   Blast: drop in order set_details, exercise_logs, exercise_assignments (internal FK chain)
+
+── DROP AFTER SMALL CODE CHANGE ──
+
+6. BOOKING / CLIPCARDS ESTATE (product DEAD)
+   Tables: booked_sessions(0), coach_time_slots(1), coach_availability(5), sessions(1),
+           clipcards(18), clipcard_types(2), clip_cards(0)
+   Code change: delete schedulingService.ts, CoachClientSubscriptionSection, clipcards UI refs
+                (CoachProfileShell, coachDashboardService, client/profile)
+   RPC change: drop 14 booking functions (Part 3.1) BEFORE tables
+   Extra RPC: patch get_client_dashboard() to remove sessions next-session block (Part 3.3)
+   Drop order: booked_sessions -> coach_time_slots -> sessions -> clipcards -> clipcard_types
+               -> coach_availability -> clip_cards
+   CASCADE: none onto kept tables
+
+7. program_days
+   Rows: 0 | Prior: superseded
+   Code change: none (no .from)
+   SQL change: DROP FK program_day_assignments_program_day_id_fkey first (all NULL)
+   Blast: then DROP program_days
+
+8. daily_workout_cache + legacy daily-workout RPCs
+   Rows: 0
+   Code change: remove dead workoutTemplateService.ts methods :1670-1825
+   RPC drop: cleanup_workout_cache(), get_daily_workout(), generate_daily_workout(),
+             complete_workout() (no src callers; only dead service methods)
+   Then drop daily_workout_cache
+
+9. leaderboard_titles
+   Rows: 0 | Prior: SQL-maintained
+   Code change: none (no src .from)
+   RPC/trigger: drop calculate_title_duration + trigger tr_title_duration first
+   Blast: leaf after trigger removed
+
+10. meal_plan_items (pending user pick a vs b — see DECISIONS)
+    Rows: 9 | Code change: remove legacy branches (Part 5 file list)
+    Blast: FK to meal_plans, foods, profiles — leaf
+
+── DROP AFTER RPC REWRITE (not small — separate wave) ──
+
+11. program_assignment_progress (1) + program_workout_completions (0)
+    Blocker: get_train_page_data LIVE reads program_assignment_progress
+    Also: deactivate_previous_program, complete_workout function bodies
+    Action: rewrite get_train_page_data to use program_day_completions ledger only;
+            retire complete_workout + deactivate_previous_program progress-table writes;
+            then drop tables in order program_workout_completions, program_assignment_progress
+
+── EXCLUDED — KEEP ──
+
+• water_logs, sleep_logs, step_logs, supplement_logs, daily_wellness_logs (wellness product KEEP)
+• leaderboard_rankings — blind-spot: current_champions VIEW + refresh_leaderboard_rankings()
+• meal_items — 9 rows on assigned "Sample Meal Plan"; migrate to meal_food_items first
+• program_assignment_progress chain — until RPC rewrite (above)
+• All Part D tables with live code (workout_programs, client_activities, leaderboard_entries, etc.)
+
+── DECISIONS FOR USER (one line each) ──
+
+A) Compliance: RETIRE recommended — drop get_client_compliance_scores + _simple, delete ComplianceSnapshot.tsx
+B) meal_plan_items: (a) drop+code if test data disposable | (b) migrate 9 rows then drop if assignment matters
+C) meal_items: migrate 9 rows Sample Meal Plan -> meal_food_items before any drop (not bundled with meal_plan_items)
+D) program_assignment_progress: approve RPC rewrite wave before table drop
+
+================================================================================
+APPENDIX — BOOKING CODE EVIDENCE (grep)
+================================================================================
+src/ RPC booking calls: NONE
+src/ .from('clipcards'): CoachClientSubscriptionSection.tsx:134,169,197,262,316,334,359;
+  CoachProfileShell.tsx:108; coachDashboardService.ts:1020; client/profile/page.tsx:305
+src/ .from('sessions'|'coach_availability'): schedulingService.ts only (zero imports)
+CoachClientSubscriptionSection mounted: CoachProfileShell.tsx:170
+
+================================================================================
+END OF WAVE 4 REPORT
+================================================================================

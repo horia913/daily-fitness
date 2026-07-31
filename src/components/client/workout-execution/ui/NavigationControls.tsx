@@ -3,6 +3,7 @@
 import React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useWorkoutExecutionChrome } from "../WorkoutExecutionChromeContext";
 
 interface NavigationControlsProps {
   currentBlock: number;
@@ -22,6 +23,11 @@ export function NavigationControls({
   canGoPrevious = true,
   canGoNext = true,
 }: NavigationControlsProps) {
+  const chrome = useWorkoutExecutionChrome();
+  if (chrome?.hideNavigationControls) {
+    return null;
+  }
+
   if (totalBlocks <= 1) {
     return null;
   }

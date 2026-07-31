@@ -1,5 +1,7 @@
 import { supabase } from '@/lib/supabase'
-import { collectExerciseIdsDeep } from '@/lib/collectExerciseIdsDeep'
+import { adaptBlockRowToLegacy } from '@/lib/groupModel/adaptBlockRow'
+import { fetchPrescriptionsBySlotIds } from '@/lib/groupModel/canvasLoad'
+import type { GroupModelSlotWrite } from '@/lib/groupModel/types'
 import {
   WorkoutSetEntry,
   WorkoutSetEntryExercise,
@@ -123,39 +125,7 @@ export class WorkoutSetEntryService {
     const allBlockIds = blocks.map((b: any) => b.id)
     if (allBlockIds.length === 0) return []
 
-    const setTypes = new Set((blocks || []).map((b: any) => b.set_type))
-    const needsTimeProtocols =
-      setTypes.has('amrap') ||
-      setTypes.has('emom') ||
-      setTypes.has('for_time') ||
-      setTypes.has('tabata')
-    const needsDropSets = setTypes.has('drop_set')
-    const needsClusterSets = setTypes.has('cluster_set')
-    const needsRestPause = setTypes.has('rest_pause')
-    const needsSpeedSets = setTypes.has('speed_work')
-    const needsEnduranceSets = setTypes.has('endurance')
-
-    // Load workout_set_entry_exercises for every set entry so lite prefetch still gets exercise_ids
-    // for drop_set, superset, etc. (same pattern as get_workout_blocks / execution loadAssignment).
-    const blockIdsForExercises = allBlockIds
-    const blockIdsForTimeProtocols = needsTimeProtocols
-      ? blocks.filter((b: any) => ['amrap', 'emom', 'for_time', 'tabata'].includes(b.set_type)).map((b: any) => b.id)
-      : []
-    const blockIdsForDropSets = needsDropSets
-      ? blocks.filter((b: any) => b.set_type === 'drop_set').map((b: any) => b.id)
-      : []
-    const blockIdsForClusterSets = needsClusterSets
-      ? blocks.filter((b: any) => b.set_type === 'cluster_set').map((b: any) => b.id)
-      : []
-    const blockIdsForRestPause = needsRestPause
-      ? blocks.filter((b: any) => b.set_type === 'rest_pause').map((b: any) => b.id)
-      : []
-    const blockIdsForSpeedSets = needsSpeedSets
-      ? blocks.filter((b: any) => b.set_type === 'speed_work').map((b: any) => b.id)
-      : []
-    const blockIdsForEnduranceSets = needsEnduranceSets
-      ? blocks.filter((b: any) => b.set_type === 'endurance').map((b: any) => b.id)
-      : []
+    // Group model: slots on workout_set_entry_exercises are the source of truth; satellite tables ignored.
 
     const safeQuery = async (
       queryFn: () => PromiseLike<{ data: any; error: any }>,
@@ -235,52 +205,15 @@ export class WorkoutSetEntryService {
       return { data: allData, error: null }
     }
 
-    const lite = (options && 'lite' in options && options.lite) === true
-    // Sequential only: 3+ concurrent requests cause Supabase 500s and statement timeouts on hosted DB
     const exercisesRes = await queryTableInChunks(
       'workout_set_entry_exercises',
-      'id, set_entry_id, exercise_id, exercise_order, sets, reps, weight_kg, rest_seconds, tempo, rir, notes, exercise_letter, load_percentage',
-      blockIdsForExercises
+      '*',
+      allBlockIds,
     )
-    const timeProtocolsRes = !lite && needsTimeProtocols
-      ? await queryTableInChunks('workout_time_protocols', 'id, set_entry_id, exercise_id, exercise_order, protocol_type, set, rounds, work_seconds, rest_seconds, rest_after_set, total_duration_minutes, reps_per_round, target_reps, time_cap_minutes, emom_mode, weight_kg, load_percentage', blockIdsForTimeProtocols)
-      : { data: [], error: null }
-    const dropRes = !lite && needsDropSets
-      ? await queryTableInChunks('workout_drop_sets', 'id, set_entry_id, exercise_id, exercise_order, drop_order, reps, weight_kg, load_percentage', blockIdsForDropSets)
-      : { data: [], error: null }
-    const clusterRes = !lite && needsClusterSets
-      ? await queryTableInChunks('workout_cluster_sets', 'id, set_entry_id, exercise_id, exercise_order, reps_per_cluster, clusters_per_set, intra_cluster_rest, weight_kg, load_percentage', blockIdsForClusterSets)
-      : { data: [], error: null }
-    const restPauseRes = !lite && needsRestPause
-      ? await queryTableInChunks('workout_rest_pause_sets', 'id, set_entry_id, exercise_id, exercise_order, rest_pause_duration, max_rest_pauses, weight_kg, load_percentage', blockIdsForRestPause)
-      : { data: [], error: null }
-    const speedSetsRes = !lite && needsSpeedSets
-      ? await queryTableInChunks(
-          'workout_speed_sets',
-          'id, set_entry_id, exercise_id, exercise_order, intervals, distance_meters, load_pct_bw, target_speed_pct, target_hr_pct, rest_seconds, notes',
-          blockIdsForSpeedSets,
-        )
-      : { data: [], error: null }
-    const enduranceSetsRes = !lite && needsEnduranceSets
-      ? await queryTableInChunks(
-          'workout_endurance_sets',
-          'id, set_entry_id, exercise_id, exercise_order, target_distance_meters, target_time_seconds, target_pace_seconds_per_km, hr_zone, target_hr_pct, notes',
-          blockIdsForEnduranceSets,
-        )
-      : { data: [], error: null }
 
     const allExerciseIds = new Set<string>()
-    for (const id of collectExerciseIdsDeep([
-      blocks,
-      exercisesRes.data,
-      dropRes.data,
-      clusterRes.data,
-      restPauseRes.data,
-      timeProtocolsRes.data,
-      speedSetsRes.data,
-      enduranceSetsRes.data,
-    ])) {
-      allExerciseIds.add(id)
+    for (const row of exercisesRes.data || []) {
+      if (row.exercise_id) allExerciseIds.add(row.exercise_id)
     }
 
     const exercisesLabel = process.env.NODE_ENV !== 'production' ? `[buildBlocks] exercises ${buildRunId}` : ''
@@ -345,312 +278,21 @@ export class WorkoutSetEntryService {
       exercisesByBlock.get(ex.set_entry_id)!.push(row)
     })
 
-    const timeProtocolsByBlock = new Map<string, any[]>()
-    ;(timeProtocolsRes.data || []).forEach((tp: any) => {
-      if (!timeProtocolsByBlock.has(tp.set_entry_id)) {
-        timeProtocolsByBlock.set(tp.set_entry_id, [])
-      }
-      timeProtocolsByBlock.get(tp.set_entry_id)!.push(tp)
-    })
-
-    const createExerciseKey = (blockId: string, exerciseId: string, exerciseOrder: number) => {
-      return `${blockId}:${exerciseId}:${exerciseOrder}`
+    const allSlotIds = (exercisesRes.data || []).map((ex: any) => ex.id).filter(Boolean)
+    const prescriptionsBySlot = await fetchPrescriptionsBySlotIds(supabase, allSlotIds)
+    for (const [blockId, slotRows] of exercisesByBlock) {
+      exercisesByBlock.set(
+        blockId,
+        slotRows.map((row: any) => ({
+          ...row,
+          prescriptions: prescriptionsBySlot.get(row.id) ?? undefined,
+        })),
+      )
     }
-
-    const groupByExercise = (arr: any[], tableName: string) => {
-      const map = new Map<string, any[]>()
-      arr.forEach((row: any) => {
-        const k = createExerciseKey(row.set_entry_id, row.exercise_id, row.exercise_order)
-        if (!map.has(k)) map.set(k, [])
-        map.get(k)!.push(row)
-        if (process.env.NODE_ENV !== "production") {
-          console.log(`WorkoutSetEntryService -> Grouping ${tableName}: Key '${k}' with data`, row);
-        }
-      })
-      if (process.env.NODE_ENV !== "production") {
-        console.log(`WorkoutSetEntryService -> ${tableName} Map Keys:`, Array.from(map.keys()));
-      }
-      return map
-    }
-
-    const dropByExercise = groupByExercise(dropRes.data || [], "drop_sets")
-    const clusterByExercise = groupByExercise(clusterRes.data || [], "cluster_sets")
-    const restPauseByExercise = groupByExercise(restPauseRes.data || [], "rest_pause_sets")
 
     const enriched = (blocks || []).map((block: any) => {
-      const setType = block.set_type
-
-      const blockTimeProtocols = timeProtocolsByBlock.get(block.id) || []
-      block.time_protocols = blockTimeProtocols
-      block.time_protocol = blockTimeProtocols.length > 0 ? blockTimeProtocols[0] : null
-
-      const usesBlockExercises = [
-        'straight_set',
-        'superset',
-        'giant_set',
-        'pre_exhaustion',
-        'timed_set',
-      ].includes(setType)
-      const usesDropSets = setType === 'drop_set'
-      const usesClusterSets = setType === 'cluster_set'
-      const usesRestPause = setType === 'rest_pause'
-      const usesTimeProtocols = ['amrap', 'emom', 'for_time', 'tabata'].includes(setType)
-      const usesSpeedSets = setType === 'speed_work'
-      const usesEnduranceSets = setType === 'endurance'
-
-      if (usesBlockExercises) {
-        const blockExercises = exercisesByBlock.get(block.id) || []
-        let mappedExercises = blockExercises.map((ex: any) => {
-          const exerciseKey = createExerciseKey(block.id, ex.exercise_id, ex.exercise_order)
-          return {
-            ...ex,
-            drop_sets: dropByExercise.get(exerciseKey) || [],
-            cluster_sets: clusterByExercise.get(exerciseKey) || [],
-            rest_pause_sets: restPauseByExercise.get(exerciseKey) || []
-          }
-        })
-
-        if (setType === 'giant_set') {
-          mappedExercises = mappedExercises.sort((a, b) => {
-            const letterA = a.exercise_letter || "A"
-            const letterB = b.exercise_letter || "A"
-            return letterA.localeCompare(letterB)
-          })
-        }
-
-        block.exercises = mappedExercises
-      } else if (usesDropSets) {
-        const dropSets = dropRes.data?.filter((ds: any) => ds.set_entry_id === block.id) || []
-        const fromWse = exercisesByBlock.get(block.id) || []
-        if (fromWse.length > 0) {
-          block.exercises = fromWse
-            .map((ex: any) => {
-              const dropForEx = dropSets.filter(
-                (d: any) =>
-                  d.exercise_id === ex.exercise_id && d.exercise_order === ex.exercise_order,
-              ).sort((a: any, b: any) => (a.drop_order ?? 0) - (b.drop_order ?? 0))
-              return {
-                ...ex,
-                exercise: exercisesMap.get(ex.exercise_id) || ex.exercise || null,
-                sets: ex.sets ?? block.total_sets,
-                reps: ex.reps ?? block.reps_per_set,
-                weight_kg: ex.weight_kg ?? dropForEx[0]?.weight_kg,
-                load_percentage: ex.load_percentage ?? dropForEx[0]?.load_percentage,
-                drop_sets: dropForEx,
-              }
-            })
-            .sort((a: any, b: any) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0))
-        } else if (dropSets.length > 0) {
-          const exerciseMap = new Map<string, any>()
-          dropSets.forEach((ds: any) => {
-            const key = `${ds.exercise_id}:${ds.exercise_order}`
-            if (!exerciseMap.has(key)) {
-              exerciseMap.set(key, {
-                id: ds.id,
-                set_entry_id: ds.set_entry_id,
-                exercise_id: ds.exercise_id,
-                exercise_order: ds.exercise_order,
-                exercise: exercisesMap.get(ds.exercise_id) || null,
-                sets: block.total_sets,
-                reps: block.reps_per_set,
-                weight_kg: ds.weight_kg,
-                load_percentage: ds.load_percentage,
-                drop_sets: dropSets.filter((d: any) =>
-                  d.exercise_id === ds.exercise_id && d.exercise_order === ds.exercise_order
-                ).sort((a: any, b: any) => a.drop_order - b.drop_order)
-              })
-            }
-          })
-          block.exercises = Array.from(exerciseMap.values()).sort((a, b) => a.exercise_order - b.exercise_order)
-        } else {
-          block.exercises = []
-        }
-      } else if (usesClusterSets) {
-        const clusterSets = clusterRes.data?.filter((cs: any) => cs.set_entry_id === block.id) || []
-        const fromWseCluster = exercisesByBlock.get(block.id) || []
-        if (clusterSets.length > 0) {
-          block.exercises = clusterSets.map((cs: any) => ({
-            id: cs.id,
-            set_entry_id: cs.set_entry_id,
-            exercise_id: cs.exercise_id,
-            exercise_order: cs.exercise_order,
-            exercise: exercisesMap.get(cs.exercise_id) || null,
-            sets: block.total_sets,
-            reps_per_cluster: cs.reps_per_cluster,
-            clusters_per_set: cs.clusters_per_set,
-            intra_cluster_rest: cs.intra_cluster_rest,
-            rest_seconds: block.rest_seconds,
-            weight_kg: cs.weight_kg,
-            load_percentage: cs.load_percentage,
-            cluster_sets: [cs]
-          })).sort((a: any, b: any) => a.exercise_order - b.exercise_order)
-        } else if (fromWseCluster.length > 0) {
-          block.exercises = fromWseCluster.map((ex: any) => ({
-            ...ex,
-            exercise: exercisesMap.get(ex.exercise_id) || ex.exercise || null,
-            cluster_sets: [],
-          })).sort((a: any, b: any) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0))
-        } else {
-          block.exercises = []
-        }
-      } else if (usesRestPause) {
-        const restPauseSets = restPauseRes.data?.filter((rp: any) => rp.set_entry_id === block.id) || []
-        const fromWseRp = exercisesByBlock.get(block.id) || []
-        if (restPauseSets.length > 0) {
-          block.exercises = restPauseSets.map((rp: any) => ({
-            id: rp.id,
-            set_entry_id: rp.set_entry_id,
-            exercise_id: rp.exercise_id,
-            exercise_order: rp.exercise_order,
-            exercise: exercisesMap.get(rp.exercise_id) || null,
-            sets: block.total_sets,
-            reps: block.reps_per_set,
-            rest_pause_duration: rp.rest_pause_duration,
-            max_rest_pauses: rp.max_rest_pauses,
-            weight_kg: rp.weight_kg,
-            load_percentage: rp.load_percentage,
-            rest_pause_sets: [rp]
-          })).sort((a: any, b: any) => a.exercise_order - b.exercise_order)
-        } else if (fromWseRp.length > 0) {
-          block.exercises = fromWseRp.map((ex: any) => ({
-            ...ex,
-            exercise: exercisesMap.get(ex.exercise_id) || ex.exercise || null,
-            rest_pause_sets: [],
-          })).sort((a: any, b: any) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0))
-        } else {
-          block.exercises = []
-        }
-      } else if (usesTimeProtocols) {
-        const timeProtocols = timeProtocolsByBlock.get(block.id) || []
-        const fromWseTp = exercisesByBlock.get(block.id) || []
-        if (timeProtocols.length > 0) {
-          const exerciseMap = new Map<string, any>()
-          timeProtocols.forEach((tp: any) => {
-            const key = `${tp.exercise_id}:${tp.exercise_order}`
-            if (!exerciseMap.has(key)) {
-              exerciseMap.set(key, {
-                id: tp.id,
-                set_entry_id: tp.set_entry_id,
-                exercise_id: tp.exercise_id,
-                exercise_order: tp.exercise_order,
-                exercise: exercisesMap.get(tp.exercise_id) || null,
-                sets: block.total_sets,
-                weight_kg: tp.weight_kg,
-                load_percentage: tp.load_percentage,
-                time_protocols: timeProtocols.filter((t: any) =>
-                  t.exercise_id === tp.exercise_id && t.exercise_order === tp.exercise_order
-                )
-              })
-            }
-          })
-          block.exercises = Array.from(exerciseMap.values()).sort((a, b) => a.exercise_order - b.exercise_order)
-        } else if (fromWseTp.length > 0) {
-          block.exercises = fromWseTp.map((ex: any) => ({
-            ...ex,
-            exercise: exercisesMap.get(ex.exercise_id) || ex.exercise || null,
-            time_protocols: [],
-          })).sort((a: any, b: any) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0))
-        } else {
-          block.exercises = []
-        }
-      } else if (usesSpeedSets) {
-        const speedRows = speedSetsRes.data?.filter((r: any) => r.set_entry_id === block.id) || []
-        const fromWseSpeed = exercisesByBlock.get(block.id) || []
-        if (speedRows.length > 0) {
-          if (fromWseSpeed.length > 0) {
-            block.exercises = fromWseSpeed
-              .map((ex: any) => {
-                const match = speedRows.find(
-                  (r: any) =>
-                    r.exercise_id === ex.exercise_id &&
-                    r.exercise_order === ex.exercise_order,
-                )
-                return {
-                  ...ex,
-                  exercise: exercisesMap.get(ex.exercise_id) || ex.exercise || null,
-                  sets: ex.sets ?? match?.intervals ?? block.total_sets,
-                  rest_seconds:
-                    ex.rest_seconds ?? match?.rest_seconds ?? block.rest_seconds,
-                  speed_sets: match ? [match] : [],
-                }
-              })
-              .sort((a: any, b: any) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0))
-          } else {
-            block.exercises = speedRows.map((row: any) => ({
-              id: row.id,
-              set_entry_id: row.set_entry_id,
-              exercise_id: row.exercise_id,
-              exercise_order: row.exercise_order,
-              exercise: exercisesMap.get(row.exercise_id) || null,
-              sets: block.total_sets,
-              rest_seconds: row.rest_seconds ?? block.rest_seconds,
-              speed_sets: [row],
-            })).sort((a: any, b: any) => a.exercise_order - b.exercise_order)
-          }
-          block.speed_sets = speedRows.sort((a: any, b: any) => a.exercise_order - b.exercise_order)
-        } else if (fromWseSpeed.length > 0) {
-          block.exercises = fromWseSpeed
-            .map((ex: any) => ({
-              ...ex,
-              exercise: exercisesMap.get(ex.exercise_id) || ex.exercise || null,
-              speed_sets: [],
-            }))
-            .sort((a: any, b: any) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0))
-          block.speed_sets = []
-        } else {
-          block.exercises = []
-          block.speed_sets = []
-        }
-      } else if (usesEnduranceSets) {
-        const endRows = enduranceSetsRes.data?.filter((r: any) => r.set_entry_id === block.id) || []
-        const fromWseEndurance = exercisesByBlock.get(block.id) || []
-        if (endRows.length > 0) {
-          if (fromWseEndurance.length > 0) {
-            block.exercises = fromWseEndurance
-              .map((ex: any) => {
-                const match = endRows.find(
-                  (r: any) =>
-                    r.exercise_id === ex.exercise_id &&
-                    r.exercise_order === ex.exercise_order,
-                )
-                return {
-                  ...ex,
-                  exercise: exercisesMap.get(ex.exercise_id) || ex.exercise || null,
-                  sets: ex.sets ?? block.total_sets,
-                  endurance_sets: match ? [match] : [],
-                }
-              })
-              .sort((a: any, b: any) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0))
-          } else {
-            block.exercises = endRows.map((row: any) => ({
-              id: row.id,
-              set_entry_id: row.set_entry_id,
-              exercise_id: row.exercise_id,
-              exercise_order: row.exercise_order,
-              exercise: exercisesMap.get(row.exercise_id) || null,
-              sets: block.total_sets,
-              endurance_sets: [row],
-            })).sort((a: any, b: any) => a.exercise_order - b.exercise_order)
-          }
-          block.endurance_sets = endRows.sort((a: any, b: any) => a.exercise_order - b.exercise_order)
-        } else if (fromWseEndurance.length > 0) {
-          block.exercises = fromWseEndurance
-            .map((ex: any) => ({
-              ...ex,
-              exercise: exercisesMap.get(ex.exercise_id) || ex.exercise || null,
-              endurance_sets: [],
-            }))
-            .sort((a: any, b: any) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0))
-          block.endurance_sets = []
-        } else {
-          block.exercises = []
-          block.endurance_sets = []
-        }
-      } else {
-        block.exercises = []
-      }
-
-      return block
+      const slotRows = exercisesByBlock.get(block.id) || []
+      return adaptBlockRowToLegacy(block, slotRows)
     })
 
     return enriched
@@ -676,6 +318,10 @@ export class WorkoutSetEntryService {
       if (setEntryData.rest_seconds) insertData.rest_seconds = setEntryData.rest_seconds
       if (setEntryData.total_sets) insertData.total_sets = setEntryData.total_sets
       if (setEntryData.reps_per_set) insertData.reps_per_set = setEntryData.reps_per_set
+      const groupFields = setEntryData as Record<string, unknown>
+      if (groupFields.rounds_driver) insertData.rounds_driver = groupFields.rounds_driver
+      if (groupFields.interval_seconds != null) insertData.interval_seconds = groupFields.interval_seconds
+      if (groupFields.time_cap_seconds != null) insertData.time_cap_seconds = groupFields.time_cap_seconds
 
       const { data, error } = await supabase
         .from('workout_set_entries')
@@ -726,6 +372,18 @@ export class WorkoutSetEntryService {
     return n
   }
 
+  /** Load blocks from program_instance_workouts when contentId is an instance workout. */
+  static async loadInstanceWorkoutBlocksIfAny(contentId: string): Promise<WorkoutSetEntry[]> {
+    const { loadWorkoutBlocksByContentId } = await import('./loadWorkoutBlocksByContentId')
+    const { data: instanceRow } = await supabase
+      .from('program_instance_workouts')
+      .select('id')
+      .eq('id', contentId)
+      .maybeSingle()
+    if (!instanceRow?.id) return []
+    return loadWorkoutBlocksByContentId(supabase, contentId, { preferInstance: true })
+  }
+
   // Get all set entries for a workout template
   static async getWorkoutBlocks(templateId: string, options?: { lite?: boolean }): Promise<WorkoutSetEntry[]> {
     const getBlocksRunId = this.nextRunId()
@@ -745,6 +403,16 @@ export class WorkoutSetEntryService {
 
       if (error) throw error
       if (!blocks || blocks.length === 0) {
+        const instanceBlocks = await WorkoutSetEntryService.loadInstanceWorkoutBlocksIfAny(
+          templateId,
+        )
+        if (instanceBlocks.length > 0) {
+          this.setCachedBlocks(templateId, lite, instanceBlocks)
+          if (process.env.NODE_ENV !== 'production') {
+            console.timeEnd(`[WorkoutSetEntryService] getWorkoutBlocks ${getBlocksRunId}`)
+          }
+          return instanceBlocks
+        }
         if (process.env.NODE_ENV !== 'production') console.timeEnd(`[WorkoutSetEntryService] getWorkoutBlocks ${getBlocksRunId}`)
         return []
       }
@@ -825,6 +493,18 @@ export class WorkoutSetEntryService {
         this.setCachedBlocks(templateId, lite, templateBlocks)
         result.set(templateId, templateBlocks)
       })
+
+      await Promise.all(
+        uncachedTemplateIds.map(async (templateId) => {
+          const current = result.get(templateId) ?? []
+          if (current.length > 0) return
+          const instanceBlocks = await this.loadInstanceWorkoutBlocksIfAny(templateId)
+          if (instanceBlocks.length > 0) {
+            this.setCachedBlocks(templateId, lite, instanceBlocks)
+            result.set(templateId, instanceBlocks)
+          }
+        }),
+      )
 
       return result
     } catch (error) {
@@ -1182,8 +862,78 @@ export class WorkoutSetEntryService {
 
   /** Clears all child tables sequentially (avoids RPC statement timeout on hosted Supabase). */
   static async deleteAllChildTablesSequential(setEntryId: string): Promise<void> {
+    const { data: slots } = await supabase
+      .from('workout_set_entry_exercises')
+      .select('id')
+      .eq('set_entry_id', setEntryId)
+    const slotIds = (slots ?? []).map((s) => s.id)
+    if (slotIds.length > 0) {
+      const { error: rxErr } = await supabase
+        .from('workout_set_prescriptions')
+        .delete()
+        .in('slot_id', slotIds)
+      if (rxErr) throw rxErr
+    }
     for (const table of ALL_SET_ENTRY_CHILD_TABLES) {
       await this.deleteChildTableStrict(setEntryId, table)
+    }
+  }
+
+  /** Insert Group-model slots after child tables are cleared (unique exercise_id per group). */
+  static async persistGroupModelSlots(
+    setEntryId: string,
+    slots: GroupModelSlotWrite[],
+  ): Promise<void> {
+    const seen = new Set<string>()
+    const deduped = slots
+      .filter((slot) => {
+        if (seen.has(slot.exercise_id)) return false
+        seen.add(slot.exercise_id)
+        return true
+      })
+      .map((slot, index) => ({ ...slot, exercise_order: index + 1 }))
+
+    for (const slot of deduped) {
+      const insertData: Record<string, unknown> = {
+        set_entry_id: setEntryId,
+        exercise_id: slot.exercise_id,
+        exercise_order: slot.exercise_order,
+        measurement: slot.measurement,
+        technique: slot.technique,
+      }
+      const optionalFields: (keyof GroupModelSlotWrite)[] = [
+        'exercise_letter',
+        'sets',
+        'reps',
+        'weight_kg',
+        'load_percentage',
+        'rir',
+        'tempo',
+        'rest_seconds',
+        'notes',
+        'work_seconds',
+        'distance_meters',
+        'target_time_seconds',
+        'target_pace_seconds_per_km',
+        'target_speed_pct',
+        'hr_zone',
+        'target_hr_pct',
+        'drop_percentage',
+        'max_drops',
+        'reps_per_cluster',
+        'clusters_per_set',
+        'intra_cluster_rest_seconds',
+        'rest_pause_seconds',
+        'max_rest_pauses',
+      ]
+      for (const key of optionalFields) {
+        const val = slot[key]
+        if (val !== undefined && val !== null && val !== '') {
+          insertData[key] = val
+        }
+      }
+      const { error } = await supabase.from('workout_set_entry_exercises').insert(insertData)
+      if (error) throw error
     }
   }
 

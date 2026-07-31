@@ -1,6 +1,6 @@
 /**
  * Leaderboard Population Service
- * Writes and updates leaderboard_entries, recalculates ranks, returns rank changes.
+ * Writes and updates leaderboard_entries, recalculates ranks within a coach roster.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -10,6 +10,7 @@ import {
   calculateTonnage,
   type LeaderboardEntry,
 } from './leaderboardService'
+import { getLatestClientWeight } from './metrics/body'
 
 const SENTINEL_EXERCISE_ID = '00000000-0000-0000-0000-000000000000'
 const SENTINEL_TIME_WINDOW = 'all_time'
@@ -25,6 +26,30 @@ export interface LeaderboardRankChange {
 export interface UpdateLeaderboardResult {
   entries: LeaderboardEntry[]
   rankChanges: LeaderboardRankChange[]
+}
+
+type PartitionKey = {
+  type: string
+  exerciseId: string | null
+  timeWindow: string
+  coachId: string
+}
+
+/**
+ * Resolve the coach for a client via clients.coach_id.
+ */
+export async function resolveClientCoachId(
+  clientId: string,
+  db?: SupabaseClient
+): Promise<string | null> {
+  const supabaseClient = db ?? supabase
+  const { data, error } = await supabaseClient
+    .from('clients')
+    .select('coach_id')
+    .eq('client_id', clientId)
+    .maybeSingle()
+  if (error || !data?.coach_id) return null
+  return data.coach_id as string
 }
 
 /**
@@ -70,7 +95,8 @@ async function getCurrentRanks(
 }
 
 /**
- * Upsert one row into leaderboard_entries (select then update or insert, no unique constraint on columns).
+ * Upsert one row into leaderboard_entries (select then update or insert).
+ * coach_id is filled by the DB trigger on INSERT/UPDATE — do not set here.
  */
 async function upsertEntry(
   db: SupabaseClient,
@@ -112,17 +138,19 @@ async function upsertEntry(
 }
 
 /**
- * Recalculate ranks for a given (leaderboard_type, exercise_id, time_window) partition.
+ * Recalculate ranks for a (coach_id, leaderboard_type, exercise_id, time_window) partition.
  */
-async function recalcRanksForPartition(
+export async function recalcRanksForPartition(
   db: SupabaseClient,
   leaderboardType: string,
   exerciseId: string | null,
-  timeWindow: string
+  timeWindow: string,
+  coachId: string
 ): Promise<void> {
   let q = db
     .from('leaderboard_entries')
     .select('id, score')
+    .eq('coach_id', coachId)
     .eq('leaderboard_type', leaderboardType)
     .eq('time_window', timeWindow)
     .order('score', { ascending: false })
@@ -141,7 +169,72 @@ async function recalcRanksForPartition(
 }
 
 /**
- * Update leaderboard entries for a client and recalculate ranks.
+ * Delete all leaderboard_entries for a client, then recalc ranks in each affected coach partition.
+ */
+export async function deleteClientLeaderboardEntriesAndRecalc(
+  clientId: string,
+  db?: SupabaseClient
+): Promise<void> {
+  const supabaseClient = db ?? supabase
+
+  const { data: rows } = await supabaseClient
+    .from('leaderboard_entries')
+    .select('leaderboard_type, exercise_id, time_window, coach_id')
+    .eq('client_id', clientId)
+
+  const partitions: PartitionKey[] = []
+  const seen = new Set<string>()
+  for (const row of rows || []) {
+    const coachId = row.coach_id as string | null
+    if (!coachId) continue
+    const timeWindow = (row.time_window as string | null) ?? SENTINEL_TIME_WINDOW
+    const exerciseId = (row.exercise_id as string | null) ?? null
+    const key = `${coachId}|${row.leaderboard_type}|${exerciseId ?? SENTINEL_EXERCISE_ID}|${timeWindow}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    partitions.push({
+      type: row.leaderboard_type as string,
+      exerciseId,
+      timeWindow,
+      coachId,
+    })
+  }
+
+  await supabaseClient.from('leaderboard_entries').delete().eq('client_id', clientId)
+
+  for (const p of partitions) {
+    await recalcRanksForPartition(
+      supabaseClient,
+      p.type,
+      p.exerciseId,
+      p.timeWindow,
+      p.coachId
+    )
+  }
+}
+
+/**
+ * Update display_name / is_anonymous on all existing rows for a client.
+ */
+export async function syncClientLeaderboardDisplay(
+  clientId: string,
+  displayName: string,
+  isAnonymous: boolean,
+  db?: SupabaseClient
+): Promise<void> {
+  const supabaseClient = db ?? supabase
+  await supabaseClient
+    .from('leaderboard_entries')
+    .update({
+      display_name: displayName,
+      is_anonymous: isAnonymous,
+      last_updated: new Date().toISOString(),
+    })
+    .eq('client_id', clientId)
+}
+
+/**
+ * Update leaderboard entries for a client and recalculate ranks within their coach's roster.
  * Returns updated entries and list of rank improvements for toasts.
  */
 export async function updateLeaderboardForClient(
@@ -155,7 +248,7 @@ export async function updateLeaderboardForClient(
 
   const { data: profile, error: profileError } = await supabaseClient
     .from('profiles')
-    .select('id, first_name, last_name, bodyweight, leaderboard_visibility')
+    .select('id, first_name, last_name, leaderboard_visibility')
     .eq('id', clientId)
     .single()
 
@@ -168,16 +261,24 @@ export async function updateLeaderboardForClient(
     return { entries, rankChanges }
   }
 
+  const coachId = await resolveClientCoachId(clientId, supabaseClient)
+  if (!coachId) {
+    console.warn('[leaderboardPopulationService] No coach_id for client; skipping update:', clientId)
+    return { entries, rankChanges }
+  }
+
   const displayName =
     visibility === 'anonymous'
       ? 'Anonymous'
       : [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim() || 'Anonymous'
   const isAnonymous = visibility === 'anonymous'
-  const bodyweightKg = profile.bodyweight != null ? Number(profile.bodyweight) : null
+  // Current BW from body_metrics only; skip bw_multiple when none (no zero/stale fallback).
+  const latestWeight = await getLatestClientWeight(clientId, supabaseClient)
+  const bodyweightKg = latestWeight?.weightKg ?? null
 
   const beforeRanks = await getCurrentRanks(supabaseClient, clientId)
   const exerciseIds = await getExercisesWithSets(supabaseClient, clientId, exerciseId)
-  const partitions: { type: string; exerciseId: string | null; timeWindow: string }[] = []
+  const partitions: PartitionKey[] = []
 
   for (const eid of exerciseIds) {
     const pr1 = await calculatePRForExercise(clientId, eid, 1, supabaseClient)
@@ -185,20 +286,20 @@ export async function updateLeaderboardForClient(
     const pr5 = await calculatePRForExercise(clientId, eid, 5, supabaseClient)
     if (pr1 != null && pr1 > 0) {
       await upsertEntry(supabaseClient, clientId, 'pr_1rm', eid, 'all_time', pr1, displayName, isAnonymous)
-      partitions.push({ type: 'pr_1rm', exerciseId: eid, timeWindow: 'all_time' })
+      partitions.push({ type: 'pr_1rm', exerciseId: eid, timeWindow: 'all_time', coachId })
     }
     if (pr3 != null && pr3 > 0) {
       await upsertEntry(supabaseClient, clientId, 'pr_3rm', eid, 'all_time', pr3, displayName, isAnonymous)
-      partitions.push({ type: 'pr_3rm', exerciseId: eid, timeWindow: 'all_time' })
+      partitions.push({ type: 'pr_3rm', exerciseId: eid, timeWindow: 'all_time', coachId })
     }
     if (pr5 != null && pr5 > 0) {
       await upsertEntry(supabaseClient, clientId, 'pr_5rm', eid, 'all_time', pr5, displayName, isAnonymous)
-      partitions.push({ type: 'pr_5rm', exerciseId: eid, timeWindow: 'all_time' })
+      partitions.push({ type: 'pr_5rm', exerciseId: eid, timeWindow: 'all_time', coachId })
     }
     if (bodyweightKg != null && bodyweightKg > 0 && pr1 != null && pr1 > 0) {
       const bw = Math.round((pr1 / bodyweightKg) * 100) / 100
       await upsertEntry(supabaseClient, clientId, 'bw_multiple', eid, 'all_time', bw, displayName, isAnonymous)
-      partitions.push({ type: 'bw_multiple', exerciseId: eid, timeWindow: 'all_time' })
+      partitions.push({ type: 'bw_multiple', exerciseId: eid, timeWindow: 'all_time', coachId })
     }
   }
 
@@ -208,16 +309,16 @@ export async function updateLeaderboardForClient(
   await upsertEntry(supabaseClient, clientId, 'tonnage_week', null, 'this_week', tonnageWeek, displayName, isAnonymous)
   await upsertEntry(supabaseClient, clientId, 'tonnage_month', null, 'this_month', tonnageMonth, displayName, isAnonymous)
   await upsertEntry(supabaseClient, clientId, 'tonnage_all_time', null, 'all_time', tonnageAll, displayName, isAnonymous)
-  partitions.push({ type: 'tonnage_week', exerciseId: null, timeWindow: 'this_week' })
-  partitions.push({ type: 'tonnage_month', exerciseId: null, timeWindow: 'this_month' })
-  partitions.push({ type: 'tonnage_all_time', exerciseId: null, timeWindow: 'all_time' })
+  partitions.push({ type: 'tonnage_week', exerciseId: null, timeWindow: 'this_week', coachId })
+  partitions.push({ type: 'tonnage_month', exerciseId: null, timeWindow: 'this_month', coachId })
+  partitions.push({ type: 'tonnage_all_time', exerciseId: null, timeWindow: 'all_time', coachId })
 
   const seenPartition = new Set<string>()
   for (const p of partitions) {
-    const key = `${p.type}|${p.exerciseId ?? SENTINEL_EXERCISE_ID}|${p.timeWindow}`
+    const key = `${p.coachId}|${p.type}|${p.exerciseId ?? SENTINEL_EXERCISE_ID}|${p.timeWindow}`
     if (seenPartition.has(key)) continue
     seenPartition.add(key)
-    await recalcRanksForPartition(supabaseClient, p.type, p.exerciseId, p.timeWindow)
+    await recalcRanksForPartition(supabaseClient, p.type, p.exerciseId, p.timeWindow, p.coachId)
   }
 
   const { data: updatedRows } = await supabaseClient

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
@@ -58,7 +58,7 @@ export default function CoachClientWorkoutLogDetailPage() {
         <button
           type="button"
           onClick={() => router.back()}
-          className="inline-flex p-2 rounded-xl border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)] fc-glass hover:border-[color:var(--fc-domain-workouts)]/40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--fc-accent-cyan)]"
+          className="inline-flex p-2 rounded-xl border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)] fc-glass hover:border-[color:var(--fc-domain-workouts)]/40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--fc-accent)]"
           aria-label="Go back"
         >
           <ArrowLeft className="w-5 h-5 shrink-0" aria-hidden />
@@ -72,7 +72,7 @@ export default function CoachClientWorkoutLogDetailPage() {
       </div>
 
       {loading ? (
-        <div className="fc-card-shell p-6 sm:p-8">
+        <div className="rounded-[18px] border border-[color:rgba(255,255,255,0.08)] bg-transparent p-6 sm:p-8">
           <PageSkeleton variant="form" />
         </div>
       ) : error || !detail ? (

@@ -6,10 +6,16 @@
 import { supabase } from "@/lib/supabase";
 import { getLatestMeasurement } from "@/lib/measurementService";
 import { getClientCheckInConfig } from "@/lib/checkInConfigService";
+import { nullIfStaleAthleteScore } from "@/lib/athleteScoreFreshness";
 import type { AthleteScore } from "@/types/athleteScore";
 import { ATHLETE_TIERS } from "@/types/athleteScore";
 import type { DailyWellnessLog } from "@/lib/wellnessService";
-import { weekdayMon0Sun6InTimezone } from "@/lib/clientZonedCalendar";
+import { loadInstancePhases } from "@/lib/programInstance/instanceCanvasLoad";
+import {
+  buildPhaseWeekRanges,
+  clientPhaseChipLabel,
+  resolvePhaseForAbsoluteWeek,
+} from "@/lib/clientInstancePhaseContext";
 
 export type AthleteScoreChipState = "default" | "paused" | "no_program";
 
@@ -59,6 +65,8 @@ export interface DashboardData {
     completedCount: number;
     totalSlots: number;
     percent: number;
+    currentPhaseLabel?: string | null;
+    weekWithinPhase?: number | null;
   };
   /** Latest active `program_assignments.pause_status` (parallel read; matches RPC active-assignment scope). */
   activeProgramPauseStatus?: string | null;
@@ -79,80 +87,6 @@ export interface DashboardPageData {
   checkinStreak: number;
   hasScheduledCheckInThisPeriod: boolean;
   scoreError: string | null;
-}
-
-type TrainRpcScheduleRow = {
-  id: string;
-  week_number: number;
-  day_number: number;
-  day_of_week: number;
-  template_id: string | null;
-  template_name?: string | null;
-  estimated_duration?: number | null;
-  exercise_count?: number | null;
-};
-
-type TrainRpcCompletionRow = {
-  program_schedule_id: string;
-};
-
-type TrainRpcDashboardOverlay = {
-  hasProgram?: boolean;
-  currentProgramWeek?: number | null;
-  timezoneSnapshot?: string | null;
-  schedule?: TrainRpcScheduleRow[] | null;
-  completions?: TrainRpcCompletionRow[] | null;
-};
-
-function buildDashboardOverlayFromTrainRpc(
-  rpc: TrainRpcDashboardOverlay | null,
-): Pick<DashboardData, "weeklyProgress" | "todaysWorkout"> | null {
-  if (!rpc?.hasProgram) return null;
-  const schedule = Array.isArray(rpc.schedule) ? rpc.schedule : [];
-  const completions = Array.isArray(rpc.completions) ? rpc.completions : [];
-  const completedIds = new Set(
-    completions
-      .map((c) => c.program_schedule_id)
-      .filter((id): id is string => typeof id === "string" && id.length > 0),
-  );
-  const currentWeek =
-    typeof rpc.currentProgramWeek === "number" && rpc.currentProgramWeek >= 1
-      ? rpc.currentProgramWeek
-      : 1;
-
-  const currentWeekSlots = schedule.filter(
-    (s) => s.week_number === currentWeek && !!s.template_id,
-  );
-  const weeklyGoal = currentWeekSlots.length;
-  const weeklyCurrent = currentWeekSlots.filter((s) => completedIds.has(s.id)).length;
-
-  const tz = rpc.timezoneSnapshot?.trim() || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-  const todayWeekday = weekdayMon0Sun6InTimezone(new Date(), tz);
-  const sortedUncompleted = currentWeekSlots
-    .filter((s) => !completedIds.has(s.id))
-    .sort((a, b) => {
-      const byDay = a.day_of_week - b.day_of_week;
-      return byDay !== 0 ? byDay : a.day_number - b.day_number;
-    });
-  const upcomingTodayOrLater = sortedUncompleted.find((s) => s.day_of_week >= todayWeekday);
-  const nextSlot = upcomingTodayOrLater ?? sortedUncompleted[0] ?? null;
-
-  return {
-    weeklyProgress: { current: weeklyCurrent, goal: weeklyGoal },
-    todaysWorkout: nextSlot
-      ? {
-          hasWorkout: true,
-          type: "program",
-          name: nextSlot.template_name ?? "Workout",
-          weekNumber: nextSlot.week_number,
-          dayNumber: nextSlot.day_number,
-          templateId: nextSlot.template_id ?? undefined,
-          scheduleId: nextSlot.id,
-          estimatedDuration: nextSlot.estimated_duration ?? null,
-          totalSets: nextSlot.exercise_count ?? null,
-        }
-      : { hasWorkout: false },
-  };
 }
 
 /** Map `get_client_dashboard` athleteScore JSON (camelCase) or DB-shaped rows to AthleteScore. */
@@ -178,11 +112,6 @@ export function mapRpcAthleteScore(
     training_score: num("trainingScore", "training_score"),
     training_completion_score: num("trainingCompletionScore", "training_completion_score"),
     training_execution_score: num("trainingExecutionScore", "training_execution_score"),
-    recovery_score: num("recoveryScore", "recovery_score"),
-    recovery_sleep_score: num("recoverySleepScore", "recovery_sleep_score"),
-    recovery_steps_score: num("recoveryStepsScore", "recovery_steps_score"),
-    nutrition_score: num("nutritionScore", "nutrition_score") ?? 0,
-    extras_score: num("extrasScore", "extras_score") ?? 0,
     window_start: String(raw.windowStart ?? raw.window_start ?? ""),
     window_end: String(raw.windowEnd ?? raw.window_end ?? ""),
     calculated_at: String(raw.calculatedAt ?? raw.calculated_at ?? ""),
@@ -228,7 +157,9 @@ export function mapDashboardRpcResponse(
 
   const rawScore = rpc.athleteScore as Record<string, unknown> | null | undefined;
   /** Latest persisted row (any week); not gated on active program — see resolveAthleteScoreChipState. */
-  const athleteScore: AthleteScore | null = mapRpcAthleteScore(rawScore);
+  const athleteScore: AthleteScore | null = nullIfStaleAthleteScore(
+    mapRpcAthleteScore(rawScore),
+  );
 
   const todayWellnessLog = (rpc.todayWellnessLog as DailyWellnessLog | null) ?? null;
   const hasCheckInToday = todayWellnessLog != null;
@@ -245,22 +176,21 @@ export function mapDashboardRpcResponse(
   };
 }
 
-/** Single source: one RPC returns everything the dashboard UI needs. */
+/**
+ * Single source: `get_client_dashboard` returns everything the dashboard UI
+ * needs. Its weeklyProgress / programProgress / todaysWorkout are now computed
+ * from the canonical resolver + instance-keyed adherence (see the step-6 RPC
+ * rewrite), so the old train-RPC-over-dashboard-RPC overlay hack is removed —
+ * every surface reads the same Week X of N and adherence.
+ */
 export async function fetchDashboardPageData(userId: string): Promise<DashboardPageData> {
-  const [{ data, error }, trainOverlayRes, latestMeasurement, checkInConfig, activePaRes] = await Promise.all([
+  const [{ data, error }, latestMeasurement, checkInConfig, activePaRes] = await Promise.all([
     supabase.rpc("get_client_dashboard"),
-    supabase.rpc("get_train_page_data", {
-      p_client_id: userId,
-      p_today_weekday: weekdayMon0Sun6InTimezone(
-        new Date(),
-        Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-      ),
-    }),
     getLatestMeasurement(userId),
     getClientCheckInConfig(userId),
     supabase
       .from("program_assignments")
-      .select("pause_status")
+      .select("id, pause_status")
       .eq("client_id", userId)
       .eq("status", "active")
       .order("created_at", { ascending: false })
@@ -287,20 +217,28 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
     (data ?? null) as Record<string, unknown> | null,
     hasScheduledCheckInThisPeriod,
   );
-  const trainOverlay = (trainOverlayRes.data ?? null) as TrainRpcDashboardOverlay | null;
   const athleteScoreChipState = resolveAthleteScoreChipState(
     pageData.athleteScore,
     activePaRes.data?.pause_status,
   );
 
   if (pageData.dashboard) {
-    const overlay = buildDashboardOverlayFromTrainRpc(trainOverlay);
-    if (overlay) {
-      pageData.dashboard.weeklyProgress = overlay.weeklyProgress;
-      pageData.dashboard.todaysWorkout = overlay.todaysWorkout;
-    }
     pageData.dashboard.activeProgramPauseStatus = activePaRes.data?.pause_status ?? null;
     pageData.dashboard.athleteScoreChipState = athleteScoreChipState;
+
+    const assignmentId = activePaRes.data?.id as string | undefined;
+    const pp = pageData.dashboard.programProgress;
+    if (assignmentId && pp && pp.currentWeek >= 1) {
+      const phases = await loadInstancePhases(supabase, assignmentId);
+      const pos = resolvePhaseForAbsoluteWeek(
+        pp.currentWeek,
+        buildPhaseWeekRanges(phases),
+      );
+      if (pos) {
+        pp.currentPhaseLabel = clientPhaseChipLabel(pos.range.phase);
+        pp.weekWithinPhase = pos.weekWithinPhase;
+      }
+    }
   }
   return pageData;
 }

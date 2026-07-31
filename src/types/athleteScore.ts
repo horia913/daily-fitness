@@ -6,7 +6,8 @@ export type AthleteScoreTierKey =
   | "benched";
 
 /**
- * Latest `athlete_scores` row (v2 columns). Legacy v1 columns removed after migration 12.2.
+ * Latest `athlete_scores` row. Training-only score over rolling 14 days:
+ * `training_completion_score` (70%) + `training_execution_score` (30%).
  */
 export interface AthleteScore {
   id?: string;
@@ -16,11 +17,6 @@ export interface AthleteScore {
   training_score: number | null;
   training_completion_score: number | null;
   training_execution_score: number | null;
-  recovery_score: number | null;
-  recovery_sleep_score: number | null;
-  recovery_steps_score: number | null;
-  nutrition_score: number | null;
-  extras_score: number | null;
   window_start: string;
   window_end: string;
   calculated_at: string;

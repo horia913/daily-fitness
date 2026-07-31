@@ -13,6 +13,8 @@ export interface WorkoutTemplate {
   difficulty_level: 'beginner' | 'intermediate' | 'advanced' | 'athlete'
   estimated_duration: number
   category?: string
+  kind?: 'library' | 'program_day' | 'client_day'
+  source_workout_id?: string | null
   is_active: boolean
   created_at: string
   updated_at: string
@@ -70,9 +72,15 @@ export interface Program {
   description?: string
   coach_id: string
   difficulty_level: 'beginner' | 'intermediate' | 'advanced' | 'athlete'
-  duration_weeks: number
+  /** Derived client-side from SUM(training_blocks.duration_weeks) — not a DB column. */
+  duration_weeks?: number
   target_audience?: string | null
-  category?: string | null // Training category for volume calculator
+  /** Legacy — dropped from workout_programs; stripped on write. */
+  category?: string | null
+  /** FLIP 3 — fixed (periodized) vs recurring (single repeating week). */
+  type?: 'fixed' | 'recurring'
+  /** Display-only periodization preset. */
+  periodization_style?: string | null
   is_public?: boolean // Optional - not in database schema
   is_active: boolean
   created_at: string
@@ -157,13 +165,6 @@ export interface AssignProgramToClientsResult {
     error: string
     orphanedAssignmentId?: string
   }>
-}
-
-/** Master schedule → snapshot propagation audit trail (Fix 4). */
-export interface PropagateScheduleSlotResult {
-  updated: number
-  inserted: number
-  failures: Array<{ assignmentId: string; stage: 'update' | 'insert'; error: string }>
 }
 
 export interface DailyWorkout {
@@ -267,6 +268,7 @@ export class WorkoutTemplateService {
         .select('*')
         .eq('coach_id', coachId)
         .eq('is_active', true)
+        .eq('kind', 'library')
         .order('created_at', { ascending: false })
       if (process.env.NODE_ENV !== 'production') {
         console.timeEnd('[getWorkoutTemplates] workout_templates')
@@ -877,6 +879,16 @@ export class WorkoutTemplateService {
       }
 
       // No longer creating copies - assignment links directly to original template
+      try {
+        const { emitInAppNotification } = await import('@/lib/inAppNotificationEvents')
+        void emitInAppNotification({
+          event: 'client_workout_assigned',
+          clientId: clientProfileId,
+          assignmentId: assignment.id,
+        })
+      } catch {
+        /* non-blocking */
+      }
       return assignment
     } catch (error) {
       console.error('Error assigning workout to client:', error)
@@ -1122,9 +1134,12 @@ export class WorkoutTemplateService {
   static async createProgram(programData: Omit<Program, 'id' | 'created_at' | 'updated_at'>): Promise<Program | null> {
     try {
       console.log('📝 WorkoutTemplateService.createProgram called with:', programData);
-      
+
+      // duration_weeks / category were dropped from workout_programs (length lives on training_blocks)
+      const { duration_weeks: _dropDuration, category: _dropCategory, ...safeProgramData } = programData
+
       const insertData = {
-        ...programData,
+        ...safeProgramData,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -1154,101 +1169,13 @@ export class WorkoutTemplateService {
     }
   }
 
-  /**
-   * Align training_blocks durations with workout_programs.duration_weeks.
-   * Shrinks from the last block in program order (delete whole tail blocks or shrink last).
-   */
-  static async reconcileBlocksToDuration(programId: string, targetDuration: number): Promise<void> {
-    for (;;) {
-      const { data: blocks, error: blocksError } = await supabase
-        .from('training_blocks')
-        .select('id, duration_weeks, block_order, created_at')
-        .eq('program_id', programId)
-        .order('block_order', { ascending: true })
-        .order('created_at', { ascending: true })
-
-      if (blocksError) throw blocksError
-
-      if (!blocks || blocks.length === 0) {
-        const { error: insErr } = await supabase.from('training_blocks').insert({
-          program_id: programId,
-          name: 'Block 1',
-          goal: 'custom',
-          duration_weeks: targetDuration,
-          block_order: 1,
-        })
-        if (insErr) throw insErr
-        return
-      }
-
-      const currentSum = blocks.reduce((s, b) => s + Math.max(0, Number(b.duration_weeks) || 0), 0)
-
-      if (currentSum === targetDuration) return
-
-      if (currentSum < targetDuration) {
-        const last = blocks[blocks.length - 1]
-        const shortfall = targetDuration - currentSum
-        const { error: upErr } = await supabase
-          .from('training_blocks')
-          .update({
-            duration_weeks: last.duration_weeks + shortfall,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', last.id)
-        if (upErr) throw upErr
-        return
-      }
-
-      const remaining = currentSum - targetDuration
-      const last = blocks[blocks.length - 1]
-
-      if (blocks.length === 1) {
-        const { error: upErr } = await supabase
-          .from('training_blocks')
-          .update({
-            duration_weeks: Math.max(1, last.duration_weeks - remaining),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', last.id)
-        if (upErr) throw upErr
-        return
-      }
-
-      if (last.duration_weeks <= remaining) {
-        const { error: delErr } = await supabase.from('training_blocks').delete().eq('id', last.id)
-        if (delErr) throw delErr
-        continue
-      }
-
-      const { error: upErr } = await supabase
-        .from('training_blocks')
-        .update({
-          duration_weeks: last.duration_weeks - remaining,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', last.id)
-      if (upErr) throw upErr
-      return
-    }
-  }
-
   static async updateProgram(programId: string, programData: Partial<Program>): Promise<Program | null> {
-    const { data: currentProgram, error: curErr } = await supabase
-      .from('workout_programs')
-      .select('duration_weeks')
-      .eq('id', programId)
-      .single()
-
-    if (curErr) throw curErr
-
-    const oldDuration = currentProgram?.duration_weeks ?? null
-    const newDuration =
-      programData.duration_weeks !== undefined ? programData.duration_weeks : oldDuration
+    const { duration_weeks: _dropDuration, category: _dropCategory, ...patch } = programData
 
     const { data, error } = await supabase
       .from('workout_programs')
       .update({
-        ...programData,
+        ...patch,
         updated_at: new Date().toISOString(),
       })
       .eq('id', programId)
@@ -1256,19 +1183,6 @@ export class WorkoutTemplateService {
       .single()
 
     if (error) throw error
-
-    if (oldDuration !== null && newDuration !== null && newDuration !== oldDuration) {
-      await this.reconcileBlocksToDuration(programId, newDuration)
-
-      if (newDuration < oldDuration) {
-        const { error: rpcErr } = await supabase.rpc('cleanup_orphan_schedule', {
-          p_program_id: programId,
-          p_max_week: newDuration,
-        })
-        if (rpcErr) throw rpcErr
-      }
-    }
-
     return data
   }
 
@@ -1357,375 +1271,12 @@ export class WorkoutTemplateService {
     }
   }
 
-  /**
-   * Master program_schedule → program_day_assignments for active/paused assignments.
-   * Only rows with is_customized = false are updated; never deletes snapshot rows.
-   */
-  private static snapshotDayNumber(weekNumber: number, programDay: number): number {
-    return (weekNumber - 1) * 7 + programDay
-  }
-
-  private static async getActivePausedAssignmentIds(programId: string): Promise<string[]> {
-    const { data, error } = await supabase
-      .from('program_assignments')
-      .select('id')
-      .eq('program_id', programId)
-      .in('status', ['active', 'paused'])
-
-    if (error) {
-      console.error('[propagation] load assignments:', error)
-      return []
-    }
-    return (data ?? []).map((r) => r.id as string).filter(Boolean)
-  }
-
-  private static snapshotSlotDefaultName(
-    weekNumber: number,
-    programDay: number,
-    templateId: string | null,
-  ): string {
-    return templateId
-      ? `Workout Day ${weekNumber}-${programDay}`
-      : `Rest Day ${weekNumber}-${programDay}`
-  }
-
-  private static async resolveSnapshotDisplayName(
-    templateId: string | null,
-    weekNumber: number,
-    programDay: number,
-    hintName?: string | null,
-  ): Promise<string> {
-    if (hintName && hintName.trim()) return hintName.trim()
-    if (!templateId) return this.snapshotSlotDefaultName(weekNumber, programDay, null)
-    const { data, error } = await supabase
-      .from('workout_templates')
-      .select('name')
-      .eq('id', templateId)
-      .maybeSingle()
-    if (error) {
-      console.error('[propagation] template name:', error)
-    }
-    const n = (data?.name as string) || ''
-    return n.trim() || this.snapshotSlotDefaultName(weekNumber, programDay, templateId)
-  }
-
-  /**
-   * Push one master (week, program_day) slot to all non-customized snapshots for this program.
-   */
-  static async propagateScheduleSlotToSnapshots(
-    programId: string,
-    weekNumber: number,
-    programDay: number,
-    templateId: string | null | undefined,
-    options?: { ensureMissingRows?: boolean; templateNameHint?: string | null; isOptional?: boolean },
-  ): Promise<PropagateScheduleSlotResult> {
-    const empty = (): PropagateScheduleSlotResult => ({ updated: 0, inserted: 0, failures: [] })
-    try {
-      if (programDay < 1 || programDay > 7 || weekNumber < 1) return empty()
-
-      const isOptionalFlag = Boolean(options?.isOptional)
-
-      const tid =
-        templateId && typeof templateId === 'string' && templateId.trim().length > 0
-          ? templateId.trim()
-          : null
-
-      const assignmentIds = await this.getActivePausedAssignmentIds(programId)
-      if (assignmentIds.length === 0) return empty()
-
-      const dayNumber = this.snapshotDayNumber(weekNumber, programDay)
-      const dayType: 'workout' | 'rest' = tid ? 'workout' : 'rest'
-      const name = await this.resolveSnapshotDisplayName(
-        tid,
-        weekNumber,
-        programDay,
-        options?.templateNameHint,
-      )
-
-      const now = new Date().toISOString()
-      const { data: updated, error: updateError } = await supabase
-        .from('program_day_assignments')
-        .update({
-          workout_template_id: tid,
-          name,
-          day_type: dayType,
-          is_optional: isOptionalFlag,
-          updated_at: now,
-        })
-        .in('program_assignment_id', assignmentIds)
-        .eq('day_number', dayNumber)
-        .eq('is_customized', false)
-        .select('id')
-
-      if (updateError) {
-        console.error('[propagation] update snapshots:', updateError)
-        const msg = updateError.message || String(updateError)
-        return {
-          updated: 0,
-          inserted: 0,
-          failures: assignmentIds.map((assignmentId) => ({
-            assignmentId,
-            stage: 'update' as const,
-            error: msg,
-          })),
-        }
-      }
-
-      const n = updated?.length ?? 0
-      console.log(
-        `[propagation] template change for program ${programId} (week ${weekNumber}, day ${programDay}) -> ${n} snapshot rows updated`,
-      )
-
-      let inserted = 0
-      const failures: PropagateScheduleSlotResult['failures'] = []
-
-      if (options?.ensureMissingRows) {
-        const { data: existingPd, error: exErr } = await supabase
-          .from('program_day_assignments')
-          .select('program_assignment_id')
-          .eq('day_number', dayNumber)
-          .in('program_assignment_id', assignmentIds)
-
-        if (exErr) {
-          console.error('[propagation] list existing snapshot rows:', exErr)
-          const msg = exErr.message || String(exErr)
-          return {
-            updated: n,
-            inserted: 0,
-            failures: assignmentIds.map((assignmentId) => ({
-              assignmentId,
-              stage: 'insert' as const,
-              error: msg,
-            })),
-          }
-        }
-
-        const have = new Set((existingPd ?? []).map((r) => r.program_assignment_id as string))
-        const missing = assignmentIds.filter((id) => !have.has(id))
-        if (missing.length === 0) return { updated: n, inserted: 0, failures: [] }
-
-        const description = tid ? null : 'Rest day'
-        const insertRows = missing.map((program_assignment_id) => ({
-          program_assignment_id,
-          program_day_id: null,
-          program_day: programDay,
-          day_number: dayNumber,
-          day_type: dayType,
-          workout_template_id: tid,
-          name,
-          description,
-          estimated_duration: null,
-          target_muscles: [] as string[],
-          intensity_level: null,
-          rest_focus: null,
-          recommended_activities: [] as string[],
-          is_completed: false,
-          completed_date: null,
-          notes: null,
-          is_customized: false,
-          is_optional: isOptionalFlag,
-        }))
-
-        const { error: insErr } = await supabase.from('program_day_assignments').insert(insertRows)
-        if (insErr) {
-          console.error('[propagation] insert missing snapshot rows:', insErr)
-          const msg = insErr.message || String(insErr)
-          missing.forEach((assignmentId) =>
-            failures.push({ assignmentId, stage: 'insert', error: msg }),
-          )
-        } else {
-          inserted = missing.length
-        }
-      }
-
-      return { updated: n, inserted, failures }
-    } catch (e) {
-      console.error('[propagation] propagateScheduleSlotToSnapshots', e)
-      throw e
-    }
-  }
-
-  /**
-   * After copy_week_schedule (or any full master refresh), sync every program_schedule
-   * cell to non-customized snapshots and create missing rows for active assignments.
-   */
-  static async propagateAllScheduleSlotsToSnapshots(programId: string): Promise<void> {
-    const schedule = await this.getProgramSchedule(programId)
-    const failures: PropagateScheduleSlotResult['failures'] = []
-    for (const slot of schedule) {
-      const w = slot.week_number ?? 1
-      const d = slot.program_day ?? 1
-      const tid = slot.template_id && String(slot.template_id).trim() ? String(slot.template_id) : null
-      const r = await this.propagateScheduleSlotToSnapshots(programId, w, d, tid, {
-        ensureMissingRows: true,
-        templateNameHint: slot.template_name ?? null,
-        isOptional: Boolean(slot.is_optional),
-      })
-      failures.push(...r.failures)
-    }
-    if (failures.length > 0) {
-      const lines = failures.map((f) => `  • ${f.assignmentId} (${f.stage}): ${f.error}`)
-      throw new Error(`propagateAllScheduleSlotsToSnapshots — failures:\n${lines.join('\n')}`)
-    }
-  }
-
   // ===== PROGRAM ASSIGNMENT MANAGEMENT =====
 
-  /**
-   * Same client + program_id reuses the existing `program_assignments` row (UPDATE path).
-   * Prior `workout_logs` / ledgers still reference that id + the same `program_schedule` ids,
-   * so the Train UI would show every slot as completed. Wipe run-scoped rows for a fresh start.
-   * Deletes run server-side (`POST .../reset-run-data`) so the service role bypasses RLS on the client's logs.
-   */
-  private static async clearStaleRunDataForAssignmentReuse(assignmentId: string): Promise<void> {
-    // Plain fetch (not fetchApi): fetchApi retries 403 and may sign out on a real "forbidden" response.
-    const url = `/api/coach/program-assignments/${encodeURIComponent(assignmentId)}/reset-run-data`
-    const res = await fetch(url, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-    })
-    const body = (await res.json().catch(() => ({}))) as {
-      error?: string
-      step?: string
-      detail?: string
-    }
-    if (!res.ok) {
-      const msg =
-        typeof body?.error === 'string'
-          ? body.error
-          : `reset-run-data failed (${res.status})`
-      console.error('[createProgramAssignment] clearStaleRunData:', msg, body)
-      throw new Error(msg)
-    }
-  }
-
-  static async createProgramAssignment(clientId: string, programId: string, startDate: string, coachId?: string, progressionMode?: 'auto' | 'coach_managed'): Promise<ProgramAssignment> {
-    try {
-      console.log('[createProgramAssignment] Creating assignment:', {
-        clientId,
-        programId,
-        coachId,
-        startDate
-      })
-      
-      // Enforce single program assignment: Set all existing programs to 'completed'
-      // This ensures only one program is active per client
-      await supabase
-        .from('program_assignments')
-        .update({ status: 'completed', updated_at: new Date().toISOString() })
-        .eq('client_id', clientId)
-        .eq('status', 'active')
-
-      const { data: existing, error: existingError } = await supabase
-        .from('program_assignments')
-        .select('*')
-        .eq('client_id', clientId)
-        .eq('program_id', programId)
-        .maybeSingle()
-
-      if (existingError && existingError.code !== 'PGRST116') {
-        throw existingError
-      }
-
-      const schedule = await this.getProgramSchedule(programId)
-      const totalDays = schedule?.length || 0
-
-      const { data: clientProfile } = await supabase
-        .from('profiles')
-        .select('timezone')
-        .eq('id', clientId)
-        .single()
-      const timezoneSnapshot = (clientProfile?.timezone as string) ?? 'UTC'
-
-      const insertPayload: any = {
-        client_id: clientId,
-        program_id: programId,
-        start_date: startDate,
-        total_days: totalDays,
-        status: 'active',
-        timezone_snapshot: timezoneSnapshot,
-      }
-
-      if (coachId) {
-        insertPayload.coach_id = coachId
-      }
-      if (progressionMode) {
-        insertPayload.progression_mode = progressionMode
-        // coach_unlocked_week is no longer written; calendar unlock is authoritative.
-      }
-
-      let data: any = existing
-      if (!existing) {
-        const insertResponse = await supabase
-          .from('program_assignments')
-          .insert(insertPayload)
-          .select('*')
-          .single()
-
-        if (insertResponse.error) throw insertResponse.error
-        data = insertResponse.data
-      } else {
-        await WorkoutTemplateService.clearStaleRunDataForAssignmentReuse(existing.id)
-
-        const updatePayload: Record<string, any> = {
-            status: 'active',
-            start_date: startDate,
-            updated_at: new Date().toISOString(),
-            timezone_snapshot: timezoneSnapshot,
-          }
-        if (progressionMode) {
-          updatePayload.progression_mode = progressionMode
-          // coach_unlocked_week is no longer written; calendar unlock is authoritative.
-        }
-        const updateResponse = await supabase
-          .from('program_assignments')
-          .update(updatePayload)
-          .eq('id', existing.id)
-          .select('*')
-          .single()
-
-        if (updateResponse.error) throw updateResponse.error
-        data = updateResponse.data
-      }
-
-      if (data?.id) {
-        console.log('[createProgramAssignment] Assignment created/updated:', {
-          assignmentId: data.id,
-          coach_id: data.coach_id,
-          client_id: data.client_id,
-          program_id: data.program_id,
-          status: data.status,
-          start_date: data.start_date
-        })
-        
-        await ProgramProgressionService.deleteClientProgramProgressionRules(
-          data.id
-        )
-        const copied =
-          await ProgramProgressionService.copyProgramRulesToClient(
-            programId,
-            data.id,
-            clientId
-          )
-        if (!copied) {
-          console.warn(
-            '[ClientProgramCopy] Failed to copy progression rules for assignment',
-            {
-              programId,
-              assignmentId: data.id,
-              clientId,
-            }
-          )
-        }
-      }
-
-      return data
-    } catch (error) {
-      console.error('Error creating program assignment:', error)
-      throw error
-    }
-  }
+  // NOTE: The old client-side assign saga (createProgramAssignment +
+  // clearStaleRunDataForAssignmentReuse) was removed in the Program Spine
+  // Rebuild (step 3). Assignment now goes through the transactional RPC
+  // `assign_program_instance` via assignProgramToClients().
 
   static async getProgramAssignmentsByClient(clientId: string): Promise<ProgramAssignment[]> {
     try {
@@ -1776,7 +1327,6 @@ export class WorkoutTemplateService {
         name,
         description,
         notes: notes ?? null,
-        is_customized: overrides?.description || overrides?.name ? true : false,
         is_completed: false,
         program_day: programDay,
         target_muscles: [],
@@ -1899,7 +1449,16 @@ export class WorkoutTemplateService {
   }
 
   /**
-   * Convenience method: assign a program to multiple clients and copy program days
+   * Assign a program to multiple clients. Each client gets a complete,
+   * client-owned instance produced by the transactional RPC
+   * `assign_program_instance` (deep copy of phases, workouts, set entries,
+   * exercises, per-set prescriptions, legacy protocol satellites, schedule,
+   * and progression rules). Each client either gets a full instance or
+   * nothing (the RPC is all-or-nothing); failures are reported per client.
+   *
+   * Replaces the old client-side saga (createProgramAssignment +
+   * copyProgramRulesToClient + program_day_assignments snapshot upsert +
+   * orphan cleanup). Re-assign always creates a FRESH instance (D8).
    */
   static async assignProgramToClients(
     programId: string,
@@ -1911,108 +1470,70 @@ export class WorkoutTemplateService {
   ): Promise<AssignProgramToClientsResult> {
     const successful: AssignProgramToClientsResult['successful'] = []
     const failed: AssignProgramToClientsResult['failed'] = []
-    const days = await this.getProgramSchedule(programId)
+
+    if (!coachId) {
+      for (const clientId of clientIds) {
+        failed.push({ clientId, stage: 'assignment', error: 'Missing coachId — cannot assign program instance' })
+      }
+      return { successful, failed }
+    }
 
     for (const clientId of clientIds) {
-      let assignment: ProgramAssignment | null = null
       try {
-        assignment = await this.createProgramAssignment(
-          clientId,
-          programId,
-          startDate,
-          coachId,
-          progressionMode
-        )
+        // Snapshot the client's timezone at assign time (frozen on the instance).
+        const { data: clientProfile } = await supabase
+          .from('profiles')
+          .select('timezone')
+          .eq('id', clientId)
+          .maybeSingle()
+        const timezoneSnapshot = (clientProfile?.timezone as string) || 'UTC'
+
+        const { data, error } = await supabase.rpc('assign_program_instance', {
+          p_program_id: programId,
+          p_client_id: clientId,
+          p_coach_id: coachId,
+          p_start_date: startDate,
+          p_progression_mode: progressionMode ?? 'auto',
+          p_timezone_snapshot: timezoneSnapshot,
+          p_notes: notes ?? null,
+        })
+
+        if (error) throw error
+
+        const assignmentId = (data as unknown as string) || ''
+        if (!assignmentId) {
+          failed.push({
+            clientId,
+            stage: 'assignment',
+            error: 'assign_program_instance returned no assignment id',
+          })
+          continue
+        }
+
+        successful.push({ clientId, assignmentId })
+        try {
+          const { emitInAppNotification } = await import('@/lib/inAppNotificationEvents')
+          void emitInAppNotification({
+            event: 'client_program_assigned',
+            clientId,
+            assignmentId,
+          })
+        } catch {
+          /* non-blocking */
+        }
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         failed.push({ clientId, stage: 'assignment', error: msg })
-        continue
       }
-
-      if (!assignment?.id) {
-        failed.push({
-          clientId,
-          stage: 'assignment',
-          error: 'Assignment was not created',
-        })
-        continue
-      }
-
-      if (days && days.length > 0) {
-        const rows = days.map((d) => {
-          const weekNumber = d.week_number ?? 1
-          const programDay = d.program_day ?? 1
-          const dayNumber = (weekNumber - 1) * 7 + programDay
-          const dayType = d.template_id ? 'workout' : 'rest'
-          const defaultName =
-            dayType === 'workout'
-              ? `Workout Day ${weekNumber}-${programDay}`
-              : `Rest Day ${weekNumber}-${programDay}`
-          const name = d.template_name ?? defaultName
-          const description =
-            d.template_description ??
-            (dayType === 'rest' ? 'Rest day' : d.notes ?? null)
-
-          return {
-            program_assignment_id: assignment!.id,
-            program_day_id: null,
-            program_day: programDay,
-            day_number: dayNumber,
-            day_type: dayType,
-            workout_template_id: d.template_id ?? null,
-            name,
-            description,
-            estimated_duration: d.estimated_duration ?? null,
-            target_muscles: [],
-            intensity_level: null,
-            rest_focus: null,
-            recommended_activities: [],
-            is_completed: false,
-            completed_date: null,
-            notes: notes ?? d.notes ?? null,
-            is_customized: false,
-          }
-        })
-        const { error } = await supabase
-          .from('program_day_assignments')
-          .upsert(rows, { onConflict: 'program_assignment_id,day_number' })
-        if (error) {
-          console.error('Error copying program days to assignment:', error)
-          const orphanId = assignment.id
-          const { error: delErr } = await supabase.from('program_assignments').delete().eq('id', orphanId)
-          if (delErr) {
-            const cleanupMsg =
-              delErr.message ||
-              String(delErr)
-            console.error('[assignProgramToClients] ORPHAN CLEANUP FAILED — manual cleanup required', {
-              orphanedAssignmentId: orphanId,
-              clientId,
-              cleanupError: cleanupMsg,
-              snapshotError: error.message || String(error),
-            })
-            failed.push({
-              clientId,
-              stage: 'cleanup',
-              error: `Snapshot failed (${error.message || String(error)}); orphan cleanup failed (${cleanupMsg})`,
-              orphanedAssignmentId: orphanId,
-            })
-          } else {
-            failed.push({
-              clientId,
-              stage: 'snapshot',
-              error: error.message || String(error),
-            })
-          }
-          continue
-        }
-      }
-
-      successful.push({ clientId, assignmentId: assignment.id })
     }
 
     return { successful, failed }
   }
 
+  /**
+   * Upsert one master program_schedule cell. Master-only — does NOT touch
+   * program_day_assignments on active assignments (step 7: propagation removed).
+   */
   static async setProgramSchedule(args: {
     programId: string
     programDay: number
@@ -2063,29 +1584,6 @@ export class WorkoutTemplateService {
     if (!row) {
       throw new Error('setProgramSchedule: no row returned from upsert')
     }
-
-    const effectiveTemplateId =
-      row.template_id != null && String(row.template_id).trim() !== ''
-        ? String(row.template_id)
-        : templateId
-
-    const propagation = await this.propagateScheduleSlotToSnapshots(
-      programId,
-      weekNumber,
-      programDay,
-      effectiveTemplateId,
-      {
-        ensureMissingRows: true,
-        templateNameHint: row.template_name ?? null,
-        isOptional: Boolean(row.is_optional),
-      }
-    )
-    if (propagation.failures.length > 0) {
-      const lines = propagation.failures.map(
-        (f) => `  • ${f.assignmentId} (${f.stage}): ${f.error}`,
-      )
-      throw new Error(`setProgramSchedule — snapshot propagation failed:\n${lines.join('\n')}`)
-    }
   }
 
   static async removeProgramSchedule(programId: string, programDay: number, weekNumber: number): Promise<boolean> {
@@ -2123,15 +1621,6 @@ export class WorkoutTemplateService {
       .eq('week_number', weekNumber)
 
     if (error) throw error
-
-    const propagation = await this.propagateScheduleSlotToSnapshots(programId, weekNumber, programDay, null, {
-      ensureMissingRows: false,
-      isOptional: false,
-    })
-    if (propagation.failures.length > 0) {
-      const lines = propagation.failures.map((f) => `  • ${f.assignmentId} (${f.stage}): ${f.error}`)
-      throw new Error(`removeProgramSchedule — snapshot propagation failed:\n${lines.join('\n')}`)
-    }
 
     return true
   }
@@ -2200,24 +1689,6 @@ export class WorkoutTemplateService {
         message: 'No active program assigned. Contact your coach to get started!',
         weekCompleted: false
       }
-    }
-  }
-
-  static async completeWorkout(clientId: string, templateId: string, durationMinutes?: number, notes?: string): Promise<{ success: boolean; message: string; nextWorkout?: DailyWorkout; isProgramCompleted?: boolean }> {
-    try {
-      const { data, error } = await supabase
-        .rpc('complete_workout', {
-          p_client_id: clientId,
-          p_template_id: templateId,
-          p_duration_minutes: durationMinutes,
-          p_notes: notes
-        })
-
-      if (error) throw error
-      return data || { success: false, message: 'Failed to complete workout' }
-    } catch (error) {
-      console.error('Error completing workout:', error)
-      return { success: false, message: 'Error completing workout' }
     }
   }
 
@@ -2331,44 +1802,6 @@ export class WorkoutTemplateService {
     // For now, just return the next due workout regardless of date
     // This maintains compatibility while transitioning to the new system
     return await this.getNextDueWorkout(clientId)
-  }
-
-  static async generateDailyWorkout(clientId: string, programAssignmentId: string, workoutDate: string): Promise<DailyWorkout> {
-    try {
-      const { data, error } = await supabase
-        .rpc('generate_daily_workout', {
-          p_client_id: clientId,
-          p_program_assignment_id: programAssignmentId,
-          p_workout_date: workoutDate
-        })
-
-      if (error) throw error
-      return data || { hasWorkout: false, message: 'Failed to generate workout' }
-    } catch (error) {
-      console.error('Error generating daily workout:', error)
-      return { hasWorkout: false, message: 'Error generating workout' }
-    }
-  }
-
-  static async clearWorkoutCache(clientId: string, programAssignmentId?: string): Promise<boolean> {
-    try {
-      let query = supabase
-        .from('daily_workout_cache')
-        .delete()
-        .eq('client_id', clientId)
-
-      if (programAssignmentId) {
-        query = query.eq('program_assignment_id', programAssignmentId)
-      }
-
-      const { error } = await query
-
-      if (error) throw error
-      return true
-    } catch (error) {
-      console.error('Error clearing workout cache:', error)
-      return false
-    }
   }
 
   // ===== EXERCISE ALTERNATIVES =====

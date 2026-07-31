@@ -15,7 +15,7 @@
   padding: 9px 10px;
   align-items: center;
   font-size: 11px;
-  background: var(--fc-surface-card);
+  background: transparent;
 }
 
 .rowCompare {
@@ -23,14 +23,15 @@
 }
 
 .valDisplay {
-  font-family: var(--f-display, "Big Shoulders Display", ui-serif, serif);
+  font-family: var(--f-display);
+  font-stretch: 125%;
   font-weight: 700;
   font-size: 15px;
 }
 
 .head {
-  background: var(--fc-glass-soft);
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  background: transparent;
+  font-family: var(--f-mono);
   font-size: 9.5px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -58,7 +59,7 @@
 }
 
 .trend {
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 9.5px;
   color: var(--fc-text-subtle);
 }
@@ -66,5 +67,5 @@
 .dash {
   color: var(--fc-text-quaternary);
   font-style: italic;
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
 }

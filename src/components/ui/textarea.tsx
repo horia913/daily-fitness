@@ -20,7 +20,7 @@ function Textarea({
       className={cn(
         baseClass,
         variant === "fc"
-          ? "focus-visible:border-[var(--fc-accent-cyan)] focus-visible:ring-2 focus-visible:ring-[rgba(0,242,255,0.2)]"
+          ? "focus-visible:border-[var(--fc-accent)] focus-visible:ring-2 focus-visible:ring-[rgba(0,242,255,0.2)]"
           : "",
         className
       )}

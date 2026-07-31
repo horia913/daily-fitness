@@ -1,0 +1,117 @@
+# P5 — MEAL PLAN GENERATOR WIZARD RESKIN REPORT
+**Date:** 2026-07-05
+
+---
+
+## 1. Files changed
+
+### Created
+- `src/app/coach/nutrition/generator/generator.module.css` — generator-specific open layout, stepper, borderless fields, dropdown/modal scrim, review chrome
+
+### Modified
+- `src/app/coach/nutrition/generator/page.tsx` — full presentation reskin
+
+### Confirmed untouched (logic fence)
+- `src/lib/mealPlanGeneratorService.ts` — **not modified**
+- `src/app/api/coach/nutrition/generate/route.ts` — **not modified**
+- `src/lib/apiClient.ts` (`fetchApi`) — **not modified**
+
+---
+
+## 2. Logic-untouched confirmation
+
+| Contract | Status |
+|----------|--------|
+| `GeneratorConfig` shape in `runGeneration` | Unchanged (same fields, same conditionals for manual macros, same `tolerance: 0.07`) |
+| API payload (`POST /api/coach/nutrition/generate`) | Unchanged |
+| `localOptions` merge before `saveGeneratedPlan` in `handleSave` | Unchanged |
+| Step 2 → Step 3 coupling (`handleGoToReview`: `setStep(3)` + `runGeneration()`) | Unchanged |
+| `FoodSearchBox` query (`foods` ilike, limit 10, 300ms debounce) | Unchanged |
+| Open/close/blur timing (150ms blur delay, mousedown preventDefault) | Unchanged |
+| Portal positioning (`fixed` + `getBoundingClientRect`) | Unchanged — only shell styling moved to CSS |
+| 60s `AbortController` + `cancelledRef` cancel semantics | Unchanged |
+| `requiredFoodIds` UI + payload | Kept as-is (still collected; engine behavior unchanged) |
+| Handler orchestration (`runGeneration`, `handleAdjust`, `handleSwap`, `handleSwapConfirm`, `cancelGeneration`) | Logic identical; JSX restyled only |
+
+---
+
+## 3. Audit worklist resolution (items 1–30)
+
+| Item | Resolved how | Location |
+|------|--------------|----------|
+| 1 | Removed all `GlassCard` / `fc-card-shell` step wrappers | `page.tsx` — open sections throughout |
+| 2 | Auto macro readout → mono line (`gen.macroLine`) | `page.tsx` ~L430 |
+| 3 | Step 3 meals → builder accordion rows (`mealStyles.mrow`, `mhead`, badge) | `page.tsx` ~L680 |
+| 4 | Food `<table>` → hairline list (`mealStyles.food`, `GeneratorFoodRow`) | `page.tsx` ~L260, ~L730 |
+| 5 | Shell `default-5xl` → `data-7xl`; steps 1–2 in `gen.formCol` (max 36rem) | `page.tsx` L478, `generator.module.css` `.formCol` |
+| 6 | Title → `mealStyles.h1` (Archivo display) | `page.tsx` L486 |
+| 7 | Back → `mealStyles.back` mono uppercase eyebrow | `page.tsx` L483 |
+| 8 | Section titles → `gen.sectionTitle` (Archivo + accent bar) | `generator.module.css` |
+| 9 | Column/data labels → `gen.fieldLabel`, `mealStyles.fm`, `mealStyles.mrx` (mono) | Throughout |
+| 10 | Numeric values in mono (`fmt1` in `mealStyles.fm`, macro line) | `GeneratorFoodRow`, totals |
+| 11 | shadcn `Input` removed → `gen.underlineInput` | Step 1 fields |
+| 12 | `FoodSearchBox` → borderless `gen.underlineField` | `page.tsx` FoodSearchBox |
+| 13 | `<select>` → `gen.underlineSelect` | Steps 1–2 |
+| 14 | Macro mode → `wsStyles.chip` / `chipOn` / `chipOff` | Step 1 |
+| 15 | `--fc-accent-cyan` → `--fc-accent` (via workspace/meal tokens) | All accent usage |
+| 16 | `--fc-aurora` hovers removed → `color-mix` on `--fc-text-primary` / accent | `generator.module.css`, dropdown/modal |
+| 17 | Green axis removed → semantic success pills / `foodChipSuccess` | Review meta, required chips |
+| 18 | Dividers → `--fc-hairline` (`gen.section`, stepper, meal rows) | `generator.module.css`, borrowed meal styles |
+| 19 | Regenerate → `wsStyles.ghostBtn` (no glow) | Review header + action bar |
+| 20 | Loading aurora circle removed → flat `gen.loadingRow` + spinner | Step 3 generating |
+| 21 | CTAs → `wsStyles.primaryCta` (glow) / `ghostBtn` (secondary) | All steps |
+| 22 | Traffic-light step circles → flat mono stepper (`gen.stepper`, accent/muted labels) | `Stepper` component |
+| 23 | Connectors → `gen.stepRail` hairline | `Stepper` |
+| 24 | Dropdown inline rgba/blur/shadow → `gen.dropdownShell` / `dropdownItem` classes; position only inline | `FoodSearchBox` |
+| 25 | Swap modal `bg-black/60 backdrop-blur` → `gen.modalScrim` token scrim, no blur | Swap modal |
+| 26 | Cyan underline tabs → `wsStyles.chip` option switcher | Step 3 per meal |
+| 27 | Index badge box → builder `hueBadgeClass` + group chrome `hueOptClass` | Step 3 meals/options |
+| 28 | Emoji → Lucide (`Beef`, `Wheat`, `CheckCircle2`, `AlertTriangle`, `Star`) | Review meta, swap modal |
+| 29 | Restriction presets → workspace chips (not bordered checkbox tiles) | Step 2 |
+| 30 | `FloatingParticles` removed; no blur on data surface | `page.tsx` — import and render removed |
+
+**Deferred:** None.
+
+---
+
+## 4. Design-law conformance
+
+| Rule | Confirmed |
+|------|-----------|
+| Open-by-default (GlassCards gone) | Yes — hairline-separated sections |
+| Borderless inputs | Yes — underline fields/selects/search |
+| Archivo / Inter / JetBrains hierarchy | Yes — display titles, Inter body (default), mono labels/data |
+| Canonical `--fc-accent` + `--fc-hairline` | Yes |
+| `--fc-aurora` removed | Yes |
+| Emoji → Lucide | Yes |
+| Blur/particles removed | Yes |
+| One glow per step | Yes — Step 1 **Next**, Step 2 **Generate plan**, Step 3 bottom **Save plan** only (`primaryCta`). Top Save, Regenerate, Back, Cancel, Retry all ghost |
+
+---
+
+## 5. Step 3 grammar
+
+| Element | Approach |
+|---------|----------|
+| Macro summary | **`PlanMacroStrip` reused** — purely presentational (props: `computed` + `targets`; no draft context). Mapped from `result.dailyTotals` / `result.targets`. |
+| Meal rows | Builder grammar via `mealStyles.mlist`, `mrow`, `mhead`, type badge (`mealTypeBadge` + `hueBadgeClass`) |
+| Options | Group chrome: `mealStyles.opt` + `hueOptClass(optionHueIndex)`; switcher as system chips |
+| Food rows | Hairline list with portion ± and swap wired to `handleAdjust` / `handleSwap` |
+| Swap modal | System scrim + hairline panel; `getSwapAlternatives` + `handleSwapConfirm` unchanged |
+
+Generator state remains `result` / `localOptions` — **not** wired to draft context or meal-tree writes.
+
+---
+
+## 6. TypeScript check
+
+```
+npx tsc --noEmit
+Exit code: 0
+```
+
+---
+
+## 7. Sanity note
+
+Route unchanged: `/coach/nutrition/generator`. Entry links from nutrition workspace and coach menu unchanged. Generation, review edit (swap/adjust), and save behavior should match pre-P5; only presentation changed.

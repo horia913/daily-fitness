@@ -5,11 +5,11 @@ import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const BADGE: Record<
-  'cyan' | 'lime' | 'purple' | 'warn' | 'good' | 'crit',
+  'cyan' | 'action' | 'purple' | 'warn' | 'good' | 'crit',
   { bg: string; fg: string }
 > = {
-  cyan: { bg: 'var(--cyan-soft)', fg: 'var(--cyan)' },
-  lime: { bg: 'var(--lime-soft)', fg: 'var(--lime)' },
+  cyan: { bg: 'var(--fc-accent-dim)', fg: 'var(--fc-accent)' },
+  action: { bg: 'var(--fc-accent-dim)', fg: 'var(--fc-accent)' },
   purple: { bg: 'var(--purple-soft)', fg: 'var(--purple)' },
   warn: { bg: 'var(--warning-soft)', fg: 'var(--warning)' },
   good: { bg: 'var(--good-soft)', fg: 'var(--good)' },
@@ -57,7 +57,7 @@ export function StatTile({
         <span
           className={cn('text-[22px] leading-none font-bold')}
           style={{
-            fontFamily: 'var(--f-display, "Big Shoulders Display", sans-serif)',
+            fontFamily: 'var(--f-display, var(--f-display), sans-serif)',
             color: valueColor,
           }}
         >

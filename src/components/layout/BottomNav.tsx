@@ -8,7 +8,7 @@
  * Phone 1 `.nav-item.active::before`), not pill background. Replaces prior v4 §6.23
  * elevated Train hub pattern for mockup alignment.
  *
- * Phase 0b (Task 4): inactive items use `fc-text-dim`; active accent from `var(--fc-accent-cyan)` (client + coach).
+ * Phase 0b (Task 4): inactive items use `fc-text-dim`; active accent from `var(--fc-accent)` (client + coach).
  */
 
 import { usePathname } from "next/navigation";
@@ -36,7 +36,7 @@ export default function BottomNav() {
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = isSegmentActive(pathname, item);
-          const activeColor = "text-[color:var(--fc-accent-cyan)]";
+          const activeColor = "text-[color:var(--fc-accent)]";
 
           return (
             <button

@@ -460,15 +460,15 @@ export function CoachDashboardWrapper() {
               </Link>
 
               {/* Analytics */}
-              <Link href="/coach/analytics">
+              <Link href="/coach/insights">
                 <div className="p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-cyan-100 rounded-lg flex items-center justify-center">
-                      <BarChart3 className="w-5 h-5 text-cyan-600" />
+                    <div className="w-10 h-10 bg-[color-mix(in_srgb,var(--fc-group-c)_14%,transparent)] rounded-lg flex items-center justify-center">
+                      <BarChart3 className="w-5 h-5 text-[color-mix(in_srgb,var(--fc-group-c)_75%,black)]" />
                     </div>
                     <div>
-                      <h3 className="font-medium text-slate-800">Analytics</h3>
-                      <p className="text-sm text-slate-500">Performance Analytics</p>
+                      <h3 className="font-medium text-slate-800">Insights</h3>
+                      <p className="text-sm text-slate-500">Roster analysis</p>
                     </div>
                   </div>
                 </div>
@@ -484,21 +484,6 @@ export function CoachDashboardWrapper() {
                     <div>
                       <h3 className="font-medium text-slate-800">Reports</h3>
                       <p className="text-sm text-slate-500">Generate Reports</p>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-
-              {/* Compliance */}
-              <Link href="/coach/compliance">
-                <div className="p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                      <Flag className="w-5 h-5 text-red-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-slate-800">Compliance</h3>
-                      <p className="text-sm text-slate-500">Compliance Tracking</p>
                     </div>
                   </div>
                 </div>

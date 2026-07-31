@@ -161,7 +161,7 @@ export function DynamicInsights({
       actionUrl: '/client/goals',
       icon: '🎯',
       color: 'text-blue-600',
-      gradient: 'from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20',
+      gradient: 'from-blue-50 to-[color-mix(in_srgb,var(--fc-group-c)_8%,transparent)] dark:from-blue-900/20 dark:to-[color-mix(in_srgb,var(--fc-group-c)_20%,transparent)]',
       animation: 'bounce',
       createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
     },

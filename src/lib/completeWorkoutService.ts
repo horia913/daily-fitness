@@ -11,10 +11,9 @@
  * 3. Compute totals from workout_set_logs
  * 4. Update workout_logs (completed_at, totals)
  * 5. Update workout_sessions status if session_id provided
- * 6. Program completion (if program_assignment_id + program_schedule_id on log):
+ * 6. Program completion (if program_assignment_id + program_day_assignment_id on log):
  *    a. INSERT INTO program_day_completions (ON CONFLICT DO NOTHING — idempotent)
  *    b. Find next uncompleted slot via programStateService
- *    c. Update program_progress cache
  * 7. Sync goals/achievements (non-blocking, unchanged)
  * 
  * Does NOT:
@@ -29,14 +28,9 @@ import {
   getProgramScheduleSlotsForAssignment,
   getCompletedSlots,
   getNextSlot,
-  updateProgressCache,
   assertWeekUnlocked,
 } from './programStateService'
-import {
-  clampedWallClockSessionMinutes,
-  durationMinutesFromSetCompletedAts,
-} from './workoutLogDuration'
-import { computeCurrentProgramWeekForAssignment } from '@/lib/programWeekCalendar'
+import { resolveInstanceWeekForAssignment } from './programInstanceResolver'
 
 // ============================================================================
 // INTERFACES
@@ -69,7 +63,7 @@ export interface CompleteWorkoutResult {
     currentDayNumber?: number
     isCompleted?: boolean
     programAssignmentId?: string
-    programScheduleId?: string
+    programDayAssignmentId?: string
     unlockedWeekMax?: number
   } | null
   /** Newly unlocked achievements (for UI modal) */
@@ -100,7 +94,7 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
   console.log('[completeWorkoutService] Fetching workout_log:', workoutLogId)
   const { data: workoutLog, error: logError } = await supabaseAdmin
     .from('workout_logs')
-    .select('id, started_at, completed_at, client_id, workout_assignment_id, program_assignment_id, program_schedule_id')
+    .select('id, started_at, completed_at, client_id, workout_assignment_id, program_assignment_id, program_day_assignment_id')
     .eq('id', workoutLogId)
     .eq('client_id', clientId)
     .single()
@@ -156,23 +150,18 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
   // STEP 4: Calculate duration and update workout_logs
   // ========================================================================
   const completedAt = new Date()
-  let totalDurationMinutes: number
-
-  if (durationMinutes !== undefined && durationMinutes !== null) {
-    totalDurationMinutes = Math.round(durationMinutes)
-  } else {
-    const fromSets = durationMinutesFromSetCompletedAts(
-      (setLogs ?? []).map((s) => s.completed_at)
-    )
-    if (fromSets != null) {
-      totalDurationMinutes = fromSets
-    } else {
-      totalDurationMinutes = clampedWallClockSessionMinutes(
-        workoutLog.started_at,
-        completedAt
-      )
-    }
-  }
+  const { resolveWorkoutPersistDurationMinutes } = await import(
+    '@/lib/workoutLogDuration'
+  )
+  const totalDurationMinutes = resolveWorkoutPersistDurationMinutes({
+    clientPassedMinutes:
+      durationMinutes !== undefined && durationMinutes !== null
+        ? durationMinutes
+        : null,
+    startedAt: workoutLog.started_at,
+    completedAt,
+    setCompletedAts: (setLogs ?? []).map((s) => s.completed_at),
+  })
 
   const { data: updatedLog, error: updateError } = await supabaseAdmin
     .from('workout_logs')
@@ -221,62 +210,46 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
   let programProgression: CompleteWorkoutResult['programProgression'] = null
 
   let programAssignmentId: string | null = workoutLog.program_assignment_id
-  let programScheduleId: string | null = workoutLog.program_schedule_id
+  let programDayAssignmentId: string | null = workoutLog.program_day_assignment_id ?? null
 
-  // Fix C: Fallback when workout_log lacks program context (e.g. created via /api/log-set)
-  // Trace: workout_assignments → program_day_assignments → program_assignments + program_schedule
-  // Use calendar-derived current week so we resolve the correct week's schedule slot.
-  if ((!programAssignmentId || !programScheduleId) && workoutLog.workout_assignment_id) {
-    const { data: pda } = await supabaseAdmin
-      .from('program_day_assignments')
-      .select('program_assignment_id, day_number')
-      .eq('workout_assignment_id', workoutLog.workout_assignment_id)
-      .maybeSingle()
-
-    if (pda?.program_assignment_id != null && pda?.day_number != null) {
-      const { data: pa } = await supabaseAdmin
-        .from('program_assignments')
-        .select('program_id, start_date, duration_weeks, pause_status, paused_at, pause_accumulated_days, timezone_snapshot')
-        .eq('id', pda.program_assignment_id)
-        .maybeSingle()
-
-      if (pa?.program_id) {
-        const currentWeek = computeCurrentProgramWeekForAssignment(
-          {
-            start_date: pa.start_date ?? null,
-            pause_accumulated_days: pa.pause_accumulated_days ?? 0,
-            pause_status: pa.pause_status ?? null,
-            paused_at: pa.paused_at ?? null,
-            timezone_snapshot: pa.timezone_snapshot ?? null,
-            duration_weeks: pa.duration_weeks ?? null,
-          },
-          pa.timezone_snapshot ?? 'UTC'
-        ).week
-
-        const { data: ps } = await supabaseAdmin
-          .from('program_schedule')
-          .select('id')
-          .eq('program_id', pa.program_id)
-          .eq('week_number', currentWeek)
-          .eq('day_number', pda.day_number)
-          .maybeSingle()
-
-        if (ps?.id) {
-          programAssignmentId = pda.program_assignment_id
-          programScheduleId = ps.id
-          console.log('[completeWorkoutService] Resolved program context via fallback:', { programAssignmentId, programScheduleId, currentWeek })
-        }
-      }
+  if (!programDayAssignmentId && workoutLog.workout_assignment_id) {
+    const { resolveProgramDayAssignmentIdByWorkoutAssignment } = await import('./resolveInstanceScheduleRow')
+    programDayAssignmentId = await resolveProgramDayAssignmentIdByWorkoutAssignment(
+      supabaseAdmin,
+      workoutLog.workout_assignment_id
+    )
+    if (programDayAssignmentId) {
+      await supabaseAdmin
+        .from('workout_logs')
+        .update({ program_day_assignment_id: programDayAssignmentId })
+        .eq('id', workoutLogId)
     }
   }
 
-  if (programAssignmentId && programScheduleId) {
+  if ((!programAssignmentId || !programDayAssignmentId) && workoutLog.workout_assignment_id) {
+    const { data: pda } = await supabaseAdmin
+      .from('program_day_assignments')
+      .select('id, program_assignment_id')
+      .eq('workout_assignment_id', workoutLog.workout_assignment_id)
+      .maybeSingle()
+
+    if (pda?.program_assignment_id && pda?.id) {
+      programAssignmentId = pda.program_assignment_id
+      programDayAssignmentId = pda.id
+      console.log('[completeWorkoutService] Resolved program context via bridge:', {
+        programAssignmentId,
+        programDayAssignmentId,
+      })
+    }
+  }
+
+  if (programAssignmentId && programDayAssignmentId) {
 
     // 6-pre. Get program_id, slots, and completions for week lock check + progression
     const { data: assignment } = await supabaseAdmin
       .from('program_assignments')
       .select(
-        'id, client_id, program_id, start_date, duration_weeks, status, progression_mode, pause_status, paused_at, pause_accumulated_days, timezone_snapshot'
+        'id, client_id, program_id, start_date, status, progression_mode, pause_status, paused_at, pause_accumulated_days, timezone_snapshot'
       )
       .eq('id', programAssignmentId)
       .single()
@@ -285,17 +258,19 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
       console.error('[completeWorkoutService] Program assignment not found:', programAssignmentId)
       programProgression = { status: 'no_program' }
     } else {
-      const [allSlots, completedSlots] = await Promise.all([
+      const [allSlots, completedSlots, weekRes] = await Promise.all([
         getProgramScheduleSlotsForAssignment(
           supabaseAdmin,
           assignment.program_id,
           programAssignmentId
         ),
         getCompletedSlots(supabaseAdmin, programAssignmentId),
+        resolveInstanceWeekForAssignment(supabaseAdmin, programAssignmentId),
       ])
+      const totalWeeksCap = weekRes?.totalWeeks ?? null
 
       // 6-lock. WEEK LOCK: find the target slot's week and enforce sequential week order
-      const targetSlot = allSlots.find(s => s.id === programScheduleId)
+      const targetSlot = allSlots.find(s => s.id === programDayAssignmentId)
       if (targetSlot) {
         try {
           assertWeekUnlocked(
@@ -306,7 +281,7 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
               progression_mode:
                 assignment.progression_mode === 'coach_managed' ? 'coach_managed' : 'auto',
               start_date: assignment.start_date,
-              duration_weeks: assignment.duration_weeks ?? null,
+              totalWeeksCap,
               pause_status: assignment.pause_status ?? 'active',
               paused_at: assignment.paused_at ?? null,
               pause_accumulated_days: assignment.pause_accumulated_days ?? 0,
@@ -324,7 +299,7 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
               programProgression: {
                 status: 'week_locked' as any,
                 programAssignmentId,
-                programScheduleId,
+                programDayAssignmentId,
                 unlockedWeekMax: lockErr.unlockedWeekMax,
               },
               newAchievements: [],
@@ -337,7 +312,7 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
 
       console.log('[completeWorkoutService] Recording program day completion:', {
         programAssignmentId,
-        programScheduleId,
+        programDayAssignmentId,
         completedBy,
       })
 
@@ -346,7 +321,7 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
         .from('program_day_completions')
         .insert({
           program_assignment_id: programAssignmentId,
-          program_schedule_id: programScheduleId,
+          program_day_assignment_id: programDayAssignmentId,
           completed_at: completedAt.toISOString(),
           completed_by: completedBy,
           notes: notes || null,
@@ -366,11 +341,6 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
       // Refetch so we have current ledger state (getNextSlot does this internally)
       const nextSlotResult = await getNextSlot(supabaseAdmin, programAssignmentId, assignment.program_id)
       const lastSlot = allSlots[allSlots.length - 1]
-
-      // 6c. Update progress cache
-      if (lastSlot) {
-        await updateProgressCache(supabaseAdmin, programAssignmentId, nextSlotResult, lastSlot)
-      }
 
       const isComplete = nextSlotResult === null && allSlots.length > 0
       const referenceSlot = nextSlotResult ?? lastSlot
@@ -403,7 +373,7 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
         currentDayNumber: referenceSlot?.day_number,
         isCompleted: isComplete,
         programAssignmentId,
-        programScheduleId,
+        programDayAssignmentId,
       }
     }
   } else {
@@ -457,6 +427,34 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
     leaderboardRankChanges = result.rankChanges
   } catch (leaderboardError) {
     console.error('[completeWorkoutService] Failed to update leaderboard (non-blocking):', leaderboardError)
+  }
+
+  try {
+    const { notifyCoachWorkoutCompleted } = await import('@/lib/inAppNotificationEvents')
+    const { data: rawClientProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('first_name')
+      .eq('id', clientId)
+      .maybeSingle()
+    const clientProfile = rawClientProfile as { first_name: string | null } | null
+    let workoutName: string | null = null
+    if (workoutLog.workout_assignment_id) {
+      const { data: wa } = await supabaseAdmin
+        .from('workout_assignments')
+        .select('name')
+        .eq('id', workoutLog.workout_assignment_id)
+        .maybeSingle()
+      workoutName = (wa?.name as string | undefined) ?? null
+    }
+    await notifyCoachWorkoutCompleted({
+      clientId,
+      workoutLogId,
+      workoutName,
+      clientName: clientProfile?.first_name ?? undefined,
+      admin: supabaseAdmin,
+    })
+  } catch (notifyErr) {
+    console.error('[completeWorkoutService] In-app notification failed (non-blocking):', notifyErr)
   }
 
   // ========================================================================

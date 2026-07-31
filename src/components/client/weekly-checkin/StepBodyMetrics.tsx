@@ -25,6 +25,7 @@ interface StepBodyMetricsProps {
   setBodyData: React.Dispatch<React.SetStateAction<WeeklyCheckInBodyData>>;
   config: CheckInConfig | null;
   lastMeasurement: BodyMeasurement | null;
+  stepLabel?: string;
   onNext: () => void;
 }
 
@@ -71,6 +72,7 @@ export function StepBodyMetrics({
   setBodyData,
   config,
   lastMeasurement,
+  stepLabel = "Step 1 of 3",
   onNext,
 }: StepBodyMetricsProps) {
   const [showMeasurements, setShowMeasurements] = useState(false);
@@ -139,8 +141,8 @@ export function StepBodyMetrics({
 
   return (
     <div className={cn(checkinSuiteStyles.wizardCard, checkinSuiteStyles.root)}>
-      <p className={cn(checkinSuiteStyles.fontMono, "text-[10px] font-semibold uppercase tracking-[0.16em]")} style={{ color: "var(--cs-cyan)" }}>
-        Step 1 of 3
+      <p className={cn(checkinSuiteStyles.fontMono, "text-[10px] font-semibold uppercase tracking-[0.16em]")} style={{ color: "var(--fc-accent)" }}>
+        {stepLabel}
       </p>
       <h2 className={cn(checkinSuiteStyles.fontHeadline, "text-xl font-bold")} style={{ color: "var(--cs-t1)" }}>
         Body metrics
@@ -168,7 +170,7 @@ export function StepBodyMetrics({
               setBodyData((prev) => ({ ...prev, weight_kg: v !== null && !isNaN(v) ? v : null }));
             }}
             placeholder="e.g. 78.5"
-            className="w-full px-4 py-3 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] fc-text-primary focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]"
+            className="w-full px-4 py-3 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] fc-text-primary focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent)]"
           />
         </div>
 
@@ -186,7 +188,7 @@ export function StepBodyMetrics({
                 setBodyData((prev) => ({ ...prev, body_fat_percentage: v !== null && !isNaN(v) ? v : null }));
               }}
               placeholder="e.g. 17.8"
-              className="w-full px-4 py-3 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] fc-text-primary focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]"
+              className="w-full px-4 py-3 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] fc-text-primary focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent)]"
             />
           </div>
         )}
@@ -229,8 +231,8 @@ export function StepBodyMetrics({
           onClick={handleNext}
           className={cn(checkinSuiteStyles.fontBody, "inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold")}
           style={{
-            color: "var(--cs-cyan-text)",
-            background: "linear-gradient(135deg, var(--cs-cyan), #34a8ad)",
+            color: "var(--fc-ink)",
+            background: "var(--fc-accent)",
           }}
         >
           Next

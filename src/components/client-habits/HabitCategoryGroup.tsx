@@ -16,9 +16,9 @@ const CAT_ICONS: Record<string, LucideIcon> = {
 }
 
 const CAT_NAME_COLOR: Record<string, string> = {
-  hydration: 'var(--cyan)',
+  hydration: 'var(--fc-accent)',
   nutrition: 'var(--good)',
-  movement: 'var(--lime)',
+  movement: 'var(--fc-accent)',
   sleep_recovery: 'var(--purple)',
   mindfulness: 'var(--rose)',
 }

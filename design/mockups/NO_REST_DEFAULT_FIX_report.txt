@@ -1,0 +1,21 @@
+FIX — no prescribed rest means no rest
+Date: 2026-07-20
+No git.
+
+1. Files modified
+- src/components/client/workout-execution/live-card/formatLiveCard.ts (resolver)
+- src/components/client/workout-execution/live-card/index.ts
+- src/components/client/LiveWorkoutSetEntryExecutor.tsx
+- blocks: Straight, Drop, Superset, Giant, RestPause, Cluster, Speed, Timed, Endurance, PreExhaustion
+- src/app/client/workouts/[id]/start/page.tsx (TemplateExercise map + legacy setRestTime)
+
+2. Resolver
+- Lives at: live-card/formatLiveCard.ts → resolveRestSeconds(...candidates)
+- First positive prescribed value wins; null/0/missing → 0. No defaults.
+- Removed fallbacks: ?? 60 / || 60 (straight, drop, rest-pause, superset, executor seed, start map/setRestTime); || 90 (giant); ?? 90 (cluster); ?? 120 (speed); ?? 30 (timed); || 15 (pre-exhaust).
+
+3. Bridge retry
+- Removed. Seed before logSet; ack always; startRest only if sec > 0.
+
+4. tsc
+- npx tsc -p tsconfig.json --noEmit → 0

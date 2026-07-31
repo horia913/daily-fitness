@@ -13,38 +13,39 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { X, Trash2 } from "lucide-react";
-import {
-  TrainingBlock,
-  TrainingBlockGoal,
-  ProgressionProfile,
-  TRAINING_BLOCK_GOALS,
-  PROGRESSION_PROFILES,
-} from "@/types/trainingBlock";
-
-/** Suggested progression profile when coach changes block goal (coach can accept or pick another). */
-const GOAL_SUGGESTED_PROFILE: Record<TrainingBlockGoal, ProgressionProfile> = {
-  hypertrophy: "volume_ramp",
-  strength: "intensity_ramp",
-  power: "intensity_ramp",
-  peaking: "taper",
-  accumulation: "volume_ramp",
-  conditioning: "density_increase",
-  deload: "reduction",
-  general_fitness: "linear",
-  sport_specific: "linear",
-  custom: "none",
-};
+import { TrainingBlock } from "@/types/trainingBlock";
 import { TrainingBlockService } from "@/lib/trainingBlockService";
 import { useToast } from "@/components/ui/toast-provider";
+import {
+  blockSequentialLabel,
+  blockSequentialOptions,
+  getPresetPhaseTypeOptions,
+  resolveBlockPhaseLabel,
+  usesBlockSequentialPhaseType,
+  usesFreeTextPhaseType,
+  usesPresetPhaseTypeDropdown,
+} from "@/lib/programs/periodizationStyles";
+
+export interface TrainingBlockDraftPayload {
+  name: string;
+  duration_weeks: number;
+  phase_label?: string | null;
+  notes?: string | null;
+}
 
 interface TrainingBlockModalProps {
   isOpen: boolean;
   block: TrainingBlock | null;
   programId: string;
   nextBlockOrder: number;
+  periodizationStyle?: string | null;
+  totalBlockCount?: number;
   onSave: (block: TrainingBlock) => void;
   onDelete?: (blockId: string) => void;
   onClose: () => void;
+  /** When true, mutations stay in working copy — no DB writes from this modal. */
+  draftMode?: boolean;
+  onDraftSave?: (payload: TrainingBlockDraftPayload) => void;
 }
 
 export function TrainingBlockModal({
@@ -52,9 +53,13 @@ export function TrainingBlockModal({
   block,
   programId,
   nextBlockOrder,
+  periodizationStyle,
+  totalBlockCount,
   onSave,
   onDelete,
   onClose,
+  draftMode = false,
+  onDraftSave,
 }: TrainingBlockModalProps) {
   const { addToast } = useToast();
   const { isDark, getSemanticColor } = useTheme();
@@ -63,31 +68,45 @@ export function TrainingBlockModal({
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const [name, setName] = useState("");
-  const [goal, setGoal] = useState<TrainingBlockGoal>("custom");
-  const [customGoalLabel, setCustomGoalLabel] = useState("");
   const [durationWeeks, setDurationWeeks] = useState(4);
-  const [progressionProfile, setProgressionProfile] = useState<ProgressionProfile>("none");
+  const [phaseLabel, setPhaseLabel] = useState("");
   const [notes, setNotes] = useState("");
+
+  const blockOrder = block?.block_order ?? nextBlockOrder;
+  const blockCount = Math.max(totalBlockCount ?? nextBlockOrder, blockOrder);
+  const presetOptions = getPresetPhaseTypeOptions(periodizationStyle);
+  const blockOptions = blockSequentialOptions(blockCount);
+  const showPresetDropdown = usesPresetPhaseTypeDropdown(periodizationStyle);
+  const showBlockDropdown = usesBlockSequentialPhaseType(periodizationStyle);
+  const showFreeTextPhaseType = usesFreeTextPhaseType(periodizationStyle);
+  const presetDropdownOptions =
+    presetOptions && phaseLabel && !presetOptions.includes(phaseLabel)
+      ? [phaseLabel, ...presetOptions]
+      : presetOptions ?? [];
+  const blockDropdownOptions =
+    phaseLabel && !blockOptions.includes(phaseLabel)
+      ? [phaseLabel, ...blockOptions]
+      : blockOptions;
 
   // Sync fields from the block being edited (or reset for new)
   useEffect(() => {
     if (block) {
       setName(block.name);
-      setGoal(block.goal);
-      setCustomGoalLabel(block.custom_goal_label || "");
       setDurationWeeks(block.duration_weeks);
-      setProgressionProfile(block.progression_profile ?? "none");
+      setPhaseLabel(
+        resolveBlockPhaseLabel(block.block_order, block.phase_label, periodizationStyle) ?? "",
+      );
       setNotes(block.notes || "");
     } else {
-      setName("");
-      setGoal("custom");
-      setCustomGoalLabel("");
+      setName(`Phase ${nextBlockOrder}`);
       setDurationWeeks(4);
-      setProgressionProfile("none");
+      setPhaseLabel(
+        resolveBlockPhaseLabel(nextBlockOrder, null, periodizationStyle) ?? "",
+      );
       setNotes("");
     }
     setConfirmDelete(false);
-  }, [block, isOpen]);
+  }, [block, isOpen, nextBlockOrder, periodizationStyle]);
 
   if (!isOpen) return null;
 
@@ -105,27 +124,41 @@ export function TrainingBlockModal({
 
   const handleSave = async () => {
     if (!name.trim()) return;
+    const resolvedPhaseLabel = showFreeTextPhaseType
+      ? phaseLabel.trim() || null
+      : showBlockDropdown
+        ? phaseLabel.trim() || blockSequentialLabel(blockOrder)
+        : phaseLabel.trim() || presetDropdownOptions[0] || null;
+    const payload: TrainingBlockDraftPayload = {
+      name: name.trim(),
+      duration_weeks: durationWeeks,
+      phase_label: resolvedPhaseLabel,
+      notes: notes.trim() || null,
+    };
+
+    if (draftMode && onDraftSave) {
+      onDraftSave(payload);
+      onClose();
+      return;
+    }
+
     setSaving(true);
     try {
       let saved: TrainingBlock | null = null;
       if (isEditing && block) {
         saved = await TrainingBlockService.updateTrainingBlock(block.id, {
-          name: name.trim(),
-          goal,
-          custom_goal_label: goal === "custom" ? customGoalLabel.trim() || null : null,
-          duration_weeks: durationWeeks,
-          progression_profile: progressionProfile,
-          notes: notes.trim() || null,
+          name: payload.name,
+          duration_weeks: payload.duration_weeks,
+          phase_label: payload.phase_label,
+          notes: payload.notes,
         });
       } else {
         saved = await TrainingBlockService.createTrainingBlock({
           program_id: programId,
-          name: name.trim(),
-          goal,
-          custom_goal_label: goal === "custom" ? customGoalLabel.trim() || undefined : undefined,
-          duration_weeks: durationWeeks,
-          progression_profile: progressionProfile,
-          notes: notes.trim() || undefined,
+          name: payload.name,
+          duration_weeks: payload.duration_weeks,
+          phase_label: payload.phase_label ?? undefined,
+          notes: payload.notes ?? undefined,
         });
       }
       if (saved) {
@@ -145,6 +178,11 @@ export function TrainingBlockModal({
       setConfirmDelete(true);
       return;
     }
+    if (draftMode) {
+      onDelete?.(block.id);
+      onClose();
+      return;
+    }
     setDeleting(true);
     try {
       await TrainingBlockService.deleteTrainingBlock(block.id);
@@ -156,8 +194,8 @@ export function TrainingBlockModal({
       const title =
         raw.includes("Cannot delete the last block") ||
         raw.includes("last block of a program")
-          ? raw
-          : raw || "Could not delete training block.";
+          ? "Cannot delete the last phase of a program. Delete the program instead, or add another phase first."
+          : raw || "Could not delete training phase.";
       addToast({ title, variant: "destructive" });
     } finally {
       setDeleting(false);
@@ -189,7 +227,7 @@ export function TrainingBlockModal({
           }}
         >
           <h2 className="text-base font-bold" style={labelStyle}>
-            {isEditing ? "Edit Training Block" : "New Training Block"}
+            {isEditing ? "Edit Training Phase" : "New Training Phase"}
           </h2>
           <button
             onClick={onClose}
@@ -205,52 +243,78 @@ export function TrainingBlockModal({
           {/* Phase Name */}
           <div>
             <label className="text-sm font-semibold block mb-1.5" style={labelStyle}>
-              Block Name *
+              Phase Name *
             </label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder='e.g. "Hypertrophy Block"'
+              placeholder='e.g. "Hypertrophy Phase"'
               style={inputStyle}
             />
           </div>
 
-          {/* Goal */}
-          <div>
-            <label className="text-sm font-semibold block mb-1.5" style={labelStyle}>
-              Goal
-            </label>
-            <Select value={goal} onValueChange={(v) => setGoal(v as TrainingBlockGoal)}>
-              <SelectTrigger style={inputStyle}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(TRAINING_BLOCK_GOALS).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Custom Goal Label */}
-          {goal === "custom" && (
+          {showPresetDropdown && presetOptions ? (
             <div>
               <label className="text-sm font-semibold block mb-1.5" style={labelStyle}>
-                Custom Goal Name
+                Phase type
+              </label>
+              <Select
+                value={phaseLabel || presetDropdownOptions[0] || ''}
+                onValueChange={setPhaseLabel}
+              >
+                <SelectTrigger style={inputStyle}>
+                  <SelectValue placeholder="Select phase type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {presetDropdownOptions.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+
+          {showBlockDropdown ? (
+            <div>
+              <label className="text-sm font-semibold block mb-1.5" style={labelStyle}>
+                Phase type
+              </label>
+              <Select
+                value={phaseLabel || blockSequentialLabel(blockOrder)}
+                onValueChange={setPhaseLabel}
+              >
+                <SelectTrigger style={inputStyle}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {blockDropdownOptions.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+
+          {showFreeTextPhaseType ? (
+            <div>
+              <label className="text-sm font-semibold block mb-1.5" style={labelStyle}>
+                Phase type
                 <span className="text-xs font-normal ml-2" style={{ color: isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.4)" }}>
                   (optional)
                 </span>
               </label>
               <Input
-                value={customGoalLabel}
-                onChange={(e) => setCustomGoalLabel(e.target.value)}
-                placeholder='e.g. "Off-season conditioning"'
+                value={phaseLabel}
+                onChange={(e) => setPhaseLabel(e.target.value)}
+                placeholder='e.g. "Accumulation"'
                 style={inputStyle}
               />
             </div>
-          )}
+          ) : null}
 
           {/* Duration */}
           <div>
@@ -276,38 +340,6 @@ export function TrainingBlockModal({
             </div>
           </div>
 
-          {/* Progression Profile */}
-          <div>
-            <label className="text-sm font-semibold block mb-1.5" style={labelStyle}>
-              Progression Profile
-            </label>
-            <Select
-              value={progressionProfile}
-              onValueChange={(v) => setProgressionProfile(v as ProgressionProfile)}
-            >
-              <SelectTrigger style={inputStyle}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(PROGRESSION_PROFILES).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {progressionProfile !== GOAL_SUGGESTED_PROFILE[goal] && (
-              <button
-                type="button"
-                onClick={() => setProgressionProfile(GOAL_SUGGESTED_PROFILE[goal])}
-                className="mt-1.5 text-xs underline"
-                style={{ color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.5)" }}
-              >
-                Suggested: {PROGRESSION_PROFILES[GOAL_SUGGESTED_PROFILE[goal]]}
-              </button>
-            )}
-          </div>
-
           {/* Notes */}
           <div>
             <label className="text-sm font-semibold block mb-1.5" style={labelStyle}>
@@ -320,7 +352,7 @@ export function TrainingBlockModal({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              placeholder="Any notes about this training block..."
+              placeholder="Any notes about this training phase..."
               className="resize-none text-sm"
               style={inputStyle}
             />
@@ -336,7 +368,7 @@ export function TrainingBlockModal({
                 color: "#ef4444",
               }}
             >
-              This will permanently delete this block and all its scheduled workouts and progression rules. This cannot be undone.
+              This will permanently delete this phase and all its scheduled workouts and progression rules. This cannot be undone.
             </div>
           )}
         </div>
@@ -392,7 +424,7 @@ export function TrainingBlockModal({
                   opacity: saving || !name.trim() ? 0.5 : 1,
                 }}
               >
-                {saving ? "Saving..." : isEditing ? "Save Changes" : "Add Block"}
+                {saving ? "Saving..." : isEditing ? "Save Changes" : "Add Phase"}
               </Button>
             </>
           )}

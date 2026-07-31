@@ -296,7 +296,7 @@ export function LifestyleAnalytics({ loading = false }: LifestyleAnalyticsProps)
               </h3>
               
               {/* Water Bottle Visual */}
-              <div className="rounded-2xl p-5 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border-2 border-blue-200 dark:border-blue-700 mb-4">
+              <div className="rounded-2xl p-5 bg-gradient-to-r from-blue-50 to-[color-mix(in_srgb,var(--fc-group-c)_8%,transparent)] dark:from-blue-900/20 dark:to-[color-mix(in_srgb,var(--fc-group-c)_20%,transparent)] border-2 border-blue-200 dark:border-blue-700 mb-4">
                 <div className="flex items-center gap-4">
                   <div className="flex-1">
                     <p className={`text-sm ${theme.textSecondary} mb-2`}>Today's Water Intake</p>
@@ -307,7 +307,7 @@ export function LifestyleAnalytics({ loading = false }: LifestyleAnalyticsProps)
                           className={cn(
                             "flex-1 h-16 rounded-t-lg transition-all",
                             index < waterIntakeToday
-                              ? "bg-gradient-to-t from-blue-500 to-cyan-400"
+                              ? "bg-gradient-to-t from-blue-500 to-[color:var(--fc-group-c)]"
                               : "bg-slate-200 dark:bg-slate-700"
                           )}
                         ></div>
@@ -439,7 +439,7 @@ export function LifestyleAnalytics({ loading = false }: LifestyleAnalyticsProps)
                     }}
                     className={cn(
                       "rounded-xl p-4 border-2 text-center relative overflow-hidden cursor-pointer transition-all hover:scale-105 hover:shadow-lg",
-                      isUnlocked && displayTier === 'platinum' && "bg-gradient-to-br from-cyan-100 to-blue-100 dark:from-cyan-900/30 dark:to-blue-900/30 border-cyan-300 dark:border-cyan-700",
+                      isUnlocked && displayTier === 'platinum' && "bg-gradient-to-br from-[color-mix(in_srgb,var(--fc-group-c)_14%,transparent)] to-blue-100 dark:from-[color-mix(in_srgb,var(--fc-group-c)_30%,transparent)] dark:to-blue-900/30 border-[color-mix(in_srgb,var(--fc-group-c)_70%,white)] dark:border-[color-mix(in_srgb,var(--fc-group-c)_55%,black)]",
                       isUnlocked && displayTier === 'gold' && "bg-gradient-to-br from-yellow-100 to-orange-100 dark:from-yellow-900/30 dark:to-orange-900/30 border-yellow-300 dark:border-yellow-700",
                       isUnlocked && displayTier === 'silver' && "bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 border-slate-300 dark:border-slate-600",
                       isUnlocked && displayTier === 'bronze' && "bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 border-amber-300 dark:border-amber-700",
@@ -495,7 +495,7 @@ export function LifestyleAnalytics({ loading = false }: LifestyleAnalyticsProps)
             {/* Modal Header */}
             <div className={cn(
               "p-6 bg-gradient-to-r",
-              selectedAchievement.tier === 'platinum' && "from-cyan-500 to-blue-600",
+              selectedAchievement.tier === 'platinum' && "from-[color:var(--fc-group-c)] to-blue-600",
               selectedAchievement.tier === 'gold' && "from-yellow-400 to-orange-500",
               selectedAchievement.tier === 'silver' && "from-slate-300 to-slate-400",
               selectedAchievement.tier === 'bronze' && "from-amber-500 to-orange-600"
@@ -530,7 +530,7 @@ export function LifestyleAnalytics({ loading = false }: LifestyleAnalyticsProps)
                 </h3>
                 <div className={cn(
                   "rounded-xl p-4 border-2",
-                  selectedAchievement.tier === 'platinum' && "bg-gradient-to-br from-cyan-50 to-blue-50 dark:from-cyan-900/20 dark:to-blue-900/20 border-cyan-300 dark:border-cyan-700",
+                  selectedAchievement.tier === 'platinum' && "bg-gradient-to-br from-[color-mix(in_srgb,var(--fc-group-c)_8%,transparent)] to-blue-50 dark:from-[color-mix(in_srgb,var(--fc-group-c)_20%,transparent)] dark:to-blue-900/20 border-[color-mix(in_srgb,var(--fc-group-c)_70%,white)] dark:border-[color-mix(in_srgb,var(--fc-group-c)_55%,black)]",
                   selectedAchievement.tier === 'gold' && "bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-yellow-300 dark:border-yellow-700",
                   selectedAchievement.tier === 'silver' && "bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 border-slate-300 dark:border-slate-600",
                   selectedAchievement.tier === 'bronze' && "bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-amber-300 dark:border-amber-700"
@@ -541,7 +541,7 @@ export function LifestyleAnalytics({ loading = false }: LifestyleAnalyticsProps)
                     </span>
                     <Badge className={cn(
                       "text-white",
-                      selectedAchievement.tier === 'platinum' && "bg-cyan-600",
+                      selectedAchievement.tier === 'platinum' && "bg-[color-mix(in_srgb,var(--fc-group-c)_75%,black)]",
                       selectedAchievement.tier === 'gold' && "bg-yellow-600",
                       selectedAchievement.tier === 'silver' && "bg-slate-600",
                       selectedAchievement.tier === 'bronze' && "bg-amber-600",
@@ -569,7 +569,7 @@ export function LifestyleAnalytics({ loading = false }: LifestyleAnalyticsProps)
                         key={tier}
                         className={cn(
                           "rounded-xl p-4 border-2 transition-all",
-                          isUnlocked && tier === 'platinum' && "bg-gradient-to-r from-cyan-50 to-blue-50 dark:from-cyan-900/20 dark:to-blue-900/20 border-cyan-300 dark:border-cyan-700",
+                          isUnlocked && tier === 'platinum' && "bg-gradient-to-r from-[color-mix(in_srgb,var(--fc-group-c)_8%,transparent)] to-blue-50 dark:from-[color-mix(in_srgb,var(--fc-group-c)_20%,transparent)] dark:to-blue-900/20 border-[color-mix(in_srgb,var(--fc-group-c)_70%,white)] dark:border-[color-mix(in_srgb,var(--fc-group-c)_55%,black)]",
                           isUnlocked && tier === 'gold' && "bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-yellow-300 dark:border-yellow-700",
                           isUnlocked && tier === 'silver' && "bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 border-slate-300 dark:border-slate-600",
                           isUnlocked && tier === 'bronze' && "bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-amber-300 dark:border-amber-700",
@@ -594,7 +594,7 @@ export function LifestyleAnalytics({ loading = false }: LifestyleAnalyticsProps)
                           {isUnlocked && (
                             <CheckCircle className={cn(
                               "w-6 h-6",
-                              tier === 'platinum' && "text-cyan-600",
+                              tier === 'platinum' && "text-[color-mix(in_srgb,var(--fc-group-c)_75%,black)]",
                               tier === 'gold' && "text-yellow-600",
                               tier === 'silver' && "text-slate-600",
                               tier === 'bronze' && "text-amber-600"

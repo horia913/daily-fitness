@@ -1,0 +1,164 @@
+.attentionBlock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 8px;
+  min-width: 0;
+}
+
+.levelPill {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-family: var(--f-mono);
+}
+
+.levelNeeds {
+  color: var(--fc-status-error);
+}
+
+.levelMonitor {
+  color: var(--fc-status-warning);
+}
+
+.levelOnTrack {
+  color: var(--fc-status-success);
+}
+
+.reasons {
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--fc-text-dim);
+}
+
+.rowCard {
+  /* inherits queue row styles; denser on wide 2-col queues via media below */
+}
+
+.rowCardCompact {
+  padding-top: 9px;
+  padding-bottom: 9px;
+  gap: 8px;
+}
+
+@media (min-width: 1280px) {
+  .rowCard {
+    padding-top: 9px;
+    padding-bottom: 9px;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .rowReasons {
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+
+  .rowReasons .reasons {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.rowAvatarImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.rowReasons {
+  margin-top: 2px;
+}
+
+.rowReasons .levelPill {
+  font-size: 10px;
+}
+
+.rowReasons .reasons {
+  font-size: 11px;
+}
+
+.gridAttention {
+  padding: 0 14px 8px;
+  min-width: 0;
+}
+
+.standingNote {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--fc-text-subtle);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.listStandingNote {
+  display: block;
+  margin-top: 2px;
+}
+
+.listReasons {
+  min-width: 0;
+}
+
+.listMetaRow {
+  display: contents;
+}
+
+.listMetaSecondary {
+  display: contents;
+}
+
+/**
+ * Wide list row: reasons claim the middle; secondary meta stays compact;
+ * standing note drops so score/chevron stay on one line.
+ */
+@media (min-width: 1280px) {
+  .listMetaRow {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .listStandingNote {
+    display: none;
+  }
+
+  .listReasons {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .listReasons .reasons {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .listMetaSecondary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}
+
+.gridStandingNote {
+  padding: 0 14px 6px;
+}

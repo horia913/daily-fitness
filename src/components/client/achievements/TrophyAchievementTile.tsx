@@ -123,7 +123,7 @@ function TierLadder({ row }: { row: TrophyRow }) {
               highestUnlockedTierName(p)
             )}
           </span>
-          <span style={{ color: "var(--ps-cyan)", fontWeight: 600 }}>
+          <span style={{ color: "var(--fc-accent)", fontWeight: 600 }}>
             {p.nextTier ? `Next: ${p.nextTier.label}` : ""}
           </span>
         </>
@@ -198,7 +198,7 @@ export function TrophyAchievementTile({ row }: { row: TrophyRow }) {
 
   let stripeColor: string | null = null;
   if (!locked) {
-    stripeColor = full ? "var(--mastered)" : "var(--ps-cyan)";
+    stripeColor = full ? "var(--gold)" : "var(--fc-group-c)";
   }
 
   return (
@@ -213,7 +213,7 @@ export function TrophyAchievementTile({ row }: { row: TrophyRow }) {
       {stripeColor ? (
         <span
           className={tr.trophyStripe}
-          style={{ background: stripeColor }}
+          style={{ background: stripeColor, color: stripeColor }}
           aria-hidden
         />
       ) : null}
@@ -252,7 +252,7 @@ export function TrophyAchievementTile({ row }: { row: TrophyRow }) {
             </div>
             <div className={tr.trophyProgFoot}>
               <span>
-                <span style={{ color: "var(--ps-cyan)", fontWeight: 600 }}>{pct}%</span> · {p.currentValue}{" "}
+                <span style={{ color: "var(--fc-accent)", fontWeight: 600 }}>{pct}%</span> · {p.currentValue}{" "}
                 of {goal} {unit}
               </span>
               <span style={{ color: "var(--ps-t3)" }}>

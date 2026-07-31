@@ -54,13 +54,13 @@ export function getCategoryAccent(category: string): {
     cat.includes("acceleration")
   )
     return {
-      border: "border-l-cyan-500",
-      iconBg: "bg-cyan-500/20",
-      text: "text-cyan-400",
+      border: "border-l-[color:var(--fc-group-c)]",
+      iconBg: "bg-[color-mix(in_srgb,var(--fc-group-c)_20%,transparent)]",
+      text: "text-[color:var(--fc-group-c)]",
     };
   return {
-    border: "border-l-cyan-500/50",
-    iconBg: "bg-cyan-500/10",
-    text: "text-cyan-400",
+    border: "border-l-[color:var(--fc-group-c)]/50",
+    iconBg: "bg-[color-mix(in_srgb,var(--fc-group-c)_10%,transparent)]",
+    text: "text-[color:var(--fc-group-c)]",
   };
 }

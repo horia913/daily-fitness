@@ -30,6 +30,7 @@ import {
   SelectTrigger,
 } from '@/components/ui/select'
 import hub from '@/components/coach-analytics/coachAnalyticsHub.module.css'
+import reports from '@/components/coach-analytics/coachReports.module.css'
 import { AnalyticsHero } from '@/components/coach-analytics/AnalyticsHero'
 import { ReportTemplateCard } from '@/components/coach-analytics/ReportTemplateCard'
 import { DateRangeSeg } from '@/components/coach-analytics/DateRangeSeg'
@@ -42,7 +43,7 @@ interface ReportTemplate {
   name: string
   description: string
   icon: LucideIcon
-  accent: 'cyan' | 'purple' | 'lime' | 'good'
+  accent: 'cyan' | 'purple' | 'action' | 'good' | 'gold'
   sections: string[]
   isPopular?: boolean
 }
@@ -76,7 +77,7 @@ const REPORT_TEMPLATES: ReportTemplate[] = [
   {
     id: 'progress',
     name: 'Progress Report',
-    description: 'Comprehensive overview of client achievements and goals',
+    description: 'Client achievements and goals',
     icon: TrendingUp,
     accent: 'cyan',
     sections: ['executive-summary', 'metrics-overview', 'goal-progress', 'achievements', 'recommendations'],
@@ -85,7 +86,7 @@ const REPORT_TEMPLATES: ReportTemplate[] = [
   {
     id: 'analytics',
     name: 'Analytics Report',
-    description: 'Data-driven insights with charts and KPIs',
+    description: 'Charts and KPIs',
     icon: BarChart3,
     accent: 'purple',
     sections: ['metrics-overview', 'workout-analytics', 'nutrition-tracking', 'engagement-metrics', 'trend-analysis'],
@@ -93,17 +94,17 @@ const REPORT_TEMPLATES: ReportTemplate[] = [
   {
     id: 'summary',
     name: 'Client Summary',
-    description: 'Personal summary including goals, progress, recommendations',
+    description: 'Goals, progress, next steps',
     icon: User,
-    accent: 'lime',
+    accent: 'action',
     sections: ['executive-summary', 'goal-progress', 'achievements', 'coach-notes'],
   },
   {
     id: 'comprehensive',
     name: 'Comprehensive',
-    description: 'Complete analysis with all available metrics and insights',
+    description: 'Everything available',
     icon: FileText,
-    accent: 'good',
+    accent: 'gold',
     sections: [
       'executive-summary',
       'metrics-overview',
@@ -123,7 +124,7 @@ const REPORT_SECTIONS: ReportSection[] = [
   {
     id: 'executive-summary',
     name: 'Executive summary',
-    description: 'High-level overview of key metrics and performance',
+    description: 'Key metrics overview',
     icon: List,
     required: true,
     category: 'insights',
@@ -131,7 +132,7 @@ const REPORT_SECTIONS: ReportSection[] = [
   {
     id: 'metrics-overview',
     name: 'Metrics overview',
-    description: 'Comprehensive breakdown of all key performance indicators',
+    description: 'All key performance indicators',
     icon: Activity,
     required: false,
     category: 'metrics',
@@ -139,7 +140,7 @@ const REPORT_SECTIONS: ReportSection[] = [
   {
     id: 'workout-analytics',
     name: 'Workout analytics',
-    description: 'Detailed analysis of workout completion and performance',
+    description: 'Completion and performance',
     icon: Dumbbell,
     required: false,
     category: 'charts',
@@ -147,7 +148,7 @@ const REPORT_SECTIONS: ReportSection[] = [
   {
     id: 'nutrition-tracking',
     name: 'Nutrition tracking',
-    description: 'Meal logging statistics and dietary adherence',
+    description: 'Meal logging and adherence',
     icon: Utensils,
     required: false,
     category: 'charts',
@@ -155,7 +156,7 @@ const REPORT_SECTIONS: ReportSection[] = [
   {
     id: 'engagement-metrics',
     name: 'Engagement',
-    description: 'Session attendance, app usage, and interaction data',
+    description: 'Attendance and app usage',
     icon: Activity,
     required: false,
     category: 'metrics',
@@ -163,7 +164,7 @@ const REPORT_SECTIONS: ReportSection[] = [
   {
     id: 'goal-progress',
     name: 'Goal progress',
-    description: 'Current progress towards established goals',
+    description: 'Progress toward goals',
     icon: Target,
     required: false,
     category: 'goals',
@@ -171,7 +172,7 @@ const REPORT_SECTIONS: ReportSection[] = [
   {
     id: 'achievements',
     name: 'Achievements',
-    description: 'Milestones reached and personal bests achieved',
+    description: 'Milestones and PBs',
     icon: Award,
     required: false,
     category: 'insights',
@@ -179,7 +180,7 @@ const REPORT_SECTIONS: ReportSection[] = [
   {
     id: 'trend-analysis',
     name: 'Trend analysis',
-    description: 'Historical trends and performance patterns',
+    description: 'Historical patterns',
     icon: TrendingUp,
     required: false,
     category: 'charts',
@@ -187,7 +188,7 @@ const REPORT_SECTIONS: ReportSection[] = [
   {
     id: 'recommendations',
     name: 'Recommendations',
-    description: 'Actionable insights and suggestions for improvement',
+    description: 'Actionable suggestions',
     icon: MessageSquare,
     required: false,
     category: 'insights',
@@ -195,7 +196,7 @@ const REPORT_SECTIONS: ReportSection[] = [
   {
     id: 'coach-notes',
     name: 'Coach notes',
-    description: 'Personalized comments and insights from the coach',
+    description: 'Your comments',
     icon: Edit,
     required: false,
     category: 'insights',
@@ -487,27 +488,57 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
     return dateRange.charAt(0).toUpperCase() + dateRange.slice(1)
   }, [dateRange, customStartDate, customEndDate])
 
-  const sectionsSummary = `${selectedSections.length} / ${REPORT_SECTIONS.length} selected`
+  const sectionsSummary = `${selectedSections.length} / ${REPORT_SECTIONS.length}`
+  const sectionsSummaryFull = `${sectionsSummary} selected`
 
   const canGenerate = Boolean(selectedClient && selectedTemplate && selectedSections.length > 0)
 
   const exportReady =
     showPreview || (Boolean(selectedClient) && Boolean(selectedTemplate) && selectedSections.length > 0)
 
-  const sectionIconBtn = (variant: 'cyan' | 'good' | 'warn' | 'purple' | 'lime', Icon: LucideIcon) => {
+  const sectionIconBtn = (variant: 'cyan' | 'good' | 'warn' | 'purple' | 'action', Icon: LucideIcon) => {
     const map = {
-      cyan: { bg: 'var(--cyan-soft)', fg: 'var(--cyan)' },
+      cyan: { bg: 'var(--fc-accent-dim)', fg: 'var(--fc-accent)' },
       good: { bg: 'var(--good-soft)', fg: 'var(--good)' },
       warn: { bg: 'var(--warning-soft)', fg: 'var(--warning)' },
       purple: { bg: 'var(--purple-soft)', fg: 'var(--purple)' },
-      lime: { bg: 'var(--lime-soft)', fg: 'var(--lime)' },
+      action: { bg: 'var(--fc-accent-dim)', fg: 'var(--fc-accent)' },
     }[variant]
     return (
-      <div className="flex size-6 shrink-0 items-center justify-center rounded-lg" style={{ background: map.bg }}>
+      <div className="flex size-[26px] shrink-0 items-center justify-center rounded-lg" style={{ background: map.bg }}>
         <Icon className="size-3.5" style={{ color: map.fg }} aria-hidden />
       </div>
     )
   }
+
+  const summaryRail = (
+    <>
+      <StickyGenBar
+        className={reports.railGen}
+        clientLabel={selectedClientData?.name ?? ''}
+        templateLabel={selectedTemplateData?.name ?? ''}
+        sectionsLabel={sectionsSummary}
+        rangeLabel={rangeLabel}
+        canGenerate={canGenerate}
+        isGenerating={isGenerating}
+        onGenerate={generateReport}
+        onExportPdf={() => exportReport('pdf')}
+        onExportExcel={() => exportReport('excel')}
+        onExportCsv={() => exportReport('csv')}
+        exportDisabled={!exportReady}
+      />
+      <div className={reports.previewBox}>
+        <div className={reports.previewEyebrow}>Preview</div>
+        <p className={reports.previewBody}>
+          {selectedClientData
+            ? showPreview
+              ? 'Preview is on — generate to refresh the narrative view.'
+              : 'Use Show preview in the header, then generate to see the report.'
+            : 'Select a client to see how the report will look before generating.'}
+        </p>
+      </div>
+    </>
+  )
 
   if (loading) {
     return <PageSkeleton variant="dashboard" />
@@ -516,8 +547,7 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
   return (
     <div className="space-y-4 pb-[var(--fc-bottom-safe-area)] sm:space-y-5">
       <AnalyticsHero
-        accent="good"
-        heroBackground="goodTint"
+        accent="cyan"
         eyebrow="Coaching reports"
         title="Build a report"
         subtitle="Client-ready summaries and performance narratives"
@@ -526,9 +556,9 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
             <button
               type="button"
               onClick={() => setShowPreview((v) => !v)}
-              className="inline-flex items-center gap-1.5 rounded-[10px] border px-2.5 py-2 text-[11px] transition-colors hover:bg-white/[0.04]"
+              className="inline-flex items-center gap-1.5 rounded-[9px] border px-[15px] py-[9px] text-[10.5px] font-bold uppercase tracking-[0.07em] transition-colors hover:bg-white/[0.04]"
               style={{
-                borderColor: 'var(--line)',
+                borderColor: 'var(--line-2)',
                 color: 'var(--t2)',
                 fontFamily: 'var(--f-mono, "Geist Mono", monospace)',
                 background: 'transparent',
@@ -545,9 +575,9 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
                   loadData()
                 }
               }}
-              className="inline-flex items-center gap-1.5 rounded-[10px] border px-2.5 py-2 text-[11px] transition-colors hover:bg-white/[0.04]"
+              className="inline-flex items-center gap-1.5 rounded-[9px] border px-[15px] py-[9px] text-[10.5px] font-bold uppercase tracking-[0.07em] transition-colors hover:bg-white/[0.04]"
               style={{
-                borderColor: 'var(--line)',
+                borderColor: 'var(--line-2)',
                 color: 'var(--t2)',
                 fontFamily: 'var(--f-mono, "Geist Mono", monospace)',
                 background: 'transparent',
@@ -560,209 +590,192 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
         }
       />
 
-      {showPreview ? (
-        <div
-          className="rounded-[18px] border p-4 text-sm"
-          style={{ background: 'var(--card)', borderColor: 'var(--line)', color: 'var(--t2)' }}
-        >
-          Preview is on — configure the report below, then generate.
-        </div>
-      ) : null}
-
       {requiredTooltipFlash ? (
         <p className="text-center text-[11px]" style={{ color: 'var(--warning)' }}>
           Executive summary is required for this template.
         </p>
       ) : null}
 
-      {/* Client */}
-      <div className={hub.sectionCard}>
-        <div className={hub.sectionHead}>
-          <div className={hub.sectionHeadLeft}>
-            {sectionIconBtn('cyan', User)}
-            <h2 className={hub.sectionTitle}>Client</h2>
-          </div>
-        </div>
-        <Select value={selectedClient || undefined} onValueChange={setSelectedClient}>
-          <SelectTrigger
-            className={cn(
-              'h-auto min-h-0 w-full justify-between rounded-[11px] border px-3 py-2.5 text-left text-[12.5px] shadow-none',
-              !selectedClientData && 'text-[color:var(--t4)]',
-            )}
-            style={{
-              background: 'var(--card-2)',
-              borderColor: 'var(--line)',
-              color: selectedClientData ? 'var(--t1)' : 'var(--t2)',
-            }}
-          >
-            <span className="flex min-w-0 flex-1 items-center gap-2">
-              {selectedClientData ? (
-                <span
-                  className="flex size-[18px] shrink-0 items-center justify-center rounded-md text-[8px] font-bold text-white"
-                  style={{
-                    background: 'linear-gradient(135deg, hsl(190 55% 42%), hsl(260 50% 38%))',
-                  }}
-                >
-                  {initialsFromName(selectedClientData.name)}
+      <div className={reports.layout}>
+        <div className={reports.main}>
+          {/* Client */}
+          <div className={hub.sectionCard}>
+            <div className={hub.sectionHead}>
+              <div className={hub.sectionHeadLeft}>
+                {sectionIconBtn('cyan', User)}
+                <h2 className={hub.sectionTitle}>Client</h2>
+              </div>
+            </div>
+            <Select value={selectedClient || undefined} onValueChange={setSelectedClient}>
+              <SelectTrigger
+                className={cn(
+                  'h-auto min-h-0 w-full justify-between rounded-[10px] border px-3.5 py-3 text-left text-[13px] shadow-none',
+                  !selectedClientData && reports.clientTriggerMiss,
+                  !selectedClientData && 'text-[color:var(--t4)]',
+                )}
+                style={{
+                  background: 'var(--card-2)',
+                  borderColor: selectedClientData ? 'var(--line-2)' : undefined,
+                  color: selectedClientData ? 'var(--t1)' : 'var(--t3)',
+                }}
+              >
+                <span className="flex min-w-0 flex-1 items-center gap-2">
+                  {selectedClientData ? (
+                    <span
+                      className="flex size-[18px] shrink-0 items-center justify-center rounded-md text-[8px] font-bold text-white"
+                      style={{
+                        background: 'linear-gradient(135deg, hsl(190 55% 42%), hsl(260 50% 38%))',
+                      }}
+                    >
+                      {initialsFromName(selectedClientData.name)}
+                    </span>
+                  ) : null}
+                  <span className="min-w-0 truncate">
+                    {selectedClientData ? selectedClientData.name : 'Select a client for the report'}
+                  </span>
                 </span>
-              ) : null}
-              <span className={cn('min-w-0 truncate', !selectedClientData && 'italic')}>
-                {selectedClientData ? selectedClientData.name : 'Select a client for the report'}
-              </span>
-            </span>
-          </SelectTrigger>
-          <SelectContent>
-            {clients.map((client) => (
-              <SelectItem key={client.id} value={client.id}>
-                <div className="flex items-center gap-2">
-                  <div className="flex size-8 items-center justify-center rounded-full bg-[color:var(--cyan-soft)] text-xs font-bold text-[color:var(--cyan)]">
-                    {client.avatar}
-                  </div>
-                  <div>
-                    <p className="font-medium">{client.name}</p>
-                    <p className="text-xs opacity-70">{client.program}</p>
-                  </div>
+                {!selectedClientData ? (
+                  <span className={reports.clientRequiredHint}>Required</span>
+                ) : null}
+              </SelectTrigger>
+              <SelectContent>
+                {clients.map((client) => (
+                  <SelectItem key={client.id} value={client.id}>
+                    <div className="flex items-center gap-2">
+                      <div className="flex size-8 items-center justify-center rounded-full bg-[color:var(--fc-accent-dim)] text-xs font-bold text-[color:var(--fc-accent)]">
+                        {client.avatar}
+                      </div>
+                      <div>
+                        <p className="font-medium">{client.name}</p>
+                        <p className="text-xs opacity-70">{client.program}</p>
+                      </div>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Template */}
+          <div className={hub.sectionCard}>
+            <div className={hub.sectionHead}>
+              <div className={hub.sectionHeadLeft}>
+                {sectionIconBtn('good', FileText)}
+                <h2 className={hub.sectionTitle}>Template</h2>
+              </div>
+            </div>
+            <div className={reports.tplGrid}>
+              {REPORT_TEMPLATES.map((template) => (
+                <ReportTemplateCard
+                  key={template.id}
+                  name={template.name}
+                  description={template.description}
+                  meta={`${template.sections.length} sections`}
+                  icon={template.icon}
+                  accent={template.accent}
+                  selected={selectedTemplate === template.id}
+                  popular={template.isPopular}
+                  onClick={() => handleTemplateSelect(template.id)}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Date range */}
+          <div className={hub.sectionCard}>
+            <div className={hub.sectionHead}>
+              <div className={hub.sectionHeadLeft}>
+                {sectionIconBtn('warn', Calendar)}
+                <h2 className={hub.sectionTitle}>Date range</h2>
+              </div>
+            </div>
+            <DateRangeSeg value={dateRange} onChange={setDateRange} />
+            {dateRange === 'custom' ? (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div>
+                  <label className="mb-1 block text-[11px]" style={{ color: 'var(--t3)' }}>
+                    Start
+                  </label>
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="w-full cursor-pointer rounded-[11px] border px-3 py-2.5 text-[12.5px] outline-none"
+                    style={{ background: 'var(--card-2)', borderColor: 'var(--line)', color: 'var(--t1)' }}
+                  />
                 </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Template */}
-      <div className={hub.sectionCard}>
-        <div className={hub.sectionHead}>
-          <div className={hub.sectionHeadLeft}>
-            {sectionIconBtn('good', FileText)}
-            <h2 className={hub.sectionTitle}>Template</h2>
+                <div>
+                  <label className="mb-1 block text-[11px]" style={{ color: 'var(--t3)' }}>
+                    End
+                  </label>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="w-full cursor-pointer rounded-[11px] border px-3 py-2.5 text-[12.5px] outline-none"
+                    style={{ background: 'var(--card-2)', borderColor: 'var(--line)', color: 'var(--t1)' }}
+                  />
+                </div>
+              </div>
+            ) : null}
           </div>
-        </div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {REPORT_TEMPLATES.map((template) => (
-            <ReportTemplateCard
-              key={template.id}
-              name={template.name}
-              description={template.description}
-              meta={`${template.sections.length} sections`}
-              icon={template.icon}
-              accent={template.accent}
-              selected={selectedTemplate === template.id}
-              popular={template.isPopular}
-              onClick={() => handleTemplateSelect(template.id)}
-            />
-          ))}
-        </div>
-      </div>
 
-      {/* Date range */}
-      <div className={hub.sectionCard}>
-        <div className={hub.sectionHead}>
-          <div className={hub.sectionHeadLeft}>
-            {sectionIconBtn('warn', Calendar)}
-            <h2 className={hub.sectionTitle}>Date range</h2>
-          </div>
-        </div>
-        <DateRangeSeg value={dateRange} onChange={setDateRange} />
-        {dateRange === 'custom' ? (
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <div>
-              <label className="mb-1 block text-[11px]" style={{ color: 'var(--t3)' }}>
-                Start
-              </label>
-              <input
-                type="date"
-                value={customStartDate}
-                onChange={(e) => setCustomStartDate(e.target.value)}
-                className="w-full cursor-pointer rounded-[11px] border px-3 py-2.5 text-[12.5px] outline-none"
-                style={{ background: 'var(--card-2)', borderColor: 'var(--line)', color: 'var(--t1)' }}
-              />
+          {/* Sections */}
+          <div className={hub.sectionCard}>
+            <div className={hub.sectionHead}>
+              <div className={hub.sectionHeadLeft}>
+                {sectionIconBtn('purple', List)}
+                <h2 className={hub.sectionTitle}>Report sections</h2>
+              </div>
+              <span className={reports.sectionsCount}>{sectionsSummaryFull}</span>
             </div>
-            <div>
-              <label className="mb-1 block text-[11px]" style={{ color: 'var(--t3)' }}>
-                End
-              </label>
-              <input
-                type="date"
-                value={customEndDate}
-                onChange={(e) => setCustomEndDate(e.target.value)}
-                className="w-full cursor-pointer rounded-[11px] border px-3 py-2.5 text-[12.5px] outline-none"
-                style={{ background: 'var(--card-2)', borderColor: 'var(--line)', color: 'var(--t1)' }}
-              />
+            <div className={reports.secGrid}>
+              {REPORT_SECTIONS.map((section) => (
+                <ReportSectionRow
+                  key={section.id}
+                  name={section.name}
+                  description={section.description}
+                  icon={section.icon}
+                  required={section.required}
+                  checked={selectedSections.includes(section.id)}
+                  onToggle={() => handleSectionToggle(section.id)}
+                  onRequiredClick={flashRequiredHint}
+                />
+              ))}
             </div>
           </div>
-        ) : null}
-      </div>
 
-      {/* Sections */}
-      <div className={hub.sectionCard}>
-        <div className={hub.sectionHead}>
-          <div className={hub.sectionHeadLeft}>
-            {sectionIconBtn('purple', List)}
-            <h2 className={hub.sectionTitle}>Report sections</h2>
-          </div>
-          <span
-            className="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
-            style={{
-              fontFamily: 'var(--f-mono, "Geist Mono", monospace)',
-              background: 'var(--purple-soft)',
-              color: 'var(--purple)',
-              borderColor: 'var(--purple-dim)',
-            }}
-          >
-            {sectionsSummary}
-          </span>
-        </div>
-        <div className="flex flex-col gap-2">
-          {REPORT_SECTIONS.map((section) => (
-            <ReportSectionRow
-              key={section.id}
-              name={section.name}
-              description={section.description}
-              icon={section.icon}
-              required={section.required}
-              checked={selectedSections.includes(section.id)}
-              onToggle={() => handleSectionToggle(section.id)}
-              onRequiredClick={flashRequiredHint}
+          {/* Coach notes */}
+          <div className={hub.sectionCard}>
+            <div className={hub.sectionHead}>
+              <div className={hub.sectionHeadLeft}>
+                {sectionIconBtn('action', Edit)}
+                <h2 className={hub.sectionTitle}>Coach notes</h2>
+              </div>
+            </div>
+            <textarea
+              placeholder="Add personalised comments, insights, or recommendations for this client…"
+              value={coachNotes}
+              onChange={(e) => setCoachNotes(e.target.value)}
+              className="min-h-[96px] w-full resize-y rounded-[10px] border px-3.5 py-3 text-[12.5px] outline-none"
+              style={{
+                background: 'var(--card-2)',
+                borderColor: 'var(--line-2)',
+                color: 'var(--t1)',
+                fontFamily: 'var(--font-body, Inter, sans-serif)',
+              }}
             />
-          ))}
-        </div>
-      </div>
-
-      {/* Coach notes */}
-      <div className={hub.sectionCard}>
-        <div className={hub.sectionHead}>
-          <div className={hub.sectionHeadLeft}>
-            {sectionIconBtn('lime', Edit)}
-            <h2 className={hub.sectionTitle}>Coach notes</h2>
           </div>
-        </div>
-        <textarea
-          placeholder="Add personalized comments, insights, or recommendations for this client..."
-          value={coachNotes}
-          onChange={(e) => setCoachNotes(e.target.value)}
-          className="min-h-[80px] w-full resize-none rounded-[11px] border p-3 text-[12.5px] outline-none"
-          style={{
-            background: 'var(--card-2)',
-            borderColor: 'var(--line)',
-            color: 'var(--t1)',
-            fontFamily: 'var(--font-geist-sans, Geist, sans-serif)',
-          }}
-        />
-      </div>
 
-      <StickyGenBar
-        clientLabel={selectedClientData?.name ?? ''}
-        templateLabel={selectedTemplateData?.name ?? ''}
-        sectionsLabel={sectionsSummary}
-        rangeLabel={rangeLabel}
-        canGenerate={canGenerate}
-        isGenerating={isGenerating}
-        onGenerate={generateReport}
-        onExportPdf={() => exportReport('pdf')}
-        onExportExcel={() => exportReport('excel')}
-        onExportCsv={() => exportReport('csv')}
-        exportDisabled={!exportReady}
-      />
+          {/* Mobile: summary below form (unchanged order) */}
+          <div className="lg:hidden">{summaryRail}</div>
+        </div>
+
+        {/* Desktop sticky rail */}
+        <aside className={cn(reports.rail, 'hidden lg:flex')} aria-label="Report summary">
+          {summaryRail}
+        </aside>
+      </div>
     </div>
   )
 }

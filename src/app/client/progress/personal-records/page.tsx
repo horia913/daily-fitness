@@ -3,13 +3,10 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
-import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { ClientPageShell } from "@/components/client-ui";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
-import { Trophy, ChevronDown, ArrowLeft, Dumbbell, Filter } from "lucide-react";
+import { Trophy, Dumbbell, Filter } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import {
   Select,
@@ -23,78 +20,60 @@ import {
   PersonalRecord,
 } from "@/lib/personalRecords";
 import {
-  formatKgRepsLift,
-  formatPrKindTag,
-  formatPrLatestLine,
-  formatPrRecentListLine,
-} from "@/lib/personalRecordDisplay";
-import {
   getPRTimeline,
   getPRStats,
   backfillPRs,
   type PersonalRecord as StoredPR,
 } from "@/lib/prService";
 import { PRTimelineChart, type PRMilestone } from "@/components/progress/PRTimelineChart";
+import { PsHero } from "@/components/client/progress-suite";
+import ps from "@/components/client/progress-suite/progressSuiteV1.module.css";
+import { cn } from "@/lib/utils";
 
-function formatRelative(dateStr: string): string {
-  const d = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
-  if (days === 0) return "Today";
-  if (days === 1) return "1 day ago";
-  if (days < 7) return `${days} days ago`;
-  if (days < 14) return "1 week ago";
-  if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+function trimWeight(w: number): string {
+  if (!Number.isFinite(w)) return "—";
+  if (Math.abs(w - Math.round(w)) < 0.01) return String(Math.round(w));
+  return String(Math.round(w * 100) / 100);
 }
 
-const EXERCISE_ICON_CLASSES = [
-  "bg-[color:var(--fc-status-error)]/10 text-[color:var(--fc-status-error)] border border-[color:var(--fc-status-error)]/20",
-  "bg-[color:var(--fc-accent-cyan)]/10 text-[color:var(--fc-accent-cyan)] border border-[color:var(--fc-accent-cyan)]/20",
-  "bg-[color:var(--fc-status-success)]/10 fc-text-success border border-[color:var(--fc-status-success)]/20",
-  "bg-[color:var(--fc-status-warning)]/10 text-[color:var(--fc-status-warning)] border border-[color:var(--fc-status-warning)]/20",
-  "bg-[color:var(--fc-accent-cyan)]/10 text-[color:var(--fc-accent-cyan)] border border-[color:var(--fc-accent-cyan)]/20",
-];
-
-function getExerciseIconClass(exerciseName: string, index: number): string {
-  return EXERCISE_ICON_CLASSES[index % EXERCISE_ICON_CLASSES.length];
+/** Client v6: `reps × weight` (not weight-first). */
+function formatRepsTimesWeight(weight: number, reps: number): string {
+  return `${reps} × ${trimWeight(weight)} kg`;
 }
 
-function personalRecordToUiRow(record: PersonalRecord) {
-  return {
-    record_type: record.prKind ?? "",
-    record_value:
-      record.prKind === "strength_endurance" ? record.volume : record.weight,
-    weight_at_record: record.weight,
-    reps_at_record: record.reps,
-  };
-}
-
-function exerciseHeaderLatest(records: PersonalRecord[]): string {
-  const ms = records.find((r) => r.prKind === "max_strength");
-  if (ms) return `${ms.weight} kg · ${formatRelative(ms.date)}`;
-  const vol = records.find((r) => r.prKind === "strength_endurance");
-  if (vol && vol.volume != null) {
-    return `${vol.volume} vol · ${formatRelative(vol.date)}`;
+function formatClientPrLine(args: {
+  record_type: string;
+  record_value?: number | string | null;
+  weight_at_record?: number | null;
+  reps_at_record?: number | null;
+  weight?: number;
+  reps?: number;
+  volume?: number | null;
+}): string {
+  const t = (args.record_type || "").toLowerCase().trim();
+  const w = Number(args.weight_at_record ?? args.weight ?? args.record_value ?? 0);
+  const r = Number(args.reps_at_record ?? args.reps ?? 0);
+  if (t === "max_strength" || t === "weight") {
+    return formatRepsTimesWeight(w, r);
   }
-  const first = records[0];
-  return first ? `${first.record} · ${formatRelative(first.date)}` : "—";
+  if (t === "strength_endurance") {
+    const vol = Number(args.record_value ?? args.volume ?? 0);
+    return `${trimWeight(vol)} vol · ${formatRepsTimesWeight(w, r)}`;
+  }
+  return args.record_value != null ? String(args.record_value) : "—";
 }
 
-function sortRecordsForExpandedView(records: PersonalRecord[]): PersonalRecord[] {
-  return [...records].sort((a, b) => {
-    const aMs = a.prKind === "max_strength" ? 0 : 1;
-    const bMs = b.prKind === "max_strength" ? 0 : 1;
-    if (aMs !== bMs) return aMs - bMs;
-    return new Date(b.date).getTime() - new Date(a.date).getTime();
-  });
+/** Mono technique/kind note — never a chip. */
+function prKindNote(recordType: string | null | undefined): string | null {
+  const t = (recordType || "").toLowerCase().trim();
+  if (t === "max_strength" || t === "weight") return "↳ max strength";
+  if (t === "strength_endurance") return "↳ volume";
+  return null;
 }
 
 export default function PersonalRecordsPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const { performanceSettings } = useTheme();
 
   const [loading, setLoading] = useState(true);
   const [backfilling, setBackfilling] = useState(false);
@@ -110,8 +89,6 @@ export default function PersonalRecordsPage() {
     mostImproved: StoredPR | null;
   } | null>(null);
   const [filterExercise, setFilterExercise] = useState<string | null>(null);
-  const [openGroup, setOpenGroup] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"grouped" | "timeline">("grouped");
   const [loadError, setLoadError] = useState<string | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -193,26 +170,6 @@ export default function PersonalRecordsPage() {
     return Array.from(set).sort();
   }, [personalRecords]);
 
-  const filteredRecords = useMemo(() => {
-    if (!filterExercise) return personalRecords;
-    return personalRecords.filter((r) => r.exerciseName === filterExercise);
-  }, [personalRecords, filterExercise]);
-
-  const groupedByExercise = useMemo(() => {
-    const map = new Map<string, PersonalRecord[]>();
-    filteredRecords.forEach((r) => {
-      const list = map.get(r.exerciseName) ?? [];
-      list.push(r);
-      map.set(r.exerciseName, list);
-    });
-    return Array.from(map.entries()).map(([name, records]) => ({
-      exerciseName: name,
-      records: records.sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-      ),
-    }));
-  }, [filteredRecords]);
-
   /** Weight PR milestones by exercise (from stored personal_records). Used for PR timeline chart. */
   const weightPRMilestonesByExercise = useMemo(() => {
     const byExercise = new Map<
@@ -264,11 +221,6 @@ export default function PersonalRecordsPage() {
     };
   }, [weightPRMilestonesByExercise, filterExercise]);
 
-  const recentRecords = useMemo(
-    () => personalRecords.slice(0, 5),
-    [personalRecords]
-  );
-
   const dualPrSubtitle = useMemo(() => {
     if (!prStats) return null;
     const parts: string[] = [];
@@ -299,9 +251,7 @@ export default function PersonalRecordsPage() {
   if (loadError && !loading) {
     return (
       <ProtectedRoute requiredRole="client">
-        <AnimatedBackground>
-          {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
+        <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
             <div className="flex flex-col items-center justify-center min-h-[40vh] px-2 text-center">
               <p className="text-sm fc-text-dim mb-3">{loadError}</p>
               <button
@@ -316,7 +266,6 @@ export default function PersonalRecordsPage() {
               </button>
             </div>
           </ClientPageShell>
-        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
@@ -324,162 +273,106 @@ export default function PersonalRecordsPage() {
   if (authLoading || loading) {
     return (
       <ProtectedRoute requiredRole="client">
-        <AnimatedBackground>
-          {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
+        <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
             <PageSkeleton variant="dashboard" />
           </ClientPageShell>
-        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
 
   return (
     <ProtectedRoute requiredRole="client">
-      <AnimatedBackground>
-        {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden space-y-4">
-          <header className="flex items-center gap-2 mb-4">
-            <button
-              type="button"
-              onClick={() => router.push("/client/progress")}
-              className="shrink-0 p-2 -ml-2 rounded-xl fc-text-subtle hover:fc-text-primary hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
-              aria-label="Back to progress"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div className="min-w-0">
-              <h1 className="text-xl font-bold tracking-tight fc-text-primary truncate">
-                Personal Records
-              </h1>
-              <p className="text-xs fc-text-dim mt-0.5">Best lifts tracked</p>
-            </div>
-          </header>
+      <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
+        <div className={ps.psV1}>
+          <PsHero
+            glow="cyan"
+            onBack={() => router.push("/client/progress")}
+            backAriaLabel="Back to progress hub"
+            eyebrow="Progress · records"
+            eyebrowColor="var(--fc-group-a)"
+            title="Personal Records"
+            subtitle="Best lifts tracked"
+          />
 
           {backfilling ? (
-            <div className="py-6 text-center border-y border-[color:var(--fc-glass-border)]">
-              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-[color:var(--fc-accent-cyan)] border-t-transparent mb-2" />
-              <p className="text-sm fc-text-dim">Analyzing your workout history...</p>
+            <div className="mt-4 py-6 text-center border-y border-[color:var(--fc-hairline)]">
+              <div className="mx-auto mb-2 h-8 w-8 animate-spin rounded-full border-2 border-[color:var(--fc-group-a)] border-t-transparent" />
+              <p className={cn(ps.psFontMono, "text-sm fc-text-dim")}>
+                Analyzing your workout history...
+              </p>
             </div>
           ) : (prStats && prStats.totalPRs > 0) || totalRecords > 0 ? (
-            <>
-              <section className="border-b border-[color:var(--fc-glass-border)] pb-4">
-                <p className="text-sm uppercase tracking-wider fc-text-dim mb-2">
+            <div className="mt-4 space-y-4">
+              <section className="rounded-[18px] border border-[color:var(--fc-hairline)] bg-transparent p-4">
+                <p
+                  className={cn(
+                    ps.psFontMono,
+                    "mb-2 text-[10px] uppercase tracking-[0.08em] text-[color:var(--fc-text-subtle)]",
+                  )}
+                >
                   Overview
                 </p>
-                <div className="space-y-1 text-sm fc-text-primary">
+                <div className={cn(ps.psFontMono, "space-y-1 text-sm fc-text-primary")}>
                   {prStats && prStats.prsThisWeek > 0 && (
                     <p>
                       PRs this week:{" "}
-                      <span className="font-semibold">{prStats.prsThisWeek}</span>
+                      <span className={cn(ps.psFontDisplay, "text-base font-bold tabular-nums")}>
+                        {prStats.prsThisWeek}
+                      </span>
                     </p>
                   )}
                   {prStats && prStats.prsThisMonth > 0 && (
                     <p>
                       PRs this month:{" "}
-                      <span className="font-semibold">{prStats.prsThisMonth}</span>
+                      <span className={cn(ps.psFontDisplay, "text-base font-bold tabular-nums")}>
+                        {prStats.prsThisMonth}
+                      </span>
                     </p>
                   )}
                 </div>
                 {dualPrSubtitle && (
-                  <p className="text-xs fc-text-dim mt-1 leading-snug">{dualPrSubtitle}</p>
+                  <p className={cn(ps.psFontMono, "mt-1 text-xs leading-snug fc-text-dim")}>
+                    {dualPrSubtitle}
+                  </p>
                 )}
                 {prStats?.latestPR && (
-                  <p className="text-xs fc-text-dim mt-2 leading-snug">
+                  <p className={cn(ps.psFontMono, "mt-2 text-xs leading-snug fc-text-dim")}>
                     Latest:{" "}
                     <span className="font-semibold fc-text-primary">
                       {prStats.latestPR.exercises?.name || "Unknown Exercise"}
                     </span>{" "}
                     —{" "}
-                    {formatPrLatestLine({
+                    {formatClientPrLine({
                       record_type: prStats.latestPR.record_type,
                       record_value: prStats.latestPR.record_value,
-                      record_unit: prStats.latestPR.record_unit,
                       weight_at_record: prStats.latestPR.weight_at_record,
                       reps_at_record: prStats.latestPR.reps_at_record,
                     })}{" "}
                     (
-                    {new Date(prStats.latestPR.achieved_date + "T12:00:00").toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                    })}
+                    {new Date(prStats.latestPR.achieved_date + "T12:00:00").toLocaleDateString(
+                      "en-US",
+                      { month: "short", day: "numeric" },
+                    )}
                     )
                   </p>
                 )}
               </section>
 
-              <section className="min-w-0 -mx-1 px-1 overflow-x-auto">
-                <PRTimelineChart
-                  milestones={chartExercise?.milestones ?? []}
-                  exerciseName={chartExercise?.name ?? "—"}
-                  recordType="max_strength"
-                  valueUnit={null}
-                  defaultTimeRange="3M"
-                  defaultExpanded={true}
-                />
-              </section>
-
-              <div className="flex flex-wrap items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setViewMode("grouped")}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide border transition-colors ${
-                    viewMode === "grouped"
-                      ? "fc-glass border-[color:var(--fc-glass-border-strong)] fc-text-primary"
-                      : "border-[color:var(--fc-glass-border)] fc-text-subtle hover:fc-text-primary"
-                  }`}
+              <div className="sticky top-0 z-10 -mx-1 border-b border-[color:var(--fc-hairline)] bg-[color:var(--fc-bg-deep)] px-1 py-2">
+                <label
+                  className={cn(
+                    ps.psFontMono,
+                    "mb-1.5 block text-[10px] uppercase tracking-[0.08em] text-[color:var(--fc-text-subtle)]",
+                  )}
                 >
-                  Grouped
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode("timeline")}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide border transition-colors ${
-                    viewMode === "timeline"
-                      ? "fc-glass border-[color:var(--fc-glass-border-strong)] fc-text-primary"
-                      : "border-[color:var(--fc-glass-border)] fc-text-subtle hover:fc-text-primary"
-                  }`}
-                >
-                  Timeline
-                </button>
-              </div>
-
-              <section>
-                <p className="text-sm uppercase tracking-wider fc-text-dim mb-2">
-                  Recent PRs
-                </p>
-                <div className="flex flex-col border-y border-[color:var(--fc-glass-border)]">
-                  {recentRecords.map((record) => (
-                      <div
-                        key={record.id}
-                        className="flex flex-wrap items-baseline justify-between gap-2 py-2.5 pl-1 pr-1 border-b border-[color:var(--fc-glass-border)] last:border-0 text-left"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold fc-text-primary truncate">
-                            {record.exerciseName}
-                          </p>
-                          <p className="text-[11px] font-mono uppercase tracking-wide fc-text-dim">
-                            {formatRelative(record.date)}
-                          </p>
-                        </div>
-                        <p className="text-sm font-mono font-bold fc-text-primary text-right shrink-0 tabular-nums">
-                          {formatPrRecentListLine(personalRecordToUiRow(record))}
-                        </p>
-                      </div>
-                  ))}
-                </div>
-              </section>
-
-              <div className="sticky top-0 z-10 -mx-1 py-2 bg-[color:var(--fc-bg-base)]/90 backdrop-blur-sm px-1">
-                <label className="text-sm uppercase tracking-wider fc-text-dim mb-1.5 block">
                   Filter
                 </label>
                 <Select
                   value={filterExercise ?? "__all__"}
                   onValueChange={(v) => setFilterExercise(v === "__all__" ? null : v)}
                 >
-                  <SelectTrigger className="w-full fc-select h-10 text-sm">
-                    <Filter className="w-3.5 h-3.5 fc-text-subtle shrink-0" />
+                  <SelectTrigger className="fc-select h-10 w-full text-sm">
+                    <Filter className="h-3.5 w-3.5 shrink-0 fc-text-subtle" />
                     <SelectValue placeholder="All exercises" />
                   </SelectTrigger>
                   <SelectContent align="start" className="max-h-[min(16rem,70vh)]">
@@ -493,7 +386,18 @@ export default function PersonalRecordsPage() {
                 </Select>
               </div>
 
-              {viewMode === "timeline" && prTimeline.length > 0 && (
+              <section className="min-w-0 -mx-1 px-1 overflow-x-auto">
+                <PRTimelineChart
+                  milestones={chartExercise?.milestones ?? []}
+                  exerciseName={chartExercise?.name ?? "—"}
+                  recordType="max_strength"
+                  valueUnit={null}
+                  defaultTimeRange="3M"
+                  defaultExpanded={true}
+                />
+              </section>
+
+              {prTimeline.length > 0 && (
                 <main className="space-y-2">
                   {prTimeline
                     .filter((pr) => !filterExercise || pr.exercises?.name === filterExercise)
@@ -502,170 +406,109 @@ export default function PersonalRecordsPage() {
                       const isRecent =
                         new Date(pr.achieved_date + "T12:00:00") >=
                         new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-                      const valueLine = formatPrRecentListLine({
+                      const valueLine = formatClientPrLine({
                         record_type: pr.record_type,
                         record_value: pr.record_value,
-                        record_unit: pr.record_unit,
                         weight_at_record: pr.weight_at_record,
                         reps_at_record: pr.reps_at_record,
                       });
-                      const typeLabel = formatPrKindTag(pr.record_type);
+                      const kindNote = prKindNote(pr.record_type);
 
                       return (
                         <div
                           key={pr.id}
-                          className={`rounded-xl border px-3 py-2 transition-all ${
-                            isRecent
-                              ? "border-[color:var(--fc-status-success)]/30 bg-[color:var(--fc-status-success)]/5"
-                              : "border-[color:var(--fc-glass-border)] fc-surface"
-                          }`}
+                          className="rounded-[14px] border border-[color:var(--fc-hairline)] bg-transparent px-3 py-2.5"
                         >
-                          <div className="flex flex-col gap-1 min-w-0">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <span className="text-xs font-semibold fc-text-primary leading-snug">
-                                {exerciseName}: {valueLine}
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <div className="flex flex-wrap items-baseline justify-between gap-2">
+                              <span
+                                className={cn(
+                                  ps.psFontDisplay,
+                                  "text-[13px] font-bold tracking-tight fc-text-primary",
+                                )}
+                              >
+                                {exerciseName}
                               </span>
-                              {isRecent && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[color:var(--fc-status-success)]/20 text-[color:var(--fc-status-success)]">
-                                  Recent
-                                </span>
-                              )}
+                              <span
+                                className={cn(
+                                  ps.psFontDisplay,
+                                  "text-sm font-bold tabular-nums fc-text-primary",
+                                )}
+                              >
+                                {valueLine}
+                              </span>
                             </div>
-                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] fc-text-subtle">
+                            <div
+                              className={cn(
+                                ps.psFontMono,
+                                "flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-[color:var(--fc-text-subtle)]",
+                              )}
+                            >
                               <span>
-                                {new Date(pr.achieved_date + "T12:00:00").toLocaleDateString("en-US", {
-                                  month: "short",
-                                  day: "numeric",
-                                  year: "numeric",
-                                })}
+                                {new Date(pr.achieved_date + "T12:00:00").toLocaleDateString(
+                                  "en-US",
+                                  {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "numeric",
+                                  },
+                                )}
                               </span>
-                              {pr.improvement_percentage != null && pr.improvement_percentage > 0 && (
-                                <span className="fc-text-success font-medium">
-                                  +{pr.improvement_percentage.toFixed(1)}%
+                              {pr.improvement_percentage != null &&
+                                pr.improvement_percentage > 0 && (
+                                  <span className="font-medium text-[color:var(--fc-status-success)]">
+                                    +{pr.improvement_percentage.toFixed(1)}%
+                                  </span>
+                                )}
+                              {isRecent ? (
+                                <span className="text-[color:var(--fc-status-success)]">
+                                  · recent
                                 </span>
-                              )}
-                              <span>{typeLabel}</span>
+                              ) : null}
                             </div>
+                            {kindNote ? (
+                              <p
+                                className={cn(
+                                  ps.psFontMono,
+                                  "text-[10px] text-[color:var(--fc-text-subtle)]",
+                                )}
+                              >
+                                {kindNote}
+                              </p>
+                            ) : null}
                           </div>
                         </div>
                       );
                     })}
                 </main>
               )}
-
-              {viewMode === "grouped" && (
-                <main className="flex flex-col border-y border-[color:var(--fc-glass-border)]">
-                  {groupedByExercise.map(({ exerciseName, records }, groupIdx) => {
-                    const latest = records[0];
-                    const isOpen = openGroup === exerciseName;
-                    const iconClass = getExerciseIconClass(exerciseName, groupIdx);
-
-                    return (
-                      <div key={exerciseName} className="border-b border-[color:var(--fc-glass-border)] last:border-0">
-                        <button
-                          type="button"
-                          onClick={() => setOpenGroup(isOpen ? null : exerciseName)}
-                          className="w-full flex items-center justify-between gap-2 py-2.5 pl-1 pr-1 text-left hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div
-                              className={`w-8 h-8 rounded-lg flex items-center justify-center border shrink-0 ${iconClass}`}
-                            >
-                              <Dumbbell className="w-4 h-4" />
-                            </div>
-                            <div className="min-w-0">
-                              <h3 className="text-sm font-bold fc-text-primary truncate">{exerciseName}</h3>
-                              <p className="text-[11px] fc-text-dim truncate">
-                                Latest:{" "}
-                                {exerciseHeaderLatest(records)}
-                              </p>
-                            </div>
-                          </div>
-                          <ChevronDown
-                            className={`w-4 h-4 fc-text-subtle shrink-0 transition-transform ${
-                              isOpen ? "rotate-180" : ""
-                            }`}
-                          />
-                        </button>
-                        {isOpen && (
-                          <div className="pb-2 pl-1 space-y-1.5 border-t border-[color:var(--fc-glass-border)] pt-2">
-                            {sortRecordsForExpandedView(records).map((record) => {
-                              const isMax = record.prKind === "max_strength";
-                              const isVol = record.prKind === "strength_endurance";
-                              return (
-                              <div
-                                key={record.id}
-                                className={`flex justify-between items-start gap-2 py-2 px-2 rounded-lg fc-glass-soft ${
-                                  isVol ? "opacity-90" : ""
-                                }`}
-                              >
-                                <span className="fc-text-dim shrink-0 text-xs pt-0.5">
-                                  {new Date(record.date).toLocaleDateString("en-US", {
-                                    month: "short",
-                                    day: "numeric",
-                                  })}
-                                </span>
-                                <div className="flex flex-col items-end gap-0.5 min-w-0">
-                                  <div className="flex items-center gap-2">
-                                    <span
-                                      className={`font-mono font-bold tabular-nums text-right ${
-                                        isMax
-                                          ? "text-base fc-text-primary"
-                                          : "text-sm fc-text-subtle"
-                                      }`}
-                                    >
-                                      {isMax
-                                        ? `${record.weight} kg`
-                                        : `${record.volume ?? record.weight} vol`}
-                                    </span>
-                                    <span
-                                      className={`text-[9px] font-semibold whitespace-nowrap ${
-                                        isMax ? "fc-text-success" : "fc-text-dim"
-                                      }`}
-                                    >
-                                      {formatPrKindTag(record.prKind ?? "")}
-                                    </span>
-                                  </div>
-                                  <span
-                                    className={`text-[10px] tabular-nums ${
-                                      isMax ? "fc-text-dim" : "fc-text-subtle"
-                                    }`}
-                                  >
-                                    {isMax
-                                      ? `(× ${record.reps} rep${record.reps !== 1 ? "s" : ""})`
-                                      : `(${formatKgRepsLift(record.weight, record.reps)})`}
-                                  </span>
-                                </div>
-                              </div>
-                            );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </main>
-              )}
-            </>
+            </div>
           ) : (
-            <div className="py-8 px-2 text-center border-y border-[color:var(--fc-glass-border)]">
+            <div className="mt-4 rounded-[18px] border border-[color:var(--fc-hairline)] bg-transparent px-4 py-8 text-center">
               <Trophy className="mx-auto mb-2 h-8 w-8 fc-text-dim opacity-70" aria-hidden />
-              <p className="text-sm font-semibold fc-text-primary mb-1">No records yet</p>
-              <p className="text-sm fc-text-dim mb-4">
+              <p
+                className={cn(
+                  ps.psFontDisplay,
+                  "mb-1 text-base font-bold tracking-tight fc-text-primary",
+                )}
+              >
+                No records yet
+              </p>
+              <p className={cn(ps.psFontMono, "mb-4 text-sm fc-text-dim")}>
                 Complete workouts to build your personal records.
               </p>
               <button
                 type="button"
                 onClick={() => router.push("/client/workouts")}
-                className="fc-btn fc-btn-primary inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm"
+                className="fc-btn fc-btn-primary inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm"
               >
-                <Dumbbell className="w-4 h-4" />
+                <Dumbbell className="h-4 w-4" />
                 Start a workout
               </button>
             </div>
           )}
-        </ClientPageShell>
-      </AnimatedBackground>
+        </div>
+      </ClientPageShell>
     </ProtectedRoute>
   );
 }

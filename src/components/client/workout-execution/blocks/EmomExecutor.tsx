@@ -3,51 +3,57 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  Timer as TimerIcon,
   CheckCircle,
   Play,
   MoreVertical,
   Pencil,
-  Clock,
-  Hash,
-  Repeat2,
-  Zap,
-  Flame,
+  ChevronLeft,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
-import {
-  BaseBlockExecutorLayout,
-  formatTime,
-} from "../BaseBlockExecutor";
-import type { PrescriptionItem } from "../ui/PrescriptionCard";
-import { LogSetButton } from "../ui/LogSetButton";
+import { formatTime } from "../BaseBlockExecutor";
 import { parseRepsTarget } from "@/lib/workout/parseRepsTarget";
-import { LargeInput } from "../ui/LargeInput";
-import logPairStyles from "../ui/logWeightRepsPair.module.css";
-import { BaseBlockExecutorProps } from "../types";
-import { LoggedSet } from "@/types/workoutBlocks";
+import { BaseSetEntryExecutorProps } from "../types";
+import { useWorkoutExecutionChrome } from "../WorkoutExecutionChromeContext";
+import { NavigationControls } from "../ui/NavigationControls";
+import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
+import { LastSessionSetsSection } from "../ui/LastSessionSetsSection";
+import { ProgressionNudge } from "../ui/ProgressionNudge";
+import { LoggedSet } from "@/types/workoutSetEntries";
 import { LoggedSetsList, type LoggedSetRow } from "../ui/LoggedSetsList";
 import { useUpdateSetRpe } from "../hooks/useUpdateSetRpe";
-import { appendTargetEffortItem } from "../appendTargetEffortItem";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
 import { fetchApi } from "@/lib/apiClient";
 import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
 import { parseWeightKgInput } from "@/lib/parseWeightKgInput";
+import { resolveSetPrescriptionTargets } from "../ui/set-rows/resolveSetPrescriptionTargets";
+import {
+  LiveCard,
+  LiveCardExerciseName,
+  LiveCardPrimary,
+  LiveCardNote,
+  LiveCardLog,
+  LiveCardLogField,
+  LiveCardLogButton,
+  LiveCardGlue,
+  effortFromPrescribedRir,
+  groupIndexToHue,
+  type LiveCardTarget,
+} from "../live-card";
 
 export function EmomExecutor({
-  block,
-  onBlockComplete,
-  onNextBlock,
+  liveSetEntry,
+  onSetEntryComplete,
+  onNextSetEntry,
   e1rmMap = {},
   onE1rmUpdate,
   lastPerformedWeightByExerciseId = {},
   lastSessionWeightByExerciseId = {},
   sessionId,
   assignmentId,
-  allBlocks = [],
-  currentBlockIndex = 0,
-  onBlockChange,
+  allSetEntries = [],
+  currentSetEntryIndex = 0,
+  onSetEntryChange,
   currentExerciseIndex = 0,
   onExerciseIndexChange,
   logSetToDatabase,
@@ -64,9 +70,9 @@ export function EmomExecutor({
   onSetLogUpsert,
   onSetEditSaved,
   loggedSets,
-}: BaseBlockExecutorProps) {
+}: BaseSetEntryExecutorProps) {
   const { addToast } = useToast();
-  const currentExercise = block.block.exercises?.[currentExerciseIndex];
+  const currentExercise = liveSetEntry.setEntry.exercises?.[currentExerciseIndex];
 
   /** Parent-owned logged sets; single source of truth. Persists across block navigation. */
   const loggedSetsList = loggedSets ?? [];
@@ -95,10 +101,10 @@ export function EmomExecutor({
       if (idx === -1) return;
       const oldEntry = list[idx];
       const newEntry = { ...oldEntry, id: set_log_id };
-      onSetLogUpsert?.(block.block.id, newEntry, { replaceId: oldEntry.id });
+      onSetLogUpsert?.(liveSetEntry.setEntry.id, newEntry, { replaceId: oldEntry.id });
     });
     return () => {};
-  }, [registerSetLogIdResolved, onSetLogUpsert, block.block.id]);
+  }, [registerSetLogIdResolved, onSetLogUpsert, liveSetEntry.setEntry.id]);
   useEffect(() => {
     if (viewingSetIndex > loggedSetsList.length)
       setViewingSetIndex(loggedSetsList.length);
@@ -117,16 +123,16 @@ export function EmomExecutor({
 
   // Read from special table (time_protocols)
   const timeProtocol =
-    block.block.time_protocols?.find(
+    liveSetEntry.setEntry.time_protocols?.find(
       (tp: any) =>
         tp.protocol_type === "emom" &&
         (tp.exercise_id === currentExercise?.exercise_id ||
           !currentExercise?.exercise_id),
-    ) || block.block.time_protocols?.[0];
+    ) || liveSetEntry.setEntry.time_protocols?.[0];
 
   const durationMinutes =
     timeProtocol?.total_duration_minutes ||
-    (block.block.duration_seconds || 600) / 60; // Default 10 minutes
+    (liveSetEntry.setEntry.duration_seconds || 600) / 60; // Default 10 minutes
   const emomMode = timeProtocol?.emom_mode || "target_reps";
   const targetReps = timeProtocol?.target_reps || timeProtocol?.reps_per_round;
   const workSeconds = timeProtocol?.work_seconds;
@@ -234,49 +240,32 @@ export function EmomExecutor({
     setCurrentMinute(1);
   };
 
-  const prescriptionItems: PrescriptionItem[] = [
-    {
-      icon: Clock,
-      label: "Duration",
-      value: durationMinutes,
-      unit: "min",
-    },
-    {
-      icon: Hash,
-      label: "Mode",
-      value: emomMode === "target_reps" ? "Target reps" : "Time based",
-    },
-  ];
-
-  if (
-    emomMode === "target_reps" &&
-    targetReps != null &&
-    (typeof targetReps !== "string" || targetReps !== "")
-  ) {
-    prescriptionItems.push({
-      icon: Repeat2,
-      label: "Reps/min",
-      value: targetReps,
-    });
-  }
-
-  if (emomMode === "time_based" && workSeconds) {
-    prescriptionItems.push({
-      icon: Zap,
-      label: "Work",
-      value: workSeconds,
-      unit: "s",
-    });
-  }
-
-  appendTargetEffortItem(
-    prescriptionItems,
-    currentExercise ? (currentExercise as { rir?: unknown }).rir : undefined,
-    Flame,
-  );
-
   const instructions =
-    currentExercise?.notes || block.block.set_notes || undefined;
+    currentExercise?.notes || liveSetEntry.setEntry.set_notes || undefined;
+
+  const activeTargets = resolveSetPrescriptionTargets(
+    currentExercise,
+    currentMinute,
+    liveSetEntry.setEntry.reps_per_set,
+  );
+  const activeEffort = effortFromPrescribedRir(activeTargets.rir);
+  const liveTarget: LiveCardTarget =
+    activeTargets.weight_kg != null
+      ? {
+          kind: "reps_weight",
+          reps:
+            activeTargets.reps ??
+            (targetReps != null ? String(targetReps) : "—"),
+          weight: activeTargets.weight_kg,
+        }
+      : {
+          kind: "reps_only",
+          reps:
+            activeTargets.reps ??
+            (targetReps != null ? String(targetReps) : "—"),
+          unit: "reps",
+        };
+
 
   const handleEditSet = (setEntry: LoggedSet) => {
     setEditingSetId(setEntry.id);
@@ -294,7 +283,7 @@ export function EmomExecutor({
       if (process.env.NODE_ENV !== "production") {
         console.log("[SAVE EDITS guard]", {
           executor: "EmomExecutor",
-          blockTypeFromUI: block.block.set_type,
+          blockTypeFromUI: liveSetEntry.setEntry.set_type,
           editingSetId,
           isSavingEdit,
           timestamp: Date.now(),
@@ -315,7 +304,7 @@ export function EmomExecutor({
       entry?.set_number ?? editDraft.set_number ?? viewingSetIndex;
     setIsSavingEdit(true);
     try {
-      const payload = buildSetEditPatchPayload(block.block.set_type, {
+      const payload = buildSetEditPatchPayload(liveSetEntry.setEntry.set_type, {
         exercise_id: currentExercise?.exercise_id ?? undefined,
         weight: !isNaN(weightNum) && weightNum >= 0 ? weightNum : undefined,
         emom_minute_number: minuteNum,
@@ -325,7 +314,7 @@ export function EmomExecutor({
         console.log("[SAVE EDITS]", {
           executor: "EmomExecutor",
           setId: editingSetId,
-          blockTypeFromUI: block.block.set_type,
+          blockTypeFromUI: liveSetEntry.setEntry.set_type,
           payloadKeys: Object.keys(payload),
         });
       }
@@ -340,13 +329,13 @@ export function EmomExecutor({
           id: editingSetId,
           exercise_id:
             current?.exercise_id ?? currentExercise?.exercise_id ?? "",
-          set_entry_id: block.block.id,
+          set_entry_id: liveSetEntry.setEntry.id,
           set_number: current?.set_number ?? 1,
           weight_kg: weightNum,
           reps_completed: repsNum,
           completed_at: current?.completed_at ?? new Date(),
         };
-        onSetEditSaved?.(block.block.id, updatedEntry);
+        onSetEditSaved?.(liveSetEntry.setEntry.id, updatedEntry);
         setEditingSetId(null);
         setEditDraft(null);
         addToast({
@@ -443,13 +432,13 @@ export function EmomExecutor({
             (result as { set_log_id?: string }).set_log_id ??
             `temp-${Date.now()}`,
           exercise_id: currentExercise.exercise_id,
-          set_entry_id: block.block.id,
+          set_entry_id: liveSetEntry.setEntry.id,
           set_number: currentMinute,
           weight_kg: weightNum,
           reps_completed: repsNum,
           completed_at: new Date(),
         } as LoggedSet;
-        onSetLogUpsert?.(block.block.id, newLoggedSet);
+        onSetLogUpsert?.(liveSetEntry.setEntry.id, newLoggedSet);
 
         addToast({
           title: "EMOM Work Logged!",
@@ -459,7 +448,7 @@ export function EmomExecutor({
         });
 
         if (currentMinute >= durationMinutes) {
-          onBlockComplete(block.block.id, []);
+          onSetEntryComplete(liveSetEntry.setEntry.id, []);
         }
       } else {
         addToast({
@@ -482,7 +471,7 @@ export function EmomExecutor({
         : currentMinute;
 
   const updateSetRpe = useUpdateSetRpe({
-    blockId: block.block.id,
+    setEntryId: liveSetEntry.setEntry.id,
     onSetLogUpsert,
   });
   const loggedSetRows: LoggedSetRow[] = loggedSetsList.map((setEntry) => ({
@@ -539,115 +528,9 @@ export function EmomExecutor({
       <LoggedSetsList rows={loggedSetRows} />
     ) : null;
 
-  const loggingInputs = (
-    <div className="space-y-4">
-      {/* Minute Counter */}
-      <div
-        className="rounded-xl p-5 text-center"
-        style={{
-          background:
-            "color-mix(in srgb, var(--fc-accent-cyan) 8%, var(--fc-surface-card))",
-          border:
-            "2px solid color-mix(in srgb, var(--fc-accent-cyan) 25%, transparent)",
-        }}
-      >
-        <div
-          className="text-2xl font-semibold mb-2"
-          style={{ color: "var(--fc-accent-cyan)" }}
-        >
-          Minute {currentMinute} of {durationMinutes}
-        </div>
-        <div
-          className="text-4xl font-bold mb-2"
-          style={{ color: "var(--fc-accent-cyan)" }}
-        >
-          {formatTime(timeRemaining)}
-        </div>
-        <div className="text-sm fc-text-dim mb-4">
-          {isActive
-            ? "Work Time"
-            : isActive === false && currentMinute === 1 && timeRemaining === 60
-              ? "Ready to Start"
-              : "Complete"}
-        </div>
-        {!isActive && currentMinute === 1 && timeRemaining === 60 && (
-          <Button
-            onClick={handleStart}
-            className="bg-green-600 hover:bg-green-700 text-white"
-          >
-            <Play className="w-4 h-4 mr-2" />
-            Start EMOM
-          </Button>
-        )}
-      </div>
-
-      {/* Weight and Reps Input */}
-      <div
-        className="p-4 rounded-xl"
-        style={{ background: "var(--fc-surface-sunken)" }}
-      >
-        <div className={`${logPairStyles.pair} ${logPairStyles.pairGapLg}`}>
-          <div className="space-y-2">
-            <LargeInput
-              label="Weight"
-              value={editDraft ? editDraft.weight : weight}
-              onChange={(val) => {
-                if (editDraft)
-                  setEditDraft((d) => (d ? { ...d, weight: val } : null));
-                else {
-                  setIsWeightPristine(false);
-                  setWeight(val);
-                }
-              }}
-              placeholder="0"
-              step="0.5"
-              unit="kg"
-              showStepper
-              stepAmount={2.5}
-              />
-            {suggested_weight != null && suggested_weight > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setWeight(String(suggested_weight));
-                  setIsWeightPristine(false);
-                }}
-                className="text-xs font-medium hover:underline"
-                style={{ color: "var(--fc-accent-cyan)" }}
-              >
-                {currentExercise?.load_percentage != null
-                  ? `${currentExercise.load_percentage}% → ${suggested_weight} kg`
-                  : `Suggested: ${suggested_weight} kg`}{" "}
-                (tap to apply)
-              </button>
-            )}
-          </div>
-          <LargeInput
-            label="Reps Completed"
-            hint={
-              !editDraft && emomMode === "target_reps"
-                ? targetRepsParsed.displayHint ?? undefined
-                : undefined
-            }
-            value={editDraft ? editDraft.reps : reps}
-            onChange={(val) => {
-              if (editDraft)
-                setEditDraft((d) => (d ? { ...d, reps: val } : null));
-              else setReps(val);
-            }}
-            placeholder="0"
-            step="1"
-            showStepper
-            stepAmount={1}
-          />
-        </div>
-      </div>
-    </div>
-  );
-
   const handleCompleteBlock = () => {
     const loggedSetsArray: LoggedSet[] = [];
-    onBlockComplete(block.block.id, loggedSetsArray);
+    onSetEntryComplete(liveSetEntry.setEntry.id, loggedSetsArray);
   };
 
   const emomWeightNum = parseWeightKgInput(weight);
@@ -668,99 +551,177 @@ export function EmomExecutor({
       ? (loggedSetsList.find((s) => s.set_number === viewingSetIndex) ??
         loggedSetsList[viewingSetIndex - 1])
       : null;
-  const logButton = (
-    <div className="space-y-3">
-      {allowSetEditDelete && isEditMode ? (
-        <div className="flex gap-2 w-full">
-          <Button
-            variant="outline"
-            onClick={handleCancelEdit}
-            className="flex-1 h-12 text-base font-semibold rounded-xl"
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSaveEdit}
-            disabled={
-              isSavingEdit ||
-              !editDraft ||
-              editDraft.reps.trim() === "" ||
-              isNaN(parseInt(editDraft.reps, 10)) ||
-              parseInt(editDraft.reps, 10) <= 0
-            }
-            variant="fc-primary"
-            className="flex-1 h-12 text-base font-bold uppercase tracking-wider rounded-xl"
-          >
-            {isSavingEdit ? "Saving…" : "Save edits"}
-          </Button>
-        </div>
-      ) : allowSetEditDelete && viewedSetEntry ? (
-        <Button
-          onClick={() => handleEditSet(viewedSetEntry)}
-          variant="fc-primary"
-          className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl"
-        >
-          <Pencil className="w-5 h-5 mr-2" />
-          Edit this minute
-        </Button>
-      ) : (
-        <>
-          <LogSetButton
-            onClick={handleLog}
-            ready={emomLogWorkReady}
-            loading={isLoggingSet}
-            label="Log work"
-          />
-          <Button
-            onClick={handleCompleteBlock}
-            variant="fc-primary"
-            className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl"
-          >
-            <CheckCircle className="w-5 h-5 mr-2" />
-            Complete Block
-          </Button>
-        </>
-      )}
-    </div>
-  );
+
+  const fmt = formatTimeProp ?? formatTime;
+  const chrome = useWorkoutExecutionChrome();
+  const hideCompactBack = chrome?.hideCompactBack ?? false;
+  const totalSetEntries = allSetEntries.length || 1;
+  const canGoPrevious = currentSetEntryIndex > 0;
+  const canGoNext = currentSetEntryIndex < totalSetEntries - 1;
+  const previousPerf =
+    exerciseId && previousPerformanceMap
+      ? (previousPerformanceMap.get(exerciseId) ?? null)
+      : null;
+
+  const nudgeWeight = (delta: number) => {
+    const cur = parseWeightKgInput(weight || "0");
+    const next = Math.max(0, (isNaN(cur) ? 0 : cur) + delta);
+    setIsWeightPristine(false);
+    setWeight(String(Math.round(next * 2) / 2));
+  };
+  const nudgeReps = (delta: number) => {
+    const cur = parseInt(reps || "0", 10);
+    const next = Math.max(0, (isNaN(cur) ? 0 : cur) + delta);
+    setReps(String(next));
+  };
 
   return (
-    <BaseBlockExecutorLayout
-      {...{
-        block,
-        onBlockComplete,
-        onNextBlock,
-        e1rmMap,
-        onE1rmUpdate,
-        sessionId,
-        assignmentId,
-        allBlocks,
-        currentBlockIndex,
-        onBlockChange,
-        currentExerciseIndex,
-        onExerciseIndexChange,
-        logSetToDatabase,
-        formatTime: formatTimeProp,
-        calculateSuggestedWeight,
-        onVideoClick,
-        onAlternativesClick,
-              onRestTimerClick,
-        onWorkoutBack,
-        previousPerformanceMap,
-      }}
-      exerciseName={currentExercise?.exercise?.name || "Exercise"}
-      prescriptionItems={prescriptionItems}
-      instructions={instructions}
-      currentSet={displayMinute}
-      totalSets={durationMinutes}
-      progressLabel="Minute"
-      loggingInputs={loggingInputs}
-      logButton={logButton}
-      showNavigation={true}
-      currentExercise={currentExercise}
-      showRestTimer={false}
-      progressionSuggestion={progressionSuggestion}
-      aboveStickyContent={aboveStickyContent}
-    />
+    <>
+      <div className="flex flex-col border-b border-white/5">
+        <div className="flex flex-col gap-3 px-0 pb-2 pt-1 sm:px-1">
+          {onWorkoutBack && !hideCompactBack ? (
+            <button
+              type="button"
+              onClick={onWorkoutBack}
+              className="-ml-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/10 hover:text-white active:scale-95"
+              aria-label="Back"
+            >
+              <ChevronLeft className="h-5 w-5" aria-hidden />
+            </button>
+          ) : null}
+
+          <LiveCard
+            hue={groupIndexToHue(currentSetEntryIndex)}
+            heading={`Minute ${displayMinute} of ${durationMinutes}`}
+            status={
+              loggedSetsList.length >= durationMinutes ? "complete" : "logging"
+            }
+          >
+            <div>
+              <LiveCardExerciseName
+                name={currentExercise?.exercise?.name || "Exercise"}
+                endSlot={
+                  currentExercise ? (
+                    <ExerciseActionButtons
+                      exercise={currentExercise}
+                      onVideoClick={onVideoClick}
+                      onAlternativesClick={onAlternativesClick}
+                    />
+                  ) : undefined
+                }
+              />
+            </div>
+            <LiveCardPrimary
+              target={liveTarget}
+              effort={activeEffort}
+              loadPct={loadPercentage}
+            />
+            {instructions ? (
+              <LiveCardNote>{instructions}</LiveCardNote>
+            ) : null}
+            <LiveCardLog>
+              <div className="flex flex-col gap-3">
+                {!isActive && currentMinute === 1 && timeRemaining === 60 ? (
+                  <Button
+                    onClick={handleStart}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <Play className="w-4 h-4 mr-2" />
+                    Start EMOM
+                  </Button>
+                ) : null}
+
+                <LiveCardLogField
+                  label="Weight"
+                  value={editDraft ? editDraft.weight : weight}
+                  onChange={(val) => {
+                    if (editDraft)
+                      setEditDraft((d) => (d ? { ...d, weight: val } : null));
+                    else {
+                      setIsWeightPristine(false);
+                      setWeight(val);
+                    }
+                  }}
+                  onIncrement={() => nudgeWeight(2.5)}
+                  onDecrement={() => nudgeWeight(-2.5)}
+                />
+                <LiveCardLogField
+                  label="Reps"
+                  value={editDraft ? editDraft.reps : reps}
+                  onChange={(val) => {
+                    if (editDraft)
+                      setEditDraft((d) => (d ? { ...d, reps: val } : null));
+                    else setReps(val);
+                  }}
+                  onIncrement={() => nudgeReps(1)}
+                  onDecrement={() => nudgeReps(-1)}
+                />
+                <LiveCardLogButton
+                  disabled={isEditMode ? isSavingEdit : !emomLogWorkReady}
+                  onClick={() => {
+                    if (isEditMode) void handleSaveEdit();
+                    else void handleLog();
+                  }}
+                />
+                {isEditMode ? (
+                  <Button variant="outline" onClick={handleCancelEdit}>
+                    Cancel edit
+                  </Button>
+                ) : viewedSetEntry && allowSetEditDelete ? (
+                  <Button
+                    onClick={() => handleEditSet(viewedSetEntry)}
+                    variant="outline"
+                  >
+                    <Pencil className="w-4 h-4 mr-2" />
+                    Edit this minute
+                  </Button>
+                ) : null}
+                <Button
+                  onClick={handleCompleteBlock}
+                  variant="fc-primary"
+                  className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl"
+                >
+                  <CheckCircle className="w-5 h-5 mr-2" />
+                  Finish EMOM
+                </Button>
+              </div>
+            </LiveCardLog>
+            <LiveCardGlue timer={fmt(timeRemaining)}>
+              ↻ &nbsp;next minute
+            </LiveCardGlue>
+          </LiveCard>
+
+          {previousPerf?.lastWorkout != null || progressionSuggestion ? (
+            <div className="mx-4">
+              <ProgressionNudge
+                suggestion={progressionSuggestion}
+                previousPerformance={previousPerf}
+                showPreviousSession={false}
+              />
+            </div>
+          ) : null}
+
+          {aboveStickyContent}
+
+          <NavigationControls
+            currentBlock={currentSetEntryIndex + 1}
+            totalBlocks={totalSetEntries}
+            onPrevious={() => {
+              if (onSetEntryChange && canGoPrevious) {
+                onSetEntryChange(currentSetEntryIndex - 1);
+              }
+            }}
+            onNext={() => {
+              if (onSetEntryChange && canGoNext) {
+                onSetEntryChange(currentSetEntryIndex + 1);
+              }
+            }}
+            canGoPrevious={canGoPrevious}
+            canGoNext={canGoNext}
+          />
+        </div>
+        <LastSessionSetsSection lastWorkout={previousPerf?.lastWorkout ?? null} />
+      </div>
+    </>
   );
 }

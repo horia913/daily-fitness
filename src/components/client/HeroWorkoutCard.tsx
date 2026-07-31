@@ -1,6 +1,10 @@
 "use client";
-import { Coffee, Clock, Info, PauseCircle } from "lucide-react";
+
+import { useState, useCallback } from "react";
+import { Coffee, Clock, Info, Loader2, PauseCircle } from "lucide-react";
 import type { DashboardData } from "@/lib/clientDashboardPageData";
+import { startProgramWorkout } from "@/lib/startProgramWorkout";
+import { useToast } from "@/components/ui/toast-provider";
 
 export interface HeroWorkoutCardProps {
   todaysWorkout: DashboardData["todaysWorkout"] | undefined;
@@ -14,7 +18,7 @@ function isPausedAssignment(pauseStatus: string | null | undefined): boolean {
 
 /**
  * Phone 1 hero (client-screens-v5.html `.hero-workout` / `.rest-card`).
- * Lime-glow training card or cyan-tint rest / empty-state card. Mount after greeting on `/client`.
+ * Primary action starts today's workout directly (same endpoint as Train).
  */
 export function HeroWorkoutCard({
   todaysWorkout,
@@ -66,14 +70,14 @@ export function HeroWorkoutCard({
         <div
           className="rounded-[18px] border border-[var(--fc-glass-border)] py-[22px] px-4 text-center"
           style={{
-            background: `linear-gradient(135deg, color-mix(in srgb, var(--fc-accent-cyan) 5%, transparent) 0%, transparent 100%), var(--fc-surface-card)`,
+            background: `linear-gradient(135deg, color-mix(in srgb, var(--fc-accent) 5%, transparent) 0%, transparent 100%), var(--fc-surface-card)`,
           }}
         >
           <div
             className="mx-auto mb-2 grid h-9 w-9 place-items-center rounded-full"
-            style={{ background: "color-mix(in srgb, var(--fc-accent-cyan) 13%, transparent)" }}
+            style={{ background: "color-mix(in srgb, var(--fc-accent) 13%, transparent)" }}
           >
-            <Coffee className="h-[18px] w-[18px] text-[var(--fc-accent-cyan)]" aria-hidden />
+            <Coffee className="h-[18px] w-[18px] text-[var(--fc-accent)]" aria-hidden />
           </div>
           <p
             className="mb-1 font-semibold fc-text-primary"
@@ -90,20 +94,19 @@ export function HeroWorkoutCard({
     );
   }
 
-  // Active program, not paused, no workout today (scheduled rest / off day in program).
   return (
     <section className="mb-[22px] mx-4">
       <div
         className="rounded-[18px] border border-[var(--fc-glass-border)] py-[22px] px-4 text-center"
         style={{
-          background: `linear-gradient(135deg, color-mix(in srgb, var(--fc-accent-cyan) 5%, transparent) 0%, transparent 100%), var(--fc-surface-card)`,
+          background: `linear-gradient(135deg, color-mix(in srgb, var(--fc-accent) 5%, transparent) 0%, transparent 100%), var(--fc-surface-card)`,
         }}
       >
         <div
           className="mx-auto mb-2 grid h-9 w-9 place-items-center rounded-full"
-          style={{ background: "color-mix(in srgb, var(--fc-accent-cyan) 13%, transparent)" }}
+          style={{ background: "color-mix(in srgb, var(--fc-accent) 13%, transparent)" }}
         >
-          <Coffee className="h-[18px] w-[18px] text-[var(--fc-accent-cyan)]" aria-hidden />
+          <Coffee className="h-[18px] w-[18px] text-[var(--fc-accent)]" aria-hidden />
         </div>
         <p
           className="mb-1 font-semibold fc-text-primary"
@@ -126,6 +129,9 @@ export function HeroWorkoutCard({
 }
 
 function HeroWorkoutActiveCard({ tw }: { tw: DashboardData["todaysWorkout"] }) {
+  const { addToast } = useToast();
+  const [isStarting, setIsStarting] = useState(false);
+
   const name =
     tw.name?.trim() ||
     (tw.type === "program" && tw.weekNumber != null && tw.dayNumber != null
@@ -150,25 +156,74 @@ function HeroWorkoutActiveCard({ tw }: { tw: DashboardData["todaysWorkout"] }) {
     typeof tw.estimatedDuration === "number" && Number.isFinite(tw.estimatedDuration)
       ? tw.estimatedDuration
       : null;
-  /** TODO(backend): expose reliable `estimatedDuration` on all `todaysWorkout` branches in `get_client_dashboard`. */
   const durationLabel = durationMin != null ? `~${durationMin} min` : "~60 min";
 
   const templateId = tw.templateId?.trim();
   const detailsHref =
-    templateId && templateId.length > 0 ? `/client/workouts/${templateId}/details` : null;
+    templateId && templateId.length > 0 ? `/client/workouts/${templateId}/start` : null;
+
+  const handleStart = useCallback(async () => {
+    if (isStarting) return;
+    setIsStarting(true);
+
+    if (tw.type === "assignment" && tw.assignmentId) {
+      window.location.href = `/client/workouts/${tw.assignmentId}/start`;
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
+
+    try {
+      const result = await startProgramWorkout({
+        programDayAssignmentId: tw.scheduleId ?? undefined,
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (!result.ok) {
+        if (result.code === "WEEK_LOCKED") {
+          addToast({
+            title: result.message || "Complete the current week first.",
+            variant: "destructive",
+          });
+        } else if (result.code === "ALREADY_COMPLETED") {
+          addToast({
+            title: result.message || result.error || "This workout is already completed.",
+            variant: "destructive",
+          });
+        } else if (result.code === "TIMEOUT") {
+          addToast({ title: "Request timed out. Please try again.", variant: "destructive" });
+        } else {
+          addToast({
+            title: result.message || result.error || "Could not start workout.",
+            variant: "destructive",
+          });
+        }
+      }
+    } catch {
+      clearTimeout(timeout);
+      addToast({
+        title: "Could not start workout. Check your connection.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsStarting(false);
+    }
+  }, [isStarting, tw, addToast]);
 
   return (
     <section className="mb-[22px] mx-4">
       <div
         className="relative overflow-hidden rounded-[28px] border p-[22px]"
         style={{
-          borderColor: "color-mix(in srgb, var(--fc-accent-lime) 20%, transparent)",
+          borderColor: "color-mix(in srgb, var(--fc-accent) 20%, transparent)",
           background: `
-            radial-gradient(ellipse 80% 60% at 100% 0%, color-mix(in srgb, var(--fc-accent-lime-2) 18%, transparent), transparent 60%),
-            radial-gradient(ellipse 100% 80% at 0% 100%, color-mix(in srgb, var(--fc-accent-lime) 14%, transparent), transparent 65%),
+            radial-gradient(ellipse 80% 60% at 100% 0%, color-mix(in srgb, var(--fc-accent) 18%, transparent), transparent 60%),
+            radial-gradient(ellipse 100% 80% at 0% 100%, color-mix(in srgb, var(--fc-accent) 14%, transparent), transparent 65%),
             linear-gradient(135deg, color-mix(in srgb, var(--fc-surface-elevated) 80%, var(--fc-bg-base)) 0%, var(--fc-surface-card) 100%)`,
           boxShadow: `
-            0 20px 50px -20px var(--fc-accent-lime-glow),
+            0 20px 50px -20px var(--fc-accent-glow),
             inset 0 1px 0 color-mix(in srgb, var(--fc-text-primary) 6%, transparent)`,
         }}
       >
@@ -193,7 +248,7 @@ function HeroWorkoutActiveCard({ tw }: { tw: DashboardData["todaysWorkout"] }) {
                 fontFamily: "var(--f-headline, var(--font-body))",
                 fontSize: "10.5px",
                 letterSpacing: "0.2em",
-                color: "var(--fc-accent-lime)",
+                color: "var(--fc-accent)",
               }}
             >
               Today&apos;s Work
@@ -234,15 +289,18 @@ function HeroWorkoutActiveCard({ tw }: { tw: DashboardData["todaysWorkout"] }) {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => {
-                window.location.href = "/client/train";
-              }}
-              className="btn-action flex min-h-0 flex-1 items-center justify-center gap-2 normal-case px-4 py-3.5 text-[14.5px] tracking-[0.01em]"
+              onClick={() => void handleStart()}
+              disabled={isStarting}
+              className="btn-action flex min-h-0 flex-1 items-center justify-center gap-2 normal-case px-4 py-3.5 text-[14.5px] tracking-[0.01em] disabled:opacity-60"
             >
-              <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="currentColor" aria-hidden>
-                <polygon points="6 4 20 12 6 20 6 4" />
-              </svg>
-              Start Training
+              {isStarting ? (
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+              ) : (
+                <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="currentColor" aria-hidden>
+                  <polygon points="6 4 20 12 6 20 6 4" />
+                </svg>
+              )}
+              {isStarting ? "Starting…" : "Start Workout"}
             </button>
             {detailsHref ? (
               <button
@@ -256,7 +314,8 @@ function HeroWorkoutActiveCard({ tw }: { tw: DashboardData["todaysWorkout"] }) {
                   borderColor: "var(--fc-glass-border)",
                   color: "var(--fc-text-dim)",
                 }}
-                aria-label="Workout details"
+                aria-label="See exercises first"
+                title="See exercises first"
               >
                 <Info className="h-[18px] w-[18px]" strokeWidth={2} />
               </button>

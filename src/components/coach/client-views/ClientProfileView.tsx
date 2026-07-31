@@ -1,11 +1,13 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { User, Mail, Dumbbell, Shield, Camera, Save, Pencil, CheckCircle2, Clock } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { User, Mail, Dumbbell, Shield, Camera, Save, Pencil, CheckCircle2, Clock, Heart } from 'lucide-react'
 import DetailGrid from '@/components/coach/client-detail/DetailGrid'
 import ProfilePhotoCard from '@/components/coach/client-detail/ProfilePhotoCard'
 import sec from '@/components/coach/client-detail/coachClientDetailUi.module.css'
 import { supabase } from '@/lib/supabase'
+import { getLatestClientWeight, type LatestClientWeight } from '@/lib/metrics/body'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,7 +22,7 @@ interface ClientProfileViewProps {
 }
 
 function formatVisibilityLabel(raw: string | null): string {
-  if (!raw) return '—'
+  if (!raw) return 'â€”'
   const s = raw.toLowerCase()
   if (s === 'public') return 'Public'
   if (s === 'private') return 'Private'
@@ -28,7 +30,7 @@ function formatVisibilityLabel(raw: string | null): string {
 }
 
 function formatClientTypeLabel(raw: string | null): string {
-  if (!raw) return '—'
+  if (!raw) return 'â€”'
   const s = raw.toLowerCase().replace(/[-_]/g, ' ')
   if (s === 'online') return 'Online'
   if (s === 'in person' || s === 'inperson') return 'In-person'
@@ -44,11 +46,17 @@ type ProfileRow = {
   avatar_url: string | null
   bio: string | null
   sex: string | null
-  bodyweight: number | string | null
   client_type: string | null
   leaderboard_visibility: string | null
   role: string | null
   created_at: string | null
+  medical_conditions: string | null
+  injuries: string | null
+}
+
+function displayHealthNote(raw: string | null | undefined): string {
+  const t = (raw ?? '').trim()
+  return t || 'None noted'
 }
 
 const CLIENT_STATUSES = ['active', 'inactive', 'pending'] as const
@@ -58,8 +66,10 @@ export default function ClientProfileView({
   layoutVariant = 'default',
 }: ClientProfileViewProps) {
   const { user } = useAuth()
+  const queryClient = useQueryClient()
   const { addToast } = useToast()
   const [profile, setProfile] = useState<ProfileRow | null>(null)
+  const [latestWeight, setLatestWeight] = useState<LatestClientWeight | null>(null)
   const [clientStatus, setClientStatus] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [editOpen, setEditOpen] = useState(false)
@@ -79,21 +89,25 @@ export default function ClientProfileView({
       const { data: prof, error: pe } = await supabase
         .from('profiles')
         .select(
-          'id, email, first_name, last_name, avatar_url, bio, sex, bodyweight, client_type, leaderboard_visibility, role, created_at'
+          'id, email, first_name, last_name, avatar_url, bio, sex, client_type, leaderboard_visibility, role, created_at, medical_conditions, injuries'
         )
         .eq('id', clientId)
         .maybeSingle()
       if (pe) throw pe
 
-      const { data: rel } = await supabase
-        .from('clients')
-        .select('status')
-        .eq('coach_id', user.id)
-        .eq('client_id', clientId)
-        .maybeSingle()
+      const [{ data: rel }, weight] = await Promise.all([
+        supabase
+          .from('clients')
+          .select('status')
+          .eq('coach_id', user.id)
+          .eq('client_id', clientId)
+          .maybeSingle(),
+        getLatestClientWeight(clientId),
+      ])
 
       if (prof) {
         setProfile(prof as ProfileRow)
+        setLatestWeight(weight)
         const st = rel?.status ?? 'active'
         setClientStatus(rel?.status ?? null)
         setDraft({
@@ -107,11 +121,13 @@ export default function ClientProfileView({
         })
       } else {
         setProfile(null)
+        setLatestWeight(null)
       }
     } catch (e) {
       console.error(e)
       addToast({ title: 'Could not load profile', variant: 'destructive' })
       setProfile(null)
+      setLatestWeight(null)
     } finally {
       setLoading(false)
     }
@@ -163,6 +179,15 @@ export default function ClientProfileView({
       addToast({ title: 'Profile updated', variant: 'default' })
       setEditOpen(false)
       await load()
+      await queryClient.invalidateQueries({
+        queryKey: ['coach-client', clientId, 'identity'],
+      })
+      await queryClient.invalidateQueries({
+        queryKey: ['coach-clients', user?.id],
+      })
+      await queryClient.invalidateQueries({
+        queryKey: ['coach-client', clientId, 'summary'],
+      })
     } catch (e) {
       console.error(e)
       addToast({ title: 'Save failed', variant: 'destructive' })
@@ -216,28 +241,66 @@ export default function ClientProfileView({
             avatarUrl={profile.avatar_url}
             onEditPhoto={openEdit}
           />
+        </section>
+
+        <section className={sec.section}>
+          <div className={sec.sectionHead}>
+            <span className={sec.eyebrow}>Health &amp; injuries</span>
+          </div>
+          <p className="m-0 text-[11px] leading-snug text-[color:var(--fc-text-subtle)]">
+            From the client&apos;s profile â€” use when programming around limitations.
+          </p>
+          <div className="space-y-3">
+            <div>
+              <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--fc-text-subtle)]">
+                Medical conditions
+              </p>
+              <p className="m-0 whitespace-pre-wrap text-sm leading-relaxed text-[color:var(--fc-text-primary)]">
+                {displayHealthNote(profile.medical_conditions)}
+              </p>
+            </div>
+            <div>
+              <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--fc-text-subtle)]">
+                Injuries
+              </p>
+              <p className="m-0 whitespace-pre-wrap text-sm leading-relaxed text-[color:var(--fc-text-primary)]">
+                {displayHealthNote(profile.injuries)}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className={sec.section}>
+          <div className={sec.sectionHead}>
+            <span className={sec.eyebrow}>Details</span>
+          </div>
           <DetailGrid
             rows={[
               {
                 icon: User,
                 label: 'Name',
-                value: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || '—',
+                value: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'â€”',
               },
               { icon: Mail, label: 'Email', value: profile.email },
               {
                 icon: Dumbbell,
                 label: 'Bodyweight',
-                value:
-                  profile.bodyweight != null && String(profile.bodyweight).trim() !== ''
-                    ? `${profile.bodyweight} kg`
-                    : null,
+                value: latestWeight
+                  ? `${latestWeight.weightKg} kg Â· ${new Date(
+                      latestWeight.measuredDate + 'T12:00:00',
+                    ).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}`
+                  : null,
                 mutedWhenEmpty: true,
               },
               {
                 icon: CheckCircle2,
                 label: 'Client type',
                 value: formatClientTypeLabel(profile.client_type),
-                iconTone: 'lime',
+                iconTone: 'action',
               },
               {
                 icon: Clock,
@@ -260,7 +323,7 @@ export default function ClientProfileView({
             <div>
               <Label className="fc-text-subtle">First name</Label>
               <Input
-                className="mt-1 rounded-[11px] border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface-card)]"
+                className="mt-1 rounded-[11px] border border-[color:var(--fc-glass-border)] bg-transparent"
                 value={draft.first_name}
                 onChange={(e) => setDraft((d) => ({ ...d, first_name: e.target.value }))}
               />
@@ -268,7 +331,7 @@ export default function ClientProfileView({
             <div>
               <Label className="fc-text-subtle">Last name</Label>
               <Input
-                className="mt-1 rounded-[11px] border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface-card)]"
+                className="mt-1 rounded-[11px] border border-[color:var(--fc-glass-border)] bg-transparent"
                 value={draft.last_name}
                 onChange={(e) => setDraft((d) => ({ ...d, last_name: e.target.value }))}
               />
@@ -276,8 +339,8 @@ export default function ClientProfileView({
             <div>
               <Label className="fc-text-subtle">Avatar URL</Label>
               <Input
-                className="mt-1 rounded-[11px] border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface-card)]"
-                placeholder="https://…"
+                className="mt-1 rounded-[11px] border border-[color:var(--fc-glass-border)] bg-transparent"
+                placeholder="https://â€¦"
                 value={draft.avatar_url}
                 onChange={(e) => setDraft((d) => ({ ...d, avatar_url: e.target.value }))}
               />
@@ -285,7 +348,7 @@ export default function ClientProfileView({
             <div>
               <Label className="fc-text-subtle">Bio</Label>
               <Textarea
-                className="mt-1 min-h-[88px] rounded-[11px] border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface-card)]"
+                className="mt-1 min-h-[88px] rounded-[11px] border border-[color:var(--fc-glass-border)] bg-transparent"
                 value={draft.bio}
                 onChange={(e) => setDraft((d) => ({ ...d, bio: e.target.value }))}
                 placeholder="Optional"
@@ -294,7 +357,7 @@ export default function ClientProfileView({
             <div>
               <Label className="fc-text-subtle">Coaching relationship (clients.status)</Label>
               <select
-                className="mt-1 w-full h-10 rounded-[11px] border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface-card)] px-3 text-sm fc-text-primary"
+                className="mt-1 w-full h-10 rounded-[11px] border border-[color:var(--fc-glass-border)] bg-transparent px-3 text-sm fc-text-primary"
                 value={draft.status}
                 onChange={(e) => setDraft((d) => ({ ...d, status: e.target.value }))}
               >
@@ -316,7 +379,7 @@ export default function ClientProfileView({
                 onClick={() => void saveProfile()}
               >
                 <Save className="w-4 h-4" />
-                {saving ? 'Saving…' : 'Save'}
+                {saving ? 'Savingâ€¦' : 'Save'}
               </Button>
             </div>
           </div>
@@ -340,7 +403,7 @@ export default function ClientProfileView({
       </div>
       <div className="flex-1 min-w-0">
         <p className="fc-text-subtle mb-1 text-xs font-medium">{label}</p>
-        <p className="fc-text-primary text-sm font-semibold break-words">{value || '—'}</p>
+        <p className="fc-text-primary text-sm font-semibold break-words">{value || 'â€”'}</p>
       </div>
     </div>
   )
@@ -348,14 +411,14 @@ export default function ClientProfileView({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-cyan-400/60">
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-[color-mix(in_srgb,var(--fc-group-c)_60%,transparent)]">
           Personal information
         </h2>
         <Button
           type="button"
           size="sm"
           variant="ghost"
-          className="gap-2 text-cyan-400 border border-cyan-500/25 hover:bg-cyan-500/10"
+          className="gap-2 text-[color:var(--fc-group-c)] border border-[color-mix(in_srgb,var(--fc-group-c)_25%,transparent)] hover:bg-[color-mix(in_srgb,var(--fc-group-c)_10%,transparent)]"
           onClick={openEdit}
         >
           <Pencil className="w-4 h-4" />
@@ -381,7 +444,7 @@ export default function ClientProfileView({
                 className="w-24 h-24 rounded-full object-cover border-2 border-[color:var(--fc-glass-border)] shadow-lg"
               />
             ) : (
-              <div className="w-24 h-24 rounded-full border-2 border-[color:var(--fc-glass-border)] shadow-lg fc-glass-soft flex items-center justify-center text-2xl font-bold fc-text-primary">
+              <div className="w-24 h-24 rounded-full border-2 border-[color:var(--fc-glass-border)] shadow-lg bg-transparent flex items-center justify-center text-2xl font-bold fc-text-primary">
                 {profile.first_name?.[0]}
                 {profile.last_name?.[0]}
               </div>
@@ -392,6 +455,34 @@ export default function ClientProfileView({
               </h3>
               <p className="fc-text-dim text-sm">{profile.email}</p>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-[color:var(--fc-glass-border)]">
+        <div className="px-3 py-2 border-b border-[color:var(--fc-glass-border)]">
+          <div className="flex items-center gap-3">
+            <div className="fc-icon-tile fc-icon-workouts">
+              <Heart className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold fc-text-primary">Health &amp; injuries</h3>
+              <p className="text-xs fc-text-dim">From the client&apos;s profile â€” use when programming</p>
+            </div>
+          </div>
+        </div>
+        <div className="px-3 py-3 space-y-3">
+          <div>
+            <p className="fc-text-subtle mb-1 text-xs font-medium">Medical conditions</p>
+            <p className="fc-text-primary text-sm whitespace-pre-wrap">
+              {displayHealthNote(profile.medical_conditions)}
+            </p>
+          </div>
+          <div>
+            <p className="fc-text-subtle mb-1 text-xs font-medium">Injuries</p>
+            <p className="fc-text-primary text-sm whitespace-pre-wrap">
+              {displayHealthNote(profile.injuries)}
+            </p>
           </div>
         </div>
       </div>
@@ -415,7 +506,21 @@ export default function ClientProfileView({
           {profile.bio ? (
             <InfoRow icon={User} label="Bio" value={profile.bio} />
           ) : null}
-          <InfoRow icon={Dumbbell} label="Bodyweight" value={profile.bodyweight != null ? `${profile.bodyweight} kg` : null} />
+          <InfoRow
+            icon={Dumbbell}
+            label="Bodyweight"
+            value={
+              latestWeight
+                ? `${latestWeight.weightKg} kg Â· ${new Date(
+                    latestWeight.measuredDate + 'T12:00:00',
+                  ).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}`
+                : null
+            }
+          />
           <InfoRow icon={Shield} label="Client type" value={profile.client_type} />
           <InfoRow icon={Shield} label="Leaderboard" value={profile.leaderboard_visibility} />
         </div>
@@ -449,7 +554,7 @@ export default function ClientProfileView({
             <Label className="fc-text-subtle">Avatar URL</Label>
             <Input
               className="mt-1"
-              placeholder="https://…"
+              placeholder="https://â€¦"
               value={draft.avatar_url}
               onChange={(e) => setDraft((d) => ({ ...d, avatar_url: e.target.value }))}
             />
@@ -483,7 +588,7 @@ export default function ClientProfileView({
             </Button>
             <Button type="button" className="fc-btn fc-btn-primary gap-2" disabled={saving} onClick={() => void saveProfile()}>
               <Save className="w-4 h-4" />
-              {saving ? 'Saving…' : 'Save'}
+              {saving ? 'Savingâ€¦' : 'Save'}
             </Button>
           </div>
         </div>

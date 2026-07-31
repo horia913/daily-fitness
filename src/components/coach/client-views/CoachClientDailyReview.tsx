@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCoachClient } from "@/contexts/CoachClientContext";
@@ -8,11 +8,14 @@ import { WeekReviewModal } from "@/components/coach/WeekReviewModal";
 import {
   Dumbbell,
   TrendingUp,
-  Trophy,
   Heart,
-  Utensils,
   MessageCircle,
   SlidersHorizontal,
+  ChevronRight,
+  FileText,
+  Scale,
+  Utensils,
+  CalendarCheck,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import type { AttentionLevel } from "@/lib/coachClientAttention";
@@ -20,6 +23,8 @@ import { deltaTone, adherenceTierFromPercent } from "@/lib/coachWorkoutAdherence
 import { cn } from "@/lib/utils";
 import ClientHeaderCard from "@/components/coach/client-detail/ClientHeaderCard";
 import { CoachAthleteScoreHero } from "@/components/coach/CoachAthleteScoreHero";
+import { CoachScoreBreakdownBlock } from "@/components/coach/CoachScoreBreakdownBlock";
+import { CoachClientPerformanceLazy } from "@/components/coach/client-views/CoachClientPerformanceLazy";
 import ov from "./CoachClientDailyReview.module.css";
 
 export type TodayWorkoutJson = {
@@ -136,6 +141,8 @@ type Props = {
   program: ProgramCardJson;
   nutrition: NutritionCardJson;
   weeklyReview: WeeklyReviewJson;
+  /** Private standing coach note (null = empty). */
+  standingNote?: string | null;
 };
 
 function tierColor(tier: "green" | "amber" | "red" | null) {
@@ -201,25 +208,41 @@ export default function CoachClientDailyReview({
   nextScheduledWorkout,
   latestCheckIn,
   program,
-  nutrition,
+  nutrition: _nutrition,
   weeklyReview,
+  standingNote: standingNoteProp = null,
 }: Props) {
   const { clientName } = useCoachClient();
   const { addToast } = useToast();
   const router = useRouter();
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [scoreBreakdownOpen, setScoreBreakdownOpen] = useState(false);
+  const [standingNote, setStandingNote] = useState<string | null>(standingNoteProp);
 
-  const adherencePct = useMemo(() => {
-    const g = weeklyProgress.goal;
-    if (!g || g <= 0) return null;
-    return Math.round((weeklyProgress.current / g) * 100);
-  }, [weeklyProgress.current, weeklyProgress.goal]);
+  useEffect(() => {
+    setStandingNote(standingNoteProp);
+  }, [standingNoteProp]);
+
+  const currentWeek = weeklyReview?.currentWeek ?? null;
+
+  const programAdherence = useMemo(() => {
+    if (!currentWeek || currentWeek.workouts.planned <= 0) return null;
+    return {
+      completed: currentWeek.workouts.completed,
+      scheduled: currentWeek.workouts.planned,
+    };
+  }, [currentWeek?.workouts.completed, currentWeek?.workouts.planned]);
+
+  const programAdherencePct = useMemo(() => {
+    if (!programAdherence || programAdherence.scheduled <= 0) return null;
+    return Math.round((programAdherence.completed / programAdherence.scheduled) * 100);
+  }, [programAdherence]);
 
   const alertCount = attention.reasons.length;
 
   const attentionDetail = useMemo(() => {
     const parts = attention.reasons.filter((r) => !r.startsWith("Flagged at-risk"));
-    const tail = parts.length ? parts.join(" · ") : "review compliance";
+    const tail = parts.length ? parts.join(" · ") : "review adherence";
     const checkInBit =
       lastCheckinDate && weeklyReview?.clientTimezone
         ? (() => {
@@ -241,14 +264,14 @@ export default function CoachClientDailyReview({
 
   const flaggedForHeader =
     attention.level === "urgent" ||
-    (adherencePct !== null && adherencePct < 40);
+    (programAdherencePct !== null && programAdherencePct < 40);
 
   const headerAlertSecondary =
     attention.reasons.length > 0
       ? attentionDetail
-      : adherencePct != null
-        ? `compliance · ${adherencePct}% weekly adherence${lastCheckinDate ? "" : " · no recent check-in"}`
-        : "compliance · review client";
+      : programAdherencePct != null
+        ? `Adherence ${programAdherencePct}% this week${lastCheckinDate ? "" : " · no recent check-in"}`
+        : "Review client adherence";
 
   const adherenceTier = adherenceTierFromPercent(todayWorkout?.adherencePercent ?? null);
 
@@ -265,8 +288,6 @@ export default function CoachClientDailyReview({
     program?.coachUnlockedWeek ??
     program?.currentWeek ??
     1;
-
-  const currentWeek = weeklyReview?.currentWeek ?? null;
 
   const weekJustStarted = !!currentWeek && (
     currentWeek.workouts.completed === 0 &&
@@ -335,30 +356,55 @@ export default function CoachClientDailyReview({
         : "On track"
     : "";
 
-  const nutritionEmpty =
-    !nutrition?.planName &&
-    (nutrition?.compliance7dPct == null || Number.isNaN(nutrition.compliance7dPct));
+  const deepDiveLinkClass =
+    "flex items-center justify-between gap-3 rounded-xl border border-[color:rgba(255,255,255,0.08)] bg-transparent px-3 py-2.5 text-left transition-colors hover:bg-white/[0.03]";
 
   return (
     <div className={ov.page}>
+      {/* —— 1. Header / status —— */}
       <ClientHeaderCard
         clientId={clientId}
         name={name}
         email={email}
         initials={initials}
-        adherencePct={adherencePct}
+        programAdherence={programAdherence}
+        progress={
+          program?.currentWeek != null && program?.durationWeeks != null && program.durationWeeks > 0
+            ? { currentWeek: program.currentWeek, totalWeeks: program.durationWeeks }
+            : null
+        }
         streakDays={streak}
         alertCount={alertCount}
         trainedToday={trainedToday}
         attentionLevel={attention.level}
-        attentionDetail={flaggedForHeader ? headerAlertSecondary : null}
+        attentionDetail={headerAlertSecondary}
+        flagged={flaggedForHeader}
         phone={phone}
         onMessage={openMessage}
+        standingNote={standingNote}
+        onStandingNoteSaved={setStandingNote}
       />
 
-      <CoachAthleteScoreHero clientId={clientId} />
+      <CoachAthleteScoreHero
+        clientId={clientId}
+        onOpenBreakdown={() => setScoreBreakdownOpen(true)}
+      />
 
-      {/* Today */}
+      <button
+        type="button"
+        onClick={() => setScoreBreakdownOpen((o) => !o)}
+        className="mb-1 w-full text-left text-[11px] font-medium text-[color:var(--fc-set-type-straight)]"
+      >
+        {scoreBreakdownOpen ? "Hide score breakdown" : "View score breakdown"}
+      </button>
+      {scoreBreakdownOpen ? (
+        <div className="mb-4">
+          <CoachScoreBreakdownBlock clientId={clientId} />
+        </div>
+      ) : null}
+
+      {/* —— 2. Today / This week —— */}
+      <div className={ov.deskPair}>
       <section className={ov.section}>
         <div className={ov.sectionHead}>
           <span className={ov.eyebrow}>Today</span>
@@ -383,7 +429,7 @@ export default function CoachClientDailyReview({
               </p>
               {todayWorkout.adherencePercent != null && (
                 <p className="mt-1 text-[11px]">
-                  <span className="text-[color:var(--fc-text-subtle)]">Target: </span>
+                  <span className="text-[color:var(--fc-text-subtle)]">Execution: </span>
                   <span className={cn("font-medium", tierColor(adherenceTier))}>
                     {Math.round(todayWorkout.adherencePercent)}% sets on target
                   </span>
@@ -437,7 +483,7 @@ export default function CoachClientDailyReview({
               No active program — stats stay at zero until you assign one.
             </p>
           ) : (
-            <div className={ov.tileGrid4}>
+            <div className={ov.tileGrid4} style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
               <button
                 type="button"
                 className={ov.tile}
@@ -462,15 +508,11 @@ export default function CoachClientDailyReview({
                   >
                     {currentWeek.workouts.completed}/{currentWeek.workouts.planned}
                   </span>
-                  <span className={ov.tileUnit}>sessions</span>
+                  <span className={ov.tileUnit}>scheduled</span>
                 </div>
-                <div className={ov.tileLabel}>Workouts</div>
+                <div className={ov.tileLabel}>Adherence</div>
               </button>
-              <button
-                type="button"
-                className={ov.tile}
-                onClick={() => router.push(`/coach/clients/${clientId}/stats`)}
-              >
+              <div className={ov.tile}>
                 <div
                   className={ov.tileIcon}
                   style={{
@@ -493,44 +535,17 @@ export default function CoachClientDailyReview({
                   <span className={ov.tileUnit}>kg</span>
                 </div>
                 <div className={ov.tileLabel}>Volume</div>
-              </button>
+              </div>
               <button
                 type="button"
                 className={ov.tile}
-                onClick={() => router.push(`/coach/clients/${clientId}/stats`)}
+                onClick={() => router.push(`/coach/clients/${clientId}/check-ins`)}
               >
                 <div
                   className={ov.tileIcon}
                   style={{
-                    background: "var(--fc-effort-medium-soft)",
-                    color: "var(--fc-effort-medium)",
-                  }}
-                >
-                  <Trophy className="h-3 w-3" />
-                </div>
-                <div>
-                  <span
-                    className={cn(
-                      ov.tileNum,
-                      currentWeek.prs.count > 0 ? ov.tileNumAccentWarn : undefined,
-                    )}
-                    style={{ fontFamily: "var(--f-display, var(--font-geist-sans))" }}
-                  >
-                    {currentWeek.prs.count}
-                  </span>
-                </div>
-                <div className={ov.tileLabel}>PRs</div>
-              </button>
-              <button
-                type="button"
-                className={ov.tile}
-                onClick={() => router.push(`/coach/clients/${clientId}/progress`)}
-              >
-                <div
-                  className={ov.tileIcon}
-                  style={{
-                    background: "var(--fc-accent-lime-soft)",
-                    color: "var(--fc-accent-lime-2)",
+                    background: "var(--fc-accent-dim)",
+                    color: "var(--fc-accent)",
                   }}
                 >
                   <Heart className="h-3 w-3" />
@@ -539,7 +554,7 @@ export default function CoachClientDailyReview({
                   <span
                     className={cn(
                       ov.tileNum,
-                      currentWeek.checkIns.daily.submitted > 0 ? ov.tileNumAccentLime : undefined,
+                      currentWeek.checkIns.daily.submitted > 0 ? ov.tileNumAccentAction : undefined,
                     )}
                     style={{ fontFamily: "var(--f-display, var(--font-geist-sans))" }}
                   >
@@ -551,11 +566,13 @@ export default function CoachClientDailyReview({
             </div>
           )
         ) : (
-          <p className="text-xs text-[color:var(--fc-text-subtle)]">Weekly review unavailable</p>
+          <p className="text-xs text-[color:var(--fc-text-subtle)]">Periodical check-in unavailable</p>
         )}
       </section>
+      </div>
 
-      {/* Latest check-in */}
+      {/* Latest check-in + Program */}
+      <div className={ov.deskPair}>
       <section className={ov.section}>
         <div className={ov.sectionHead}>
           <span className={ov.eyebrow}>Latest check-in</span>
@@ -624,11 +641,11 @@ export default function CoachClientDailyReview({
         )}
       </section>
 
-      {/* Active program */}
+      {/* —— 3. Program (Progress) —— */}
       <section className={ov.section}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-[10px] font-mono uppercase tracking-[0.16em] text-[color:var(--fc-set-type-straight)]">
-            Active program
+            Program · Progress
           </span>
           {program ? (
             <span
@@ -667,18 +684,36 @@ export default function CoachClientDailyReview({
             ) : null}
             <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[color:var(--fc-text-subtle)]">
               <span>
-                {programProgressDisplay != null ? `${programProgressDisplay}% complete` : ""}
+                {programProgressDisplay != null ? `${programProgressDisplay}% Progress` : ""}
               </span>
-              <button
-                type="button"
-                onClick={() => setReviewOpen(true)}
-                className="inline-flex items-center gap-0.5 font-medium text-[color:var(--fc-set-type-straight)]"
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setReviewOpen(true)}
+                  className="inline-flex items-center gap-0.5 font-medium text-[color:var(--fc-set-type-straight)]"
+                >
+                  Review week
+                  <span aria-hidden className="text-[10px]">
+                    →
+                  </span>
+                </button>
+                <Link
+                  href={`/coach/clients/${clientId}/workouts`}
+                  className="inline-flex items-center gap-0.5 font-medium text-[color:var(--fc-text-dim)]"
+                >
+                  Training workspace
+                  <span aria-hidden>→</span>
+                </Link>
+              </div>
+            </div>
+            <div className="mt-3">
+              <Link
+                href={`/coach/clients/${clientId}/programs/${program.programId}/edit`}
+                className={ov.btnCyan}
               >
-                Review week
-                <span aria-hidden className="text-[10px]">
-                  →
-                </span>
-              </button>
+                <SlidersHorizontal className="h-[13px] w-[13px]" aria-hidden />
+                Adjust program
+              </Link>
             </div>
           </>
         ) : (
@@ -687,45 +722,82 @@ export default function CoachClientDailyReview({
           </p>
         )}
       </section>
+      </div>
 
-      {/* Nutrition */}
+      {/* —— 4. Performance (full width — chart needs desktop room) —— */}
+      <section className={ov.section} id="coach-client-performance">
+        <div className={ov.sectionHead}>
+          <span className={ov.eyebrow}>Performance</span>
+        </div>
+        <CoachClientPerformanceLazy
+          clientId={clientId}
+          prsThisWeek={currentWeek?.prs.count}
+        />
+      </section>
+
+      {/* —— 5. Deep-dive links —— */}
       <section className={ov.section}>
         <div className={ov.sectionHead}>
-          <span className={cn(ov.eyebrow, ov.eyebrowGood)}>Nutrition</span>
+          <span className={ov.eyebrow}>Deep dive</span>
         </div>
-        {nutritionEmpty ? (
-          <div className="flex flex-col gap-3">
-            <span className={ov.pillMutedTag}>No plan</span>
-            <div className={ov.todayEmpty}>
-              <div
-                className={ov.todayEmptyIcon}
-                style={{
-                  background: "var(--fc-effort-easy-soft)",
-                  color: "var(--fc-effort-easy)",
-                }}
-              >
-                <Utensils className="h-4 w-4" aria-hidden />
-              </div>
-              <p className="text-[12.5px] text-[color:var(--fc-text-primary)]">
-                No meal plan assigned · Assign a plan or set macro targets
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {nutrition?.planName ? (
-              <p className="text-sm font-medium text-[color:var(--fc-text-primary)]">{nutrition.planName}</p>
-            ) : null}
-            <p className="text-xs text-[color:var(--fc-text-subtle)]">
-              {nutrition?.compliance7dPct != null
-                ? `${nutrition.compliance7dPct}% compliance (7d)`
-                : "Compliance —"}
-              {` · ${nutrition?.mealsLoggedToday ?? 0} meal${
-                nutrition?.mealsLoggedToday === 1 ? "" : "s"
-              } logged today`}
-            </p>
-          </div>
-        )}
+        <div className="flex flex-col gap-2 lg:grid lg:grid-cols-2 lg:gap-2">
+          <Link href={`/coach/clients/${clientId}/workout-logs`} className={deepDiveLinkClass}>
+            <span className="flex items-center gap-2 min-w-0">
+              <FileText className="h-4 w-4 shrink-0 text-[color:var(--fc-set-type-straight)]" aria-hidden />
+              <span>
+                <span className="block text-[13px] font-semibold text-[color:var(--fc-text-primary)]">
+                  Workout logs
+                </span>
+                <span className="block text-[11px] text-[color:var(--fc-text-subtle)]">
+                  Execution per session — sets on target vs prescribed
+                </span>
+              </span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 fc-text-dim" aria-hidden />
+          </Link>
+          <Link href={`/coach/clients/${clientId}/check-ins`} className={deepDiveLinkClass}>
+            <span className="flex items-center gap-2 min-w-0">
+              <CalendarCheck className="h-4 w-4 shrink-0 text-[color:var(--fc-accent)]" aria-hidden />
+              <span>
+                <span className="block text-[13px] font-semibold text-[color:var(--fc-text-primary)]">
+                  Check-ins
+                </span>
+                <span className="block text-[11px] text-[color:var(--fc-text-subtle)]">
+                  Wellness review workspace
+                </span>
+              </span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 fc-text-dim" aria-hidden />
+          </Link>
+          <Link href={`/coach/clients/${clientId}/check-ins`} className={deepDiveLinkClass}>
+            <span className="flex items-center gap-2 min-w-0">
+              <Scale className="h-4 w-4 shrink-0 text-[color:var(--fc-meal-dinner)]" aria-hidden />
+              <span>
+                <span className="block text-[13px] font-semibold text-[color:var(--fc-text-primary)]">
+                  Body metrics
+                </span>
+                <span className="block text-[11px] text-[color:var(--fc-text-subtle)]">
+                  Weight and measurements in check-ins
+                </span>
+              </span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 fc-text-dim" aria-hidden />
+          </Link>
+          <Link href={`/coach/clients/${clientId}/meals`} className={deepDiveLinkClass}>
+            <span className="flex items-center gap-2 min-w-0">
+              <Utensils className="h-4 w-4 shrink-0 text-[color:var(--fc-effort-easy)]" aria-hidden />
+              <span>
+                <span className="block text-[13px] font-semibold text-[color:var(--fc-text-primary)]">
+                  Nutrition
+                </span>
+                <span className="block text-[11px] text-[color:var(--fc-text-subtle)]">
+                  Meal plan and adherence workspace
+                </span>
+              </span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 fc-text-dim" aria-hidden />
+          </Link>
+        </div>
       </section>
 
       <div className={ov.actionRow}>
@@ -733,10 +805,6 @@ export default function CoachClientDailyReview({
           <MessageCircle className="h-[13px] w-[13px]" aria-hidden />
           Message
         </button>
-        <Link href={`/coach/clients/${clientId}/workouts`} className={ov.btnCyan}>
-          <SlidersHorizontal className="h-[13px] w-[13px]" aria-hidden />
-          Adjust plan
-        </Link>
       </div>
 
       {program && (

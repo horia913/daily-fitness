@@ -38,7 +38,7 @@ export function ClientCountStrip({
             <div
               className="text-base font-bold leading-none"
               style={{
-                fontFamily: 'var(--f-display, "Big Shoulders Display", sans-serif)',
+                fontFamily: 'var(--f-display, var(--f-display), sans-serif)',
                 color: 'var(--t1)',
               }}
             >

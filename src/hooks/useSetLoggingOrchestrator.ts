@@ -77,7 +77,7 @@ export interface SetLoggingOrchestrator {
 
 export interface LogSetParams {
   sessionId: string | null | undefined;
-  blockId: string;
+  setEntryId: string;
   blockType: string;
   exerciseId: string;
   setNumber: number;
@@ -243,7 +243,7 @@ export function useSetLoggingOrchestrator(
     (params: LogSetParams): LogSetResult => {
       const key = buildIdempotencyKey(
         params.sessionId,
-        params.blockId,
+        params.setEntryId,
         params.exerciseId,
         params.setNumber,
       );
@@ -268,7 +268,7 @@ export function useSetLoggingOrchestrator(
       // Create optimistic entry
       const entry = createPendingEntry(
         key,
-        params.blockId,
+        params.setEntryId,
         params.blockType,
         params.exerciseId,
         params.setNumber,

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<title>Coach — Insights</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;}
+  :root{
+    --page:#0A0B0D; --well:#050608;
+    --line:rgba(255,255,255,.07); --line-2:rgba(255,255,255,.13);
+    --accent:#2E7BFF; --accent-dim:rgba(46,123,255,.16); --accent-glow:rgba(46,123,255,.30);
+    --good:#22E56A; --warn:#FFB020; --hot:#FF7A2F; --bad:#FF5A4D; --gold:#F5C242; --purple:#9D6BFF; --aqua:#22D3EE;
+    --text:#F0F2F5; --dim:#8B93A1; --subtle:#5C6470; --faint:#3D434D;
+    --f-d:'Archivo',sans-serif; --f-b:'Inter',sans-serif; --f-m:'JetBrains Mono',monospace;
+  }
+  body{background:var(--page);color:var(--text);font-family:var(--f-b);-webkit-font-smoothing:antialiased;padding:22px 26px 50px;font-size:13px;}
+  .d{font-family:var(--f-d);font-stretch:105%;}
+  svg{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;width:15px;height:15px;}
+
+  .tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px;max-width:720px;}
+  .tab{border:1px solid var(--line);border-radius:10px;padding:11px;text-align:center;font-family:var(--f-m);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);}
+  .tab.on{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 4px 20px -6px var(--accent-glow);}
+
+  .head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:18px;}
+  .head .eb{font-family:var(--f-m);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700;}
+  .head h1{font-family:var(--f-d);font-size:28px;font-weight:800;letter-spacing:-.025em;margin-top:7px;}
+  .head .s{font-size:12.5px;color:var(--dim);margin-top:5px;}
+  .rng{display:flex;gap:6px;background:var(--well);border:1px solid var(--line);border-radius:10px;padding:5px;}
+  .rg{padding:8px 15px;border-radius:7px;font-family:var(--f-m);font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--dim);}
+  .rg.on{background:var(--accent);color:#fff;box-shadow:0 3px 14px -5px var(--accent-glow);}
+
+  /* ONE stat strip */
+  .stats{display:grid;grid-template-columns:repeat(5,1fr);border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-bottom:14px;}
+  .st{padding:15px 18px;border-right:1px solid var(--line);}
+  .st:last-child{border-right:none;}
+  .st .l{font-family:var(--f-m);font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--faint);}
+  .st .v{font-family:var(--f-d);font-size:30px;font-weight:900;line-height:1;margin:9px 0 5px;letter-spacing:-.03em;}
+  .st .v .u{font-family:var(--f-m);font-size:13px;font-weight:600;color:var(--dim);margin-left:2px;}
+  .st .d2{font-family:var(--f-m);font-size:9.5px;color:var(--subtle);}
+  .st .d2 b{font-weight:700;}
+  .up{color:var(--good);} .down{color:var(--bad);} .flat{color:var(--faint);}
+
+  .row2{display:grid;grid-template-columns:1fr 340px;gap:14px;margin-bottom:14px;align-items:start;}
+  .card{border:1px solid var(--line);border-radius:13px;padding:16px 18px;}
+  .ch{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;}
+  .ch .t{font-family:var(--f-m);font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--dim);font-weight:700;}
+  .ch .n{font-family:var(--f-m);font-size:9.5px;color:var(--faint);}
+
+  /* trend bars */
+  .trend{display:flex;align-items:flex-end;gap:8px;height:132px;}
+  .tb{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;}
+  .tb .bar{width:100%;border-radius:4px 4px 0 0;background:linear-gradient(180deg,var(--accent),color-mix(in srgb,var(--accent) 55%,transparent));box-shadow:0 0 16px -6px var(--accent-glow);}
+  .tb.now .bar{background:linear-gradient(180deg,var(--good),color-mix(in srgb,var(--good) 55%,transparent));box-shadow:0 0 16px -5px var(--good);}
+  .tb .wk{font-family:var(--f-m);font-size:8.5px;color:var(--faint);}
+  .tb .pc{font-family:var(--f-m);font-size:9px;color:var(--dim);font-weight:600;}
+
+  /* distribution */
+  .dist{display:flex;flex-direction:column;gap:11px;}
+  .db{}
+  .db .r{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:5px;}
+  .db .r .n{font-size:11.5px;font-weight:600;}
+  .db .r .c{font-family:var(--f-d);font-size:15px;font-weight:800;}
+  .db .track{height:7px;border-radius:4px;background:rgba(255,255,255,.05);overflow:hidden;}
+  .db .track i{display:block;height:100%;border-radius:4px;}
+  .b-hi i{background:var(--good);box-shadow:0 0 12px -3px var(--good);} .b-hi .c{color:var(--good);}
+  .b-md i{background:var(--warn);box-shadow:0 0 12px -3px var(--warn);} .b-md .c{color:var(--warn);}
+  .b-lo i{background:var(--bad);box-shadow:0 0 12px -3px var(--bad);}  .b-lo .c{color:var(--bad);}
+  .b-no i{background:rgba(255,255,255,.16);} .b-no .c{color:var(--faint);}
+
+  /* roster table */
+  .tbl{border:1px solid var(--line);border-radius:13px;overflow:hidden;}
+  .th{display:grid;grid-template-columns:minmax(200px,1.4fr) 150px 150px 130px 110px 110px 40px;gap:16px;
+      padding:12px 18px;border-bottom:1px solid var(--line);align-items:center;}
+  .th span{font-family:var(--f-m);font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--faint);}
+  .th span.sort{color:var(--accent);display:flex;align-items:center;gap:5px;}
+  .tr{display:grid;grid-template-columns:minmax(200px,1.4fr) 150px 150px 130px 110px 110px 40px;gap:16px;
+      padding:13px 18px;border-bottom:1px solid var(--line);align-items:center;}
+  .tr:last-child{border-bottom:none;}
+  .tr:hover{background:rgba(255,255,255,.02);}
+  .cl{display:flex;align-items:center;gap:11px;min-width:0;}
+  .av{width:28px;height:28px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+      font-family:var(--f-m);font-size:9.5px;font-weight:700;color:#0A0B0D;}
+  .cl .n{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+  /* cell with inline bar */
+  .mc .v{font-family:var(--f-d);font-size:14px;font-weight:800;line-height:1;}
+  .mc .t2{height:4px;border-radius:2px;background:rgba(255,255,255,.05);margin-top:6px;overflow:hidden;}
+  .mc .t2 i{display:block;height:100%;border-radius:2px;}
+  .g .v{color:var(--good);}  .g .t2 i{background:var(--good);}
+  .a .v{color:var(--warn);}  .a .t2 i{background:var(--warn);}
+  .r .v{color:var(--bad);}   .r .t2 i{background:var(--bad);}
+  .none{font-family:var(--f-m);font-size:12px;color:var(--faint);}
+  .cell{font-family:var(--f-m);font-size:11.5px;color:var(--dim);}
+  .cell b{color:var(--text);font-family:var(--f-d);font-size:14px;font-weight:800;}
+  .chev{color:var(--faint);text-align:right;}
+
+  .foot{text-align:center;padding:16px;font-family:var(--f-m);font-size:10.5px;color:var(--subtle);}
+  .foot a{color:var(--accent);font-weight:700;}
+
+  .note{margin-top:26px;padding-left:14px;border-left:2px solid var(--accent);font-size:12px;line-height:1.8;color:var(--subtle);max-width:940px;}
+  .note b{color:var(--text);}
+</style></head>
+<body>
+
+<div class="tabs"><span class="tab on">Insights</span><span class="tab">Reports</span></div>
+
+<div class="head">
+  <div>
+    <div class="eb">● Roster analysis</div>
+    <h1 class="d">Insights</h1>
+    <div class="s">How the whole roster is trending — compare clients, spot patterns</div>
+  </div>
+  <div class="rng"><span class="rg">4 wk</span><span class="rg on">12 wk</span><span class="rg">6 mo</span></div>
+</div>
+
+<!-- ONE stat strip -->
+<div class="stats">
+  <div class="st"><div class="l">Avg adherence</div><div class="v d" style="color:var(--warn)">68<span class="u">%</span></div><div class="d2 up">▲ 6 pts vs prev</div></div>
+  <div class="st"><div class="l">Sessions logged</div><div class="v d">184</div><div class="d2 up">▲ 12 vs prev</div></div>
+  <div class="st"><div class="l">On track</div><div class="v d" style="color:var(--good)">8<span class="u">/13</span></div><div class="d2 flat">— same as prev</div></div>
+  <div class="st"><div class="l">PRs this period</div><div class="v d" style="color:var(--gold)">17</div><div class="d2 up">▲ 5 vs prev</div></div>
+  <div class="st"><div class="l">Active clients</div><div class="v d" style="color:var(--accent)">13</div><div class="d2 flat">2 without a program</div></div>
+</div>
+
+<div class="row2">
+  <div class="card">
+    <div class="ch"><span class="t">Roster adherence · weekly</span><span class="n">12 weeks · % of scheduled sessions completed</span></div>
+    <div class="trend">
+      <div class="tb"><div class="bar" style="height:52%"></div><span class="pc">52</span><span class="wk">W1</span></div>
+      <div class="tb"><div class="bar" style="height:58%"></div><span class="pc">58</span><span class="wk">W2</span></div>
+      <div class="tb"><div class="bar" style="height:49%"></div><span class="pc">49</span><span class="wk">W3</span></div>
+      <div class="tb"><div class="bar" style="height:61%"></div><span class="pc">61</span><span class="wk">W4</span></div>
+      <div class="tb"><div class="bar" style="height:66%"></div><span class="pc">66</span><span class="wk">W5</span></div>
+      <div class="tb"><div class="bar" style="height:57%"></div><span class="pc">57</span><span class="wk">W6</span></div>
+      <div class="tb"><div class="bar" style="height:63%"></div><span class="pc">63</span><span class="wk">W7</span></div>
+      <div class="tb"><div class="bar" style="height:71%"></div><span class="pc">71</span><span class="wk">W8</span></div>
+      <div class="tb"><div class="bar" style="height:64%"></div><span class="pc">64</span><span class="wk">W9</span></div>
+      <div class="tb"><div class="bar" style="height:69%"></div><span class="pc">69</span><span class="wk">W10</span></div>
+      <div class="tb"><div class="bar" style="height:73%"></div><span class="pc">73</span><span class="wk">W11</span></div>
+      <div class="tb now"><div class="bar" style="height:68%"></div><span class="pc">68</span><span class="wk">Now</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ch"><span class="t">Distribution</span><span class="n">13 clients</span></div>
+    <div class="dist">
+      <div class="db b-hi"><div class="r"><span class="n">On track · 80%+</span><span class="c d">5</span></div><div class="track"><i style="width:38%"></i></div></div>
+      <div class="db b-md"><div class="r"><span class="n">Slipping · 50–79%</span><span class="c d">4</span></div><div class="track"><i style="width:31%"></i></div></div>
+      <div class="db b-lo"><div class="r"><span class="n">Behind · under 50%</span><span class="c d">2</span></div><div class="track"><i style="width:15%"></i></div></div>
+      <div class="db b-no"><div class="r"><span class="n">No programme</span><span class="c d">2</span></div><div class="track"><i style="width:15%"></i></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="tbl">
+  <div class="th">
+    <span>Client</span>
+    <span class="sort">Adherence <svg viewBox="0 0 24 24" width="10" height="10"><path d="M6 9l6 6 6-6"/></svg></span>
+    <span>Execution</span>
+    <span>Progress</span>
+    <span>PRs</span>
+    <span>Volume</span>
+    <span></span>
+  </div>
+
+  <div class="tr">
+    <span class="cl"><span class="av" style="background:var(--purple)">AM</span><span class="n">Andreea Moldovan</span></span>
+    <span class="mc g"><span class="v">94%</span><span class="t2"><i style="width:94%"></i></span></span>
+    <span class="mc g"><span class="v">91%</span><span class="t2"><i style="width:91%"></i></span></span>
+    <span class="cell">W7<b style="font-size:11px"> / 12</b></span>
+    <span class="cell"><b>4</b></span>
+    <span class="cell"><b>18.2k</b> kg</span>
+    <span class="chev"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M9 5l7 7-7 7"/></svg></span>
+  </div>
+
+  <div class="tr">
+    <span class="cl"><span class="av" style="background:var(--aqua)">BP</span><span class="n">Bob Persona</span></span>
+    <span class="mc g"><span class="v">86%</span><span class="t2"><i style="width:86%"></i></span></span>
+    <span class="mc a"><span class="v">78%</span><span class="t2"><i style="width:78%"></i></span></span>
+    <span class="cell">W5<b style="font-size:11px"> / 8</b></span>
+    <span class="cell"><b>3</b></span>
+    <span class="cell"><b>14.7k</b> kg</span>
+    <span class="chev"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M9 5l7 7-7 7"/></svg></span>
+  </div>
+
+  <div class="tr">
+    <span class="cl"><span class="av" style="background:var(--gold)">TB</span><span class="n">Tudorel Blidea</span></span>
+    <span class="mc a"><span class="v">61%</span><span class="t2"><i style="width:61%"></i></span></span>
+    <span class="mc a"><span class="v">72%</span><span class="t2"><i style="width:72%"></i></span></span>
+    <span class="cell">W3<b style="font-size:11px"> / 10</b></span>
+    <span class="cell"><b>1</b></span>
+    <span class="cell"><b>9.1k</b> kg</span>
+    <span class="chev"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M9 5l7 7-7 7"/></svg></span>
+  </div>
+
+  <div class="tr">
+    <span class="cl"><span class="av" style="background:var(--accent)">CP</span><span class="n">Client Popescu</span></span>
+    <span class="mc r"><span class="v">25%</span><span class="t2"><i style="width:25%"></i></span></span>
+    <span class="none">—</span>
+    <span class="cell">W4<b style="font-size:11px"> / 13</b></span>
+    <span class="cell"><b>0</b></span>
+    <span class="cell"><b>1.8k</b> kg</span>
+    <span class="chev"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M9 5l7 7-7 7"/></svg></span>
+  </div>
+
+  <div class="tr">
+    <span class="cl"><span class="av" style="background:var(--aqua)">RM</span><span class="n">Roxana Micu</span></span>
+    <span class="none">— no programme</span>
+    <span class="none">—</span>
+    <span class="none">—</span>
+    <span class="none">—</span>
+    <span class="none">—</span>
+    <span class="chev"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M9 5l7 7-7 7"/></svg></span>
+  </div>
+
+  <div class="tr">
+    <span class="cl"><span class="av" style="background:var(--purple)">LD</span><span class="n">Luminita Dejeu</span></span>
+    <span class="none">— no programme</span>
+    <span class="none">—</span>
+    <span class="none">—</span>
+    <span class="none">—</span>
+    <span class="none">—</span>
+    <span class="chev"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M9 5l7 7-7 7"/></svg></span>
+  </div>
+</div>
+
+<div class="foot">Looking for who needs action today? <a>Open Briefing →</a></div>
+
+<div class="note">
+  <b>Killed the duplicate stats.</b> The hero strip and the four cards below it showed the same four numbers twice. Now one strip — and each figure carries a <b>delta vs the previous period</b>, which is what makes a number an insight rather than a readout.<br><br>
+  <b>Insights answers what Briefing can't.</b> Briefing = who needs you today. Insights = <b>how the roster is trending and how clients compare</b>. Hence the weekly adherence trend and the distribution — neither exists anywhere else in the app.<br><br>
+  <b>The table now compares.</b> Inline bars in the adherence and execution cells, so your eye ranks the roster instead of reading 13 numbers. Sortable by any column. Clients with no programme say <b>"— no programme"</b> rather than a row of bare dashes.<br><br>
+  <b>Period selector</b> (4wk / 12wk / 6mo) top-right — Insights is inherently about a window, and there wasn't one.<br><br>
+  <b>Saturation kept:</b> solid blue tab and range control with glow, coloured stat numbers, glowing trend and distribution bars, coloured avatars.
+</div>
+
+</body></html>

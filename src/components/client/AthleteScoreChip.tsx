@@ -10,7 +10,7 @@ import { ATHLETE_TIERS } from "@/types/athleteScore";
 interface AthleteScoreChipProps {
   athleteScore: AthleteScore | null;
   chipState?: AthleteScoreChipState;
-  /** Coach check-ins header: 48px ring + inline score/tier, links to client stats. */
+  /** Coach check-ins header: 48px ring + inline score/tier, links to client overview. */
   compact?: boolean;
   coachClientId?: string;
 }
@@ -34,7 +34,7 @@ export function AthleteScoreChip({
           window.location.href = "/client/profile";
         }}
         aria-label="Athlete score: not available until you start a program."
-        className="relative shrink-0 rounded-full transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--fc-accent-cyan)]"
+        className="relative shrink-0 rounded-full transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--fc-accent)]"
       >
         <AthleteScoreRing placeholder score={null} tier={null} animated={false} size={ringSize} />
       </button>
@@ -46,7 +46,7 @@ export function AthleteScoreChip({
   const scoreValue = Math.round(athleteScore.score);
 
   const href = compact && coachClientId
-    ? `/coach/clients/${coachClientId}/stats`
+    ? `/coach/clients/${coachClientId}`
     : "/client/profile";
 
   if (compact) {
@@ -57,7 +57,7 @@ export function AthleteScoreChip({
           window.location.href = href;
         }}
         aria-label={`Athlete Score: ${scoreValue}, ${tierInfo.label}. View breakdown.`}
-        className="flex items-center gap-2 shrink-0 rounded-lg border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface-card)] px-3 py-2 transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--fc-accent-cyan)]"
+        className="flex items-center gap-2 shrink-0 rounded-lg border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface-card)] px-3 py-2 transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--fc-accent)]"
       >
         <AthleteScoreRing
           score={athleteScore.score}
@@ -85,7 +85,7 @@ export function AthleteScoreChip({
         window.location.href = href;
       }}
       aria-label={`Athlete Score: ${scoreValue}, ${tierInfo.label}. Tap to view breakdown.`}
-      className="relative shrink-0 rounded-full transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--fc-accent-cyan)]"
+      className="relative shrink-0 rounded-full transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--fc-accent)]"
     >
       <AthleteScoreRing
         score={athleteScore.score}

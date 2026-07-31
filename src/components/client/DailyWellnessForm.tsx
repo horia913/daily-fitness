@@ -15,6 +15,7 @@ import {
   getCheckinStreak,
   dbToUiScale,
 } from "@/lib/wellnessService";
+import { toLocalDateString } from "@/lib/clientActivityService";
 import { getWellnessValueColor } from "@/lib/wellnessValueColors";
 import { getLatestMeasurement } from "@/lib/measurementService";
 import { createMeasurement } from "@/lib/measurementService";
@@ -175,7 +176,7 @@ function getSorenessLabel(value: number | null): string {
 
 /** Section group: cyan left accent; put `text-base font-semibold text-white` on the title line. */
 function CheckInMetricHeading({ children }: { children: React.ReactNode }) {
-  return <div className="mb-3 border-l-2 border-cyan-500 pl-3">{children}</div>;
+  return <div className="mb-3 border-l-2 border-[color:var(--fc-group-c)] pl-3">{children}</div>;
 }
 
 /** Horizontal RPE-style pills: emoji + label, wrap on narrow viewports. */
@@ -296,12 +297,12 @@ export function DailyWellnessForm({
   );
   const [weekLogs, setWeekLogs] = useState<DailyWellnessLog[]>([]);
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = toLocalDateString(new Date());
   const todayFormatted = formatDateLong(today);
   const yesterday = (() => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
-    return d.toISOString().split("T")[0];
+    return toLocalDateString(d);
   })();
   const getWeekStart = () => {
     const d = new Date();
@@ -309,7 +310,7 @@ export function DailyWellnessForm({
     const diff = d.getDate() - day + (day === 0 ? -6 : 1);
     const mon = new Date(d);
     mon.setDate(diff);
-    return mon.toISOString().split("T")[0];
+    return toLocalDateString(mon);
   };
   const weekStart = getWeekStart();
 
@@ -349,7 +350,7 @@ export function DailyWellnessForm({
     const loadWeight = async () => {
       try {
         const latestMeasurement = await getLatestMeasurement(clientId);
-        const today = new Date().toISOString().split("T")[0];
+        const today = toLocalDateString(new Date());
         const hasWeight = latestMeasurement?.measured_date === today;
         setHasWeightToday(hasWeight);
       } catch (err) {
@@ -427,7 +428,7 @@ export function DailyWellnessForm({
 
         try {
           const latestMeasurement = await getLatestMeasurement(clientId);
-          const todayStr = new Date().toISOString().split("T")[0];
+          const todayStr = toLocalDateString(new Date());
           const hasWeight = latestMeasurement?.measured_date === todayStr;
           setHasWeightToday(hasWeight);
           if (!hasWeight) setShowWeightPrompt(true);
@@ -467,7 +468,7 @@ export function DailyWellnessForm({
         }
 
         try {
-          const todayStr = new Date().toISOString().split("T")[0];
+          const todayStr = toLocalDateString(new Date());
           const weekStartStr = getWeekStart();
           const endThis = todayStr;
           const startLast = new Date(weekStartStr + "T12:00:00");
@@ -570,7 +571,7 @@ export function DailyWellnessForm({
     if (!quickWeight || parseFloat(quickWeight) <= 0) return;
     setSavingWeight(true);
     try {
-      const today = new Date().toISOString().split("T")[0];
+      const today = toLocalDateString(new Date());
       const result = await createMeasurement({
         client_id: clientId,
         measured_date: today,
@@ -707,7 +708,7 @@ export function DailyWellnessForm({
                       value={quickWeight}
                       onChange={(e) => setQuickWeight(e.target.value)}
                       placeholder="Weight (kg)"
-                      className="flex-1 min-w-[100px] px-3 py-2 rounded-lg text-sm fc-glass fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent-cyan)]"
+                      className="flex-1 min-w-[100px] px-3 py-2 rounded-lg text-sm fc-glass fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent)]"
                     />
                     <button
                       type="button"
@@ -755,7 +756,7 @@ export function DailyWellnessForm({
           </div>
           <div>
             <h2 className="text-xl font-bold fc-text-primary">
-              Check-in complete
+              Daily check-in complete
             </h2>
             <p className="text-sm fc-text-dim">
               {todayLog?.created_at
@@ -899,7 +900,7 @@ export function DailyWellnessForm({
                     value={quickWeight}
                     onChange={(e) => setQuickWeight(e.target.value)}
                     placeholder="Weight (kg)"
-                    className="flex-1 px-3 py-2 rounded-lg text-sm fc-glass fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent-cyan)]"
+                    className="flex-1 px-3 py-2 rounded-lg text-sm fc-glass fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent)]"
                   />
                   <button
                     type="button"
@@ -959,7 +960,7 @@ export function DailyWellnessForm({
           ) : (
             <>
               <h2 className="font-bold fc-text-primary text-[22px]">
-                Daily Check-in
+                Daily check-in
               </h2>
               <p className="text-sm fc-text-dim mt-0.5">{todayFormatted}</p>
               {todayLog?.created_at && (
@@ -1123,7 +1124,7 @@ export function DailyWellnessForm({
               </CheckinSectionCard>
 
               <CheckinSectionCard
-                stripe="lime"
+                stripe="action"
                 title="Steps"
                 titleRight="Optional"
               >
@@ -1535,7 +1536,7 @@ export function DailyWellnessForm({
                       placeholder="Optional — injuries, lifestyle factors, etc."
                       rows={3}
                       maxLength={MAX_NOTES}
-                      className="w-full px-4 py-3 rounded-xl text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)] resize-none"
+                      className="w-full px-4 py-3 rounded-xl text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent)] resize-none"
                     />
                     <p className="text-xs fc-text-subtle mt-1">
                       {notes.length}/{MAX_NOTES}
@@ -1571,9 +1572,9 @@ export function DailyWellnessForm({
                 {(() => {
                   const weekDays: string[] = [];
                   for (let i = 0; i < 7; i++) {
-                    const d = new Date(weekStart + "T12:00:00Z");
-                    d.setUTCDate(d.getUTCDate() + i);
-                    weekDays.push(d.toISOString().split("T")[0]);
+                    const d = new Date(weekStart + "T12:00:00");
+                    d.setDate(d.getDate() + i);
+                    weekDays.push(toLocalDateString(d));
                   }
                   const logByDate = new Map(
                     weekLogs.map((l) => [l.log_date, l]),
@@ -1605,9 +1606,9 @@ export function DailyWellnessForm({
                 {(() => {
                   const weekDays: string[] = [];
                   for (let i = 0; i < 7; i++) {
-                    const d = new Date(weekStart + "T12:00:00Z");
-                    d.setUTCDate(d.getUTCDate() + i);
-                    weekDays.push(d.toISOString().split("T")[0]);
+                    const d = new Date(weekStart + "T12:00:00");
+                    d.setDate(d.getDate() + i);
+                    weekDays.push(toLocalDateString(d));
                   }
                   const logByDate = new Map(
                     weekLogs.map((l) => [l.log_date, l]),

@@ -35,7 +35,7 @@ export function DailyCheckInHeroCard({
               style={{ color: "var(--fc-status-success)" }}
               aria-hidden
             />
-            <span className="text-sm font-semibold fc-text-primary">Check-in complete</span>
+            <span className="text-sm font-semibold fc-text-primary">Daily check-in complete</span>
           </div>
         ) : (
           <>
@@ -65,7 +65,7 @@ export function DailyCheckInHeroCard({
                     window.location.href = "/client/check-ins/weekly";
                   }}
                 >
-                  Complete monthly check-in
+                  Complete periodical check-in
                 </Button>
               )}
             </div>

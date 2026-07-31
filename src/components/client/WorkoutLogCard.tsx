@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import ps from "@/components/client/progress-suite/progressSuiteV1.module.css";
 import { cn } from "@/lib/utils";
+import { isCoachStrengthTestSession } from "@/lib/coachStrengthTest";
+import { resolveWorkoutDisplayDurationMinutes } from "@/lib/workoutLogDuration";
 
 export interface WorkoutLogCardLog {
   id: string;
@@ -15,10 +17,12 @@ export interface WorkoutLogCardLog {
   started_at: string;
   completed_at: string | null;
   overall_difficulty_rating?: number | null;
+  notes?: string | null;
   programContext?: { dayNumber: number; programName: string } | null;
   workout_set_logs: Array<{
     weight?: number | null;
     reps?: number | null;
+    completed_at?: string | null;
     exercises?: { id: string; name?: string | null } | null;
   }>;
 }
@@ -48,19 +52,26 @@ export function WorkoutLogCard({ log }: WorkoutLogCardProps) {
     ? new Date(log.completed_at)
     : new Date(log.started_at);
 
-  let duration: number | null = null;
-  if (log.total_duration_minutes != null) {
-    duration = Math.round(log.total_duration_minutes);
-  } else if (log.completed_at && log.started_at) {
-    const started = new Date(log.started_at);
-    const completed = new Date(log.completed_at);
-    duration = Math.round((completed.getTime() - started.getTime()) / 60000);
-  }
+  const duration = resolveWorkoutDisplayDurationMinutes({
+    storedMinutes: log.total_duration_minutes,
+    startedAt: log.started_at,
+    completedAt: log.completed_at,
+    setCompletedAts: (log.workout_set_logs ?? []).map((s) => s.completed_at),
+  });
 
   const volumeKg = Math.round(log.totalWeight);
-  const detailUrl = `/client/progress/workout-logs/${log.id}`;
+  const fromTrain =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("from") === "train";
+  const detailUrl = fromTrain
+    ? `/client/progress/workout-logs/${log.id}?from=train`
+    : `/client/progress/workout-logs/${log.id}`;
   const exercisePreview = getExerciseNames(log);
   const hasLoggedSets = log.totalSets > 0;
+  const coachTest = isCoachStrengthTestSession({
+    notes: log.notes,
+    name: workoutName,
+  });
 
   const dayName = completedDate.toLocaleDateString("en-US", { weekday: "short" });
   const dayNum = completedDate.getDate();
@@ -98,6 +109,14 @@ export function WorkoutLogCard({ log }: WorkoutLogCardProps) {
         >
           {workoutName}
         </p>
+        {coachTest ? (
+          <p
+            className={cn(ps.psFontMono, "text-[9px] uppercase leading-snug")}
+            style={{ color: "var(--ps-accent, var(--fc-accent))", letterSpacing: "0.08em", marginTop: 2 }}
+          >
+            Coach strength test
+          </p>
+        ) : null}
         <p
           className={cn(ps.psFontMono, "text-[9.5px] leading-snug")}
           style={{ color: "var(--ps-t3)", letterSpacing: "0.04em" }}

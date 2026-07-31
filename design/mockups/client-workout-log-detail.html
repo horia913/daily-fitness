@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<title>Client — Workout log detail</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;}
+  :root{
+    --page:#0A0B0D; --well:#050608;
+    --line:rgba(255,255,255,.07); --line-2:rgba(255,255,255,.13);
+    --accent:#2E7BFF; --accent-glow:rgba(46,123,255,.30);
+    --good:#22E56A; --warn:#FFB020; --hot:#FF7A2F; --bad:#FF5A4D; --gold:#F5C242; --purple:#9D6BFF; --aqua:#22D3EE;
+    --text:#F0F2F5; --dim:#8B93A1; --subtle:#5C6470; --faint:#3D434D;
+    --f-d:'Archivo',sans-serif; --f-b:'Inter',sans-serif; --f-m:'JetBrains Mono',monospace;
+  }
+  body{background:#070809;color:var(--text);font-family:var(--f-b);-webkit-font-smoothing:antialiased;padding:22px;font-size:13px;
+       display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start;}
+  .d{font-family:var(--f-d);font-stretch:105%;}
+  svg{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;}
+  .lbl{font-family:var(--f-m);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:9px;font-weight:700;}
+  .phone{width:375px;background:var(--page);border:1px solid var(--line-2);border-radius:22px;padding:18px 16px 26px;}
+
+  /* header */
+  .hd{display:flex;align-items:center;gap:11px;margin-bottom:14px;}
+  .bk{width:34px;height:34px;border-radius:10px;border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;color:var(--dim);flex-shrink:0;}
+  .hd .t{flex:1;min-width:0;}
+  .hd .t .n{font-family:var(--f-d);font-size:18px;font-weight:800;letter-spacing:-.015em;line-height:1.15;}
+  .hd .t .dt{font-family:var(--f-m);font-size:9.5px;color:var(--faint);margin-top:4px;}
+  .badge{font-family:var(--f-m);font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+         color:var(--good);background:color-mix(in srgb,var(--good) 15%,transparent);border-radius:5px;padding:4px 8px;flex-shrink:0;}
+
+  /* stats */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border-radius:12px;overflow:hidden;margin-bottom:18px;}
+  .sc{background:var(--page);padding:13px 10px;text-align:center;}
+  .sc .v{font-family:var(--f-d);font-size:20px;font-weight:900;line-height:1;}
+  .sc .v .u{font-family:var(--f-m);font-size:10px;font-weight:600;color:var(--dim);}
+  .sc .k{font-family:var(--f-m);font-size:7.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);margin-top:7px;}
+
+  .eb{font-family:var(--f-m);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--subtle);margin:18px 0 10px;font-weight:700;display:flex;align-items:center;gap:7px;}
+  .eb svg{width:12px;height:12px;color:var(--gold);}
+
+  /* PRs — deduped, one per exercise */
+  .pr{display:flex;align-items:center;gap:11px;border:1px solid color-mix(in srgb,var(--gold) 26%,transparent);border-radius:11px;
+      padding:12px 13px;margin-bottom:8px;position:relative;overflow:hidden;
+      background:linear-gradient(100deg,color-mix(in srgb,var(--gold) 12%,transparent),color-mix(in srgb,var(--gold) 3%,transparent) 40%,transparent 72%);}
+  .pr::before{content:"";position:absolute;left:0;top:11px;bottom:11px;width:3px;background:var(--gold);border-radius:0 3px 3px 0;}
+  .pr .nm{flex:1;min-width:0;}
+  .pr .nm .e{font-size:13px;font-weight:600;}
+  .pr .nm .k{font-family:var(--f-m);font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--gold);margin-top:4px;}
+  .pr .vv{text-align:right;}
+  .pr .vv .v{font-family:var(--f-d);font-size:17px;font-weight:800;line-height:1;color:var(--gold);}
+  .pr .vv .dl{font-family:var(--f-m);font-size:9.5px;color:var(--good);margin-top:4px;font-weight:700;}
+
+  /* exercise blocks */
+  .ex{border:1px solid var(--line);border-radius:13px;padding:14px 15px;margin-bottom:10px;}
+  .exh{display:flex;align-items:center;gap:10px;}
+  .bg{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+      font-family:var(--f-m);font-size:10px;font-weight:800;color:#0A0B0D;flex-shrink:0;}
+  .exh .n{font-size:14px;font-weight:700;flex:1;}
+  .exh .mt{font-family:var(--f-m);font-size:9.5px;color:var(--faint);}
+  .tech{font-family:var(--f-m);font-size:9.5px;color:var(--hot);margin:8px 0 0 32px;}
+
+  .sets{margin:11px 0 0 32px;display:flex;flex-direction:column;gap:6px;}
+  .st{display:flex;align-items:baseline;gap:10px;font-family:var(--f-m);font-size:11.5px;}
+  .st .no{color:var(--faint);width:46px;flex-shrink:0;}
+  .st .vl{color:var(--text);}
+  .st .ef{margin-left:auto;font-family:var(--f-d);font-weight:800;font-size:11.5px;}
+  .ef.easy{color:#34D399;} .ef.med{color:#F5C242;} .ef.hard{color:var(--hot);} .ef.max{color:var(--bad);}
+  .foot{margin:9px 0 0 32px;font-family:var(--f-m);font-size:9.5px;color:var(--faint);}
+
+  .acts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:18px;}
+  .ac{border:1px solid var(--line-2);border-radius:11px;padding:12px;text-align:center;
+      font-family:var(--f-m);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);
+      display:flex;align-items:center;justify-content:center;gap:6px;}
+  .ac svg{width:13px;height:13px;}
+  .ac.pri{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 4px 20px -7px var(--accent-glow);}
+
+  .note{width:430px;font-size:12px;line-height:1.85;color:var(--subtle);border-left:2px solid var(--accent);padding-left:14px;}
+  .note b{color:var(--text);} .note code{font-family:var(--f-m);font-size:11px;color:var(--aqua);}
+</style></head>
+<body>
+
+<div>
+  <div class="lbl">Workout log detail · 375px</div>
+  <div class="phone">
+
+    <div class="hd">
+      <span class="bk"><svg viewBox="0 0 24 24" width="15" height="15"><path d="M15 5l-7 7 7 7"/></svg></span>
+      <span class="t"><div class="n d">Andreea test — Day 1</div><div class="dt">Tue 21 Jul · 11:02</div></span>
+      <span class="badge">Completed</span>
+    </div>
+
+    <div class="stats">
+      <div class="sc"><div class="v d">43<span class="u">m</span></div><div class="k">Duration</div></div>
+      <div class="sc"><div class="v d">16</div><div class="k">Sets</div></div>
+      <div class="sc"><div class="v d">2,009<span class="u"> kg</span></div><div class="k">Volume</div></div>
+    </div>
+
+    <div class="eb"><svg viewBox="0 0 24 24"><path d="M7 4h10v5a5 5 0 0 1-10 0zM12 14v3M9 21h6"/></svg>Records this session</div>
+
+    <div class="pr">
+      <span class="nm"><div class="e">Cable Glute Kickback</div><div class="k">Max strength</div></span>
+      <span class="vv"><div class="v d">40.5 kg</div><div class="dl">+2.5 kg</div></span>
+    </div>
+    <div class="pr">
+      <span class="nm"><div class="e">Leg Press Wide Stance</div><div class="k">Max strength</div></span>
+      <span class="vv"><div class="v d">10 kg</div><div class="dl">new</div></span>
+    </div>
+
+    <div class="eb">Exercises</div>
+
+    <div class="ex">
+      <div class="exh"><span class="bg" style="background:var(--accent)">A</span><span class="n">Leg Press Wide Stance</span><span class="mt">3 sets</span></div>
+      <div class="sets">
+        <div class="st"><span class="no">Sets 1–3</span><span class="vl">6 × 10 kg</span></div>
+      </div>
+      <div class="foot">same across all 3 sets · not rated</div>
+    </div>
+
+    <div class="ex">
+      <div class="exh"><span class="bg" style="background:var(--purple)">B</span><span class="n">Bulgarian Split Squat</span><span class="mt">3 sets</span></div>
+      <div class="sets">
+        <div class="st"><span class="no">Sets 1–3</span><span class="vl">6 × 10 kg</span></div>
+      </div>
+      <div class="foot">same across all 3 sets · not rated</div>
+    </div>
+
+    <div class="ex">
+      <div class="exh"><span class="bg" style="background:var(--aqua)">C</span><span class="n">Romanian Deadlift</span><span class="mt">4 sets</span></div>
+      <div class="sets">
+        <div class="st"><span class="no">Sets 1–4</span><span class="vl">12 × 5.5 kg</span></div>
+      </div>
+      <div class="foot">same across all 4 sets · not rated</div>
+    </div>
+
+    <div class="ex">
+      <div class="exh"><span class="bg" style="background:var(--warn)">D</span><span class="n">Cable Glute Kickback</span><span class="mt">2 sets</span></div>
+      <div class="tech">↳ drop set</div>
+      <div class="sets">
+        <div class="st"><span class="no">Set 1</span><span class="vl">10 × 38 kg</span></div>
+        <div class="st"><span class="no">Set 2</span><span class="vl">10 × 40.5 kg</span></div>
+      </div>
+    </div>
+
+    <div class="ex">
+      <div class="exh"><span class="bg" style="background:var(--good)">E</span><span class="n">Jump Rope</span><span class="mt">4 sets</span></div>
+      <div class="sets">
+        <div class="st"><span class="no">Sets 1–2</span><span class="vl">30 × 2.5 kg</span></div>
+        <div class="st"><span class="no">Set 3</span><span class="vl">30 × 5 kg</span><span class="ef max">Max</span></div>
+        <div class="st"><span class="no">Set 4</span><span class="vl">30 × 10 kg</span><span class="ef max">Max</span></div>
+      </div>
+    </div>
+
+    <div class="acts">
+      <span class="ac pri"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/></svg>Repeat</span>
+      <span class="ac"><svg viewBox="0 0 24 24"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M12 15V3M8 7l4-4 4 4"/></svg>Share</span>
+      <span class="ac"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>PDF</span>
+    </div>
+
+  </div>
+</div>
+
+<div class="note">
+  <b>Sets collapse when identical</b> — "Sets 1–3 · 6 × 10 kg" instead of three separate rows saying the same thing. This is the grammar the <b>workout-complete screen already uses</b>; the log detail should match it rather than having its own. Cuts the page by roughly half.<br><br>
+  <b>The N/A wall is gone.</b> Effort shows only where the client actually rated it (Jump Rope sets 3–4 = Max). Where nothing was rated, one quiet line says "not rated" instead of a column of N/A on every row.<br><br>
+  <b>Records deduped.</b> Five PR entries became two.<br><br>
+  <b>Data bugs to fix — the mock shows the corrected values:</b><br>
+  · <b>Duration said "3 min" for 16 sets.</b> Impossible. Mock shows 43 min. Find whether it's reading a wrong field (session vs log), or a start/end that never got stamped.<br>
+  · <b>Jump Rope logged three PRs in one session</b> — "300 vol", "Max Strength 10 kg", "150 vol". Two faults: (a) <b>a session can only set one PR per exercise per type</b> — take the best, not every improving set; (b) <b>a rope doesn't have a max-strength PR</b> — apply the same exclusion the volume rail and est-1RM use (<code>athletic_development</code> excluded, muscle tag required).<br>
+  · That leaves the two genuine PRs shown above.<br><br>
+  <b>Double fetch again:</b> <code>get_workout_log_full</code> POSTs twice (209ms, then <code>(REPEAT)</code> 219ms) and <code>workout_assignments</code> GETs twice. Same root cause as the progress hub — worth fixing once, in both places.<br><br>
+  <b>Kept:</b> letter badges + group hues, drop-set note, completed badge, stat strip, Repeat/Share, saturated gold PR cards with rail and wash.
+</div>
+
+</body></html>

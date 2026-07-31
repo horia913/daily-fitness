@@ -19,7 +19,7 @@ function valueClass(pct: number | null): string {
   if (pct <= 0) return styles.valCrit;
   if (pct < 50) return styles.valWarn;
   if (pct < 100) return styles.valGood;
-  return styles.valLime;
+  return styles.valAction;
 }
 
 function barFillClass(pct: number | null): string {
@@ -27,7 +27,7 @@ function barFillClass(pct: number | null): string {
   if (pct <= 0) return styles.barCrit;
   if (pct < 50) return styles.barWarn;
   if (pct < 100) return styles.barGood;
-  return styles.barLime;
+  return styles.barAction;
 }
 
 export default function MetricRow({ items }: { items: MetricItem[] }) {

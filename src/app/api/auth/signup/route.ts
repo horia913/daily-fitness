@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { isCoachRole } from "@/lib/roleGuard";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function getAdminClient() {
-  return createClient(supabaseUrl, serviceRoleKey, {
+  return createClient(supabaseUrl!, serviceRoleKey!, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
@@ -18,12 +18,29 @@ function getAdminClient() {
 }
 
 function getStandardClient() {
-  return createClient(supabaseUrl, supabaseAnonKey, {
+  return createClient(supabaseUrl!, supabaseAnonKey!, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
     },
   });
+}
+
+function resolveSiteUrl(request: NextRequest): string {
+  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
+
+  const vercelUrl = process.env.VERCEL_URL?.trim();
+  if (vercelUrl) return `https://${vercelUrl}`;
+
+  const origin = request.headers.get("origin")?.trim();
+  if (origin) return origin.replace(/\/$/, "");
+
+  const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
+  const proto = request.headers.get("x-forwarded-proto") || "https";
+  if (host) return `${proto}://${host}`.replace(/\/$/, "");
+
+  return "http://localhost:3000";
 }
 
 function isEmailExistsError(error: unknown): boolean {
@@ -36,14 +53,30 @@ function isEmailExistsError(error: unknown): boolean {
   );
 }
 
+function isMissingRpcError(error: unknown): boolean {
+  const message = String((error as { message?: string })?.message || "").toLowerCase();
+  const code = String((error as { code?: string })?.code || "");
+  return (
+    code === "PGRST202" ||
+    message.includes("could not find the function") ||
+    message.includes("consume_invite_code")
+  );
+}
+
 export async function POST(request: NextRequest) {
-  if (!supabaseUrl || !serviceRoleKey || !supabaseAnonKey || !siteUrl) {
-    console.error("[signup] Missing required env vars");
+  if (!supabaseUrl || !serviceRoleKey || !supabaseAnonKey) {
+    console.error("[signup] Missing required env vars", {
+      hasUrl: Boolean(supabaseUrl),
+      hasAnon: Boolean(supabaseAnonKey),
+      hasServiceRole: Boolean(serviceRoleKey),
+    });
     return NextResponse.json(
       { error: "Something went wrong. Please try again." },
       { status: 500 }
     );
   }
+
+  const siteUrl = resolveSiteUrl(request);
 
   let body: {
     email?: string;
@@ -114,10 +147,6 @@ export async function POST(request: NextRequest) {
   async function rollbackDeleteAuthUser() {
     if (!createdUserId) return;
     try {
-      // admin.auth.admin.deleteUser cascades (after clients FK migration is applied):
-      // - auth.users -> profiles (ON DELETE CASCADE on profiles.id -> auth.users.id)
-      // - profiles -> clients (ON DELETE CASCADE via clients_client_id_fkey / clients_coach_id_fkey)
-      // So a single deleteUser() call cleans up profile + any clients rows referencing that profile.
       const { error } = await admin.auth.admin.deleteUser(createdUserId);
       if (error) {
         console.error("[signup] rollback deleteUser failed", error);
@@ -127,20 +156,71 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  async function ensureClientProfile(userId: string): Promise<boolean> {
+    const { error: profileError } = await admin.from("profiles").upsert(
+      {
+        id: userId,
+        email,
+        role: "client",
+        first_name: firstName || null,
+        last_name: lastName || null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" }
+    );
+
+    if (profileError) {
+      console.error("[signup] profile upsert failed", profileError);
+      return false;
+    }
+
+    return true;
+  }
+
   try {
-    // Step 1: Pre-check invite validity without consuming it.
+    const { data: coachProfile, error: coachCheckError } = await admin
+      .from("profiles")
+      .select("id, role")
+      .eq("id", selectedCoachId)
+      .maybeSingle();
+
+    if (coachCheckError || !coachProfile || !isCoachRole(coachProfile.role)) {
+      console.error("[signup] coach pre-check failed", coachCheckError, coachProfile);
+      return NextResponse.json(
+        { error: "Please select a valid coach." },
+        { status: 400 }
+      );
+    }
+
+    // Look up by code + coach first (include inactive/expired so we can return specific errors)
     const { data: invite, error: inviteCheckError } = await admin
       .from("invite_codes")
       .select("id, coach_id, is_active, expires_at, max_uses, used_count")
       .eq("code", inviteCode)
       .eq("coach_id", selectedCoachId)
-      .eq("is_active", true)
-      .single();
+      .maybeSingle();
 
-    if (inviteCheckError || !invite) {
+    if (inviteCheckError) {
       console.error("[signup] invite pre-check failed", inviteCheckError);
       return NextResponse.json(
-        { error: "This invite code is invalid, expired, or doesn't match the selected coach." },
+        { error: "Something went wrong. Please try again." },
+        { status: 500 }
+      );
+    }
+
+    if (!invite) {
+      return NextResponse.json(
+        {
+          error:
+            "This invite code is invalid or doesn't match the selected coach.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (invite.is_active === false) {
+      return NextResponse.json(
+        { error: "This invite code is no longer active." },
         { status: 400 }
       );
     }
@@ -159,7 +239,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 2: Standard signup with anon key so Supabase sends confirmation email.
     const { data: signUpData, error: signUpError } = await standardClient.auth.signUp({
       email,
       password,
@@ -196,13 +275,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 3: Atomic invite consumption for race-safe usage counting.
-    // NOTE: There's a small race window between auth user creation (step 2)
-    // and invite consumption (step 3). Two simultaneous signups with the same
-    // single-use invite can both pass step 2; the slower one fails at step 3
-    // and rolls back. The slower user receives a confirmation email that, when
-    // clicked, leads to a deleted account. This is acceptable: rare race +
-    // recoverable failure mode (user sees invite-invalid error if they try again).
+    const profileReady = await ensureClientProfile(createdUserId);
+    if (!profileReady) {
+      await rollbackDeleteAuthUser();
+      return NextResponse.json(
+        { error: "Something went wrong. Please try again." },
+        { status: 500 }
+      );
+    }
+
     const { error: consumeError } = await admin.rpc("consume_invite_code", {
       p_code: inviteCode,
       p_coach_id: selectedCoachId,
@@ -211,6 +292,12 @@ export async function POST(request: NextRequest) {
     if (consumeError) {
       console.error("[signup] consume_invite_code failed", consumeError);
       await rollbackDeleteAuthUser();
+      if (isMissingRpcError(consumeError)) {
+        return NextResponse.json(
+          { error: "Signup is temporarily unavailable. Please contact support." },
+          { status: 500 }
+        );
+      }
       return NextResponse.json(
         { error: "This invite code is invalid, expired, or has already been used." },
         { status: 400 }
@@ -218,7 +305,6 @@ export async function POST(request: NextRequest) {
     }
     inviteConsumed = true;
 
-    // Step 4: Create coach-client pairing row (clients.id is generated; auth user id is client_id only).
     const { error: clientInsertError } = await admin.from("clients").insert({
       coach_id: selectedCoachId,
       client_id: createdUserId,
@@ -226,9 +312,12 @@ export async function POST(request: NextRequest) {
     });
 
     if (clientInsertError) {
-      // No clients row exists when insert fails — no manual clients delete needed.
-      // Roll back: restore invite usage, then delete auth user (cascades profile + clients after FK migration).
-      console.error("[signup] clients insert failed", clientInsertError);
+      console.error("[signup] clients insert failed", {
+        message: clientInsertError.message,
+        code: clientInsertError.code,
+        details: clientInsertError.details,
+        hint: clientInsertError.hint,
+      });
       await rollbackInviteConsume();
       await rollbackDeleteAuthUser();
       return NextResponse.json(
@@ -237,7 +326,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 5: Success.
+    try {
+      const { notifyCoachNewClient } = await import("@/lib/inAppNotificationEvents");
+      notifyCoachNewClient({
+        coachId: selectedCoachId,
+        clientId: createdUserId,
+        clientName: firstName || undefined,
+        admin,
+      });
+    } catch {
+      /* non-blocking */
+    }
+
     return NextResponse.json({
       success: true,
       message:

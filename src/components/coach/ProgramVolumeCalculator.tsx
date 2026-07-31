@@ -14,7 +14,7 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
-import type { WorkoutBlock } from "@/types/workoutBlocks";
+import type { WorkoutSetEntry } from "@/types/workoutSetEntries";
 import {
   calculateVolumePerMuscleGroup,
   detectPriorityMuscleGroup,
@@ -38,7 +38,7 @@ interface WorkoutTemplate {
   name: string;
   category?: string | null;
   difficulty_level: string;
-  blocks?: WorkoutBlock[];
+  blocks?: WorkoutSetEntry[];
   [key: string]: any;
 }
 
@@ -345,8 +345,8 @@ export default function ProgramVolumeCalculator({
           <div className="flex items-center gap-2 shrink-0">
             {volumePerMuscleGroup.size > 0 ? (
               <span
-                className="rounded-full px-2 py-0.5 text-[11px] font-medium text-[var(--pe-cyan)]"
-                style={{ background: "rgba(79,227,232,0.12)" }}
+                className="rounded-full px-2 py-0.5 text-[11px] font-medium text-[var(--fc-accent)]"
+                style={{ background: "rgba(34, 211, 238, 0.12)" }}
               >
                 {volumePerMuscleGroup.size} muscle groups
               </span>
@@ -390,7 +390,7 @@ export default function ProgramVolumeCalculator({
                 }}
                 className="h-9 w-[60px] text-center rounded-lg border text-base font-bold"
                 style={{
-                  fontFamily: "var(--f-display, Big Shoulders Display, sans-serif)",
+                  fontFamily: "var(--f-display, sans-serif)",
                   background: "var(--pe-card)",
                   borderColor: "rgba(255,255,255,0.08)",
                   color: "var(--pe-t1)",
@@ -406,7 +406,7 @@ export default function ProgramVolumeCalculator({
               </Label>
               <div
                 className="text-base font-bold text-[var(--pe-t1)]"
-                style={{ fontFamily: "var(--f-display, Big Shoulders Display, sans-serif)" }}
+                style={{ fontFamily: "var(--f-display, sans-serif)" }}
               >
                 {schedule.length} entries
               </div>
@@ -417,14 +417,14 @@ export default function ProgramVolumeCalculator({
             <div
               className="rounded-[11px] border px-3 py-3 flex items-center gap-2"
               style={{
-                borderColor: "rgba(79,227,232,0.18)",
-                background: "linear-gradient(90deg, rgba(79,227,232,0.12), transparent)",
-                boxShadow: "inset 3px 0 0 #4FE3E8",
+                borderColor: "rgba(34, 211, 238, 0.18)",
+                background: "linear-gradient(90deg, rgba(34, 211, 238, 0.12), transparent)",
+                boxShadow: "inset 3px 0 0 var(--fc-group-c)",
               }}
             >
-              <Target className="w-4 h-4 text-[var(--pe-cyan)] shrink-0" />
+              <Target className="w-4 h-4 text-[var(--fc-accent)] shrink-0" />
               <p
-                className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--pe-cyan)] leading-snug"
+                className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--fc-accent)] leading-snug"
                 style={{ fontFamily: "var(--f-mono, Geist Mono, monospace)" }}
               >
                 Priority muscle: {priorityMuscleGroup} ·{" "}
@@ -456,7 +456,7 @@ export default function ProgramVolumeCalculator({
                           <span className="text-[12.5px] font-semibold text-[var(--pe-t1)]">{muscleGroup}</span>
                           <span
                             className="text-sm font-bold text-[var(--pe-t1)]"
-                            style={{ fontFamily: "var(--f-display, Big Shoulders Display, sans-serif)" }}
+                            style={{ fontFamily: "var(--f-display, sans-serif)" }}
                           >
                             {currentSets.toFixed(1)}
                           </span>
@@ -512,7 +512,7 @@ export default function ProgramVolumeCalculator({
                             <span
                               className="text-sm font-bold tabular-nums"
                               style={{
-                                fontFamily: "var(--f-display, Big Shoulders Display, sans-serif)",
+                                fontFamily: "var(--f-display, sans-serif)",
                                 color: "var(--pe-t1)",
                               }}
                             >

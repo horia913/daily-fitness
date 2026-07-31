@@ -51,7 +51,7 @@
 .v6Axis {
   display: flex;
   justify-content: space-between;
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 9px;
   color: var(--fc-text-quaternary);
   padding: 0 4px 2px;
@@ -62,7 +62,7 @@
   bottom: 6px;
   right: 6px;
   z-index: 2;
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 9.5px;
   padding: 6px 8px;
   border-radius: 8px;

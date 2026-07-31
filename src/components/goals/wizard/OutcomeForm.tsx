@@ -1,13 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { GoalCreationPayload } from "@/lib/goalCreationService";
 import { WizardNotice } from "./WizardNotice";
 import { AUTO_TRACKING_DEFERRED_NOTICE } from "./wizardCopy";
+import {
+  WizardFieldLabel,
+  WizardFormActions,
+  WizardHint,
+  WizardOptionChip,
+  WizardSectionLabel,
+  wizardInputClass,
+  wizardTextareaClass,
+} from "./wizardUi";
 
 type OutSub = "sleep" | "stress" | "energy";
 type Dir = "increase" | "decrease" | "maintain";
@@ -17,7 +24,9 @@ function defaultDir(sub: OutSub): Dir {
   return "increase";
 }
 
-function wellnessField(sub: OutSub): "sleep_hours" | "stress_level" | "energy_level" {
+function wellnessField(
+  sub: OutSub,
+): "sleep_hours" | "stress_level" | "energy_level" {
   if (sub === "sleep") return "sleep_hours";
   if (sub === "stress") return "stress_level";
   return "energy_level";
@@ -105,109 +114,75 @@ export function OutcomeForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <fieldset className="space-y-2">
-        <legend className="text-xs font-semibold uppercase tracking-wider fc-text-dim mb-2">Focus</legend>
-        <div className="flex flex-col gap-2">
-          {(
-            [
-              ["sleep", "Sleep average"],
-              ["stress", "Stress average"],
-              ["energy", "Energy average"],
-            ] as const
-          ).map(([v, lab]) => (
-            <label
-              key={v}
-              className="flex items-center gap-2 rounded-lg border border-[color:var(--fc-glass-border)] px-3 py-2 cursor-pointer has-[:checked]:border-[color:var(--fc-accent-cyan)]"
-            >
-              <input
-                type="radio"
-                name="out-sub"
-                checked={subType === v}
-                onChange={() => setSubType(v)}
-                className="accent-[color:var(--fc-accent-cyan)]"
-              />
-              <span className="text-sm fc-text-primary">{lab}</span>
-            </label>
-          ))}
-        </div>
+      <fieldset>
+        <WizardSectionLabel>Focus</WizardSectionLabel>
+        <WizardOptionChip
+          name="out-focus"
+          value={subType}
+          onChange={setSubType}
+          options={[
+            { value: "sleep", label: "Sleep average", hint: "Hours / night" },
+            { value: "stress", label: "Stress average", hint: "Scale 1–5" },
+            { value: "energy", label: "Energy average", hint: "Scale 1–5" },
+          ]}
+        />
       </fieldset>
 
-      <>
-        <WizardNotice>{AUTO_TRACKING_DEFERRED_NOTICE}</WizardNotice>
-        <p className="text-xs fc-text-dim">Aggregation: last 7 days (average).</p>
+      <WizardNotice>{AUTO_TRACKING_DEFERRED_NOTICE}</WizardNotice>
+      <WizardHint>Aggregation: last 7 days (average).</WizardHint>
 
-        <div className="space-y-2">
-          <Label className="text-sm fc-text-subtle">Target value ({unitLabel(subType)})</Label>
-          <Input
-            type="number"
-            step="0.1"
-            min={0}
-            required
-            value={targetValue}
-            onChange={(e) => setTargetValue(e.target.value)}
-            className="rounded-xl border-[color:var(--fc-glass-border)]"
-          />
-        </div>
+      <div>
+        <WizardFieldLabel>Target value ({unitLabel(subType)})</WizardFieldLabel>
+        <Input
+          type="number"
+          step="0.1"
+          min={0}
+          required
+          value={targetValue}
+          onChange={(e) => setTargetValue(e.target.value)}
+          className={wizardInputClass}
+        />
+      </div>
 
-        <fieldset className="space-y-2">
-          <legend className="text-xs font-semibold uppercase tracking-wider fc-text-dim mb-2">Direction</legend>
-          <div className="flex flex-col gap-2">
-            {(
-              [
-                ["increase", "Increase"],
-                ["decrease", "Decrease"],
-                ["maintain", "Maintain"],
-              ] as const
-            ).map(([v, lab]) => (
-              <label
-                key={v}
-                className="flex items-center gap-2 rounded-lg border border-[color:var(--fc-glass-border)] px-3 py-2 cursor-pointer has-[:checked]:border-[color:var(--fc-accent-cyan)]"
-              >
-                <input
-                  type="radio"
-                  name="out-dir"
-                  checked={direction === v}
-                  onChange={() => setDirection(v)}
-                  className="accent-[color:var(--fc-accent-cyan)]"
-                />
-                <span className="text-sm fc-text-primary">{lab}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
+      <fieldset>
+        <WizardSectionLabel>Direction</WizardSectionLabel>
+        <WizardOptionChip
+          name="out-dir"
+          value={direction}
+          onChange={setDirection}
+          columns={3}
+          options={[
+            { value: "increase", label: "Increase" },
+            { value: "decrease", label: "Decrease" },
+            { value: "maintain", label: "Maintain" },
+          ]}
+        />
+      </fieldset>
 
-        <div className="space-y-2">
-          <Label className="text-sm fc-text-subtle">Title</Label>
-          <Input
-            value={title}
-            onChange={(e) => {
-              setTitleTouched(true);
-              setTitle(e.target.value);
-            }}
-            required
-            className="rounded-xl border-[color:var(--fc-glass-border)]"
-          />
-        </div>
-      </>
+      <div>
+        <WizardFieldLabel>Title</WizardFieldLabel>
+        <Input
+          value={title}
+          onChange={(e) => {
+            setTitleTouched(true);
+            setTitle(e.target.value);
+          }}
+          required
+          className={wizardInputClass}
+        />
+      </div>
 
-      <div className="space-y-2">
-        <Label className="text-sm fc-text-subtle">Notes (optional)</Label>
+      <div>
+        <WizardFieldLabel>Notes (optional)</WizardFieldLabel>
         <Textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={3}
-          className="rounded-xl border-[color:var(--fc-glass-border)]"
+          className={wizardTextareaClass}
         />
       </div>
 
-      <div className="flex gap-2 pt-2">
-        <Button type="button" variant="outline" className="flex-1" onClick={onBack} disabled={submitting}>
-          Back
-        </Button>
-        <Button type="submit" className="flex-1 fc-btn fc-btn-primary" disabled={submitting}>
-          {submitting ? "Saving…" : "Create goal"}
-        </Button>
-      </div>
+      <WizardFormActions onBack={onBack} submitting={submitting} />
     </form>
   );
 }

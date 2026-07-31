@@ -1,34 +1,24 @@
 /* Gym Console v1 — v6 live session (scoped tokens) */
 .root {
-  --bg: #07101a;
-  --card: #0e1f2e;
-  --card-2: #0b1824;
-  --line: rgba(255, 255, 255, 0.08);
-  --line-2: rgba(255, 255, 255, 0.05);
-  --t1: #fff;
-  --t2: rgba(255, 255, 255, 0.65);
-  --t3: rgba(255, 255, 255, 0.42);
-  --t4: rgba(255, 255, 255, 0.26);
-  --cyan: #4fe3e8;
-  --cyan-soft: rgba(79, 227, 232, 0.12);
-  --cyan-dim: rgba(79, 227, 232, 0.18);
-  --lime: #c5ff4a;
-  --lime-2: #7fe89a;
-  --lime-soft: rgba(197, 255, 74, 0.14);
-  --lime-text: #0a1a18;
+  --line: var(--fc-glass-border);
+  --line-2: var(--fc-hairline);
+  --t1: var(--fc-text-primary);
+  --t2: var(--fc-text-dim);
+  --t3: var(--fc-text-subtle);
+  --t4: var(--fc-text-quaternary);
   --purple: #a78bfa;
   --purple-soft: rgba(167, 139, 250, 0.12);
   --purple-dim: rgba(167, 139, 250, 0.22);
-  --warning: #f5c242;
-  --warning-soft: rgba(245, 194, 66, 0.12);
-  --good: #34d399;
-  --good-soft: rgba(52, 211, 153, 0.12);
-  --critical: #ff5a5f;
-  --critical-soft: rgba(255, 90, 95, 0.12);
-  --f-head: "Bricolage Grotesque", var(--font-geist-sans, system-ui, sans-serif);
-  --f-body: var(--font-geist-sans, "Geist", system-ui, sans-serif);
-  --f-mono: var(--font-geist-mono, "Geist Mono", ui-monospace, monospace);
-  --f-display: "Big Shoulders Display", var(--font-geist-sans, system-ui, sans-serif);
+  --warning: var(--fc-status-warning);
+  --warning-soft: color-mix(in srgb, var(--fc-status-warning) 12%, transparent);
+  --good: var(--fc-status-success);
+  --good-soft: color-mix(in srgb, var(--fc-status-success) 12%, transparent);
+  --critical: var(--fc-status-error);
+  --critical-soft: color-mix(in srgb, var(--fc-status-error) 12%, transparent);
+  --f-head: var(--f-headline);
+  --f-body: var(--font-body);
+  --f-mono: var(--f-mono);
+  --f-display: var(--f-display);
   color: var(--t1);
 }
 
@@ -58,7 +48,7 @@
 
 .backLink:hover {
   color: var(--t1);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
 }
 
 .refreshBtn {
@@ -78,7 +68,7 @@
 
 .refreshBtn:hover:not(:disabled) {
   color: var(--t1);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
 }
 
 .refreshBtn:disabled {
@@ -93,7 +83,7 @@
   padding: 14px 16px;
   border-radius: 20px;
   border: 1px solid var(--line);
-  background: linear-gradient(135deg, var(--card) 0%, rgba(197, 255, 74, 0.04) 100%);
+  background: linear-gradient(135deg, var(--fc-surface-card) 0%, color-mix(in srgb, var(--fc-accent) 4%, transparent) 100%);
 }
 
 .heroGlow {
@@ -103,7 +93,7 @@
   top: -40px;
   right: -40px;
   border-radius: 50%;
-  background: radial-gradient(circle, var(--lime-soft), transparent 70%);
+  background: radial-gradient(circle, var(--fc-accent-dim), transparent 70%);
   pointer-events: none;
 }
 
@@ -121,25 +111,24 @@
   font-weight: 500;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--lime);
+  color: var(--fc-accent);
 }
 
 .liveDot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--lime);
-  box-shadow: 0 0 6px var(--lime);
+  background: var(--fc-accent);
   flex-shrink: 0;
   animation: gymLivePulse 1.6s ease-in-out infinite alternate;
 }
 
 @keyframes gymLivePulse {
   from {
-    box-shadow: 0 0 6px var(--lime);
+    opacity: 0.85;
   }
   to {
-    box-shadow: 0 0 12px var(--lime);
+    opacity: 1;
   }
 }
 
@@ -171,6 +160,7 @@
 
 .statNum {
   font-family: var(--f-display);
+  font-stretch: 125%;
   font-weight: 700;
   font-size: 22px;
   line-height: 1;
@@ -188,7 +178,7 @@
 .sessionCard {
   position: relative;
   overflow: hidden;
-  background: var(--card);
+  background: var(--fc-surface-card);
   border: 1px solid var(--line);
   border-radius: 18px;
   padding: 14px;
@@ -204,7 +194,7 @@
   top: 0;
   bottom: 0;
   width: 3px;
-  background: var(--lime);
+  background: var(--fc-accent);
   border-radius: 2px 0 0 2px;
 }
 
@@ -246,9 +236,8 @@
   width: 11px;
   height: 11px;
   border-radius: 50%;
-  background: var(--lime);
-  border: 2px solid var(--card);
-  box-shadow: 0 0 6px var(--lime);
+  background: var(--fc-accent);
+  border: 2px solid var(--fc-surface-card);
   animation: gymLivePulse 1.6s ease-in-out infinite alternate;
 }
 
@@ -273,7 +262,7 @@
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--cyan);
+  color: var(--fc-accent);
   margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
@@ -295,13 +284,13 @@
 
 .iconBtn:hover {
   color: var(--t1);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
 }
 
 .iconBtnDanger:hover {
   color: var(--critical);
   background: var(--critical-soft);
-  border-color: rgba(255, 90, 95, 0.3);
+  border-color: color-mix(in srgb, var(--fc-status-error) 30%, transparent);
 }
 
 .progressWrap {
@@ -323,12 +312,12 @@
 
 .progressRow strong {
   font-weight: 700;
-  color: var(--lime);
+  color: var(--fc-accent);
 }
 
 .barTrack {
   height: 5px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--fc-track);
   border-radius: 999px;
   overflow: hidden;
   display: flex;
@@ -339,7 +328,7 @@
 .barDone {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--lime), var(--lime-2));
+  background: linear-gradient(90deg, var(--fc-accent), var(--fc-accent));
   min-width: 0;
 }
 
@@ -352,13 +341,12 @@
 .barCurrent {
   height: 100%;
   border-radius: 999px;
-  background: var(--cyan);
-  box-shadow: 0 0 8px var(--cyan);
+  background: var(--fc-accent);
   min-width: 0;
 }
 
 .exerciseCard {
-  background: var(--card-2);
+  background: var(--fc-surface-elevated);
   border: 1px solid var(--line-2);
   border-radius: 12px;
   padding: 10px 11px;
@@ -368,14 +356,14 @@
 }
 
 .exerciseDone {
-  border-color: rgba(52, 211, 153, 0.25);
-  background: rgba(52, 211, 153, 0.03);
+  border-color: color-mix(in srgb, var(--fc-status-success) 25%, transparent);
+  background: color-mix(in srgb, var(--fc-status-success) 3%, transparent);
 }
 
 .exerciseCurrent {
-  border-color: var(--cyan);
-  box-shadow: inset 0 0 0 1px var(--cyan-dim);
-  background: rgba(79, 227, 232, 0.04);
+  border-color: var(--fc-accent);
+  box-shadow: inset 0 0 0 1px var(--fc-accent-glow);
+  background: color-mix(in srgb, var(--fc-accent) 4%, transparent);
 }
 
 .exerciseUpcoming {
@@ -397,7 +385,7 @@
   place-items: center;
   cursor: pointer;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
   color: var(--t4);
   font-family: var(--f-mono);
   font-size: 9px;
@@ -405,16 +393,15 @@
 }
 
 .statusCurrent {
-  background: var(--cyan-soft);
-  border-color: var(--cyan-dim);
-  box-shadow: 0 0 6px var(--cyan-dim);
+  background: var(--fc-accent-dim);
+  border-color: var(--fc-accent-glow);
 }
 
 .statusInnerPulse {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--cyan);
+  background: var(--fc-accent);
   animation: gymCyanPulse 1.6s ease-in-out infinite alternate;
 }
 
@@ -431,7 +418,7 @@
 
 .statusDone {
   background: var(--good-soft);
-  border-color: rgba(52, 211, 153, 0.25);
+  border-color: color-mix(in srgb, var(--fc-status-success) 25%, transparent);
   color: var(--good);
 }
 
@@ -450,7 +437,7 @@
 .exNameDone {
   color: var(--t2);
   text-decoration: line-through;
-  text-decoration-color: rgba(52, 211, 153, 0.4);
+  text-decoration-color: color-mix(in srgb, var(--fc-status-success) 40%, transparent);
 }
 
 .pill {
@@ -466,9 +453,9 @@
 }
 
 .pillStraight {
-  background: var(--cyan-soft);
-  color: var(--cyan);
-  border-color: var(--cyan-dim);
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
+  border-color: var(--fc-accent-glow);
 }
 
 .pillCluster {
@@ -480,7 +467,7 @@
 .pillDrop {
   background: var(--warning-soft);
   color: var(--warning);
-  border-color: rgba(245, 194, 66, 0.28);
+  border-color: color-mix(in srgb, var(--fc-status-warning) 28%, transparent);
 }
 
 .prescription {
@@ -520,7 +507,7 @@
 }
 
 .presValCyan {
-  color: var(--cyan);
+  color: var(--fc-accent);
 }
 
 .presMeta {
@@ -547,7 +534,7 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  border: 1px solid rgba(245, 194, 66, 0.25);
+  border: 1px solid color-mix(in srgb, var(--fc-status-warning) 25%, transparent);
   background: var(--warning-soft);
   color: var(--warning);
   cursor: pointer;
@@ -555,18 +542,17 @@
 }
 
 .restPillActive {
-  background: rgba(245, 194, 66, 0.2);
+  background: color-mix(in srgb, var(--fc-status-warning) 20%, transparent);
   border-color: var(--warning);
-  box-shadow: 0 0 8px rgba(245, 194, 66, 0.3);
   animation: gymRestPulse 1.4s ease-in-out infinite alternate;
 }
 
 @keyframes gymRestPulse {
   from {
-    filter: brightness(1);
+    opacity: 0.92;
   }
   to {
-    filter: brightness(1.08);
+    opacity: 1;
   }
 }
 
@@ -577,8 +563,8 @@
   padding: 6px;
   margin-left: 26px;
   margin-top: 2px;
-  background: var(--card);
-  border: 1px solid var(--cyan-dim);
+  background: var(--fc-surface-card);
+  border: 1px solid var(--fc-accent-glow);
   border-radius: 10px;
 }
 
@@ -588,7 +574,7 @@
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--cyan);
+  color: var(--fc-accent);
   padding: 0 4px;
   flex-shrink: 0;
 }
@@ -597,7 +583,7 @@
   flex: 1;
   min-width: 0;
   padding: 5px 8px;
-  background: var(--card-2);
+  background: var(--fc-surface-elevated);
   border: 1px solid var(--line);
   border-radius: 7px;
   color: var(--t1);
@@ -615,8 +601,8 @@
 }
 
 .qInput:focus {
-  border-color: var(--cyan-dim);
-  box-shadow: 0 0 0 1px var(--cyan-soft);
+  border-color: var(--fc-accent-glow);
+  box-shadow: 0 0 0 1px var(--fc-accent-dim);
 }
 
 .logBtn {
@@ -627,8 +613,8 @@
   font-family: var(--f-body);
   font-size: 11px;
   font-weight: 600;
-  color: #0a1a26;
-  background: linear-gradient(135deg, var(--cyan), #34a8ad);
+  color: var(--fc-ink);
+  background: linear-gradient(135deg, var(--fc-accent), color-mix(in srgb, var(--fc-accent) 72%, black));
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -648,8 +634,8 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  background: linear-gradient(135deg, var(--lime), var(--lime-2));
-  color: #0a1a18;
+  background: linear-gradient(135deg, var(--fc-accent), var(--fc-accent));
+  color: var(--fc-ink);
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -668,9 +654,9 @@
   margin-top: 4px;
   padding: 6px 9px;
   border-radius: 8px;
-  background: rgba(79, 227, 232, 0.04);
-  border: 1px solid var(--cyan-dim);
-  border-left: 2px solid var(--cyan);
+  background: color-mix(in srgb, var(--fc-accent) 4%, transparent);
+  border: 1px solid var(--fc-accent-glow);
+  border-left: 2px solid var(--fc-accent);
   font-size: 10.5px;
   color: var(--t2);
   line-height: 1.4;
@@ -682,7 +668,7 @@
   font-size: 9px;
   font-weight: 500;
   text-transform: uppercase;
-  color: var(--cyan);
+  color: var(--fc-accent);
   font-style: normal;
   margin-right: 4px;
 }
@@ -695,7 +681,7 @@
   background: transparent;
   border: 1px dashed var(--line);
   border-radius: 14px;
-  color: var(--cyan);
+  color: var(--fc-accent);
   font-family: var(--f-body);
   font-size: 12.5px;
   font-weight: 600;
@@ -707,11 +693,95 @@
 }
 
 .addClientBtn:hover {
-  border-color: var(--cyan);
-  background: var(--cyan-soft);
+  border-color: var(--fc-accent);
+  background: var(--fc-accent-dim);
 }
 
 .neverItalic {
   font-style: italic;
   color: var(--t4);
 }
+
+.clipboardList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.clipboardGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.clipboardGroup:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.clipboardExtras {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 32px;
+  margin-top: 2px;
+}
+
+.refExerciseName {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t3);
+  margin: 4px 0 0;
+}
+
+.refLine,
+.refLineMuted {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--t2);
+}
+
+.refLineMuted {
+  color: var(--t4);
+  font-style: italic;
+}
+
+.refLabel {
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+
+.refMeta {
+  color: var(--t3);
+}
+
+.emptyBox {
+  padding: 16px 4px 8px;
+}
+
+.emptyTitle {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.emptyHint {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--t3);
+  line-height: 1.45;
+}
+

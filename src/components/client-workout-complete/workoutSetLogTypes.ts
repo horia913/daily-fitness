@@ -9,10 +9,12 @@ export interface WorkoutSetLog {
   reps: number | null;
   set_number: number | null;
   completed_at: string;
+  rpe?: number | null;
   dropset_initial_weight?: number | null;
   dropset_initial_reps?: number | null;
   dropset_final_weight?: number | null;
   dropset_final_reps?: number | null;
+  dropset_percentage?: number | null;
   superset_exercise_a_id?: string | null;
   superset_weight_a?: number | null;
   superset_reps_a?: number | null;

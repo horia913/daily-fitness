@@ -1,0 +1,61 @@
+BUILD — one workout-details screen, and no double START
+Date: 2026-07-20
+
+1) Start intent signal (param vs state) + where consumed
+- Train START intent is signaled by a query param:
+  - `src/lib/startProgramWorkout.ts`: navigation URL is now
+    `/client/workouts/{workoutAssignmentId}/start?start=1`
+  - `src/app/client/workouts/[id]/start/page.tsx`:
+    - parses `explicitStartIntent` via `useSearchParams().get("start") === "1"`
+    - in `startWorkout()`:
+      after reusing/creating `sessionId`, it immediately calls `setHasStarted(true)`
+      (also in the localStorage fallback branch).
+
+2) What migrated onto the pre-start summary (old `/details` content)
+- `src/app/client/workouts/[id]/start/page.tsx` (pre-start gate, when `!hasStarted`)
+  - Workout description/notes:
+    - shows `assignment.description` (if present)
+    - shows `assignment.notes` (if present)
+  - Estimated duration:
+    - fetched non-blocking from `workout_templates.estimated_duration`
+      using `assignment.workout_template_id`
+    - rendered in header as `~{estimatedDurationMin} min`
+  - Per-exercise PR chips:
+    - fetched via `fetchPersonalRecords(user.id)` and stored in
+      `personalRecordsForPR`
+    - `ExecGroupList` pre-start UI now renders a `PR {weight} × {reps}` pill
+      next to each exercise’s target summary line (driven by
+      `getExercisePreviousBest(exerciseName)`).
+
+3) Retire old `/client/workouts/[id]/details` page
+- Retirement behavior:
+  - `src/app/client/workouts/[id]/details/page.tsx` now redirects immediately
+    (client-side) to `/client/workouts/{id}/start` (no `start=1`), so users
+    land on the summary + its own START button.
+- In-app link updates (so the old screen is no longer reachable from UI):
+  - `src/components/client/train/ExtraTraining.tsx`
+    - `/client/workouts/${workout.id}/details` → `/client/workouts/${workout.id}/start`
+  - `src/components/client/train/TrainWeekDayList.tsx`
+    - `/client/workouts/${day.templateId}/details` → `/client/workouts/${day.templateId}/start`
+  - `src/components/client/train/TrainExtraTrainingSection.tsx`
+    - `/client/workouts/${workout.id}/details` → `/client/workouts/${workout.id}/start`
+  - `src/components/client/HeroWorkoutCard.tsx`
+    - `/client/workouts/${templateId}/details` → `/client/workouts/${templateId}/start`
+
+4) Entry points found + re-pointed
+From code search for `client/workouts/{...}/details`:
+- `ExtraTraining.tsx`
+- `TrainWeekDayList.tsx`
+- `TrainExtraTrainingSection.tsx`
+- `HeroWorkoutCard.tsx`
+
+5) Resume bypass confirmation
+- Resume/in-progress behavior remains governed by the existing restore logic:
+  - when session/progress is restored, the page sets `hasStarted` to true
+    as before (so it jumps straight to the live execution view),
+    regardless of the `?start=1` intent param.
+- The new param only affects the `startWorkout()` path by ensuring
+  `setHasStarted(true)` happens immediately after session resolution/creation.
+
+6) Verification
+- `npx tsc -p tsconfig.json --noEmit` : 0 errors (exit code 0)

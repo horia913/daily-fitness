@@ -5,7 +5,7 @@ export function getCompleteAccent(input: {
   isFirstEverWorkout: boolean;
   skippedExerciseCount: number;
 }): CompleteAccent {
-  if (input.prCount >= 1) return "lime";
+  if (input.prCount >= 1) return "action";
   if (input.isFirstEverWorkout) return "purple";
   if (input.skippedExerciseCount > 0) return "warning";
   return "cyan";
@@ -13,7 +13,7 @@ export function getCompleteAccent(input: {
 
 export function titleForAccent(accent: CompleteAccent): string {
   switch (accent) {
-    case "lime":
+    case "action":
       return "Crushed it.";
     case "purple":
       return "First one down.";

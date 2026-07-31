@@ -1,0 +1,124 @@
+LEADERBOARD AUDIT — read-only (2026-07-19)
+============================================
+Scope: what exists, reachability, data, privacy, verdict, options.
+No code/SQL writes/git. Confirmed against app code + live schema.
+
+------------------------------------------------------------------------------
+1 · FILES / ROUTES
+------------------------------------------------------------------------------
+CLIENT (mounted, live):
+  Route:  /client/progress/leaderboard
+  Page:   src/app/client/progress/leaderboard/page.tsx
+  UI:     src/components/client/progress/ClientLeaderboardPageBody.tsx
+  Read:   src/lib/leaderboardService.ts  → public.leaderboard_entries
+  Write:  src/lib/leaderboardPopulationService.ts
+          call sites: completeWorkoutService, api/log-set (on PR), discardWorkoutSession
+
+COACH: no leaderboard route, component, or Insights mount.
+  CoachInsightsHub (src/components/coach/CoachInsightsHub.tsx) — roster metrics only; zero leaderboard refs.
+  Coach ClientProfileView — READ-ONLY display of profiles.leaderboard_visibility (not a board).
+
+ORPHAN / UNMOUNTED (no importers found):
+  src/components/progress/CommunityLeaderboard.tsx  (+ sampleData fallback)
+  src/lib/leaderboard.ts                           (PR/profile aggregation; only used by CommunityLeaderboard)
+  src/components/ui/LeaderboardCard.tsx
+  getProgressHubCards() in progressHubCardsService — includes a leaderboard card fetch but is never called
+
+RELATED BUT SEPARATE:
+  Challenge leaderboards via challengeService / challenge_participants (not this feature).
+  public.leaderboard_rankings — 0 rows; app does not populate (legacy parallel model).
+  graveyard.leaderboard_titles — 0 rows; no app reads/writes found. Safe vs graveyard hard-drop
+  for *this* table (live path uses public.leaderboard_entries only).
+
+LIVE DATA (public.leaderboard_entries): ~158 rows; 4 distinct clients; last_updated as recent as
+  2026-07-19. Types: pr_1rm/3rm/5rm, bw_multiple, tonnage_week/month/all_time.
+
+------------------------------------------------------------------------------
+2 · REACHABILITY
+------------------------------------------------------------------------------
+Linked today:
+  • /client/me — NAV_CARDS → "Leaderboards" → /client/progress/leaderboard
+  • EnhancedClientWorkouts (client workouts page) — "Competitive" card → same URL
+  • Workout complete flow can surface leaderboard_rank_changes toasts (API returns them)
+
+NOT linked from:
+  • /client/progress hub drill-downs (no Leaderboard DrillLink)
+  • Coach app / Insights (entirely absent)
+
+Not URL-only — client Me + Workouts provide entry. Coach has none.
+
+------------------------------------------------------------------------------
+3 · DATA SOURCE, RANKING SCOPE, GRAVEYARD
+------------------------------------------------------------------------------
+Power: table public.leaderboard_entries (precomputed). No RPC for the board UI.
+Populate: client-side service recalculates from workout_set_logs (PRs via calculatePRForExercise,
+  tonnage via calculateTonnage), upserts rows, then recalcRanksForPartition (order by score desc).
+
+Ranking scope (from query, not naming):
+  GLOBAL across all clients present in leaderboard_entries for that
+  (leaderboard_type, exercise_id, time_window) partition.
+  No coach_id filter on read or rank. Not roster-scoped. Not challenge-scoped.
+  (Prod sample: all 4 LB clients share one coach_id — leak not visible yet, but code allows it.)
+
+Champions chip on client page: getCurrentChampions() reads rank=1 from leaderboard_entries
+  (comment notes current_champions view / leaderboard_rankings path is unused for this).
+
+Graveyard: live feature does NOT read graveyard.*. Dropping graveyard.leaderboard_titles
+  (empty, unused) does not break this board. Uncertainty: whether any external/cron still
+  expected to write leaderboard_rankings — none found in this repo.
+
+------------------------------------------------------------------------------
+4 · PRIVACY / CORRECTNESS
+------------------------------------------------------------------------------
+Exposed to any SELECT-capable client (RLS leaderboard_entries_select_all USING true):
+  client_id, display_name, score, rank, leaderboard_type, exercise_id, is_anonymous, last_updated.
+
+Visibility: profiles.leaderboard_visibility (public|anonymous|hidden).
+  • Population skips upsert when hidden; anonymous → display_name "Anonymous".
+  • updateLeaderboardVisibility() exists but has NO UI call site (client cannot change setting
+    in-app; coach profile view only shows the field). All 13 profiles currently 'public'.
+  • Hidden does NOT delete existing rows → stale public names/scores can linger. Uncertainty:
+    whether admin/coach ever toggles visibility outside this app.
+
+Cross-coach leak: YES by design of queries + RLS (global board). Mounting into coach Insights
+  as-is would still show/compare athletes outside that coach's roster if they have entries.
+
+Correctness notes:
+  • Scores refresh on complete-workout / PR log-set / discard — event-driven, not cron.
+    Stale risk if someone never completes after logging, or if visibility flips without
+    recompute/delete. Not the athlete_scores cron path.
+  • Sex filter re-ranks client-side after load (stored ranks can disagree with filtered order).
+  • Exercise resolve uses name aliases; wrong exercise match → empty/wrong board (known alias map).
+  • March 2026 audit ("never written") is STALE — population service + 158 live rows contradict it.
+
+------------------------------------------------------------------------------
+5 · VERDICT
+------------------------------------------------------------------------------
+WORKING (client), with unfinished privacy/scope and orphaned alternate UI.
+
+Evidence: full page + body, real reads, real writes, recent DB updates, Me/Workouts links.
+Not abandoned. Not a stub. Half-built only in the product sense (global vs roster, dead
+parallel components, no coach surface, visibility UX missing).
+
+------------------------------------------------------------------------------
+6 · OPTIONS (plan only) + RECOMMENDATION
+------------------------------------------------------------------------------
+(a) Mount in coach Insights as-is
+    Effort: S (link + reuse client read service / thin coach wrapper).
+    Risk: wrong product — global ranks, cross-roster PII via display_name.
+
+(b) Finish/fix first (roster scope + privacy), then optionally mount
+    Effort: M–L — filter ranks by coach roster; tighten RLS; delete-on-hidden;
+    client visibility settings UI; drop or quarantine orphans (CommunityLeaderboard/
+    leaderboard.ts/LeaderboardCard); decide sex-filter rank semantics.
+
+(c) Leave client-only
+    Effort: none. Keep Me/Workouts entry; defer Insights.
+
+(d) Remove
+    Effort: M — unwind write call sites, route, Me/Workouts links, complete toasts,
+    optionally drop/archive leaderboard_entries. Premature given live usage.
+
+RECOMMEND: (c) short-term; (b) before any Insights mount.
+  Do not do (a) until roster-scoped. Do not (d) while Me links + live rows exist.
+  If Insights is the near-term goal, start (b) with coach_id partition on read+recalc.

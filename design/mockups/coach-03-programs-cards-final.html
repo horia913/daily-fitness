@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Coach — Programs (final cards)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root{
+    --bg:#0A0B0D; --card:#0B0C0F; --raised:#101318;
+    --hairline:rgba(255,255,255,.07); --hairline-2:rgba(255,255,255,.12);
+    --accent:#2E7BFF; --good:#22E56A; --warn:#FFB020; --bad:#FF5A4D;
+    --hueA:#2E7BFF; --hueB:#9D6BFF; --hueC:#22D3EE; --hueD:#FFB020;
+    /* phase-intensity scale: light → moderate → hard, + deload */
+    --phase-light:#22E56A; --phase-mod:#FFB020; --phase-hard:#FF5A4D; --phase-deload:#22D3EE;
+    --text:#EEF1F5; --dim:#98A2B3; --subtle:#5C6470;
+    --f-display:'Archivo',sans-serif; --f-body:'Inter',sans-serif; --f-mono:'JetBrains Mono',monospace;
+  }
+  body{ background:var(--bg); color:var(--text); font-family:var(--f-body); -webkit-font-smoothing:antialiased; }
+  .disp{ font-family:var(--f-display); font-stretch:125%; }
+
+  .wrap{ max-width:1500px; margin:0 auto; padding:26px 40px 70px; }
+
+  .back{ font-family:var(--f-mono); font-size:10.5px; letter-spacing:.14em; color:var(--subtle); text-transform:uppercase; margin-bottom:14px; }
+  .head{ display:flex; align-items:flex-end; justify-content:space-between; gap:20px; margin-bottom:22px; }
+  .h1{ font-size:30px; font-weight:800; letter-spacing:-.01em; }
+  .sub{ font-family:var(--f-mono); font-size:11.5px; color:var(--dim); margin-top:8px; letter-spacing:.03em; }
+  .sub .a{ color:var(--text); }
+  .hactions{ display:flex; gap:10px; align-items:center; }
+  .ghost{ font-family:var(--f-mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--text); background:transparent; border:1px solid var(--hairline-2); padding:11px 16px; border-radius:11px; cursor:pointer; }
+  .cta{ font-family:var(--f-mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; font-weight:700; color:#04122E; background:var(--accent); border:none; padding:12px 18px; border-radius:11px; cursor:pointer; box-shadow:0 0 0 1px rgba(46,123,255,.5), 0 8px 30px -6px rgba(46,123,255,.55); }
+
+  .filters{ display:flex; gap:8px; margin-bottom:18px; }
+  .chip{ font-family:var(--f-mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; padding:8px 14px; border-radius:999px; cursor:pointer; border:1px solid var(--hairline); color:var(--dim); background:transparent; }
+  .chip.on{ color:#04122E; background:var(--accent); border-color:transparent; font-weight:700; }
+
+  .stack{ display:flex; flex-direction:column; gap:12px; }
+
+  /* ---- FINAL CARD: dark + left rail + right glow ---- */
+  .card{ position:relative; display:flex; gap:20px; background:var(--card); border:1px solid rgba(255,255,255,.09);
+    border-radius:16px; padding:20px 22px 18px 26px; overflow:hidden; transition:border-color .15s, background .15s; }
+  .card::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--hue,var(--accent)); z-index:3; }
+  .card::after{ content:""; position:absolute; right:0; top:0; bottom:0; width:46%; z-index:1; pointer-events:none;
+    background:radial-gradient(120% 90% at 100% 50%, color-mix(in srgb, var(--hue,var(--accent)) 32%, transparent), transparent 62%); }
+  .card:hover{ background:var(--raised); border-color:var(--hairline-2); }
+  .card.inactive{ opacity:.58; --hue:var(--subtle); }
+  .card.inactive::after{ opacity:.4; }
+
+  .body{ flex:1; min-width:0; display:flex; flex-direction:column; gap:11px; position:relative; z-index:2; }
+  .toprow{ display:flex; align-items:center; gap:12px; }
+  .name{ font-size:19px; font-weight:700; letter-spacing:-.01em; }
+  .status{ display:inline-flex; align-items:center; gap:6px; font-family:var(--f-mono); font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; padding:4px 9px; border-radius:999px; }
+  .status .d{ width:5px; height:5px; border-radius:50%; }
+  .status.active{ color:var(--good); background:rgba(34,229,106,.1); } .status.active .d{ background:var(--good); }
+  .status.off{ color:var(--dim); background:rgba(255,255,255,.05); } .status.off .d{ background:var(--dim); }
+
+  .meta{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-family:var(--f-mono); font-size:11px; color:var(--dim); letter-spacing:.03em; }
+  .lvl{ font-family:var(--f-mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; padding:3px 9px; border-radius:6px; border:1px solid var(--hairline-2); color:var(--text); }
+  .meta .sep{ color:var(--subtle); } .meta .v{ color:var(--text); }
+
+  .struct{ max-width:560px; margin-top:3px; }
+  .segs{ display:flex; gap:3px; height:8px; }
+  .seg{ height:100%; border-radius:2px; }
+  .seglabels{ display:flex; gap:3px; margin-top:9px; }
+  .slab{ min-width:0; padding-right:8px; }
+  .slab .pn{ font-size:11px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .slab .pd{ font-family:var(--f-mono); font-size:9.5px; color:var(--subtle); letter-spacing:.04em; margin-top:2px; }
+
+  .side{ display:flex; flex-direction:column; align-items:flex-end; justify-content:space-between; gap:16px; flex-shrink:0; position:relative; z-index:2; }
+  .assigned{ display:flex; align-items:center; gap:11px; }
+  .avatars{ display:flex; }
+  .av{ width:26px; height:26px; border-radius:50%; margin-left:-8px; border:2px solid var(--card); display:flex; align-items:center; justify-content:center; font-family:var(--f-mono); font-size:9.5px; font-weight:700; color:#04122E; }
+  .av:first-child{ margin-left:0; }
+  .card:hover .av{ border-color:var(--raised); }
+  .acount{ text-align:right; line-height:1.1; }
+  .acount .n{ font-family:var(--f-mono); font-size:19px; font-weight:700; color:var(--hue,var(--accent)); }
+  .acount.zero .n{ color:var(--subtle); }
+  .acount .l{ font-family:var(--f-mono); font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); display:block; margin-top:2px; }
+  .actions{ display:flex; gap:4px; }
+  .ib{ width:32px; height:32px; border-radius:9px; border:1px solid var(--hairline); background:transparent; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--dim); }
+  .ib:hover{ border-color:var(--hairline-2); color:var(--text); }
+  .ib.danger:hover{ color:var(--bad); border-color:rgba(255,90,77,.4); }
+  .i{ width:15px; height:15px; stroke:currentColor; stroke-width:1.8; fill:none; }
+
+  .hint{ margin-top:26px; font-family:var(--f-mono); font-size:10px; color:var(--subtle); letter-spacing:.05em; text-align:center; }
+
+  @media (max-width:1024px){
+    .wrap{ padding-left:20px; padding-right:20px; }
+    .card{ flex-direction:column; gap:16px; }
+    .side{ flex-direction:row; align-items:center; justify-content:space-between; width:100%; }
+    .card::after{ width:100%; height:46%; top:auto; bottom:0; background:radial-gradient(90% 120% at 100% 100%, color-mix(in srgb, var(--hue,var(--accent)) 32%, transparent), transparent 62%); }
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute"><defs>
+  <symbol id="ic-view" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="ic-assign" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></symbol>
+  <symbol id="ic-edit" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/></symbol>
+  <symbol id="ic-del" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></symbol>
+</defs></svg>
+
+<div class="wrap">
+
+  <div class="back">‹ Dashboard</div>
+
+  <div class="head">
+    <div>
+      <div class="h1 disp">Training Programs</div>
+      <div class="sub"><span class="a">6</span> programs&nbsp;&nbsp;·&nbsp;&nbsp;<span class="a">5</span> active&nbsp;&nbsp;·&nbsp;&nbsp;<span class="a">29</span> assignments</div>
+    </div>
+    <div class="hactions">
+      <button class="ghost">↻ Refresh</button>
+      <button class="cta">＋ Create program</button>
+    </div>
+  </div>
+
+  <div class="filters"><span class="chip on">Active</span><span class="chip">All</span></div>
+
+  <div class="stack">
+
+    <div class="card" style="--hue:var(--hueA)">
+      <div class="body">
+        <div class="toprow"><span class="name">Hypertrophy Base</span><span class="status active"><span class="d"></span>Active</span></div>
+        <div class="meta"><span class="lvl">Intermediate</span><span class="sep">·</span><span><span class="v">12</span> wks</span><span class="sep">·</span><span>Fixed</span><span class="sep">·</span><span>4 days / wk</span></div>
+        <div class="struct">
+          <div class="segs"><div class="seg" style="flex:4;background:var(--phase-light)"></div><div class="seg" style="flex:5;background:var(--phase-mod)"></div><div class="seg" style="flex:3;background:var(--phase-deload)"></div></div>
+          <div class="seglabels"><div class="slab" style="flex:4"><div class="pn">Foundation</div><div class="pd">4 weeks</div></div><div class="slab" style="flex:5"><div class="pn">Hypertrophy</div><div class="pd">5 weeks</div></div><div class="slab" style="flex:3"><div class="pn">Deload</div><div class="pd">3 weeks</div></div></div>
+        </div>
+      </div>
+      <div class="side">
+        <div class="assigned"><div class="avatars"><span class="av" style="background:var(--hueA)">AP</span><span class="av" style="background:var(--hueB)">MK</span><span class="av" style="background:var(--hueC)">RD</span></div><div class="acount"><span class="n">8</span><span class="l">clients</span></div></div>
+        <div class="actions"><button class="ib"><svg class="i"><use href="#ic-view"/></svg></button><button class="ib"><svg class="i"><use href="#ic-assign"/></svg></button><button class="ib"><svg class="i"><use href="#ic-edit"/></svg></button><button class="ib danger"><svg class="i"><use href="#ic-del"/></svg></button></div>
+      </div>
+    </div>
+
+    <div class="card" style="--hue:var(--hueB)">
+      <div class="body">
+        <div class="toprow"><span class="name">Powerbuilding II</span><span class="status active"><span class="d"></span>Active</span></div>
+        <div class="meta"><span class="lvl">Advanced</span><span class="sep">·</span><span><span class="v">16</span> wks</span><span class="sep">·</span><span>Fixed</span><span class="sep">·</span><span>5 days / wk</span></div>
+        <div class="struct">
+          <div class="segs"><div class="seg" style="flex:5;background:var(--phase-light)"></div><div class="seg" style="flex:6;background:var(--phase-mod)"></div><div class="seg" style="flex:5;background:var(--phase-hard)"></div></div>
+          <div class="seglabels"><div class="slab" style="flex:5"><div class="pn">Volume</div><div class="pd">5 weeks</div></div><div class="slab" style="flex:6"><div class="pn">Intensity</div><div class="pd">6 weeks</div></div><div class="slab" style="flex:5"><div class="pn">Peak</div><div class="pd">5 weeks</div></div></div>
+        </div>
+      </div>
+      <div class="side">
+        <div class="assigned"><div class="avatars"><span class="av" style="background:var(--hueB)">JS</span><span class="av" style="background:var(--hueD)">TL</span></div><div class="acount"><span class="n">6</span><span class="l">clients</span></div></div>
+        <div class="actions"><button class="ib"><svg class="i"><use href="#ic-view"/></svg></button><button class="ib"><svg class="i"><use href="#ic-assign"/></svg></button><button class="ib"><svg class="i"><use href="#ic-edit"/></svg></button><button class="ib danger"><svg class="i"><use href="#ic-del"/></svg></button></div>
+      </div>
+    </div>
+
+    <div class="card" style="--hue:var(--hueC)">
+      <div class="body">
+        <div class="toprow"><span class="name">Athlete Off-Season</span><span class="status active"><span class="d"></span>Active</span></div>
+        <div class="meta"><span class="lvl">Athlete</span><span class="sep">·</span><span><span class="v">13</span> wks</span><span class="sep">·</span><span>Recurring</span><span class="sep">·</span><span>6 days / wk</span></div>
+        <div class="struct">
+          <div class="segs"><div class="seg" style="flex:6;background:var(--phase-light)"></div><div class="seg" style="flex:4;background:var(--phase-mod)"></div><div class="seg" style="flex:3;background:var(--phase-hard)"></div></div>
+          <div class="seglabels"><div class="slab" style="flex:6"><div class="pn">GPP</div><div class="pd">6 weeks</div></div><div class="slab" style="flex:4"><div class="pn">Strength</div><div class="pd">4 weeks</div></div><div class="slab" style="flex:3"><div class="pn">Power</div><div class="pd">3 weeks</div></div></div>
+        </div>
+      </div>
+      <div class="side">
+        <div class="assigned"><div class="avatars"><span class="av" style="background:var(--hueC)">DV</span></div><div class="acount"><span class="n">3</span><span class="l">clients</span></div></div>
+        <div class="actions"><button class="ib"><svg class="i"><use href="#ic-view"/></svg></button><button class="ib"><svg class="i"><use href="#ic-assign"/></svg></button><button class="ib"><svg class="i"><use href="#ic-edit"/></svg></button><button class="ib danger"><svg class="i"><use href="#ic-del"/></svg></button></div>
+      </div>
+    </div>
+
+    <div class="card" style="--hue:var(--hueA)">
+      <div class="body">
+        <div class="toprow"><span class="name">Beginner Full Body</span><span class="status active"><span class="d"></span>Active</span></div>
+        <div class="meta"><span class="lvl">Beginner</span><span class="sep">·</span><span><span class="v">8</span> wks</span><span class="sep">·</span><span>Fixed</span><span class="sep">·</span><span>3 days / wk</span></div>
+        <div class="struct">
+          <div class="segs"><div class="seg" style="flex:4;background:var(--phase-light)"></div><div class="seg" style="flex:4;background:var(--phase-mod)"></div></div>
+          <div class="seglabels"><div class="slab" style="flex:4"><div class="pn">Learn</div><div class="pd">4 weeks</div></div><div class="slab" style="flex:4"><div class="pn">Build</div><div class="pd">4 weeks</div></div></div>
+        </div>
+      </div>
+      <div class="side">
+        <div class="assigned"><div class="avatars"><span class="av" style="background:var(--hueA)">KM</span><span class="av" style="background:var(--hueC)">BN</span><span class="av" style="background:var(--hueD)">+</span></div><div class="acount"><span class="n">12</span><span class="l">clients</span></div></div>
+        <div class="actions"><button class="ib"><svg class="i"><use href="#ic-view"/></svg></button><button class="ib"><svg class="i"><use href="#ic-assign"/></svg></button><button class="ib"><svg class="i"><use href="#ic-edit"/></svg></button><button class="ib danger"><svg class="i"><use href="#ic-del"/></svg></button></div>
+      </div>
+    </div>
+
+    <div class="card" style="--hue:var(--hueD)">
+      <div class="body">
+        <div class="toprow"><span class="name">Peaking Block</span><span class="status active"><span class="d"></span>Active</span></div>
+        <div class="meta"><span class="lvl">Advanced</span><span class="sep">·</span><span><span class="v">4</span> wks</span><span class="sep">·</span><span>Fixed</span><span class="sep">·</span><span>4 days / wk</span></div>
+        <div class="struct">
+          <div class="segs"><div class="seg" style="flex:2;background:var(--phase-hard)"></div><div class="seg" style="flex:2;background:var(--phase-deload)"></div></div>
+          <div class="seglabels"><div class="slab" style="flex:2"><div class="pn">Overreach</div><div class="pd">2 weeks</div></div><div class="slab" style="flex:2"><div class="pn">Taper</div><div class="pd">2 weeks</div></div></div>
+        </div>
+      </div>
+      <div class="side">
+        <div class="assigned"><div class="acount zero"><span class="n">0</span><span class="l">clients</span></div></div>
+        <div class="actions"><button class="ib"><svg class="i"><use href="#ic-view"/></svg></button><button class="ib"><svg class="i"><use href="#ic-assign"/></svg></button><button class="ib"><svg class="i"><use href="#ic-edit"/></svg></button><button class="ib danger"><svg class="i"><use href="#ic-del"/></svg></button></div>
+      </div>
+    </div>
+
+    <div class="card inactive">
+      <div class="body">
+        <div class="toprow"><span class="name">Old Cut Program</span><span class="status off"><span class="d"></span>Inactive</span></div>
+        <div class="meta"><span class="lvl">Intermediate</span><span class="sep">·</span><span><span class="v">10</span> wks</span><span class="sep">·</span><span>Fixed</span><span class="sep">·</span><span>5 days / wk</span></div>
+        <div class="struct">
+          <div class="segs"><div class="seg" style="flex:5;background:var(--subtle)"></div><div class="seg" style="flex:5;background:var(--subtle)"></div></div>
+          <div class="seglabels"><div class="slab" style="flex:5"><div class="pn">Deficit</div><div class="pd">5 weeks</div></div><div class="slab" style="flex:5"><div class="pn">Maintenance</div><div class="pd">5 weeks</div></div></div>
+        </div>
+      </div>
+      <div class="side">
+        <div class="assigned"><div class="acount zero"><span class="n">0</span><span class="l">clients</span></div></div>
+        <div class="actions"><button class="ib"><svg class="i"><use href="#ic-view"/></svg></button><button class="ib"><svg class="i"><use href="#ic-assign"/></svg></button><button class="ib"><svg class="i"><use href="#ic-edit"/></svg></button><button class="ib danger"><svg class="i"><use href="#ic-del"/></svg></button></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="hint">Hover a card for the raised state · left rail + right glow carry each program's color</div>
+
+</div>
+
+</body></html>

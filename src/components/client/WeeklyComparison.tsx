@@ -58,7 +58,7 @@ export function WeeklyComparison({
     return (
       <div className="border-y border-[color:var(--fc-glass-border)] px-4 py-3">
         <h3 className="mb-3 text-lg font-semibold fc-text-primary">Comparison</h3>
-        <p className="text-sm fc-text-dim">Complete a weekly check-in to see comparison.</p>
+        <p className="text-sm fc-text-dim">Complete a periodical check-in to see comparison.</p>
         <Link href="/client/progress/body-metrics" className="mt-2 inline-block text-sm font-medium fc-text-primary underline">
           View full history
         </Link>

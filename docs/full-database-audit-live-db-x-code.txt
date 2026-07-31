@@ -1,0 +1,2254 @@
+================================================================================
+FULL DATABASE AUDIT (READ-ONLY) — Live Supabase DB × Code Reconciliation
+================================================================================
+Generated: 2026-07-09 (audit session)
+Project: dailyfitness-app (Supabase MCP read-only)
+Scope: public schema only; auth/storage/realtime noted but not fully audited
+Method: list_tables, execute_sql, get_advisors, list_extensions, list_migrations
+        + repo grep of .from() / .rpc() in src/
+
+ABSOLUTE RULES OBSERVED: Read-only. No migrations, writes, or code changes.
+
+================================================================================
+EXECUTIVE SUMMARY
+================================================================================
+
+Ground truth: 116 public base tables, 3 views, ~80 functions, 5 enums, 193 FKs,
+392 RLS policies. ALL 116 tables have RLS enabled; ZERO tables with RLS disabled;
+ZERO tables with RLS on and zero policies (no deny-all orphans).
+
+Top blockers:
+  1. CRITICAL — foods table: no created_by/ownership; any coach/admin can UPDATE/DELETE
+     any food row (~208 rows). SELECT open to all authenticated users.
+  2. HIGH — workout_set_entries / workout_set_entry_exercises: 7+6 overlapping RLS
+     policies with per-row EXISTS joins; direct .from() reads on hot coach paths
+     (workoutSetEntryService, workoutTemplateService, OptimizedWorkoutTemplates)
+     are prime 57014 timeout candidates. Canvas loads use SECURITY DEFINER RPCs
+     (get_workout_canvas / get_instance_workout_canvas) and bypass RLS.
+  3. HIGH — 11 phantom code table references (tables/views not in live public tables)
+     including programs, user_habits, bulk_assignments — runtime errors if hit.
+  4. HIGH — athlete_scores policy "Service role can manage athlete scores" flagged
+     by advisor (USING true / WITH CHECK true on ALL). Intentional for service-role
+     cron but applies to public role — verify role targeting.
+  5. MEDIUM — Migration drift: list_migrations returns EMPTY on live; 165+ SQL files
+     in repo migrations/ + supabase/migrations/. Manual/dashboard changes likely.
+  6. MEDIUM — 694 multiple-permissive-policy performance lints; 197 unused indexes.
+  7. MEDIUM — 101 SECURITY DEFINER functions executable by anon/authenticated per advisor.
+
+================================================================================
+PART A — INVENTORY (GROUND TRUTH FROM LIVE DB)
+================================================================================
+
+A.1 TABLES (public base relations)
+-----------------------------------
+Source: pg_class + pg_policies + reltuples estimates
+Count: 116 tables | RLS on: 116 | RLS forced: 0 | All have PK | Owner: postgres (default)
+
+Row estimates (reltuples; -1 = never analyzed):
+
+TABLE | EST_ROWS | POLICIES
+------|----------|----------
+workout_set_prescriptions | 5413 | 6
+workout_set_entry_exercises | 1795 | 6
+workout_set_entries | 1666 | 7
+program_instance_set_prescriptions | 1381 | 2
+program_progression_rules | 1175 | 4
+exercises | 553 | 5
+food_slot_types | 513 | 2
+program_instance_set_entry_exercises | 440 | 2
+program_instance_set_entries | 350 | 2
+workout_templates | 321 | 2
+program_schedule | 291 | 5
+foods | 208 | 4
+leaderboard_entries | 158 | 2
+meal_template_slots | 140 | 2
+food_tags | 104 | 2
+user_exercise_metrics | 84 | 3
+program_day_assignments | 56 | 2
+program_instance_workouts | 56 | 2
+meal_food_items | 53 | 3
+meal_completions | 42 | 4
+workout_set_logs | 41 | 3
+daily_wellness_logs | 38 | 3
+athlete_scores | 29 | 3
+client_activities | 27 | 6
+body_metrics | 16 | 4
+clipcards | 15 | 7
+personal_records | 14 | 4
+goals | 13 | 6
+workout_set_entry_completions | 12 | 4
+meal_plan_assignments | 12 | 10
+workout_time_protocols | 11 | 6
+goal_source_links | 10 | 5
+meal_plan_items | 9 | 2
+exercise_categories | 6 | 4
+workout_sessions | 4 | 2
+profiles | 3 | 6
+workout_assignments | 3 | 2
+workout_logs | 3 | 4
+workout_drop_sets | 3 | 6
+clients | 2 | 3
+clipcard_types | 2 | 5
+meal_photo_logs | 1 | 4
+workout_cluster_sets | 1 | 6
+workout_rest_pause_sets | 1 | 6
+program_day_completions | 1 | 4
+program_assignment_progress | 1 | 4
+program_instance_phases | 1 | 2
+meal_plans | 1 | 3
+exercise_muscle_groups | 0 | 2
+workout_categories | 0 | 9
+(... 65 additional tables with reltuples=-1 or 0 — see live catalog)
+
+A.2 COLUMNS
+------------
+Full column catalog retrieved via information_schema (all public tables).
+Format per column: name | type | nullable | default | is_fk
+Total columns: ~1,100+ across 116 tables (live query 2026-07-09).
+
+Sample — foods (CONFIRMED no created_by / coach_id ownership column):
+  id uuid NOT NULL | name text NOT NULL | brand text | serving_size numeric NOT NULL
+  serving_unit text DEFAULT g | calories_per_serving numeric | protein/carbs/fat/fiber/sugar/sodium
+  category text | is_active boolean | is_common boolean | *_per_100g columns | timestamps
+
+Sample — workout_set_entries (Group model parent):
+  id uuid | template_id uuid NOT NULL (FK) | set_order int | set_name | set_notes
+  duration_seconds | rest_seconds | total_sets | reps_per_set | set_type enum
+  rounds_driver | interval_seconds | time_cap_seconds | is_optional | timestamps
+
+NOTE: Full machine-readable column dump available from audit SQL export.
+      select(*) usage in code may mask column-level dead detection.
+
+A.3 FOREIGN KEYS
+------------------
+Count: 193 FK constraints in public schema (pg_constraint contype=f).
+Key relationship clusters:
+  - workout_templates → workout_set_entries → workout_set_entry_exercises → prescriptions/protocols
+  - program_assignments → program_schedule → workout_templates
+  - program_instance_workouts → program_instance_set_entries → (mirror of template tree)
+  - meal_plans → meals → meal_food_items / meal_options; meal_plan_assignments → clients
+  - clients / profiles / coaches_public identity graph
+  - workout_logs → workout_set_logs → workout_sessions
+
+A.4 INDEXES
+-----------
+Index counts per table retrieved (1–12 per table). Notable:
+  workout_set_entries: 8 indexes (advisor flags several as unused)
+  workout_logs: 12 indexes | program_progression_rules: 11 | program_schedule: 9
+  foods: only 1 index (PK) — no coach/created_by index (column absent)
+Advisor: 38 unindexed foreign keys | 197 unused indexes | 20 duplicate indexes
+
+A.5 RLS POLICIES
+----------------
+Total: 392 policies across 116 tables.
+Tables with most policies: meal_plan_assignments (10), workout_categories (9),
+  workout_set_entries (7), clipcards (7).
+
+foods policies (VERBATIM summary):
+  foods_select_public SELECT: auth.role() = authenticated (all foods readable)
+  foods_insert/update/delete: coach OR admin via profiles EXISTS check
+  NO row-level ownership on UPDATE/DELETE — any coach can modify any food
+
+workout_set_entries policies (7 — OVERLAPPING):
+  ALL "Coaches can manage workout set entries" (template coach_id match)
+  SELECT x3: assigned workouts, assigned+program_schedule, coach view (duplicate paths)
+  INSERT/UPDATE/DELETE coach-scoped EXISTS on workout_templates
+  All sampled policies use (SELECT auth.uid()) wrapper — GOOD for initplan
+
+Literal USING(true) SELECT policies (reference/shared data — expected):
+  achievement_templates, challenge_scoring_categories, coach_time_slots,
+  exercise_equipment/instructions/muscle_groups/tips, leaderboard_*, muscle_groups,
+  progression_guidelines, rp_volume_landmarks, volume_guidelines
+  athlete_scores "Service role can manage" ALL: qual=true AND with_check=true (FLAG)
+
+A.6 VIEWS
+-----------
+  current_champions
+  latest_body_metrics
+  monthly_body_metrics_summary
+Code: current_champions referenced in src/lib/leaderboardService.ts (.from)
+
+A.7 FUNCTIONS / RPCs
+--------------------
+~80 public functions. SECURITY DEFINER (hot paths):
+  get_workout_canvas, get_instance_workout_canvas, save_workout_canvas,
+  save_instance_workout_canvas, get_train_page_data, get_client_dashboard,
+  get_coach_dashboard, get_client_nutrition_page, complete_workout,
+  assign_program_instance, get_workout_session_data, get_workout_log_full,
+  calculate_adherence, discard_workout_session, get_gym_console_status, ...
+Code .rpc() references (25 unique in src/):
+  assign_program_instance, complete_workout, consume_invite_code, copy_week_schedule,
+  create_invite_code, generate_daily_workout, get_client_dashboard,
+  get_client_nutrition_page, get_client_workout_summary, get_coach_dashboard,
+  get_coach_pickup_workout, get_completed_programs, get_gym_console_status,
+  get_instance_workout_canvas, get_next_due_workout, get_train_page_data,
+  get_user_profile, get_workout_blocks, get_workout_canvas, get_workout_log_full,
+  get_workout_session_data, get_workout_set_logs_for_resume, rollback_invite_code,
+  save_instance_workout_canvas, save_workout_canvas
+NOTE: Many more functions exist in DB than are called from src (used by triggers/cron/SQL).
+
+A.8 ENUMS
+---------
+  client_type: online, in_gym
+  leaderboard_visibility: public, anonymous, hidden
+  user_role: client, coach
+  workout_set_type: straight_set, superset, giant_set, drop_set, cluster_set,
+    rest_pause, pyramid_set, pre_exhaustion, amrap, emom, emom_reps, tabata, circuit,
+    for_time, ladder, hr_sets, speed_work, endurance, timed_set
+  (hr_sets enum value exists; migration 20260411 removed hr_sets from app)
+
+A.9 TRIGGERS (sample — 35 total retrieved)
+---------------------------------------------
+  enforce_single_active_meal_plan ON meal_plan_assignments
+  enforce_single_program_assignment ON program_assignments
+  prevent_last_block_deletion ON training_blocks
+  update_*_updated_at on most mutable tables
+  tr_set_log_update_activity ON workout_set_logs
+
+A.10 EXTENSIONS (installed)
+---------------------------
+  uuid-ossp (extensions), pgcrypto (extensions), pg_stat_statements (extensions),
+  supabase_vault (vault), plpgsql (pg_catalog)
+
+A.11 get_advisors — SECURITY (151 lints, 0 ERROR)
+--------------------------------------------------
+  function_search_path_mutable: 46 functions (WARN)
+  anon_security_definer_function_executable: 50 (WARN)
+  authenticated_security_definer_function_executable: 51 (WARN)
+  public_bucket_allows_listing: 2 (avatars, exercise-images storage buckets)
+  rls_policy_always_true: 1 — athlete_scores service role policy
+  auth_leaked_password_protection: 1 — HaveIBeenPwned check disabled
+
+A.12 get_advisors — PERFORMANCE (950 lints)
+---------------------------------------------
+  multiple_permissive_policies: 694
+  unused_index: 197
+  unindexed_foreign_keys: 38
+  duplicate_index: 20
+  auth_rls_initplan: 0 (policies appear wrapped post-migration 20260708)
+  auth_db_connections_absolute: 1
+  workout_set_entries: 25 performance lints (unused indexes + multiple permissive)
+
+A.13 list_migrations
+--------------------
+Live remote: EMPTY []. Repo: 165+ migration files in migrations/ and supabase/migrations/.
+INFERENCE: Schema evolved via dashboard/SQL editor/manual apply; remote migration
+history not tracked in Supabase migration table.
+
+================================================================================
+PART B — SECURITY MAP
+================================================================================
+
+Classification key:
+  NO_RLS — RLS disabled (NONE found in public)
+  RLS_ON_NO_POLICIES — deny-all (NONE found)
+  RLS_WITH_POLICIES — all 116 tables
+
+B.1 CRITICAL
+--------------
+[C1] foods — shared catalog, no ownership column
+  Evidence: information_schema shows no created_by/coach_id; policies allow any
+  coach/admin DELETE/UPDATE on any row; SELECT for all authenticated.
+  Code: src/lib/* food search, meal builders use .from(foods) — CONFIRMED client path.
+  Impact: Coach A can delete/edit Coach B foods; clients see all foods.
+  Self-signup: worsens — more coaches sharing flat namespace.
+
+[C2] athlete_scores policy "Service role can manage athlete scores"
+  USING(true) WITH CHECK(true) on ALL for role public per pg_policies.
+  Advisor flags as unrestricted RLS bypass.
+  Code: service-role upsert in calculateAthleteScore + coach clients API.
+  INFERENCE: Policy may be intended for service_role only but role binding unclear.
+  Verify: if authenticated matches, any user could write any athlete score.
+
+B.2 HIGH
+----------
+[H1] Phantom/broken code paths referencing missing tables
+  programs — code uses .from(programs); live table is workout_programs
+    Files: src/lib/programWeekStateBuilder.ts
+  user_habits — HabitManager.tsx, HabitTracker.tsx; live has habits + habit_logs
+  bulk_assignments / bulk_assignment_items — BulkAssignment.tsx
+  habit_entries — grep match in src
+  workout_template_exercises — superseded by workout_set_entry_exercises
+  workout_exercise_groups — not in live DB
+  user_preferences, avatars (as public TABLE) — not in public tables
+  current_champions — VIEW exists (OK); avatars is storage bucket
+
+[H2] coach_time_slots SELECT policy qual=true
+  Anyone can view all time slots including booked/unavailable metadata.
+  May be intentional for booking UX; review for coach privacy.
+
+[H3] invite_codes — "Anyone can validate invite codes"
+  Active non-expired codes readable by anon/authenticated.
+  Needed for signup flow but exposes code metadata (email hints in notes?).
+
+[H4] 101 SECURITY DEFINER functions executable by anon/authenticated
+  Advisor WARN on each. Many RPCs (get_coach_dashboard, complete_workout, etc.)
+  rely on internal auth checks — audit each for missing auth.uid() guard.
+  Repo migration 20260409_security_auth_uid_checks_on_rpcs.sql suggests prior fixes.
+
+[H5] Storage public bucket listing (avatars, exercise-images)
+  Broad SELECT on storage.objects enables enumeration.
+
+B.3 MEDIUM
+------------
+[M1] Reference tables with USING(true) SELECT — acceptable if truly global read-only
+  muscle_groups, volume_guidelines, leaderboard_entries, etc.
+[M2] RLS assumes coach-managed client relationship
+  Many policies join program_assignments / meal_plan_assignments with client_id = auth.uid().
+  Self-managed membership (no coach) may hit deny-all on coach-scoped tables.
+[M3] clip_cards vs clipcards — duplicate naming; clip_cards orphaned in code grep
+[M4] assigned_workouts / assigned_meal_plans — legacy assignment tables, no src .from()
+
+B.4 RANKED SECURITY FINDINGS
+------------------------------
+CRITICAL: C1 foods ownership | C2 athlete_scores always-true policy
+HIGH: H1 phantom tables | H2 coach_time_slots | H3 invite_codes | H4 DEFINER RPCs | H5 storage
+MEDIUM: M1–M4 reference data + self-signup RLS gaps + legacy duplicates
+
+================================================================================
+PART C — PERFORMANCE (57014 / TIMEOUT PATTERNS)
+================================================================================
+
+C.1 auth.uid() wrapping
+  get_advisors auth_rls_initplan: 0 issues (post 20260708 migration).
+  Manual scan of workout_set_entries policies: uses (SELECT auth.uid()) — OK.
+  Legacy unwrapped count query returned 339 — INFERRED false positives from
+  matching auth.uid() inside (SELECT auth.uid() AS uid) substrings.
+
+C.2 workout_set_entries / workout_set_entry_exercises (CONFIRMED)
+  Rows: ~1666 / ~1795. Policies: 7 / 6 with overlapping SELECT permissive policies.
+  Pattern: EXISTS subqueries joining workout_assignments, program_assignments,
+  program_schedule, workout_templates — evaluated per row on direct SELECT.
+  DIRECT TABLE READS (hot — NOT behind DEFINER RPC):
+    src/lib/workoutSetEntryService.ts — multiple .from(workout_set_entries)
+    src/lib/workoutTemplateService.ts — metadata batch reads
+    src/components/coach/OptimizedWorkoutTemplates.tsx — .in(template_id)
+    src/lib/groupModel/copyWorkout.ts, src/services/saveWorkoutTemplate.ts
+    src/hooks/useWorkoutData.ts, src/lib/programs/stationDayWorkout.ts
+  RPC-BYPASSED paths (lower RLS risk):
+    get_workout_canvas / get_instance_workout_canvas (SECURITY DEFINER)
+    get_workout_blocks, save_workout_canvas
+
+C.3 Other tables at risk (same policy patterns + row growth)
+  workout_set_prescriptions (~5413 rows) — 6 policies, child of set entries
+  program_progression_rules (~1175) — coach/client scoped EXISTS
+  meal_plan_assignments (10 policies) — complex meal tree joins
+  clipcards (7 policies), goals (6), workout_drop_sets/rest_pause/cluster (6 each)
+
+C.4 Multiple permissive policies (694 advisor lints)
+  Each role/action combo evaluates ALL matching policies (OR).
+  workout_set_entries alone: separate ALL + SELECT + INSERT + UPDATE + DELETE
+  policies for anon and authenticated — planner overhead + confusion.
+  Remediation direction: consolidate to one policy per cmd/role.
+
+C.5 Missing FK indexes (38) — affects JOIN inside policies and cascades
+  Example: achievements.goal_id_fkey unindexed (advisor).
+
+================================================================================
+PART D — DEAD / UNUSED / DRIFT
+================================================================================
+
+D.1 ORPHANED TABLES (in DB, no .from() in src/) — 22
+  Confidence: HIGH for "no direct PostgREST table access from app code"
+  Table | EST_ROWS | Notes
+  assigned_meal_plans | -1 | Legacy; superseded by meal_plan_assignments
+  assigned_workouts | -1 | Legacy; superseded by workout_assignments
+  booked_sessions | -1 | LIKELY RPC-only (book_session, cancel_session)
+  client_workout_block_exercises | -1 | Pre-spine-rebuild; instance tables canonical
+  clip_cards | -1 | Duplicate of clipcards (typo/legacy)
+  clipcard_types | 2 | RPC create_clipcard; no direct .from
+  coach_time_slots | -1 | RPC get_available_time_slots
+  exercise_equipment/instructions/muscle_groups/tips | -1/0 | Joined via exercises; RLS read-all
+  leaderboard_rankings/titles | -1 | Leaderboard feature; may be SQL-maintained
+  meal_items | -1 | LIKELY RPC get_client_nutrition_page; also meal_food_items tree
+  program_assignment_progress | 1 | Legacy cache; code comments say do NOT read directly
+  program_days | -1 | Superseded by program_schedule / instance model
+  program_workout_completions | -1 | RPC complete_workout / check_and_complete_program
+  sleep_logs/step_logs/supplement_logs/water_logs | -1 | Wellness; no src .from — INFER RPC/dashboard
+  workout_exercise_assignments | -1 | Pre-Group-model legacy
+
+D.2 PHANTOM CODE (src .from() not in live public TABLES) — 11
+  avatars — storage bucket, not public table
+  bulk_assignments, bulk_assignment_items — BulkAssignment.tsx
+  current_champions — VIEW (works via PostgREST if view granted)
+  habit_entries — dead path
+  programs — should be workout_programs
+  table — likely grep false positive / dynamic
+  user_habits — HabitManager/HabitTracker
+  user_preferences — no live table
+  workout_exercise_groups, workout_template_exercises — removed/replaced
+
+D.3 DROPPED TABLE program_progress
+  EXISTS in migrations (get_gym_console_status, advance_program_progress era)
+  Live DB: program_progress DOES NOT EXIST (confirmed SQL)
+  Code: comments only in programStateService, completeWorkoutService — no .from()
+
+D.4 DUPLICATE / SUPERSEDED STRUCTURES
+  Canonical (code-used) vs Legacy:
+  workout_programs + program_schedule + program_assignments | programs (phantom), program_days
+  meals + meal_food_items + meal_options | meal_plan_items (9 rows, 2 policies, some code)
+  workout_set_entries tree | workout_exercise_assignments, client_workout_block_exercises
+  program_instance_* mirror | template workout_set_* for assigned instances
+  clipcards | clip_cards
+  meal_plan_assignments | assigned_meal_plans
+  workout_assignments | assigned_workouts
+
+D.5 EMPTY / LOW ROW TABLES
+  workout_categories (0 rows, 9 policies) — code references; feature unused?
+  exercise_muscle_groups (0 rows) — junction; exercises may use different path
+  Many reltuples=-1 tables likely empty or stale stats — need COUNT for production decisions
+
+D.6 RLS ON DEAD TABLES
+  workout_categories: 9 policies on 0 rows — moot until feature used
+  client_workout_block_exercises: orphaned + RLS — safe to deprioritize
+
+D.7 MIGRATION DRIFT
+  Remote list_migrations: []
+  Repo: 165+ files — objects in DB without migration tracking INFERRED HIGH
+  Examples of repo-only references to missing objects: program_progress
+  Enum hr_sets still in DB enum; app migration removed usage
+
+================================================================================
+PART E — SYNTHESIS
+================================================================================
+
+E.1 TABLE-BY-TABLE MATRIX (verdict shorthand)
+K=keep F-S=fix-security F-P=fix-perf I=investigate L=likely-dead
+
+TABLE | ROWS | RLS | POL | CODE? | VERDICT
+------|------|-----|-----|-------|--------
+workout_set_prescriptions | 5413 | on | 6 | Y | F-P
+workout_set_entry_exercises | 1795 | on | 6 | Y | F-P
+workout_set_entries | 1666 | on | 7 | Y | F-P
+foods | 208 | on | 4 | Y | F-S
+athlete_scores | 29 | on | 3 | Y | F-S
+workout_templates | 321 | on | 2 | Y | K
+program_assignments | -1 | on | 2 | Y | K
+program_instance_workouts | 56 | on | 2 | Y | K
+meal_plan_assignments | 12 | on | 10 | Y | F-P
+meal_plan_items | 9 | on | 2 | Y | I
+assigned_meal_plans | -1 | on | 4 | N | L
+assigned_workouts | -1 | on | 2 | N | L
+clip_cards | -1 | on | 4 | N | L
+clipcards | 15 | on | 7 | Y | K
+program_assignment_progress | 1 | on | 4 | N | L
+program_days | -1 | on | 4 | N | L
+client_workout_block_exercises | -1 | on | 4 | N | L
+workout_exercise_assignments | -1 | on | 4 | N | L
+workout_categories | 0 | on | 9 | Y | I
+booked_sessions | -1 | on | 5 | RPC | K
+water_logs | -1 | on | 3 | N | I
+sleep_logs | -1 | on | 3 | N | I
+profiles | 3 | on | 6 | Y | K
+clients | 2 | on | 3 | Y | K
+(... remaining ~92 tables: predominantly K with RLS on; see Part A inventory)
+
+E.2 PRIORITIZED ACTION LIST (findings only — NOT applied)
+-----------------------------------------------------------
+SECURITY (onboarding blockers):
+  1. Add foods.created_by (or coach_id) + scope UPDATE/DELETE policies
+  2. Fix athlete_scores service-role policy role targeting (remove public+true/true)
+  3. Fix phantom programs→workout_programs, user_habits, bulk_assignments code paths
+  4. Audit SECURITY DEFINER RPCs for auth.uid() / coach-client checks
+  5. Tighten coach_time_slots / invite_codes if privacy required
+
+PERFORMANCE:
+  6. Consolidate workout_set_entries / workout_set_entry_exercises RLS policies
+  7. Route remaining direct .from(workout_set_entries) batch reads through RPC where possible
+  8. Add indexes on FK columns flagged by advisor (38)
+  9. Drop or keep unused indexes after pg_stat_user_indexes review (197)
+
+DRIFT / CLEANUP (after review):
+  10. Baseline migration from live schema; backfill list_migrations
+  11. Inventory legacy tables (assigned_*, clip_cards, program_days) for deprecation
+  12. Remove hr_sets from enum if fully dead
+  13. Confirm wellness logs tables (water/sleep/step/supplement) — wire or drop
+
+E.3 OPEN QUESTIONS (need your decision)
+------------------------------------------
+  Q1: Is athlete_scores "Service role" policy intentionally on public role?
+  Q2: Should foods be global shared catalog or per-coach library under self-signup?
+  Q3: Are bulk_assignments / user_habits features still planned or delete code?
+  Q4: wellness logs (water/sleep/step/supplement) — deprecated or upcoming?
+  Q5: meal_plan_items vs meals tree — which is canonical for new nutrition builder?
+  Q6: program_assignment_progress row (1) — safe to migrate off entirely?
+  Q7: coach_time_slots public SELECT — required for client booking UX?
+
+E.4 UNCERTAINTIES / LIMITATIONS
+--------------------------------
+  - Column usage: select(*) and RPC-internal SQL not fully traced
+  - reltuples=-1 for ~70 tables — row counts approximate or unknown
+  - Orphaned tables may be written by triggers/RPCs only (grep .from undercounts)
+  - current_champions is a VIEW; counted as phantom in table-only diff
+  - Storage policies audited only via advisor snippets, not full storage schema
+  - Edge functions / cron jobs outside src/ not grepped
+
+================================================================================
+END OF REPORT
+================================================================================
+
+APPENDIX A — FULL COLUMN CATALOG (live information_schema)
+Total columns: 1524
+
+
+TABLE achievement_templates
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  name | text | null=NO | fk=false
+  description | text | null=YES | fk=false
+  icon | text | null=YES | fk=false
+  category | text | null=NO | fk=false
+  achievement_type | text | null=NO | fk=false
+  is_tiered | boolean | null=NO | fk=false | def=false
+  tier_bronze_threshold | numeric | null=YES | fk=false
+  tier_bronze_label | text | null=YES | fk=false
+  tier_silver_threshold | numeric | null=YES | fk=false
+  tier_silver_label | text | null=YES | fk=false
+  tier_gold_threshold | numeric | null=YES | fk=false
+  tier_gold_label | text | null=YES | fk=false
+  tier_platinum_threshold | numeric | null=YES | fk=false
+  tier_platinum_label | text | null=YES | fk=false
+  single_threshold | numeric | null=YES | fk=false
+  is_active | boolean | null=NO | fk=false | def=true
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE achievements
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  client_id | uuid | null=NO | fk=false
+  title | text | null=NO | fk=false
+  description | text | null=YES | fk=false
+  achievement_type | text | null=NO | fk=false
+  metric_type | text | null=YES | fk=false
+  metric_value | numeric | null=YES | fk=false
+  metric_unit | text | null=YES | fk=false
+  achieved_date | date | null=NO | fk=false | def=CURRENT_DATE
+  is_public | boolean | null=YES | fk=false | def=true
+  goal_id | uuid | null=YES | fk=false
+  workout_id | uuid | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE assigned_meal_plans
+  id | bigint | null=NO | fk=false
+  client_id | uuid | null=NO | fk=false
+  coach_id | uuid | null=NO | fk=false
+  meal_plan_template_id | bigint | null=NO | fk=false
+  assigned_date | date | null=NO | fk=false
+
+TABLE assigned_workouts
+  id | bigint | null=NO | fk=false
+  client_id | uuid | null=NO | fk=false
+  coach_id | uuid | null=NO | fk=false
+  workout_template_id | bigint | null=NO | fk=false
+  assigned_date | date | null=NO | fk=false
+  status | text | null=YES | fk=false | def='pending'::text
+
+TABLE athlete_scores
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  client_id | uuid | null=NO | fk=false
+  score | integer | null=NO | fk=false | def=0
+  tier | text | null=NO | fk=false | def='benched'::text
+  window_start | date | null=NO | fk=false
+  window_end | date | null=NO | fk=false
+  calculated_at | timestamp with time zone | null=NO | fk=false | def=now()
+  created_at | timestamp with time zone | null=NO | fk=false | def=now()
+  updated_at | timestamp with time zone | null=NO | fk=false | def=now()
+  training_score | numeric | null=YES | fk=false
+  training_completion_score | numeric | null=YES | fk=false
+  training_execution_score | numeric | null=YES | fk=false
+  recovery_score | numeric | null=YES | fk=false
+  recovery_sleep_score | numeric | null=YES | fk=false
+  recovery_steps_score | numeric | null=YES | fk=false
+  nutrition_score | numeric | null=YES | fk=false
+  extras_score | numeric | null=YES | fk=false
+
+TABLE body_metrics
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  client_id | uuid | null=NO | fk=false
+  coach_id | uuid | null=YES | fk=false
+  weight_kg | numeric | null=YES | fk=false
+  body_fat_percentage | numeric | null=YES | fk=false
+  muscle_mass_kg | numeric | null=YES | fk=false
+  visceral_fat_level | integer | null=YES | fk=false
+  left_arm_circumference | numeric | null=YES | fk=false
+  right_arm_circumference | numeric | null=YES | fk=false
+  torso_circumference | numeric | null=YES | fk=false
+  waist_circumference | numeric | null=YES | fk=false
+  hips_circumference | numeric | null=YES | fk=false
+  left_thigh_circumference | numeric | null=YES | fk=false
+  right_thigh_circumference | numeric | null=YES | fk=false
+  left_calf_circumference | numeric | null=YES | fk=false
+  right_calf_circumference | numeric | null=YES | fk=false
+  measured_date | date | null=NO | fk=false | def=CURRENT_DATE
+  measurement_method | text | null=YES | fk=false
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE booked_sessions
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  time_slot_id | uuid | null=NO | fk=false
+  coach_id | uuid | null=NO | fk=false
+  client_id | uuid | null=NO | fk=false
+  session_type | text | null=NO | fk=false | def='personal_training'::text
+  status | text | null=NO | fk=false | def='scheduled'::text
+  notes | text | null=YES | fk=false
+  coach_notes | text | null=YES | fk=false
+  client_feedback | text | null=YES | fk=false
+  session_rating | integer | null=YES | fk=false
+  actual_start_time | timestamp with time zone | null=YES | fk=false
+  actual_end_time | timestamp with time zone | null=YES | fk=false
+  cancelled_at | timestamp with time zone | null=YES | fk=false
+  cancelled_by | uuid | null=YES | fk=false
+  cancellation_reason | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE challenge_participants
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  challenge_id | uuid | null=NO | fk=false
+  client_id | uuid | null=NO | fk=false
+  selected_track | text | null=YES | fk=false
+  status | text | null=NO | fk=false | def='registered'::text
+  joined_at | timestamp with time zone | null=YES | fk=false | def=now()
+  total_score | numeric | null=YES | fk=false | def=0
+  final_rank | integer | null=YES | fk=false
+  is_winner | boolean | null=YES | fk=false | def=false
+  award_notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE challenge_scoring_categories
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  challenge_id | uuid | null=NO | fk=false
+  category_name | text | null=NO | fk=false
+  exercise_id | uuid | null=YES | fk=false
+  scoring_method | text | null=NO | fk=false
+  weight_percentage | numeric | null=YES | fk=false | def=100.00
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE challenge_video_submissions
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  participant_id | uuid | null=NO | fk=false
+  scoring_category_id | uuid | null=NO | fk=false
+  video_url | text | null=NO | fk=false
+  video_path | text | null=NO | fk=false
+  submitted_at | timestamp with time zone | null=YES | fk=false | def=now()
+  status | text | null=NO | fk=false | def='pending'::text
+  reviewed_by | uuid | null=YES | fk=false
+  reviewed_at | timestamp with time zone | null=YES | fk=false
+  review_notes | text | null=YES | fk=false
+  claimed_weight | numeric | null=YES | fk=false
+  claimed_reps | integer | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE challenges
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  created_by | uuid | null=NO | fk=false
+  challenge_type | text | null=NO | fk=false
+  name | text | null=NO | fk=false
+  description | text | null=YES | fk=false
+  start_date | date | null=NO | fk=false
+  end_date | date | null=NO | fk=false
+  program_id | uuid | null=YES | fk=false
+  recomp_track | text | null=YES | fk=false
+  reward_description | text | null=YES | fk=false
+  reward_value | text | null=YES | fk=false
+  requires_video_proof | boolean | null=YES | fk=false | def=false
+  max_participants | integer | null=YES | fk=false
+  is_public | boolean | null=YES | fk=false | def=true
+  status | text | null=NO | fk=false | def='draft'::text
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE check_in_configs
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  coach_id | uuid | null=NO | fk=false
+  client_id | uuid | null=YES | fk=false
+  frequency_days | integer | null=NO | fk=false | def=30
+  weight_required | boolean | null=NO | fk=false | def=true
+  body_fat_enabled | boolean | null=NO | fk=false | def=true
+  photos_enabled | boolean | null=NO | fk=false | def=true
+  circumferences_enabled | ARRAY | null=NO | fk=false | def='{}'::text[]
+  notes_to_coach_enabled | boolean | null=NO | fk=false | def=true
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE client_activities
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  client_id | uuid | null=NO | fk=false
+  activity_type | text | null=NO | fk=false
+  custom_activity_name | text | null=YES | fk=false
+  duration_minutes | integer | null=NO | fk=false
+  distance_km | numeric | null=YES | fk=false
+  intensity | text | null=NO | fk=false | def='moderate'::text
+  notes | text | null=YES | fk=false
+  activity_date | date | null=NO | fk=false | def=CURRENT_DATE
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE client_daily_plan_selection
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  client_id | uuid | null=NO | fk=false
+  meal_plan_assignment_id | uuid | null=NO | fk=false
+  date | date | null=NO | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE client_meal_overrides
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  assignment_id | uuid | null=NO | fk=false
+  meal_id | uuid | null=NO | fk=false
+  override_type | text | null=NO | fk=false
+  original_food_item_id | uuid | null=YES | fk=false
+  replacement_food_id | uuid | null=YES | fk=false
+  original_quantity | numeric | null=YES | fk=false
+  new_quantity | numeric | null=YES | fk=false
+  unit | text | null=YES | fk=false
+  meal_option_id | uuid | null=YES | fk=false
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=NO | fk=false | def=now()
+  created_by | uuid | null=YES | fk=false
+
+TABLE client_workout_block_exercises
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  client_block_id | uuid | null=NO | fk=false
+  client_id | uuid | null=NO | fk=false
+  workout_assignment_id | uuid | null=NO | fk=false
+  original_block_exercise_id | uuid | null=YES | fk=false
+  exercise_id | uuid | null=YES | fk=false
+  exercise_order | integer | null=YES | fk=false
+  exercise_letter | text | null=YES | fk=false
+  sets | integer | null=YES | fk=false
+  reps | text | null=YES | fk=false
+  rest_seconds | integer | null=YES | fk=false
+  tempo | text | null=YES | fk=false
+  rir | integer | null=YES | fk=false
+  weight_kg | numeric | null=YES | fk=false
+  notes | text | null=YES | fk=false
+  drop_sets | jsonb | null=YES | fk=false
+  cluster_sets | jsonb | null=YES | fk=false
+  pyramid_sets | jsonb | null=YES | fk=false
+  ladder_sets | jsonb | null=YES | fk=false
+  rest_pause_sets | jsonb | null=YES | fk=false
+  amrap_config | jsonb | null=YES | fk=false
+  emom_config | jsonb | null=YES | fk=false
+  tabata_config | jsonb | null=YES | fk=false
+  circuit_config | jsonb | null=YES | fk=false
+  created_at | timestamp with time zone | null=NO | fk=false | def=now()
+  updated_at | timestamp with time zone | null=NO | fk=false | def=now()
+  load_percentage | numeric | null=YES | fk=false
+
+TABLE clients
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  coach_id | uuid | null=NO | fk=false
+  client_id | uuid | null=NO | fk=false
+  status | text | null=NO | fk=false | def='active'::text
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE clip_cards
+  id | bigint | null=NO | fk=false
+  client_id | uuid | null=NO | fk=false
+  coach_id | uuid | null=NO | fk=false
+  total_sessions | integer | null=NO | fk=false
+  used_sessions | integer | null=NO | fk=false | def=0
+
+TABLE clipcard_types
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  coach_id | uuid | null=NO | fk=false
+  name | text | null=NO | fk=false
+  sessions_count | integer | null=NO | fk=false
+  validity_days | integer | null=NO | fk=false
+  price | numeric | null=NO | fk=false
+  is_active | boolean | null=YES | fk=false | def=true
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE clipcards
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  coach_id | uuid | null=NO | fk=false
+  client_id | uuid | null=NO | fk=false
+  clipcard_type_id | uuid | null=YES | fk=false
+  sessions_total | integer | null=NO | fk=false | def=0
+  sessions_used | integer | null=YES | fk=false | def=0
+  sessions_remaining | integer | null=YES | fk=false
+  start_date | date | null=NO | fk=false
+  end_date | date | null=NO | fk=false
+  is_active | boolean | null=YES | fk=false | def=true
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+  subscription_plan_label | text | null=YES | fk=false
+  amount_paid | numeric | null=YES | fk=false
+  subscription_notes | text | null=YES | fk=false
+  subscription_status | text | null=YES | fk=false
+  plan_duration_months | integer | null=YES | fk=false
+
+TABLE coach_availability
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  coach_id | uuid | null=NO | fk=false
+  day_of_week | integer | null=NO | fk=false
+  start_time | time without time zone | null=NO | fk=false
+  end_time | time without time zone | null=NO | fk=false
+  slot_capacity | integer | null=YES | fk=false | def=4
+  is_active | boolean | null=YES | fk=false | def=true
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE coach_time_slots
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  coach_id | uuid | null=NO | fk=false
+  date | date | null=NO | fk=false
+  start_time | time without time zone | null=NO | fk=false
+  end_time | time without time zone | null=NO | fk=false
+  is_available | boolean | null=YES | fk=false | def=true
+  recurring_pattern | text | null=YES | fk=false
+  recurring_end_date | date | null=YES | fk=false
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE coach_week_reviews
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  program_assignment_id | uuid | null=NO | fk=false
+  week_number | integer | null=NO | fk=false
+  reviewed_at | timestamp with time zone | null=NO | fk=false | def=now()
+  coach_id | uuid | null=NO | fk=false
+  action | text | null=NO | fk=false
+  coach_notes | text | null=YES | fk=false
+  performance_summary | jsonb | null=YES | fk=false
+  created_at | timestamp with time zone | null=NO | fk=false | def=now()
+
+TABLE coaches_public
+  coach_id | uuid | null=NO | fk=false
+  first_name | text | null=NO | fk=false
+  last_name | text | null=NO | fk=false
+  is_active | boolean | null=NO | fk=false | def=true
+  sort_order | integer | null=NO | fk=false | def=0
+  updated_at | timestamp with time zone | null=NO | fk=false | def=now()
+
+TABLE current_champions
+  category | character varying | null=YES | fk=false
+  sex_filter | character varying | null=YES | fk=false
+  client_id | uuid | null=YES | fk=false
+  name | text | null=YES | fk=false
+  sex | character varying | null=YES | fk=false
+  bodyweight | numeric | null=YES | fk=false
+  score | numeric | null=YES | fk=false
+  title | character varying | null=YES | fk=false
+  calculated_at | timestamp with time zone | null=YES | fk=false
+
+TABLE daily_wellness_logs
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  client_id | uuid | null=NO | fk=false
+  log_date | date | null=NO | fk=false | def=CURRENT_DATE
+  energy_level | integer | null=YES | fk=false
+  mood_rating | integer | null=YES | fk=false
+  stress_level | integer | null=YES | fk=false
+  motivation_level | integer | null=YES | fk=false
+  soreness_level | integer | null=YES | fk=false
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  sleep_hours | numeric | null=YES | fk=false
+  sleep_quality | integer | null=YES | fk=false
+  steps | integer | null=YES | fk=false
+
+TABLE daily_workout_cache
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  client_id | uuid | null=NO | fk=false
+  program_id | uuid | null=NO | fk=false
+  workout_date | date | null=NO | fk=false
+  workout_data | jsonb | null=NO | fk=false
+  expires_at | timestamp with time zone | null=YES | fk=false | def=(now() + '7 days'::interval)
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE exercise_alternatives
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  primary_exercise_id | uuid | null=NO | fk=false
+  alternative_exercise_id | uuid | null=NO | fk=false
+  reason | text | null=NO | fk=false
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE exercise_categories
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  name | text | null=NO | fk=false
+  description | text | null=YES | fk=false
+  icon | text | null=YES | fk=false
+  color | text | null=YES | fk=false | def='#3B82F6'::text
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE exercise_equipment
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  exercise_id | uuid | null=NO | fk=false
+  equipment_type | text | null=NO | fk=false
+  is_required | boolean | null=YES | fk=false | def=true
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE exercise_instructions
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  exercise_id | uuid | null=NO | fk=false
+  instruction_order | integer | null=NO | fk=false
+  instruction_text | text | null=NO | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE exercise_muscle_groups
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  exercise_id | uuid | null=NO | fk=false
+  muscle_group | text | null=NO | fk=false
+  is_primary | boolean | null=YES | fk=false | def=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE exercise_tips
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  exercise_id | uuid | null=NO | fk=false
+  tip_order | integer | null=NO | fk=false
+  tip_text | text | null=NO | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE exercises
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  coach_id | uuid | null=NO | fk=false
+  name | text | null=NO | fk=false
+  description | text | null=YES | fk=false
+  category | text | null=NO | fk=false
+  image_url | text | null=YES | fk=false
+  is_active | boolean | null=YES | fk=false | def=true
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+  video_url | text | null=YES | fk=false
+  equipment_types | jsonb | null=YES | fk=false | def='[]'::jsonb
+  instructions | jsonb | null=YES | fk=false | def='[]'::jsonb
+  tips | jsonb | null=YES | fk=false | def='[]'::jsonb
+  primary_muscle_group_id | uuid | null=YES | fk=false
+  secondary_muscle_group_1_id | uuid | null=YES | fk=false
+  secondary_muscle_group_2_id | uuid | null=YES | fk=false
+
+TABLE fms_assessments
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  client_id | uuid | null=NO | fk=false
+  coach_id | uuid | null=YES | fk=false
+  total_score | integer | null=YES | fk=false
+  deep_squat | integer | null=YES | fk=false
+  hurdle_step_left | integer | null=YES | fk=false
+  hurdle_step_right | integer | null=YES | fk=false
+  inline_lunge_left | integer | null=YES | fk=false
+  inline_lunge_right | integer | null=YES | fk=false
+  shoulder_mobility_left | integer | null=YES | fk=false
+  shoulder_mobility_right | integer | null=YES | fk=false
+  active_straight_leg_raise_left | integer | null=YES | fk=false
+  active_straight_leg_raise_right | integer | null=YES | fk=false
+  trunk_stability_pushup | integer | null=YES | fk=false
+  rotary_stability_left | integer | null=YES | fk=false
+  rotary_stability_right | integer | null=YES | fk=false
+  assessed_date | date | null=NO | fk=false | def=CURRENT_DATE
+  assessor_certified | boolean | null=YES | fk=false | def=false
+  notes | text | null=YES | fk=false
+  pain_points | ARRAY | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE food_log_entries
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  client_id | uuid | null=NO | fk=false
+  food_id | uuid | null=NO | fk=false
+  log_date | date | null=NO | fk=false
+  meal_slot | text | null=NO | fk=false
+  quantity | numeric | null=NO | fk=false
+  unit | text | null=NO | fk=false
+  calories | numeric | null=NO | fk=false
+  protein_g | numeric | null=NO | fk=false
+  carbs_g | numeric | null=NO | fk=false
+  fat_g | numeric | null=NO | fk=false
+  fiber_g | numeric | null=YES | fk=false | def=0
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE food_slot_types
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  food_id | uuid | null=NO | fk=false
+  slot_type | text | null=NO | fk=false
+
+TABLE food_tags
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  food_id | uuid | null=NO | fk=false
+  tag | text | null=NO | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE foods
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  name | text | null=NO | fk=false
+  brand | text | null=YES | fk=false
+  serving_size | numeric | null=NO | fk=false
+  serving_unit | text | null=NO | fk=false | def='g'::text
+  calories_per_serving | numeric | null=NO | fk=false
+  protein | numeric | null=YES | fk=false | def=0
+  carbs | numeric | null=YES | fk=false | def=0
+  fat | numeric | null=YES | fk=false | def=0
+  fiber | numeric | null=YES | fk=false | def=0
+  category | text | null=YES | fk=false | def='General'::text
+  is_active | boolean | null=YES | fk=false | def=true
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+  sugar | numeric | null=YES | fk=false | def=0
+  sodium | numeric | null=YES | fk=false | def=0
+  is_common | boolean | null=YES | fk=false | def=false
+  calories_per_100g | numeric | null=YES | fk=false
+  protein_per_100g | numeric | null=YES | fk=false
+  carbs_per_100g | numeric | null=YES | fk=false
+  fat_per_100g | numeric | null=YES | fk=false
+  fiber_per_100g | numeric | null=YES | fk=false
+
+TABLE goal_source_links
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  goal_id | uuid | null=NO | fk=false
+  source_type | text | null=NO | fk=false
+  source_config | jsonb | null=NO | fk=false | def='{}'::jsonb
+  direction | text | null=NO | fk=false
+  created_at | timestamp with time zone | null=NO | fk=false | def=now()
+  updated_at | timestamp with time zone | null=NO | fk=false | def=now()
+
+TABLE goal_templates
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  title | text | null=NO | fk=false
+  description | text | null=YES | fk=false
+  emoji | text | null=YES | fk=false | def='🎯'::text
+  category | text | null=NO | fk=false
+  subcategory | text | null=YES | fk=false
+  default_unit | text | null=NO | fk=false
+  suggested_unit_display | text | null=YES | fk=false
+  is_auto_tracked | boolean | null=YES | fk=false | def=false
+  auto_track_source | text | null=YES | fk=false
+  is_active | boolean | null=YES | fk=false | def=true
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE goals
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  client_id | uuid | null=NO | fk=false
+  coach_id | uuid | null=YES | fk=false
+  title | text | null=NO | fk=false
+  description | text | null=YES | fk=false
+  category | text | null=NO | fk=false
+  target_value | numeric | null=YES | fk=false
+  target_date | date | null=YES | fk=false
+  current_value | numeric | null=YES | fk=false
+  status | text | null=YES | fk=false | def='active'::text
+  priority | text | null=YES | fk=false | def='medium'::text
+  start_date | date | null=NO | fk=false | def=CURRENT_DATE
+  completed_date | date | null=YES | fk=false
+  progress_percentage | numeric | null=YES | fk=false | def=0.00
+  is_public | boolean | null=YES | fk=false | def=false
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+  target_unit | text | null=YES | fk=false
+  goal_template_id | uuid | null=YES | fk=false
+  pillar | text | null=NO | fk=false | def='general'::text
+  goal_type | text | null=YES | fk=false
+
+TABLE habit_categories
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  name | text | null=NO | fk=false
+  description | text | null=YES | fk=false
+  icon | text | null=YES | fk=false | def='📋'::text
+  color | text | null=YES | fk=false | def='#8B5CF6'::text
+  sort_order | integer | null=YES | fk=false | def=0
+  is_active | boolean | null=YES | fk=false | def=true
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE habit_logs
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  habit_id | uuid | null=NO | fk=false
+  client_id | uuid | null=NO | fk=false
+  log_date | date | null=NO | fk=false | def=CURRENT_DATE
+  completed_at | timestamp with time zone | null=YES | fk=false
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=NO | fk=false | def=now()
+
+TABLE habit_templates
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  slug | text | null=NO | fk=false
+  name | text | null=NO | fk=false
+  description | text | null=YES | fk=false
+  category | text | null=NO | fk=false
+  source_type | text | null=NO | fk=false
+  source_config | jsonb | null=NO | fk=false | def='{}'::jsonb
+  default_target | jsonb | null=NO | fk=false | def='{}'::jsonb
+  user_configurable_keys | ARRAY | null=NO | fk=false | def='{}'::text[]
+  icon | text | null=YES | fk=false
+  color | text | null=YES | fk=false
+  sort_order | integer | null=NO | fk=false | def=0
+  is_active | boolean | null=NO | fk=false | def=true
+  created_at | timestamp with time zone | null=NO | fk=false | def=now()
+
+TABLE habits
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  name | character varying | null=YES | fk=false
+  description | text | null=YES | fk=false
+  is_active | boolean | null=YES | fk=false | def=true
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+  client_id | uuid | null=NO | fk=false
+  template_id | uuid | null=NO | fk=false
+  target | jsonb | null=NO | fk=false | def='{}'::jsonb
+
+TABLE invite_codes
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  code | character varying | null=NO | fk=false
+  coach_id | uuid | null=NO | fk=false
+  client_email | character varying | null=YES | fk=false
+  client_name | character varying | null=YES | fk=false
+  expires_at | timestamp with time zone | null=YES | fk=false
+  is_used | boolean | null=YES | fk=false | def=false
+  used_by | uuid | null=YES | fk=false
+  used_at | timestamp with time zone | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  notes | text | null=YES | fk=false
+  max_uses | integer | null=YES | fk=false
+  used_count | integer | null=YES | fk=false | def=0
+  last_used_at | timestamp with time zone | null=YES | fk=false
+  is_active | boolean | null=YES | fk=false | def=true
+
+TABLE latest_body_metrics
+  id | uuid | null=YES | fk=false
+  client_id | uuid | null=YES | fk=false
+  coach_id | uuid | null=YES | fk=false
+  measured_date | date | null=YES | fk=false
+  weight_kg | numeric | null=YES | fk=false
+  waist_circumference | numeric | null=YES | fk=false
+  body_fat_percentage | numeric | null=YES | fk=false
+  muscle_mass_kg | numeric | null=YES | fk=false
+  visceral_fat_level | integer | null=YES | fk=false
+  left_arm_circumference | numeric | null=YES | fk=false
+  right_arm_circumference | numeric | null=YES | fk=false
+  torso_circumference | numeric | null=YES | fk=false
+  hips_circumference | numeric | null=YES | fk=false
+  left_thigh_circumference | numeric | null=YES | fk=false
+  right_thigh_circumference | numeric | null=YES | fk=false
+  left_calf_circumference | numeric | null=YES | fk=false
+  right_calf_circumference | numeric | null=YES | fk=false
+  measurement_method | text | null=YES | fk=false
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false
+  updated_at | timestamp with time zone | null=YES | fk=false
+
+TABLE leaderboard_entries
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  client_id | uuid | null=NO | fk=false
+  leaderboard_type | text | null=NO | fk=false
+  exercise_id | uuid | null=YES | fk=false
+  rank | integer | null=NO | fk=false
+  score | numeric | null=NO | fk=false
+  time_window | text | null=YES | fk=false
+  display_name | text | null=YES | fk=false
+  is_anonymous | boolean | null=YES | fk=false | def=false
+  last_updated | timestamp with time zone | null=YES | fk=false | def=now()
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE leaderboard_rankings
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  client_id | uuid | null=NO | fk=false
+  category | character varying | null=NO | fk=false
+  sex_filter | character varying | null=YES | fk=false
+  time_filter | character varying | null=NO | fk=false | def='all_time'::character varying
+  score | numeric | null=NO | fk=false
+  rank | integer | null=NO | fk=false
+  title | character varying | null=YES | fk=false
+  calculated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE leaderboard_titles
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  client_id | uuid | null=NO | fk=false
+  category | character varying | null=NO | fk=false
+  sex_filter | character varying | null=YES | fk=false
+  rank | integer | null=NO | fk=false
+  title | character varying | null=NO | fk=false
+  earned_at | timestamp with time zone | null=YES | fk=false | def=now()
+  lost_at | timestamp with time zone | null=YES | fk=false
+  duration_days | integer | null=YES | fk=false
+
+TABLE meal_completions
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  meal_id | uuid | null=NO | fk=false
+  client_id | uuid | null=NO | fk=false
+  completed_at | timestamp with time zone | null=NO | fk=false | def=now()
+  photo_url | text | null=YES | fk=false
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  meal_option_id | uuid | null=YES | fk=false
+  date | date | null=YES | fk=false
+  meal_plan_assignment_id | uuid | null=YES | fk=false
+
+TABLE meal_food_items
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  meal_id | uuid | null=NO | fk=false
+  food_id | uuid | null=NO | fk=false
+  quantity | numeric | null=NO | fk=false
+  unit | text | null=NO | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  meal_option_id | uuid | null=YES | fk=false
+
+TABLE meal_items
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  meal_id | uuid | null=NO | fk=false
+  food_name | character varying | null=NO | fk=false
+  quantity | numeric | null=NO | fk=false
+  unit | character varying | null=NO | fk=false
+  calories_per_unit | numeric | null=NO | fk=false | def=0
+  protein_per_unit | numeric | null=NO | fk=false | def=0
+  carbs_per_unit | numeric | null=NO | fk=false | def=0
+  fat_per_unit | numeric | null=NO | fk=false | def=0
+  order_index | integer | null=NO | fk=false | def=0
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE meal_options
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  meal_id | uuid | null=NO | fk=false
+  name | text | null=NO | fk=false
+  order_index | integer | null=YES | fk=false | def=0
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE meal_photo_logs
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  client_id | uuid | null=NO | fk=false
+  meal_id | uuid | null=NO | fk=false
+  log_date | date | null=NO | fk=false
+  photo_url | text | null=NO | fk=false
+  photo_path | text | null=NO | fk=false
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+  meal_option_id | uuid | null=YES | fk=false
+
+TABLE meal_plan_assignments
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  coach_id | uuid | null=NO | fk=false
+  client_id | uuid | null=NO | fk=false
+  meal_plan_id | uuid | null=NO | fk=false
+  start_date | date | null=NO | fk=false
+  end_date | date | null=YES | fk=false
+  is_active | boolean | null=YES | fk=false | def=true
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+  label | text | null=YES | fk=false
+
+TABLE meal_plan_items
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  meal_plan_id | uuid | null=NO | fk=false
+  food_id | uuid | null=NO | fk=false
+  meal_type | text | null=NO | fk=false
+  day_of_week | integer | null=YES | fk=false
+  quantity | numeric | null=NO | fk=false | def=1
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  coach_id | uuid | null=NO | fk=false
+
+TABLE meal_plans
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  coach_id | uuid | null=NO | fk=false
+  name | text | null=NO | fk=false
+  notes | text | null=YES | fk=false
+  target_calories | integer | null=YES | fk=false
+  target_protein | numeric | null=YES | fk=false
+  target_carbs | numeric | null=YES | fk=false
+  target_fat | numeric | null=YES | fk=false
+  is_active | boolean | null=YES | fk=false | def=true
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+  generated_config | jsonb | null=YES | fk=false
+  computed_calories | numeric | null=YES | fk=false
+  computed_protein | numeric | null=YES | fk=false
+  computed_carbs | numeric | null=YES | fk=false
+  computed_fat | numeric | null=YES | fk=false
+  computed_fiber | numeric | null=YES | fk=false
+
+TABLE meal_template_slots
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  meal_template_id | uuid | null=NO | fk=false
+  slot_name | text | null=NO | fk=false
+  slot_type | text | null=NO | fk=false
+  is_required | boolean | null=YES | fk=false | def=true
+  min_portion_g | integer | null=YES | fk=false | def=30
+  max_portion_g | integer | null=YES | fk=false | def=400
+  default_portion_g | integer | null=YES | fk=false | def=150
+  order_index | integer | null=YES | fk=false | def=0
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE meal_templates
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  name | text | null=NO | fk=false
+  meal_type | text | null=NO | fk=false
+  description | text | null=YES | fk=false
+  tags | ARRAY | null=YES | fk=false | def='{}'::text[]
+  dietary_tags | ARRAY | null=YES | fk=false | def='{}'::text[]
+  incompatible_tags | ARRAY | null=YES | fk=false | def='{}'::text[]
+  min_calories | integer | null=YES | fk=false | def=200
+  max_calories | integer | null=YES | fk=false | def=800
+  is_active | boolean | null=YES | fk=false | def=true
+  created_by | uuid | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE meals
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  meal_plan_id | uuid | null=NO | fk=false
+  name | text | null=NO | fk=false
+  meal_type | text | null=NO | fk=false
+  order_index | integer | null=YES | fk=false | def=0
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+  notes | text | null=YES | fk=false
+
+TABLE mobility_metrics
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  client_id | uuid | null=NO | fk=false
+  coach_id | uuid | null=YES | fk=false
+  left_shoulder_ir | numeric | null=YES | fk=false
+  left_shoulder_er | numeric | null=YES | fk=false
+  left_shoulder_abduction | numeric | null=YES | fk=false
+  right_shoulder_ir | numeric | null=YES | fk=false
+  right_shoulder_er | numeric | null=YES | fk=false
+  right_shoulder_abduction | numeric | null=YES | fk=false
+  left_hip_ir | numeric | null=YES | fk=false
+  left_hip_er | numeric | null=YES | fk=false
+  right_hip_ir | numeric | null=YES | fk=false
+  right_hip_er | numeric | null=YES | fk=false
+  left_foot_dorsiflexion | numeric | null=YES | fk=false
+  right_foot_dorsiflexion | numeric | null=YES | fk=false
+  assessed_date | date | null=NO | fk=false | def=CURRENT_DATE
+  assessment_type | text | null=YES | fk=false | def='manual'::text
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+  left_shoulder_flexion | numeric | null=YES | fk=false
+  right_shoulder_flexion | numeric | null=YES | fk=false
+  left_hip_straight_leg_raise | numeric | null=YES | fk=false
+  left_hip_knee_to_chest | numeric | null=YES | fk=false
+  right_hip_straight_leg_raise | numeric | null=YES | fk=false
+  right_hip_knee_to_chest | numeric | null=YES | fk=false
+  left_ankle_plantar_flexion | numeric | null=YES | fk=false
+  right_ankle_plantar_flexion | numeric | null=YES | fk=false
+  forward_lean | numeric | null=YES | fk=false
+  toe_touch | numeric | null=YES | fk=false
+  squat_depth | numeric | null=YES | fk=false
+  photos | ARRAY | null=YES | fk=false
+
+TABLE monthly_body_metrics_summary
+  client_id | uuid | null=YES | fk=false
+  month | timestamp with time zone | null=YES | fk=false
+  measurement_count | bigint | null=YES | fk=false
+  avg_weight_kg | numeric | null=YES | fk=false
+  avg_waist_cm | numeric | null=YES | fk=false
+  avg_body_fat_pct | numeric | null=YES | fk=false
+  avg_muscle_mass_kg | numeric | null=YES | fk=false
+  avg_visceral_fat | numeric | null=YES | fk=false
+  first_measurement | date | null=YES | fk=false
+  last_measurement | date | null=YES | fk=false
+  weight_change_kg | numeric | null=YES | fk=false
+  waist_change_cm | numeric | null=YES | fk=false
+
+TABLE muscle_groups
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  name | text | null=NO | fk=false
+  description | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE nutrition_logs
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  client_id | uuid | null=NO | fk=false
+  log_date | date | null=NO | fk=false | def=CURRENT_DATE
+  calories | integer | null=YES | fk=false
+  protein_g | numeric | null=YES | fk=false
+  carbs_g | numeric | null=YES | fk=false
+  fat_g | numeric | null=YES | fk=false
+  fiber_g | numeric | null=YES | fk=false
+  water_ml | integer | null=YES | fk=false
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+  log_source | text | null=YES | fk=false | def='meal_plan'::text
+
+TABLE performance_tests
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  client_id | uuid | null=NO | fk=false
+  tested_at | date | null=NO | fk=false
+  test_type | text | null=NO | fk=false
+  time_seconds | integer | null=YES | fk=false
+  heart_rate_pre | integer | null=YES | fk=false
+  heart_rate_1min | integer | null=YES | fk=false
+  heart_rate_2min | integer | null=YES | fk=false
+  heart_rate_3min | integer | null=YES | fk=false
+  recovery_score | numeric | null=YES | fk=false
+  notes | text | null=YES | fk=false
+  conditions | text | null=YES | fk=false
+  perceived_effort | integer | null=YES | fk=false
+  tested_by | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE personal_records
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  client_id | uuid | null=NO | fk=false
+  exercise_id | uuid | null=NO | fk=false
+  record_type | text | null=NO | fk=false
+  record_value | numeric | null=NO | fk=false
+  record_unit | text | null=NO | fk=false
+  achieved_date | date | null=NO | fk=false | def=CURRENT_DATE
+  workout_assignment_id | uuid | null=YES | fk=false
+  previous_record_value | numeric | null=YES | fk=false
+  improvement_percentage | numeric | null=YES | fk=false
+  is_current_record | boolean | null=YES | fk=false | def=true
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+  workout_set_log_id | uuid | null=YES | fk=false
+  weight_at_record | numeric | null=YES | fk=false
+  reps_at_record | integer | null=YES | fk=false
+
+TABLE profiles
+  id | uuid | null=NO | fk=false
+  email | text | null=NO | fk=false
+  role | text | null=NO | fk=false
+  first_name | text | null=YES | fk=false
+  last_name | text | null=YES | fk=false
+  avatar_url | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+  sex | character varying | null=YES | fk=false
+  bodyweight | numeric | null=YES | fk=false
+  client_type | USER-DEFINED | null=NO | fk=false | def='online'::client_type
+  leaderboard_visibility | USER-DEFINED | null=NO | fk=false | def='public'::leaderboard_visibility
+  timezone | text | null=NO | fk=false | def='UTC'::text
+  bio | text | null=YES | fk=false
+  phone | text | null=YES | fk=false
+  height_cm | numeric | null=YES | fk=false
+  date_of_birth | date | null=YES | fk=false
+  fitness_level | text | null=YES | fk=false
+  medical_conditions | text | null=YES | fk=false
+  injuries | text | null=YES | fk=false
+  sleep_target_hours | numeric | null=NO | fk=false | def=7.0
+  steps_target | integer | null=NO | fk=false | def=8000
+
+TABLE program_assignment_progress
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  assignment_id | uuid | null=NO | fk=false
+  client_id | uuid | null=NO | fk=false
+  program_id | uuid | null=NO | fk=false
+  current_week | integer | null=NO | fk=false | def=1
+  current_day | integer | null=NO | fk=false | def=1
+  days_completed_this_week | integer | null=YES | fk=false | def=0
+  cycle_start_date | date | null=NO | fk=false | def=CURRENT_DATE
+  last_workout_date | date | null=YES | fk=false
+  total_weeks_completed | integer | null=YES | fk=false | def=0
+  is_program_completed | boolean | null=YES | fk=false | def=false
+  completed_at | timestamp with time zone | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE program_assignments
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  program_id | uuid | null=NO | fk=false
+  client_id | uuid | null=NO | fk=false
+  coach_id | uuid | null=NO | fk=false
+  current_day_number | integer | null=YES | fk=false | def=1
+  completed_days | integer | null=YES | fk=false | def=0
+  total_days | integer | null=NO | fk=false
+  start_date | date | null=NO | fk=false | def=CURRENT_DATE
+  preferred_workout_days | ARRAY | null=YES | fk=false
+  status | text | null=YES | fk=false | def='active'::text
+  is_customized | boolean | null=YES | fk=false | def=false
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+  name | text | null=YES | fk=false
+  description | text | null=YES | fk=false
+  timezone_snapshot | text | null=YES | fk=false
+  progression_mode | text | null=NO | fk=false | def='auto'::text
+  coach_unlocked_week | integer | null=YES | fk=false
+  pause_status | text | null=NO | fk=false | def='active'::text
+  paused_at | timestamp with time zone | null=YES | fk=false
+  pause_reason | text | null=YES | fk=false
+  pause_accumulated_days | integer | null=NO | fk=false | def=0
+
+TABLE program_day_assignments
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  program_assignment_id | uuid | null=NO | fk=false
+  program_day_id | uuid | null=YES | fk=false
+  day_number | integer | null=NO | fk=false
+  day_type | text | null=NO | fk=false
+  workout_assignment_id | uuid | null=YES | fk=false
+  name | text | null=NO | fk=false
+  description | text | null=YES | fk=false
+  estimated_duration | integer | null=YES | fk=false
+  target_muscles | ARRAY | null=YES | fk=false
+  intensity_level | text | null=YES | fk=false
+  rest_focus | text | null=YES | fk=false
+  recommended_activities | ARRAY | null=YES | fk=false
+  is_completed | boolean | null=YES | fk=false | def=false
+  completed_date | date | null=YES | fk=false
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+  program_day | integer | null=YES | fk=false
+  workout_template_id | uuid | null=YES | fk=false
+  is_optional | boolean | null=NO | fk=false | def=false
+  program_instance_phase_id | uuid | null=YES | fk=false
+  week_number | integer | null=YES | fk=false
+  program_instance_workout_id | uuid | null=YES | fk=false
+
+TABLE program_day_completions
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  program_assignment_id | uuid | null=NO | fk=false
+  completed_at | timestamp with time zone | null=NO | fk=false | def=now()
+  completed_by | uuid | null=NO | fk=false
+  notes | text | null=YES | fk=false
+  program_day_assignment_id | uuid | null=NO | fk=false
+
+TABLE program_days
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  program_id | uuid | null=NO | fk=false
+  day_number | integer | null=NO | fk=false
+  day_type | text | null=NO | fk=false
+  workout_template_id | uuid | null=YES | fk=false
+  name | text | null=NO | fk=false
+  description | text | null=YES | fk=false
+  estimated_duration | integer | null=YES | fk=false
+  target_muscles | ARRAY | null=YES | fk=false
+  intensity_level | text | null=YES | fk=false
+  rest_focus | text | null=YES | fk=false
+  recommended_activities | ARRAY | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE program_instance_phases
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  program_assignment_id | uuid | null=NO | fk=false
+  source_training_block_id | uuid | null=YES | fk=false
+  name | text | null=NO | fk=false
+  duration_weeks | integer | null=NO | fk=false | def=1
+  phase_order | integer | null=NO | fk=false | def=1
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=NO | fk=false | def=now()
+  updated_at | timestamp with time zone | null=NO | fk=false | def=now()
+  phase_label | text | null=YES | fk=false
+
+TABLE program_instance_set_entries
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  program_instance_workout_id | uuid | null=NO | fk=false
+  source_set_entry_id | uuid | null=YES | fk=false
+  set_order | integer | null=NO | fk=false | def=1
+  set_name | text | null=YES | fk=false
+  set_notes | text | null=YES | fk=false
+  set_type | text | null=NO | fk=false | def='straight_set'::text
+  total_sets | integer | null=YES | fk=false
+  reps_per_set | text | null=YES | fk=false
+  duration_seconds | integer | null=YES | fk=false
+  rest_seconds | integer | null=YES | fk=false
+  created_at | timestamp with time zone | null=NO | fk=false | def=now()
+  updated_at | timestamp with time zone | null=NO | fk=false | def=now()
+  rounds_driver | text | null=NO | fk=false | def='fixed'::text
+  interval_seconds | integer | null=YES | fk=false
+  time_cap_seconds | integer | null=YES | fk=false
+  is_optional | boolean | null=NO | fk=false | def=false
+
+TABLE program_instance_set_entry_exercises
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  program_instance_set_entry_id | uuid | null=NO | fk=false
+  exercise_id | uuid | null=NO | fk=false
+  source_set_entry_exercise_id | uuid | null=YES | fk=false
+  exercise_order | integer | null=NO | fk=false | def=1
+  exercise_letter | text | null=YES | fk=false
+  sets | integer | null=YES | fk=false
+  reps | text | null=YES | fk=false
+  weight_kg | numeric | null=YES | fk=false
+  rir | integer | null=YES | fk=false
+  tempo | text | null=YES | fk=false
+  rest_seconds | integer | null=YES | fk=false
+  load_percentage | numeric | null=YES | fk=false
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=NO | fk=false | def=now()
+  measurement | text | null=NO | fk=false | def='reps'::text
+  technique | text | null=NO | fk=false | def='none'::text
+  work_seconds | integer | null=YES | fk=false
+  distance_meters | numeric | null=YES | fk=false
+  target_time_seconds | integer | null=YES | fk=false
+  target_pace_seconds_per_km | numeric | null=YES | fk=false
+  target_speed_pct | numeric | null=YES | fk=false
+  hr_zone | text | null=YES | fk=false
+  target_hr_pct | numeric | null=YES | fk=false
+  drop_percentage | numeric | null=YES | fk=false
+  max_drops | integer | null=YES | fk=false
+  reps_per_cluster | integer | null=YES | fk=false
+  clusters_per_set | integer | null=YES | fk=false
+  intra_cluster_rest_seconds | integer | null=YES | fk=false
+  rest_pause_seconds | integer | null=YES | fk=false
+  max_rest_pauses | integer | null=YES | fk=false
+  is_optional | boolean | null=NO | fk=false | def=false
+
+TABLE program_instance_set_entry_protocols
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  program_instance_set_entry_id | uuid | null=NO | fk=false
+  protocol_type | text | null=NO | fk=false
+  protocol_config | jsonb | null=NO | fk=false | def='{}'::jsonb
+  created_at | timestamp with time zone | null=NO | fk=false | def=now()
+
+TABLE program_instance_set_prescriptions
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  slot_id | uuid | null=NO | fk=false
+  set_number | integer | null=NO | fk=false
+  reps | character varying | null=YES | fk=false
+  weight_kg | numeric | null=YES | fk=false
+  load_percentage | numeric | null=YES | fk=false
+  rir | integer | null=YES | fk=false
+  tempo | character varying | null=YES | fk=false
+  work_seconds | integer | null=YES | fk=false
+  distance_meters | numeric | null=YES | fk=false
+  created_at | timestamp with time zone | null=NO | fk=false | def=now()
+  updated_at | timestamp with time zone | null=NO | fk=false | def=now()
+
+TABLE program_instance_workouts
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  program_assignment_id | uuid | null=NO | fk=false
+  source_template_id | uuid | null=YES | fk=false
+  name | text | null=NO | fk=false
+  description | text | null=YES | fk=false
+  estimated_duration | integer | null=YES | fk=false
+  category | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=NO | fk=false | def=now()
+  updated_at | timestamp with time zone | null=NO | fk=false | def=now()
+
+TABLE program_progression_rules
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  program_id | uuid | null=NO | fk=false
+  week_number | integer | null=NO | fk=false
+  sets | integer | null=YES | fk=false
+  reps | text | null=YES | fk=false
+  weight_guidance | text | null=YES | fk=false
+  rest_time | integer | null=YES | fk=false
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+  program_schedule_id | uuid | null=YES | fk=false
+  set_entry_id | uuid | null=YES | fk=false
+  set_type | text | null=NO | fk=false
+  exercise_id | uuid | null=YES | fk=false
+  exercise_order | integer | null=YES | fk=false
+  exercise_letter | character varying | null=YES | fk=false
+  rest_seconds | integer | null=YES | fk=false
+  tempo | character varying | null=YES | fk=false
+  rir | integer | null=YES | fk=false
+  second_exercise_id | uuid | null=YES | fk=false
+  compound_exercise_id | uuid | null=YES | fk=false
+  first_exercise_reps | character varying | null=YES | fk=false
+  second_exercise_reps | character varying | null=YES | fk=false
+  isolation_reps | character varying | null=YES | fk=false
+  compound_reps | character varying | null=YES | fk=false
+  rest_between_pairs | integer | null=YES | fk=false
+  exercise_reps | character varying | null=YES | fk=false
+  drop_set_reps | character varying | null=YES | fk=false
+  weight_reduction_percentage | integer | null=YES | fk=false
+  reps_per_cluster | integer | null=YES | fk=false
+  clusters_per_set | integer | null=YES | fk=false
+  intra_cluster_rest | integer | null=YES | fk=false
+  rest_pause_duration | integer | null=YES | fk=false
+  max_rest_pauses | integer | null=YES | fk=false
+  rounds | integer | null=YES | fk=false
+  work_seconds | integer | null=YES | fk=false
+  rest_after_exercise | integer | null=YES | fk=false
+  rest_after_set | integer | null=YES | fk=false
+  duration_minutes | integer | null=YES | fk=false
+  emom_mode | character varying | null=YES | fk=false
+  target_reps | integer | null=YES | fk=false
+  time_cap_minutes | integer | null=YES | fk=false
+  set_order | integer | null=NO | fk=false
+  set_name | text | null=YES | fk=false
+  weight_kg | numeric | null=YES | fk=false
+  load_percentage | numeric | null=YES | fk=false
+  training_block_id | uuid | null=YES | fk=false
+  speed_endurance_config | jsonb | null=YES | fk=false
+
+TABLE program_schedule
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  program_id | uuid | null=NO | fk=false
+  template_id | uuid | null=NO | fk=false
+  day_of_week | integer | null=NO | fk=false
+  week_number | integer | null=NO | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+  day_number | integer | null=NO | fk=false
+  training_block_id | uuid | null=YES | fk=false
+  is_optional | boolean | null=YES | fk=false | def=false
+
+TABLE program_week_time_override
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  program_assignment_id | uuid | null=NO | fk=false
+  week_number | integer | null=NO | fk=false
+  override_time_score | integer | null=NO | fk=false | def=100
+  reason | text | null=YES | fk=false
+  set_by | uuid | null=NO | fk=false
+  set_at | timestamp with time zone | null=NO | fk=false | def=now()
+  created_at | timestamp with time zone | null=NO | fk=false | def=now()
+
+TABLE program_workout_completions
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  assignment_progress_id | uuid | null=NO | fk=false
+  client_id | uuid | null=NO | fk=false
+  program_id | uuid | null=NO | fk=false
+  week_number | integer | null=NO | fk=false
+  program_day | integer | null=NO | fk=false
+  template_id | uuid | null=NO | fk=false
+  workout_date | date | null=NO | fk=false | def=CURRENT_DATE
+  completed_at | timestamp with time zone | null=YES | fk=false | def=now()
+  duration_minutes | integer | null=YES | fk=false
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE progress_photos
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  client_id | uuid | null=NO | fk=false
+  photo_date | date | null=NO | fk=false | def=CURRENT_DATE
+  photo_type | text | null=NO | fk=false
+  photo_url | text | null=NO | fk=false
+  photo_path | text | null=NO | fk=false
+  weight_kg | numeric | null=YES | fk=false
+  body_fat_percentage | numeric | null=YES | fk=false
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE progression_guidelines
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  category | text | null=NO | fk=false
+  difficulty | text | null=NO | fk=false
+  volume_increase_week_min | integer | null=NO | fk=false | def=0
+  volume_increase_week_max | integer | null=NO | fk=false | def=0
+  intensity_increase_week | integer | null=NO | fk=false | def=0
+  deload_frequency_weeks | integer | null=NO | fk=false | def=4
+  deload_volume_reduction | integer | null=NO | fk=false | def=40
+  progress_when | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE restriction_presets
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  name | text | null=NO | fk=false
+  display_name | text | null=NO | fk=false
+  excluded_tags | ARRAY | null=NO | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE rp_volume_landmarks
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  muscle_group_name | text | null=NO | fk=false
+  muscle_group_id | uuid | null=YES | fk=false
+  mv | integer | null=NO | fk=false | def=0
+  mev | integer | null=NO | fk=false | def=0
+  mev_high | integer | null=NO | fk=false | def=0
+  mav_low | integer | null=NO | fk=false | def=0
+  mav_high | integer | null=NO | fk=false | def=0
+  mrv | integer | null=NO | fk=false | def=0
+  frequency | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE sessions
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  coach_id | uuid | null=NO | fk=false
+  client_id | uuid | null=NO | fk=false
+  title | text | null=NO | fk=false
+  description | text | null=YES | fk=false
+  scheduled_at | timestamp with time zone | null=NO | fk=false
+  duration_minutes | integer | null=YES | fk=false | def=60
+  status | text | null=NO | fk=false | def='scheduled'::text
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE sleep_logs
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  client_id | uuid | null=NO | fk=false
+  log_date | date | null=NO | fk=false | def=CURRENT_DATE
+  hours_slept | numeric | null=YES | fk=false
+  quality_rating | integer | null=YES | fk=false
+  bedtime | time without time zone | null=YES | fk=false
+  wake_time | time without time zone | null=YES | fk=false
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE step_logs
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  client_id | uuid | null=NO | fk=false
+  log_date | date | null=NO | fk=false | def=CURRENT_DATE
+  steps | integer | null=NO | fk=false
+  distance_meters | integer | null=YES | fk=false
+  source | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE supplement_logs
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  client_id | uuid | null=NO | fk=false
+  log_date | date | null=NO | fk=false | def=CURRENT_DATE
+  supplement_name | text | null=NO | fk=false
+  dosage | text | null=YES | fk=false
+  taken_at | timestamp with time zone | null=YES | fk=false | def=now()
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE tracking_sources
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  source_key | text | null=NO | fk=false
+  display_name | text | null=NO | fk=false
+  description | text | null=YES | fk=false
+  source_table | text | null=NO | fk=false
+  aggregation_type | text | null=YES | fk=false
+  value_column | text | null=YES | fk=false
+  filter_column | text | null=YES | fk=false
+  unit | text | null=YES | fk=false
+  category | text | null=YES | fk=false
+  is_active | boolean | null=YES | fk=false | def=true
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE training_blocks
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  program_id | uuid | null=NO | fk=false
+  name | text | null=NO | fk=false
+  duration_weeks | integer | null=NO | fk=false | def=4
+  block_order | integer | null=NO | fk=false | def=1
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+  phase_label | text | null=YES | fk=false
+
+TABLE user_achievements
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  user_id | uuid | null=NO | fk=false
+  achievement_id | uuid | null=NO | fk=false
+  earned_at | timestamp with time zone | null=YES | fk=false | def=now()
+  client_id | uuid | null=NO | fk=false
+  achievement_template_id | uuid | null=NO | fk=false
+  tier | text | null=YES | fk=false
+  metric_value | numeric | null=NO | fk=false
+  achieved_date | date | null=NO | fk=false | def=CURRENT_DATE
+  is_public | boolean | null=NO | fk=false | def=true
+
+TABLE user_exercise_metrics
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  user_id | uuid | null=NO | fk=false
+  exercise_id | uuid | null=NO | fk=false
+  estimated_1rm | numeric | null=NO | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+  best_weight | numeric | null=YES | fk=false
+  best_reps | integer | null=YES | fk=false
+  best_volume | numeric | null=YES | fk=false
+  best_volume_weight | numeric | null=YES | fk=false
+  best_volume_reps | integer | null=YES | fk=false
+
+TABLE volume_guidelines
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  category | text | null=NO | fk=false
+  difficulty | text | null=NO | fk=false
+  sets_per_muscle_week_min | integer | null=NO | fk=false
+  sets_per_muscle_week_optimal | integer | null=NO | fk=false
+  sets_per_muscle_week_max | integer | null=NO | fk=false
+  reps_per_set_min | integer | null=NO | fk=false
+  reps_per_set_max | integer | null=NO | fk=false
+  rir_min | integer | null=NO | fk=false | def=0
+  rir_max | integer | null=NO | fk=false | def=0
+  load_percent_min | integer | null=NO | fk=false | def=0
+  load_percent_max | integer | null=NO | fk=false | def=0
+  rest_period_sec | integer | null=NO | fk=false | def=60
+  sessions_per_week | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE water_logs
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  client_id | uuid | null=NO | fk=false
+  log_date | date | null=NO | fk=false | def=CURRENT_DATE
+  amount_ml | integer | null=NO | fk=false
+  logged_at | timestamp with time zone | null=YES | fk=false | def=now()
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE workout_assignments
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  workout_template_id | uuid | null=YES | fk=false
+  client_id | uuid | null=NO | fk=false
+  coach_id | uuid | null=NO | fk=false
+  name | text | null=NO | fk=false
+  description | text | null=YES | fk=false
+  estimated_duration | integer | null=YES | fk=false | def=60
+  assigned_date | date | null=NO | fk=false | def=CURRENT_DATE
+  scheduled_date | date | null=YES | fk=false
+  status | text | null=YES | fk=false | def='assigned'::text
+  notes | text | null=YES | fk=false
+  is_customized | boolean | null=YES | fk=false | def=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+  program_assignment_id | uuid | null=YES | fk=false
+
+TABLE workout_categories
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  coach_id | uuid | null=YES | fk=false
+  name | text | null=NO | fk=false
+  description | text | null=YES | fk=false
+  color | text | null=YES | fk=false | def='#3B82F6'::text
+  icon | text | null=YES | fk=false | def='Dumbbell'::text
+  is_active | boolean | null=YES | fk=false | def=true
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE workout_cluster_sets
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  reps_per_cluster | integer | null=NO | fk=false
+  clusters_per_set | integer | null=NO | fk=false
+  intra_cluster_rest | integer | null=YES | fk=false | def=15
+  inter_set_rest | integer | null=YES | fk=false | def=120
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  set_entry_id | uuid | null=YES | fk=false
+  exercise_id | uuid | null=YES | fk=false
+  exercise_order | integer | null=YES | fk=false | def=1
+  load_percentage | numeric | null=YES | fk=false
+  weight_kg | numeric | null=YES | fk=false
+
+TABLE workout_drop_sets
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  drop_order | integer | null=NO | fk=false
+  weight_kg | numeric | null=YES | fk=false
+  reps | character varying | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  set_entry_id | uuid | null=YES | fk=false
+  exercise_id | uuid | null=YES | fk=false
+  exercise_order | integer | null=YES | fk=false | def=1
+  load_percentage | numeric | null=YES | fk=false
+  drop_percentage | integer | null=YES | fk=false
+
+TABLE workout_endurance_sets
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  set_entry_id | uuid | null=NO | fk=false
+  exercise_id | uuid | null=NO | fk=false
+  exercise_order | integer | null=NO | fk=false | def=1
+  target_distance_meters | numeric | null=YES | fk=false
+  target_time_seconds | integer | null=YES | fk=false
+  target_pace_seconds_per_km | numeric | null=YES | fk=false
+  target_hr_pct | numeric | null=YES | fk=false
+  hr_zone | integer | null=YES | fk=false
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE workout_exercise_assignments
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  workout_block_assignment_id | uuid | null=NO | fk=false
+  workout_block_exercise_id | uuid | null=YES | fk=false
+  exercise_id | uuid | null=NO | fk=false
+  exercise_order | integer | null=NO | fk=false
+  exercise_letter | character varying | null=YES | fk=false
+  sets | integer | null=YES | fk=false
+  reps | character varying | null=YES | fk=false
+  weight_kg | numeric | null=YES | fk=false
+  rir | integer | null=YES | fk=false
+  tempo | character varying | null=YES | fk=false
+  rest_seconds | integer | null=YES | fk=false
+  notes | text | null=YES | fk=false
+  is_customized | boolean | null=YES | fk=false | def=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE workout_exercise_logs
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  workout_log_id | uuid | null=NO | fk=false
+  workout_exercise_assignment_id | uuid | null=YES | fk=false
+  exercise_id | uuid | null=NO | fk=false
+  exercise_order | integer | null=YES | fk=false
+  completed_sets | jsonb | null=YES | fk=false
+  total_sets_planned | integer | null=YES | fk=false
+  total_sets_completed | integer | null=YES | fk=false
+  total_reps_completed | integer | null=YES | fk=false
+  total_weight_lifted | numeric | null=YES | fk=false
+  difficulty_rating | integer | null=YES | fk=false
+  form_quality_rating | integer | null=YES | fk=false
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE workout_giant_set_exercise_logs
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  workout_set_log_id | uuid | null=NO | fk=false
+  exercise_id | uuid | null=NO | fk=false
+  exercise_order | integer | null=NO | fk=false
+  weight_kg | numeric | null=YES | fk=false
+  reps_completed | integer | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE workout_logs
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  workout_assignment_id | uuid | null=YES | fk=false
+  client_id | uuid | null=NO | fk=false
+  started_at | timestamp with time zone | null=NO | fk=false
+  completed_at | timestamp with time zone | null=YES | fk=false
+  total_duration_minutes | integer | null=YES | fk=false
+  overall_difficulty_rating | integer | null=YES | fk=false
+  perceived_effort | integer | null=YES | fk=false
+  total_sets_completed | integer | null=YES | fk=false | def=0
+  total_reps_completed | integer | null=YES | fk=false | def=0
+  total_weight_lifted | numeric | null=YES | fk=false | def=0
+  energy_level | integer | null=YES | fk=false
+  muscle_fatigue_level | integer | null=YES | fk=false
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  workout_session_id | uuid | null=YES | fk=false
+  total_hr_zone2_minutes | numeric | null=YES | fk=false
+  total_hr_zone45_minutes | numeric | null=YES | fk=false
+  average_hr_percentage | numeric | null=YES | fk=false
+  max_hr_percentage | numeric | null=YES | fk=false
+  total_distance_meters | numeric | null=YES | fk=false
+  program_assignment_id | uuid | null=YES | fk=false
+  program_day_assignment_id | uuid | null=YES | fk=false
+
+TABLE workout_programs
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  name | text | null=NO | fk=false
+  description | text | null=YES | fk=false
+  coach_id | uuid | null=NO | fk=false
+  difficulty_level | text | null=YES | fk=false | def='intermediate'::text
+  target_audience | text | null=YES | fk=false | def='general_fitness'::text
+  is_active | boolean | null=YES | fk=false | def=true
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+  type | text | null=NO | fk=false | def='fixed'::text
+  periodization_style | text | null=YES | fk=false
+
+TABLE workout_rest_pause_sets
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  weight_kg | numeric | null=YES | fk=false
+  rest_pause_duration | integer | null=YES | fk=false | def=15
+  max_rest_pauses | integer | null=YES | fk=false | def=3
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  set_entry_id | uuid | null=YES | fk=false
+  exercise_id | uuid | null=YES | fk=false
+  exercise_order | integer | null=YES | fk=false | def=1
+  load_percentage | numeric | null=YES | fk=false
+
+TABLE workout_sessions
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  assignment_id | uuid | null=NO | fk=false
+  client_id | uuid | null=NO | fk=false
+  started_at | timestamp with time zone | null=YES | fk=false | def=now()
+  completed_at | timestamp with time zone | null=YES | fk=false
+  total_duration | integer | null=YES | fk=false
+  status | text | null=YES | fk=false | def='in_progress'::text
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  current_block_index | integer | null=NO | fk=false | def=0
+  current_exercise_index | integer | null=NO | fk=false | def=0
+  last_activity_at | timestamp with time zone | null=YES | fk=false
+  total_exercises | integer | null=YES | fk=false
+  program_assignment_id | uuid | null=YES | fk=false
+  program_day_assignment_id | uuid | null=YES | fk=false
+
+TABLE workout_set_details
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  workout_exercise_log_id | uuid | null=NO | fk=false
+  set_number | integer | null=NO | fk=false
+  weight_kg | numeric | null=YES | fk=false
+  reps_completed | integer | null=YES | fk=false
+  rpe | integer | null=YES | fk=false
+  rest_seconds | integer | null=YES | fk=false
+  notes | text | null=YES | fk=false
+  completed_at | timestamp with time zone | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE workout_set_entries
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  template_id | uuid | null=NO | fk=false
+  set_order | integer | null=NO | fk=false
+  set_name | character varying | null=YES | fk=false
+  set_notes | text | null=YES | fk=false
+  duration_seconds | integer | null=YES | fk=false
+  rest_seconds | integer | null=YES | fk=false
+  total_sets | integer | null=YES | fk=false
+  reps_per_set | character varying | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+  set_type | USER-DEFINED | null=NO | fk=false | def='straight_set'::workout_set_type
+  rounds_driver | text | null=NO | fk=false | def='fixed'::text
+  interval_seconds | integer | null=YES | fk=false
+  time_cap_seconds | integer | null=YES | fk=false
+  is_optional | boolean | null=NO | fk=false | def=false
+
+TABLE workout_set_entry_completions
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  workout_log_id | uuid | null=NO | fk=false
+  workout_set_entry_id | uuid | null=YES | fk=false
+  completed_at | timestamp with time zone | null=NO | fk=false | def=now()
+  completion_type | text | null=YES | fk=false
+  meta | jsonb | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  program_instance_set_entry_id | uuid | null=YES | fk=false
+
+TABLE workout_set_entry_exercises
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  set_entry_id | uuid | null=NO | fk=false
+  exercise_id | uuid | null=NO | fk=false
+  exercise_order | integer | null=NO | fk=false
+  exercise_letter | character varying | null=YES | fk=false
+  sets | integer | null=YES | fk=false
+  reps | character varying | null=YES | fk=false
+  weight_kg | numeric | null=YES | fk=false
+  rir | integer | null=YES | fk=false
+  tempo | character varying | null=YES | fk=false
+  rest_seconds | integer | null=YES | fk=false
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+  load_percentage | numeric | null=YES | fk=false
+  measurement | text | null=NO | fk=false | def='reps'::text
+  work_seconds | integer | null=YES | fk=false
+  distance_meters | numeric | null=YES | fk=false
+  target_time_seconds | integer | null=YES | fk=false
+  target_pace_seconds_per_km | numeric | null=YES | fk=false
+  target_speed_pct | numeric | null=YES | fk=false
+  hr_zone | text | null=YES | fk=false
+  target_hr_pct | numeric | null=YES | fk=false
+  technique | text | null=NO | fk=false | def='none'::text
+  drop_percentage | numeric | null=YES | fk=false
+  max_drops | integer | null=YES | fk=false
+  reps_per_cluster | integer | null=YES | fk=false
+  clusters_per_set | integer | null=YES | fk=false
+  intra_cluster_rest_seconds | integer | null=YES | fk=false
+  rest_pause_seconds | integer | null=YES | fk=false
+  max_rest_pauses | integer | null=YES | fk=false
+  is_optional | boolean | null=NO | fk=false | def=false
+
+TABLE workout_set_logs
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  workout_log_id | uuid | null=NO | fk=false
+  client_id | uuid | null=NO | fk=false
+  set_entry_id | uuid | null=NO | fk=false
+  exercise_id | uuid | null=YES | fk=false
+  weight | numeric | null=YES | fk=false
+  reps | integer | null=YES | fk=false
+  completed_at | timestamp with time zone | null=YES | fk=false | def=now()
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  set_type | text | null=YES | fk=false
+  set_number | integer | null=YES | fk=false
+  superset_exercise_a_id | uuid | null=YES | fk=false
+  superset_weight_a | numeric | null=YES | fk=false
+  superset_reps_a | integer | null=YES | fk=false
+  superset_exercise_b_id | uuid | null=YES | fk=false
+  superset_weight_b | numeric | null=YES | fk=false
+  superset_reps_b | integer | null=YES | fk=false
+  giant_set_exercises | jsonb | null=YES | fk=false
+  round_number | integer | null=YES | fk=false
+  dropset_initial_weight | numeric | null=YES | fk=false
+  dropset_initial_reps | integer | null=YES | fk=false
+  dropset_final_weight | numeric | null=YES | fk=false
+  dropset_final_reps | integer | null=YES | fk=false
+  dropset_percentage | numeric | null=YES | fk=false
+  cluster_number | integer | null=YES | fk=false
+  rest_pause_initial_weight | numeric | null=YES | fk=false
+  rest_pause_initial_reps | integer | null=YES | fk=false
+  rest_pause_reps_after | integer | null=YES | fk=false
+  rest_pause_number | integer | null=YES | fk=false
+  preexhaust_isolation_exercise_id | uuid | null=YES | fk=false
+  preexhaust_isolation_weight | numeric | null=YES | fk=false
+  preexhaust_isolation_reps | integer | null=YES | fk=false
+  preexhaust_compound_exercise_id | uuid | null=YES | fk=false
+  preexhaust_compound_weight | numeric | null=YES | fk=false
+  preexhaust_compound_reps | integer | null=YES | fk=false
+  amrap_total_reps | integer | null=YES | fk=false
+  amrap_duration_seconds | integer | null=YES | fk=false
+  amrap_target_reps | integer | null=YES | fk=false
+  emom_minute_number | integer | null=YES | fk=false
+  emom_total_reps_this_min | integer | null=YES | fk=false
+  emom_total_duration_sec | integer | null=YES | fk=false
+  tabata_rounds_completed | integer | null=YES | fk=false
+  tabata_total_duration_sec | integer | null=YES | fk=false
+  fortime_total_reps | integer | null=YES | fk=false
+  fortime_time_taken_sec | integer | null=YES | fk=false
+  fortime_time_cap_sec | integer | null=YES | fk=false
+  fortime_target_reps | integer | null=YES | fk=false
+  rest_pause_duration | integer | null=YES | fk=false
+  max_rest_pauses | integer | null=YES | fk=false
+  hr_zone | integer | null=YES | fk=false
+  hr_percentage | numeric | null=YES | fk=false
+  hr_duration_seconds | integer | null=YES | fk=false
+  hr_distance_meters | numeric | null=YES | fk=false
+  hr_interval_round | integer | null=YES | fk=false
+  hr_work_duration_seconds | integer | null=YES | fk=false
+  hr_rest_duration_seconds | integer | null=YES | fk=false
+  hr_average_percentage | numeric | null=YES | fk=false
+  rpe | integer | null=YES | fk=false
+  actual_time_seconds | numeric | null=YES | fk=false
+  actual_distance_meters | numeric | null=YES | fk=false
+  actual_hr_avg | numeric | null=YES | fk=false
+  actual_speed_kmh | numeric | null=YES | fk=false
+  actual_duration_seconds | integer | null=YES | fk=false
+
+TABLE workout_set_prescriptions
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  slot_id | uuid | null=NO | fk=false
+  set_number | integer | null=NO | fk=false
+  reps | character varying | null=YES | fk=false
+  weight_kg | numeric | null=YES | fk=false
+  load_percentage | numeric | null=YES | fk=false
+  rir | integer | null=YES | fk=false
+  tempo | character varying | null=YES | fk=false
+  work_seconds | integer | null=YES | fk=false
+  distance_meters | numeric | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE workout_speed_sets
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  set_entry_id | uuid | null=NO | fk=false
+  exercise_id | uuid | null=NO | fk=false
+  exercise_order | integer | null=NO | fk=false | def=1
+  intervals | integer | null=NO | fk=false | def=1
+  distance_meters | numeric | null=YES | fk=false
+  target_speed_pct | numeric | null=YES | fk=false
+  target_hr_pct | numeric | null=YES | fk=false
+  rest_seconds | integer | null=NO | fk=false | def=120
+  load_pct_bw | numeric | null=YES | fk=false
+  notes | text | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+
+TABLE workout_templates
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  name | text | null=NO | fk=false
+  description | text | null=YES | fk=false
+  coach_id | uuid | null=NO | fk=false
+  difficulty_level | text | null=YES | fk=false | def='intermediate'::text
+  estimated_duration | integer | null=YES | fk=false | def=60
+  category | text | null=YES | fk=false | def='general'::text
+  is_active | boolean | null=YES | fk=false | def=true
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  updated_at | timestamp with time zone | null=YES | fk=false | def=now()
+  kind | text | null=NO | fk=false | def='library'::text
+  source_workout_id | uuid | null=YES | fk=false
+
+TABLE workout_time_protocols
+  id | uuid | null=NO | fk=false | def=gen_random_uuid()
+  set_entry_id | uuid | null=NO | fk=false
+  protocol_type | character varying | null=NO | fk=false
+  total_duration_minutes | integer | null=YES | fk=false
+  work_seconds | integer | null=YES | fk=false
+  rest_seconds | integer | null=YES | fk=false
+  rounds | integer | null=YES | fk=false
+  reps_per_round | integer | null=YES | fk=false
+  rest_after_round_seconds | integer | null=YES | fk=false
+  created_at | timestamp with time zone | null=YES | fk=false | def=now()
+  exercise_id | uuid | null=YES | fk=false
+  exercise_order | integer | null=YES | fk=false | def=1
+  load_percentage | numeric | null=YES | fk=false
+  set | integer | null=YES | fk=false
+  rest_after_set | integer | null=YES | fk=false
+  weight_kg | numeric | null=YES | fk=false
+  target_reps | integer | null=YES | fk=false
+  time_cap_minutes | integer | null=YES | fk=false
+  emom_mode | character varying | null=YES | fk=false

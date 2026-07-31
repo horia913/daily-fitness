@@ -292,6 +292,10 @@ export function AuthWrapper() {
           throw new Error("Invite code is required to create an account");
         }
 
+        if (password.length < 8) {
+          throw new Error("Password must be at least 8 characters.");
+        }
+
         // Validate password strength
         if (passwordStrength.score < 2) {
           throw new Error(
@@ -498,7 +502,7 @@ export function AuthWrapper() {
                     value={selectedCoachId}
                     onValueChange={setSelectedCoachId}
                   >
-                    <SelectTrigger className="pl-10 h-12 rounded-xl border-[color:var(--fc-glass-border)] bg-[var(--fc-glass-soft)] focus:border-[var(--fc-accent-cyan)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--fc-accent-cyan)_20%,transparent)]">
+                    <SelectTrigger className="pl-10 h-12 rounded-xl border-[color:var(--fc-glass-border)] bg-[var(--fc-glass-soft)] focus:border-[var(--fc-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--fc-accent)_20%,transparent)]">
                       <SelectValue placeholder="Choose your fitness coach" />
                     </SelectTrigger>
                     <SelectContent className="rounded-xl border-[color:var(--fc-glass-border)] bg-[var(--fc-glass-base)]">
@@ -590,7 +594,7 @@ export function AuthWrapper() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required={!isForgot}
-                    minLength={6}
+                    minLength={isSignup ? 8 : undefined}
                     variant="fc"
                     className="pl-10 pr-12 h-12 rounded-xl"
                     placeholder="Enter your password"

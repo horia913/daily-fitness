@@ -13,7 +13,6 @@ describe("coachWorkoutAdherence", () => {
     const result = computeWorkoutAdherence(
       [
         {
-          id: "sl-1",
           workout_log_id: "wl-1",
           set_entry_id: "entry-1",
           set_type: "superset",
@@ -49,7 +48,6 @@ describe("coachWorkoutAdherence", () => {
     const result = computeWorkoutAdherence(
       [
         {
-          id: "sl-s",
           workout_log_id: "wl-1",
           set_entry_id: "speed-entry",
           set_type: "speed_work",
@@ -58,7 +56,6 @@ describe("coachWorkoutAdherence", () => {
           actual_time_seconds: 45,
         },
         {
-          id: "sl-e",
           workout_log_id: "wl-1",
           set_entry_id: "endurance-entry",
           set_type: "endurance",

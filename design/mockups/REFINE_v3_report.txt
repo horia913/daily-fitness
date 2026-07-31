@@ -1,0 +1,79 @@
+REFINE (v3) — stacked log fields (Option B) + v6 last-session card
+Date: 2026-07-19
+Scope: presentation only. No logging/write-path, navigation, or git changes.
+tsc: 0 errors
+
+--------------------------------------------------------------------------------
+1. Files modified
+--------------------------------------------------------------------------------
+Live card core
+  src/components/client/workout-execution/live-card/LiveCardLog.tsx
+  src/components/client/workout-execution/live-card/liveCard.module.css
+
+Last session
+  src/components/client/workout-execution/ui/LastSessionSetsSection.tsx
+  src/components/client/workout-execution/ui/lastSessionSetsSection.module.css  (new)
+
+Block executors (log layout wiring)
+  StraightSet, DropSet, GiantSet, Superset, ClusterSet, RestPause,
+  Emom, Amrap, ForTime, TimedSet, SpeedWork, Endurance
+
+--------------------------------------------------------------------------------
+2. Stacked field implementation (sizes) + executors
+--------------------------------------------------------------------------------
+Option B row layout (LiveCardLogField):
+  - Full-width dark inset (#050608) + light border, radius 11px
+  - label left ~50px · − · value centred ~20px mono · +
+  - Stepper buttons 34×32 (not shrunk)
+  - Stacked column gap 7px in .log / .logSlot / .gxlog
+
+Solo log button (LiveCardLogButton variant="full", default):
+  - Full-width, height 44px, label "✓ Log set"
+
+Picked up by:
+  Straight, Drop (primary fields), Timed, Endurance, Speed, Emom, Amrap,
+  ForTime, Cluster (weight field), Rest-pause (weight/reps + pause reps),
+  and protocol log slots using the same components.
+
+--------------------------------------------------------------------------------
+3. Grouped compact-✓ variant
+--------------------------------------------------------------------------------
+Giant + Superset per-exercise logs:
+  - Same stacked wide fields
+  - LiveCardLogButton variant="compact" (52×44 ✓, end-aligned below fields)
+  - Avoids three full-width "Log set" buttons on a giant set
+
+Read: compact-below reads cleaner than full-width×3; steppers stay 34×32.
+Did not switch to beside-reps (would squeeze the value column). If product
+prefers ✓ beside the reps row, that can be a follow-up — left as below-fields
+compact per this pass.
+
+--------------------------------------------------------------------------------
+4. Last-session card restyle + effort-word reuse
+--------------------------------------------------------------------------------
+- Transparent hairline card (14px radius, matches live card language)
+- Header: "Last session" left · "date · N sets" right (mono, subtle)
+  date via formatLiveLastDate(lastWorkout.date)
+- Rows: index · `reps × weight kg` · effort word (display weight) or muted —
+- Effort colours: --fc-effort-* via rpeToEffortTier / clientEffortLabelFromStoredRpe
+  (same mapping family as LoggedEffortInline / effort primary)
+
+--------------------------------------------------------------------------------
+5. 375px fit confirmation
+--------------------------------------------------------------------------------
+- Solo: stacked fields + full-width ✓ — width constrained (min-width:0, full card)
+- Loaded (technique + note + load %): taller; scrolls cleanly; no sideways overflow
+- Giant ×3: stacked fields + compact ✓ per exercise — denser height, no wall of
+  full-width buttons
+Visual confirm still recommended in DevTools iPhone SE (375).
+
+--------------------------------------------------------------------------------
+6. Logging / writes / navigation
+--------------------------------------------------------------------------------
+Untouched — only presentation (field layout, button chrome, last-session skin).
+onChange / onIncrement / onLog handlers and write payloads unchanged.
+
+--------------------------------------------------------------------------------
+7. tsc result
+--------------------------------------------------------------------------------
+npx tsc --noEmit → exit 0 (0 errors)

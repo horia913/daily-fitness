@@ -20,6 +20,8 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/components/ui/toast-provider";
+import { shareOrCopy } from "@/lib/shareOrCopy";
 import {
   Dialog,
   DialogContent,
@@ -48,8 +50,6 @@ export interface ChallengeDetailPageBodyProps {
   setSubmitWeight: (s: string) => void;
   submitReps: string;
   setSubmitReps: (s: string) => void;
-  submitNotes: string;
-  setSubmitNotes: (s: string) => void;
   submitting: boolean;
   handleSubmitProof: () => void;
   getSubmissionForCategory: (categoryId: string) => any;
@@ -79,13 +79,35 @@ export function ChallengeDetailPageBody({
   setSubmitWeight,
   submitReps,
   setSubmitReps,
-  submitNotes,
-  setSubmitNotes,
   submitting,
   handleSubmitProof,
   getSubmissionForCategory,
 }: ChallengeDetailPageBodyProps) {
   const router = useRouter();
+  const { addToast } = useToast();
+
+  const handleShareChallenge = async (payload: {
+    title: string;
+    text?: string;
+  }) => {
+    const result = await shareOrCopy({
+      ...payload,
+      url: typeof window !== "undefined" ? window.location.href : undefined,
+    });
+    if (result.ok && result.method === "clipboard") {
+      addToast({
+        variant: "success",
+        title: "Copied to clipboard",
+        description: "Challenge link is ready to paste.",
+      });
+    } else if (!result.ok && result.reason !== "cancelled") {
+      addToast({
+        variant: "destructive",
+        title: "Couldn’t share",
+        description: "Clipboard isn’t available on this device.",
+      });
+    }
+  };
 
   const backControl = onBackClick ? (
     <button
@@ -145,11 +167,7 @@ export function ChallengeDetailPageBody({
             className="w-12 h-12 flex items-center justify-center rounded-xl border transition-colors shrink-0 border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)] hover:bg-[color:var(--fc-glass-soft)]"
             aria-label="Share challenge"
             onClick={() => {
-              if (typeof navigator !== "undefined" && navigator.share) {
-                navigator
-                  .share({ title: challenge.name, url: window.location.href })
-                  .catch(() => {});
-              }
+              void handleShareChallenge({ title: challenge.name });
             }}
           >
             <Share2 className="w-6 h-6 fc-text-primary" aria-hidden />
@@ -190,17 +208,12 @@ export function ChallengeDetailPageBody({
               </p>
               <button
                 type="button"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[color-mix(in_srgb,var(--fc-accent-cyan)_20%,transparent)] text-[color:var(--fc-accent-cyan)] text-sm font-medium hover:bg-[color-mix(in_srgb,var(--fc-accent-cyan)_30%,transparent)] transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[color-mix(in_srgb,var(--fc-accent)_20%,transparent)] text-[color:var(--fc-accent)] text-sm font-medium hover:bg-[color-mix(in_srgb,var(--fc-accent)_30%,transparent)] transition-colors"
                 onClick={() => {
-                  if (typeof navigator !== "undefined" && navigator.share) {
-                    navigator
-                      .share({
-                        title: `I placed #${rank} in ${challenge.name}!`,
-                        text: `I scored ${userEntry.total_score ?? 0} points and finished #${rank} in the ${challenge.name} challenge!`,
-                        url: window.location.href,
-                      })
-                      .catch(() => {});
-                  }
+                  void handleShareChallenge({
+                    title: `I placed #${rank} in ${challenge.name}!`,
+                    text: `I scored ${userEntry.total_score ?? 0} points and finished #${rank} in the ${challenge.name} challenge!`,
+                  });
                 }}
               >
                 <Share2 className="w-4 h-4" aria-hidden />
@@ -215,7 +228,7 @@ export function ChallengeDetailPageBody({
           ? leaderboard.find((e: any) => e.client_id === userId)
           : null;
         return userEntry ? (
-          <div className="rounded-xl border-y border-r border-[color:var(--fc-glass-border)] border-l-4 border-l-[color:var(--fc-accent-cyan)] bg-[color:var(--fc-glass-highlight)] p-4">
+          <div className="rounded-xl border-y border-r border-[color:var(--fc-glass-border)] border-l-4 border-l-[color:var(--fc-accent)] bg-[color:var(--fc-glass-highlight)] p-4">
             <p className="text-xs font-bold uppercase tracking-widest fc-text-workouts mb-3">
               Your performance
             </p>
@@ -313,7 +326,6 @@ export function ChallengeDetailPageBody({
                           setSubmitVideo(null);
                           setSubmitWeight("");
                           setSubmitReps("");
-                          setSubmitNotes("");
                         }}
                       >
                         <Upload className="w-4 h-4 mr-2" aria-hidden />
@@ -388,7 +400,7 @@ export function ChallengeDetailPageBody({
                     width: `${pct}%`,
                     background: isEndingSoon
                       ? "linear-gradient(90deg, var(--fc-status-error), var(--fc-status-warning))"
-                      : "linear-gradient(90deg, var(--fc-accent-cyan), var(--fc-accent-cyan))",
+                      : "linear-gradient(90deg, var(--fc-accent), var(--fc-accent))",
                   }}
                 />
                 <div className="absolute top-0 left-1/4 w-px h-full bg-[color:var(--fc-glass-border)]" />
@@ -406,7 +418,7 @@ export function ChallengeDetailPageBody({
 
               <div className="flex flex-wrap gap-2 mt-3">
                 {pct >= 50 && (
-                  <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-[color-mix(in_srgb,var(--fc-accent-cyan)_20%,transparent)] text-[color:var(--fc-accent-cyan)] flex items-center gap-1">
+                  <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-[color-mix(in_srgb,var(--fc-accent)_20%,transparent)] text-[color:var(--fc-accent)] flex items-center gap-1">
                     <CheckCircle className="w-3 h-3" aria-hidden /> Halfway reached
                   </span>
                 )}
@@ -465,7 +477,7 @@ export function ChallengeDetailPageBody({
                         <p className="text-xs font-semibold fc-text-primary truncate w-full text-center">
                           {entry.display_name ?? "Participant"}
                         </p>
-                        <p className="text-xs font-mono font-bold text-[color:var(--fc-accent-cyan)]">
+                        <p className="text-xs font-mono font-bold text-[color:var(--fc-accent)]">
                           {entry.total_score} pts
                         </p>
                         <div
@@ -489,7 +501,7 @@ export function ChallengeDetailPageBody({
                   className={cn(
                     "rounded-xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)] p-4 transition-all",
                     entry.client_id === userId &&
-                      "border-[color-mix(in_srgb,var(--fc-accent-cyan)_50%,transparent)] shadow-[0_0_0_1px_color-mix(in_srgb,var(--fc-accent-cyan)_25%,transparent)]"
+                      "border-[color-mix(in_srgb,var(--fc-accent)_50%,transparent)] shadow-[0_0_0_1px_color-mix(in_srgb,var(--fc-accent)_25%,transparent)]"
                   )}
                 >
                   <div className="flex items-center gap-4">
@@ -512,7 +524,7 @@ export function ChallengeDetailPageBody({
                       <p className="font-semibold text-[color:var(--fc-text-primary)]">
                         {entry.display_name ?? `Participant ${index + 1}`}
                         {entry.client_id === userId && (
-                          <span className="text-xs ml-2 text-[color:var(--fc-accent-cyan)]">
+                          <span className="text-xs ml-2 text-[color:var(--fc-accent)]">
                             (You)
                           </span>
                         )}
@@ -527,7 +539,7 @@ export function ChallengeDetailPageBody({
                     </div>
 
                     <div className="text-right">
-                      <p className="text-2xl font-bold text-[color:var(--fc-accent-cyan)]">
+                      <p className="text-2xl font-bold text-[color:var(--fc-accent)]">
                         {entry.total_score}
                       </p>
                       <p className="text-xs text-[color:var(--fc-text-subtle)]">
@@ -579,15 +591,6 @@ export function ChallengeDetailPageBody({
                 type="number"
                 value={submitReps}
                 onChange={(e) => setSubmitReps(e.target.value)}
-                placeholder="Optional"
-                variant="fc"
-              />
-            </div>
-            <div>
-              <Label>Notes (optional)</Label>
-              <Input
-                value={submitNotes}
-                onChange={(e) => setSubmitNotes(e.target.value)}
                 placeholder="Optional"
                 variant="fc"
               />

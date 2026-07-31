@@ -1,28 +1,21 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense } from "react";
+import Link from "next/link";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "@/contexts/ThemeContext";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { ChevronRight } from "lucide-react";
 import { ClientPageShell } from "@/components/client-ui";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
-import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import {
-  getTopProgressions,
-  getTrainedExercises,
-  getExerciseProgression,
-  getExerciseProgressionsBatch,
-  isCompoundLift,
-  type ExerciseProgression,
-  type TrainedExercise,
   type StrengthTimeRange,
   countDistinctExercisesWithSetsInRange,
 } from "@/lib/strengthAnalytics";
 import { supabase } from "@/lib/supabase";
-import { getWeeklyVolume, getWorkoutsWithVolumeForSleepAnalysis, type VolumeStats, type WorkoutWithVolumeForSleep } from "@/lib/volumeAnalytics";
+import { getWeeklyVolume, type VolumeStats } from "@/lib/volumeAnalytics";
 import { resolveStatsTabTimezone } from "@/lib/clientAnalyticsService";
 import { getWellnessTrends, type WellnessStats } from "@/lib/wellnessAnalytics";
 import { cn } from "@/lib/utils";
@@ -36,18 +29,10 @@ import { TrainingRhythmSection } from "@/components/client-progress-analytics/Tr
 import { TrainingVolumeSection } from "@/components/client-progress-analytics/TrainingVolumeSection";
 import v6 from "@/components/client-progress-analytics/progressAnalyticsV6.module.css";
 import type { VolumeWindowWeeks } from "@/components/client-progress-analytics/VolumeRangeTabs";
-import { StrengthProgressSection } from "@/components/client-progress-analytics/StrengthProgressSection";
-import { AllExercisesSection } from "@/components/client-progress-analytics/AllExercisesSection";
 import { WellnessRecoverySection } from "@/components/client-progress-analytics/WellnessRecoverySection";
 import { RecoveryInsightCard } from "@/components/client-progress-analytics/RecoveryInsightCard";
-import { SleepVsPerformanceSection } from "@/components/client-progress-analytics/SleepVsPerformanceSection";
 import { BodyCompositionSection } from "@/components/client-progress-analytics/BodyCompositionSection";
 import { GoalCompletionSection } from "@/components/client-progress-analytics/GoalCompletionSection";
-import { ExtraActivitiesSection } from "@/components/client-progress-analytics/ExtraActivitiesSection";
-import {
-  getActivitiesByDateRange,
-  type ClientActivity,
-} from "@/lib/clientActivityService";
 
 interface BodyCompositionData {
   date: string;
@@ -95,9 +80,31 @@ function analyticsRangeDays(tr: StrengthTimeRange): number | null {
   }
 }
 
+function AnalyticsDrillLink({
+  href,
+  label,
+  sub,
+}: {
+  href: string;
+  label: string;
+  sub: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center justify-between gap-3 rounded-xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface-card)] px-3 py-2.5 transition-colors hover:bg-white/[0.03]"
+    >
+      <div className="min-w-0">
+        <p className="text-[13px] font-semibold fc-text-primary">{label}</p>
+        <p className="mt-0.5 text-[11px] fc-text-dim">{sub}</p>
+      </div>
+      <ChevronRight className="h-4 w-4 shrink-0 fc-text-dim" aria-hidden />
+    </Link>
+  );
+}
+
 function AnalyticsPageContent() {
   const { user } = useAuth();
-  const { performanceSettings } = useTheme();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -120,83 +127,28 @@ function AnalyticsPageContent() {
 
   const [volumeStats, setVolumeStats] = useState<VolumeStats | null>(null);
   const [wellnessStats, setWellnessStats] = useState<WellnessStats | null>(null);
-  const [workoutsForSleepAnalysis, setWorkoutsForSleepAnalysis] = useState<WorkoutWithVolumeForSleep[]>([]);
 
-  const [topProgressions, setTopProgressions] = useState<ExerciseProgression[]>([]);
-  const [trainedExercises, setTrainedExercises] = useState<TrainedExercise[]>([]);
-  const [compoundProgressions, setCompoundProgressions] = useState<ExerciseProgression[]>([]);
-  const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(null);
-  const [progressionCache, setProgressionCache] = useState<Record<string, ExerciseProgression>>({});
-  const progressionCacheRef = useRef(progressionCache);
-  progressionCacheRef.current = progressionCache;
-  const [loadingProgression, setLoadingProgression] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clientTzRef = useRef<string>("UTC");
   const [sectionErr, setSectionErr] = useState<{ rhythm?: string; volume?: string }>({});
 
-  const [recentActivities, setRecentActivities] = useState<ClientActivity[]>([]);
-
   const setTimeRange = useCallback(
     (tr: StrengthTimeRange) => {
       setTimeRangeState(tr);
       const q = new URLSearchParams();
       q.set("range", tr);
-      const ex = searchParams.get("exerciseId");
-      if (ex) q.set("exerciseId", ex);
       const base = pathname || "/client/progress/analytics";
       router.replace(`${base}?${q.toString()}`, { scroll: false });
     },
-    [pathname, router, searchParams],
+    [pathname, router],
   );
 
   useEffect(() => {
     const r = parseRangeParam(searchParams.get("range"));
     setTimeRangeState((prev) => (prev === r ? prev : r));
   }, [searchParams]);
-
-  const exerciseIdFromUrl = searchParams.get("exerciseId");
-  useEffect(() => {
-    if (!exerciseIdFromUrl || !user?.id) return;
-    setExpandedExerciseId(exerciseIdFromUrl);
-    void loadExerciseProgressionForExpand(exerciseIdFromUrl);
-    const el = document.getElementById("strength-exercises");
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [exerciseIdFromUrl, user?.id, timeRange]);
-
-  const loadStrengthProgressions = async () => {
-    if (!user?.id) return;
-    try {
-      const [top, trained] = await Promise.all([
-        withTimeout(getTopProgressions(user.id, 3, timeRange), 14_000, "topProgressions"),
-        withTimeout(getTrainedExercises(user.id), 14_000, "trainedExercises"),
-      ]);
-      setTopProgressions(top);
-      setTrainedExercises(trained);
-      setProgressionCache({});
-      const compound = trained.filter((ex) => isCompoundLift(ex.name));
-      const compoundIds = compound.map((ex) => ex.id);
-      const progressions =
-        compoundIds.length > 0
-          ? await withTimeout(
-              getExerciseProgressionsBatch(user.id, compoundIds, timeRange),
-              14_000,
-              "compoundBatch",
-            )
-          : [];
-      setCompoundProgressions(
-        progressions.filter(
-          (p): p is ExerciseProgression => p != null && p.dataPoints.length >= 2,
-        ),
-      );
-    } catch (e) {
-      console.error("Error loading strength progressions:", e);
-      setTopProgressions([]);
-      setTrainedExercises([]);
-      setCompoundProgressions([]);
-    }
-  };
 
   const loadBodyComposition = async () => {
     if (!user?.id) return;
@@ -295,23 +247,6 @@ function AnalyticsPageContent() {
     }
   };
 
-  const loadRecentActivities = async () => {
-    if (!user?.id) return;
-    try {
-      const days = analyticsRangeDays(timeRange) ?? 730;
-      const start = new Date();
-      start.setDate(start.getDate() - days);
-      const data = await getActivitiesByDateRange(
-        user.id,
-        start.toISOString().split("T")[0],
-        new Date().toISOString().split("T")[0],
-      );
-      setRecentActivities(data);
-    } catch {
-      setRecentActivities([]);
-    }
-  };
-
   const loadWellnessStats = async () => {
     if (!user?.id) return;
     try {
@@ -321,18 +256,6 @@ function AnalyticsPageContent() {
     } catch (error) {
       console.error("Error loading wellness stats:", error);
       setWellnessStats(null);
-    }
-  };
-
-  const loadWorkoutsForSleepAnalysis = async () => {
-    if (!user?.id) return;
-    try {
-      const days = analyticsRangeDays(timeRange) ?? 365;
-      const list = await getWorkoutsWithVolumeForSleepAnalysis(user.id, days);
-      setWorkoutsForSleepAnalysis(list);
-    } catch (error) {
-      console.error("Error loading workouts for sleep analysis:", error);
-      setWorkoutsForSleepAnalysis([]);
     }
   };
 
@@ -375,11 +298,6 @@ function AnalyticsPageContent() {
         setGoalCompletion({ completed: 0, total: 0 });
         setVolumeStats(null);
         setWellnessStats(null);
-        setWorkoutsForSleepAnalysis([]);
-        setTopProgressions([]);
-        setTrainedExercises([]);
-        setCompoundProgressions([]);
-        setRecentActivities([]);
         setExercisesTrackedCount(0);
         setLoading(false);
         setRangeBusy(false);
@@ -429,16 +347,13 @@ function AnalyticsPageContent() {
             T,
             "volume",
           ),
-          withTimeout(loadStrengthProgressions(), T, "strength"),
           withTimeout(loadBodyComposition(), T, "body"),
           withTimeout(loadGoalCompletion(), T, "goals"),
           withTimeout(loadWellnessStats(), T, "wellness"),
-          withTimeout(loadWorkoutsForSleepAnalysis(), T, "sleep"),
-          withTimeout(loadRecentActivities(), T, "activities"),
           withTimeout(countDistinctExercisesWithSetsInRange(uid, tr), T, "distinct"),
         ]);
 
-        const [rRhythm, rVol, , , , , , , rDistinct] = settled;
+        const [rRhythm, rVol, , , , rDistinct] = settled;
 
         if (rRhythm.status === "fulfilled") {
           setRhythmSummary(rRhythm.value);
@@ -510,43 +425,17 @@ function AnalyticsPageContent() {
     };
   }, [loadAnalyticsData, user, timeRange]);
 
-  const loadExerciseProgressionForExpand = useCallback(
-    async (exerciseId: string) => {
-      if (!user?.id) return;
-      if (progressionCacheRef.current[exerciseId]) {
-        setExpandedExerciseId(exerciseId);
-        return;
-      }
-      setLoadingProgression(exerciseId);
-      try {
-        const prog = await getExerciseProgression(user.id, exerciseId, timeRange);
-        if (prog) {
-          setProgressionCache((prev) => ({ ...prev, [exerciseId]: prog }));
-          setExpandedExerciseId(exerciseId);
-        }
-      } catch (e) {
-        console.error("Error loading progression:", e);
-      } finally {
-        setLoadingProgression(null);
-      }
-    },
-    [user?.id, timeRange],
-  );
-
-  const toggleExerciseRow = useCallback(
-    (id: string) => {
-      if (expandedExerciseId === id) setExpandedExerciseId(null);
-      else void loadExerciseProgressionForExpand(id);
-    },
-    [expandedExerciseId, loadExerciseProgressionForExpand],
-  );
-
   const completionPercentage =
     goalCompletion.total > 0
       ? Math.round((goalCompletion.completed / goalCompletion.total) * 100)
       : 0;
   const latestBodyWeight = latestBody?.weightKg ?? null;
   const latestBodyFat = latestBody?.bodyFatPct ?? null;
+
+  const noWorkoutsInRange =
+    !loading &&
+    !loadError &&
+    (rhythmSummary?.workoutsLoggedInRange ?? 0) === 0;
 
   // Recovery insight: last 4 weeks volume + wellness (soreness/sleep) grouped by week
   const recoveryInsight = useMemo(() => {
@@ -663,66 +552,9 @@ function AnalyticsPageContent() {
     };
   }, [volumeStats, wellnessStats]);
 
-  // Sleep vs Performance: last 30 days, good sleep (≥4) vs poor (≤2), avg volume per workout
-  const sleepVsPerformanceInsight = useMemo(() => {
-    const sleepByDate = new Map<string, number>();
-    wellnessStats?.dailyData?.forEach((d) => {
-      if (d.sleepQuality != null) sleepByDate.set(d.date, d.sleepQuality);
-    });
-
-    const withSleep = workoutsForSleepAnalysis.filter(
-      (w) => sleepByDate.has(w.previousNightDate)
-    );
-    if (withSleep.length < 5)
-      return {
-        message:
-          "Log more sleep data to see how it affects your training",
-        percentDiff: null,
-      };
-
-    const goodSleep = withSleep.filter(
-      (w) => (sleepByDate.get(w.previousNightDate) ?? 0) >= 4
-    );
-    const poorSleep = withSleep.filter(
-      (w) => (sleepByDate.get(w.previousNightDate) ?? 0) <= 2
-    );
-
-    const avgVolume = (arr: WorkoutWithVolumeForSleep[]) =>
-      arr.length > 0
-        ? arr.reduce((s, w) => s + w.volume, 0) / arr.length
-        : 0;
-
-    const goodAvg = avgVolume(goodSleep);
-    const poorAvg = avgVolume(poorSleep);
-    const clearCorrelation =
-      poorAvg > 0 && goodAvg >= poorAvg * 1.1;
-
-    let message: string;
-    if (goodSleep.length >= 5 && poorSleep.length >= 1 && clearCorrelation) {
-      const pct = Math.round(((goodAvg - poorAvg) / poorAvg) * 100);
-      message = `Your best workouts happen after quality sleep — averaging ${pct}% more volume on well-rested days`;
-    } else if (withSleep.length >= 5) {
-      message =
-        "Your performance stays consistent regardless of sleep — impressive resilience";
-    } else {
-      message =
-        "Log more sleep data to see how it affects your training";
-    }
-
-    return {
-      message,
-      percentDiff:
-        poorAvg > 0 && goodAvg >= poorAvg * 1.1
-          ? Math.round(((goodAvg - poorAvg) / poorAvg) * 100)
-          : null,
-    };
-  }, [wellnessStats, workoutsForSleepAnalysis]);
-
   return (
-    <AnimatedBackground>
-      {performanceSettings.floatingParticles && <FloatingParticles />}
-
-      <ClientPageShell className="max-w-xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
+    <>
+    <ClientPageShell className="max-w-xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
         <div className={hub.hub}>
           <AnalyticsV6UtilityBar
             onBack={() => router.push("/client/progress")}
@@ -789,6 +621,27 @@ function AnalyticsPageContent() {
                 <div className={cn(v6.sectionCard, v6.shimmer, "mt-3 h-44")} />
                 <div className={cn(v6.sectionCard, v6.shimmer, "mt-3 h-52")} />
               </>
+            ) : noWorkoutsInRange ? (
+              <>
+                <TopStatsPaired
+                  weeksLabel={weeksEyebrowForRange(timeRange)}
+                  workoutsLoggedInRange={0}
+                  goalPct={completionPercentage}
+                  goalsCompleted={goalCompletion.completed}
+                  goalsTotal={goalCompletion.total}
+                  latestWeightKg={latestBodyWeight}
+                  bodyFatPct={latestBodyFat}
+                  exercisesTracked={exercisesTrackedCount}
+                />
+                <div className="mt-3">
+                  <EmptyState
+                    title="No workouts yet"
+                    description="Log a training session to see rhythm and volume for this range."
+                    actionLabel="Train"
+                    actionHref="/client/workouts"
+                  />
+                </div>
+              </>
             ) : (
               <>
                 <TopStatsPaired
@@ -827,21 +680,28 @@ function AnalyticsPageContent() {
         {!loading ? (
           <div className={hub.hub} style={{ marginTop: 12 }}>
             <div className="flex flex-col gap-3">
-              <StrengthProgressSection
-                clientId={user?.id}
-                pageTimeRange={timeRange}
-                topProgressions={topProgressions}
-                compoundProgressions={compoundProgressions}
-                trainedExercises={trainedExercises}
-              />
-              <AllExercisesSection
-                trainedExercises={trainedExercises}
-                expandedExerciseId={expandedExerciseId}
-                progressionCache={progressionCache}
-                loadingProgressionId={loadingProgression}
-                rangeBusy={rangeBusy}
-                onToggleExercise={toggleExerciseRow}
-              />
+              <div className="flex flex-col gap-2">
+                <AnalyticsDrillLink
+                  href="/client/progress/strength"
+                  label="Strength progress"
+                  sub="Top lifts & all exercises"
+                />
+                <AnalyticsDrillLink
+                  href="/client/progress/personal-records"
+                  label="Personal records"
+                  sub="Best lifts & timeline"
+                />
+                <AnalyticsDrillLink
+                  href="/client/progress/performance"
+                  label="Performance"
+                  sub="Session scores over time"
+                />
+                <AnalyticsDrillLink
+                  href="/client/activity?tab=trends"
+                  label="Extra activities"
+                  sub="Cardio, walks & other sessions"
+                />
+              </div>
               <WellnessRecoverySection timeRange={timeRange} wellnessStats={wellnessStats} />
               <RecoveryInsightCard
                 notEnoughData={recoveryInsight.notEnoughData}
@@ -849,16 +709,11 @@ function AnalyticsPageContent() {
                 boldPhrases={recoveryInsight.boldPhrases}
                 chartData={recoveryInsight.chartData}
               />
-              <SleepVsPerformanceSection
-                wellnessStats={wellnessStats}
-                message={sleepVsPerformanceInsight.message}
-              />
               <BodyCompositionSection bodyComposition={bodyComposition} goalIntent="unknown" />
               <GoalCompletionSection
                 completed={goalCompletion.completed}
                 total={goalCompletion.total}
               />
-              <ExtraActivitiesSection timeRange={timeRange} recentActivities={recentActivities} />
             </div>
           </div>
         ) : null}
@@ -885,8 +740,8 @@ function AnalyticsPageContent() {
             opacity: 1;
           }
         }
-      `}      </style>
-    </AnimatedBackground>
+      `}</style>
+    </>
   );
 }
 
@@ -895,11 +750,9 @@ export default function AnalyticsPage() {
     <ProtectedRoute requiredRole="client">
       <Suspense
         fallback={
-          <AnimatedBackground>
-            <ClientPageShell className="max-w-xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
+          <ClientPageShell className="max-w-xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
               <PageSkeleton variant="dashboard" />
             </ClientPageShell>
-          </AnimatedBackground>
         }
       >
         <AnalyticsPageContent />
@@ -907,4 +760,3 @@ export default function AnalyticsPage() {
     </ProtectedRoute>
   );
 }
-

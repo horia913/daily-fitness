@@ -1,42 +1,31 @@
 /* Gym console client drawer v1 — tokens (scoped) */
 .wrap {
-  --bg: #07101a;
-  --card: #0e1f2e;
-  --card-2: #0b1824;
-  --card-3: #091420;
-  --line: rgba(255, 255, 255, 0.08);
-  --line-2: rgba(255, 255, 255, 0.05);
-  --t1: #fff;
-  --t2: rgba(255, 255, 255, 0.65);
-  --t3: rgba(255, 255, 255, 0.42);
-  --t4: rgba(255, 255, 255, 0.26);
-  --cyan: #4fe3e8;
-  --cyan-soft: rgba(79, 227, 232, 0.12);
-  --cyan-dim: rgba(79, 227, 232, 0.18);
-  --lime: #c5ff4a;
-  --lime-2: #7fe89a;
-  --lime-soft: rgba(197, 255, 74, 0.14);
-  --critical: #ff5a5f;
-  --critical-soft: rgba(255, 90, 95, 0.12);
-  --warning: #f5c242;
-  --warning-soft: rgba(245, 194, 66, 0.12);
-  --warning-dim: rgba(245, 194, 66, 0.25);
-  --good: #34d399;
-  --good-soft: rgba(52, 211, 153, 0.12);
-  --good-dim: rgba(52, 211, 153, 0.25);
+  --line: var(--fc-glass-border);
+  --line-2: var(--fc-hairline);
+  --t1: var(--fc-text-primary);
+  --t2: var(--fc-text-dim);
+  --t3: var(--fc-text-subtle);
+  --t4: var(--fc-text-quaternary);
+  --critical: var(--fc-status-error);
+  --critical-soft: color-mix(in srgb, var(--fc-status-error) 12%, transparent);
+  --warning: var(--fc-status-warning);
+  --warning-soft: color-mix(in srgb, var(--fc-status-warning) 12%, transparent);
+  --warning-dim: color-mix(in srgb, var(--fc-status-warning) 25%, transparent);
+  --good: var(--fc-status-success);
+  --good-soft: color-mix(in srgb, var(--fc-status-success) 12%, transparent);
+  --good-dim: color-mix(in srgb, var(--fc-status-success) 25%, transparent);
   --purple: #a78bfa;
   --purple-soft: rgba(167, 139, 250, 0.12);
   --purple-dim: rgba(167, 139, 250, 0.25);
-  --lime-text: #0a1a18;
-  color: var(--t1);
-  font-family: var(--font-geist-sans, Geist, sans-serif);
+color: var(--t1);
+  font-family: var(--font-body);
 }
 
 .grabHandle {
   width: 40px;
   height: 4px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
+  background: var(--fc-text-quaternary);
   margin: 6px auto 12px;
   flex-shrink: 0;
 }
@@ -55,14 +44,14 @@
   width: 36px;
   height: 36px;
   border-radius: 11px;
-  background: linear-gradient(135deg, var(--cyan), #34a8ad);
+  background: linear-gradient(135deg, var(--fc-accent), color-mix(in srgb, var(--fc-accent) 72%, black));
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--f-headline, "Bricolage Grotesque", sans-serif);
+  font-family: var(--f-headline);
   font-size: 14px;
   font-weight: 700;
-  color: #0a1a26;
+  color: var(--fc-ink);
   overflow: hidden;
 }
 
@@ -81,12 +70,12 @@
 }
 
 .eyebrowClient {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 9.5px;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--cyan);
+  color: var(--fc-accent);
   display: flex;
   align-items: center;
   gap: 5px;
@@ -96,13 +85,12 @@
   width: 5px;
   height: 5px;
   border-radius: 999px;
-  background: var(--cyan);
-  box-shadow: 0 0 6px rgba(79, 227, 232, 0.85);
+  background: var(--fc-accent);
   flex-shrink: 0;
 }
 
 .clientTitle {
-  font-family: var(--f-headline, "Bricolage Grotesque", sans-serif);
+  font-family: var(--f-headline);
   font-size: 18px;
   font-weight: 700;
   line-height: 1.2;
@@ -116,7 +104,7 @@
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  background: var(--card-2);
+  background: var(--fc-surface-elevated);
   border: 1px solid var(--line);
   color: var(--t2);
   display: flex;
@@ -128,7 +116,7 @@
 
 .closeBtn:hover {
   color: var(--t1);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--fc-surface-sunken);
 }
 
 .scrollBody {
@@ -144,7 +132,7 @@
 }
 
 .sectionEyebrow {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.16em;
@@ -154,7 +142,7 @@
 }
 
 .programCard {
-  background: var(--card);
+  background: var(--fc-surface-card);
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 12px 13px;
@@ -170,8 +158,8 @@
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  background: var(--cyan-soft);
-  color: var(--cyan);
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -199,13 +187,13 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 9.5px;
   color: var(--t3);
 }
 
 .programDayLine {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 9.5px;
   color: var(--t3);
 }
@@ -214,9 +202,9 @@
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--cyan);
-  background: var(--cyan-soft);
-  border: 1px solid var(--cyan-dim);
+  color: var(--fc-accent);
+  background: var(--fc-accent-dim);
+  border: 1px solid var(--fc-accent-glow);
   border-radius: 5px;
   padding: 2px 6px;
 }
@@ -227,19 +215,19 @@
 }
 
 .heroEyebrow {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--cyan);
+  color: var(--fc-accent);
   margin-bottom: 6px;
 }
 
 .workoutHero {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, var(--card) 0%, var(--card-2) 100%);
+  background: linear-gradient(135deg, var(--fc-surface-card) 0%, var(--fc-surface-elevated) 100%);
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 14px;
@@ -255,7 +243,7 @@
   right: -30px;
   width: 120px;
   height: 120px;
-  background: radial-gradient(circle, var(--cyan-soft), transparent 70%);
+  background: radial-gradient(circle, var(--fc-accent-dim), transparent 70%);
   pointer-events: none;
 }
 
@@ -265,7 +253,7 @@
 }
 
 .workoutTitle {
-  font-family: var(--f-headline, "Bricolage Grotesque", sans-serif);
+  font-family: var(--f-headline);
   font-size: 18px;
   font-weight: 700;
   line-height: 1.2;
@@ -292,18 +280,19 @@
 }
 
 .statVal {
-  font-family: var(--f-display, "Big Shoulders Display", sans-serif);
+  font-family: var(--f-display);
+  font-stretch: 125%;
   font-size: 18px;
   font-weight: 700;
   line-height: 1.1;
 }
 
-.statValLime {
-  color: var(--lime);
+.statValAction {
+  color: var(--fc-accent);
 }
 
 .statValCyan {
-  color: var(--cyan);
+  color: var(--fc-accent);
 }
 
 .statValWhite {
@@ -319,7 +308,7 @@
 }
 
 .statLbl {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.12em;
@@ -329,12 +318,12 @@
 }
 
 .listEyebrow {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--lime);
+  color: var(--fc-accent);
   margin-bottom: 8px;
 }
 
@@ -345,7 +334,7 @@
 }
 
 .exRow {
-  background: var(--card);
+  background: var(--fc-surface-card);
   border: 1px solid var(--line);
   border-radius: 13px;
   padding: 11px 12px;
@@ -360,15 +349,15 @@
 
 @media (hover: hover) {
   .exRow:hover:not(:disabled) {
-    background: #0f2334;
-    border-color: var(--cyan-dim);
+    background: var(--fc-surface-elevated);
+    border-color: var(--fc-accent-glow);
   }
 }
 
 .exRowLogging {
-  border-color: var(--lime);
-  box-shadow: inset 0 0 0 1px rgba(197, 255, 74, 0.2);
-  background: rgba(197, 255, 74, 0.03);
+  border-color: var(--fc-accent);
+  box-shadow: inset 0 0 0 1px var(--fc-accent-glow);
+  background: color-mix(in srgb, var(--fc-accent) 3%, transparent);
 }
 
 .exRowDone {
@@ -403,18 +392,18 @@
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  background: var(--card-2);
+  background: var(--fc-surface-elevated);
   border: 1px solid var(--line-2);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--cyan);
+  color: var(--fc-accent);
 }
 
 .iconTileLogging {
-  background: var(--lime-soft);
-  border-color: rgba(197, 255, 74, 0.3);
-  color: var(--lime);
+  background: var(--fc-accent-dim);
+  border-color: var(--fc-accent-glow);
+  color: var(--fc-accent);
 }
 
 .iconTileDone {
@@ -447,7 +436,7 @@
 }
 
 .rx {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 9.5px;
   letter-spacing: 0.04em;
   color: var(--t3);
@@ -468,22 +457,22 @@
 }
 
 .exRow:hover .chev {
-  color: var(--cyan);
+  color: var(--fc-accent);
 }
 
 .exRowLogging .chev {
-  color: var(--lime);
+  color: var(--fc-accent);
 }
 
 .badgeLogging {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 8.5px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--lime);
-  background: var(--lime-soft);
-  border: 1px solid rgba(197, 255, 74, 0.3);
+  color: var(--fc-accent);
+  background: var(--fc-accent-dim);
+  border: 1px solid var(--fc-accent-glow);
   border-radius: 5px;
   padding: 2px 6px;
   display: inline-flex;
@@ -495,7 +484,7 @@
   width: 5px;
   height: 5px;
   border-radius: 999px;
-  background: var(--lime);
+  background: var(--fc-accent);
   animation: gcPulse 1.4s ease-in-out infinite;
 }
 
@@ -510,7 +499,7 @@
 }
 
 .badgeDone {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 8.5px;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -526,14 +515,14 @@
 }
 
 .badgePr {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 8.5px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--lime-text);
-  background: var(--lime);
-  border: 1px solid var(--lime);
+  color: var(--fc-ink);
+  background: var(--fc-accent);
+  border: 1px solid var(--fc-accent);
   border-radius: 5px;
   padding: 2px 6px;
   display: inline-flex;
@@ -542,7 +531,7 @@
 }
 
 .restDay {
-  background: var(--card-2);
+  background: var(--fc-surface-elevated);
   border: 1px dashed var(--line);
   border-radius: 14px;
   padding: 24px 14px;
@@ -557,7 +546,7 @@
   width: 44px;
   height: 44px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
   color: var(--t3);
   display: flex;
   align-items: center;
@@ -565,7 +554,7 @@
 }
 
 .restTitle {
-  font-family: var(--f-headline, "Bricolage Grotesque", sans-serif);
+  font-family: var(--f-headline);
   font-size: 14px;
   font-weight: 600;
   color: var(--t1);

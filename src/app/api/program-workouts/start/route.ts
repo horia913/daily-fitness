@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createErrorResponse, handleApiError, validateRequiredFields } from '@/lib/apiErrorHandler'
 import { validateApiAuth, validateOwnership, createUnauthorizedResponse, createForbiddenResponse } from '@/lib/apiAuth'
+import { resolveProgramDayWorkoutMeta } from '@/lib/resolveProgramDayWorkout'
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest) {
 
     const { data: programDayAssignment, error: programDayError } = await supabaseAdmin
       .from('program_day_assignments')
-      .select('id, program_assignment_id, day_type, workout_assignment_id, workout_template_id, name, description, day_number')
+      .select('id, program_assignment_id, day_type, workout_assignment_id, workout_template_id, program_instance_workout_id, name, description, day_number, program_day, week_number, is_optional')
       .eq('id', program_day_assignment_id)
       .maybeSingle()
 
@@ -82,22 +83,14 @@ export async function POST(req: NextRequest) {
     // DO NOT use program_day_assignments.is_completed — that field is a stale legacy
     // flag no longer written by the completion pipeline. The ledger is the single
     // source of truth. See programStateService.ts.
-    const { data: scheduleSlot } = await supabaseAdmin
-      .from('program_schedule')
+    const { data: completionEntry } = await supabaseAdmin
+      .from('program_day_completions')
       .select('id')
-      .eq('program_id', programAssignment.program_id)
-      .eq('day_number', programDayAssignment.day_number)
+      .eq('program_assignment_id', programDayAssignment.program_assignment_id)
+      .eq('program_day_assignment_id', programDayAssignment.id)
       .maybeSingle()
 
-    if (scheduleSlot) {
-      const { data: completionEntry } = await supabaseAdmin
-        .from('program_day_completions')
-        .select('id')
-        .eq('program_assignment_id', programDayAssignment.program_assignment_id)
-        .eq('program_schedule_id', scheduleSlot.id)
-        .maybeSingle()
-
-      if (completionEntry) {
+    if (completionEntry) {
         return createErrorResponse(
           'Workout already completed',
           'This program workout has already been completed',
@@ -105,7 +98,6 @@ export async function POST(req: NextRequest) {
           400
         )
       }
-    }
 
     if (programDayAssignment.workout_assignment_id) {
       return NextResponse.json({
@@ -115,30 +107,38 @@ export async function POST(req: NextRequest) {
     }
 
     // Step f) Insert workout_assignments using supabaseAdmin
-    if (!programDayAssignment.workout_template_id) {
+    const workoutMeta = await resolveProgramDayWorkoutMeta(supabaseAdmin, programDayAssignment)
+    if (!workoutMeta) {
       return createErrorResponse(
-        'Missing workout template',
-        'The program day assignment does not have a workout_template_id',
+        'Missing workout content',
+        'The program day assignment does not have a resolvable workout (template or instance)',
         'VALIDATION_ERROR',
         400
       )
     }
 
     const today = new Date().toISOString().split('T')[0]
-    const workoutName = programDayAssignment.name || `Program Workout Day ${programDayAssignment.day_number || 'X'}`
-    const workoutDescription = programDayAssignment.description || null
+    const workoutName = programDayAssignment.name || workoutMeta.displayName || `Program Workout Day ${programDayAssignment.day_number || 'X'}`
+    const workoutDescription = programDayAssignment.description || workoutMeta.description || null
+
+    const assignmentInsert: Record<string, unknown> = {
+      client_id: user.id,
+      coach_id: programAssignment.coach_id,
+      scheduled_date: today,
+      status: 'in_progress',
+      name: workoutName,
+      description: workoutDescription,
+      estimated_duration: workoutMeta.estimatedDuration || 60,
+      is_customized: workoutMeta.contentKind === 'instance_workout',
+      program_assignment_id: programAssignment.id,
+    }
+    if (workoutMeta.assignmentTemplateId) {
+      assignmentInsert.workout_template_id = workoutMeta.assignmentTemplateId
+    }
 
     const { data: newWorkoutAssignment, error: createError } = await supabaseAdmin
       .from('workout_assignments')
-      .insert({
-        client_id: user.id,
-        coach_id: programAssignment.coach_id,
-        workout_template_id: programDayAssignment.workout_template_id,
-        scheduled_date: today,
-        status: 'in_progress',
-        name: workoutName,
-        description: workoutDescription,
-      })
+      .insert(assignmentInsert)
       .select('id')
       .single()
 
@@ -177,6 +177,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       workout_assignment_id: newWorkoutAssignment.id,
+      template_id: workoutMeta.contentId,
+      content_kind: workoutMeta.contentKind,
+      program_instance_workout_id: workoutMeta.programInstanceWorkoutId,
     }, { status: 200 })
   } catch (error: any) {
     // Handle auth errors specifically

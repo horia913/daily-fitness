@@ -8,25 +8,18 @@ import {
   ChevronRight,
   MoreVertical,
   Pencil,
-  Target,
-  Layers,
-  Timer,
-  Clock,
-  Flame,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
-import {
-  BaseBlockExecutorLayout,
-  formatRestSeconds,
-} from "../BaseBlockExecutor";
-import type { PrescriptionItem } from "../ui/PrescriptionCard";
 import { LogSetButton } from "../ui/LogSetButton";
-import { LargeInput } from "../ui/LargeInput";
-import { BaseBlockExecutorProps } from "../types";
-import { LoggedSet } from "@/types/workoutBlocks";
+import { BaseSetEntryExecutorProps } from "../types";
+import { useWorkoutExecutionChrome } from "../WorkoutExecutionChromeContext";
+import { NavigationControls } from "../ui/NavigationControls";
+import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
+import { LastSessionSetsSection } from "../ui/LastSessionSetsSection";
+import { ProgressionNudge } from "../ui/ProgressionNudge";
+import { LoggedSet } from "@/types/workoutSetEntries";
 import { LoggedSetsList, type LoggedSetRow } from "../ui/LoggedSetsList";
 import { useUpdateSetRpe } from "../hooks/useUpdateSetRpe";
-import { appendTargetEffortItem } from "../appendTargetEffortItem";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import {
   getWeightDefaultAndSuggestion,
@@ -36,20 +29,38 @@ import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
 import { fetchApi } from "@/lib/apiClient";
 import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
 import { parseWeightKgInput } from "@/lib/parseWeightKgInput";
+import { resolveSetPrescriptionTargets } from "../ui/set-rows/resolveSetPrescriptionTargets";
+import {
+  LiveCard,
+  LiveCardExerciseName,
+  LiveCardPrimary,
+  LiveCardStats,
+  LiveCardNote,
+  LiveCardTechnique,
+  LiveCardLog,
+  LiveCardLogField,
+  formatClusterTechniqueBody,
+  effortFromPrescribedRir,
+  formatLiveRest,
+  resolveRestSeconds,
+  formatLiveLast,
+  groupIndexToHue,
+  type LiveCardTarget,
+} from "../live-card";
 
 export function ClusterSetExecutor({
-  block,
-  onBlockComplete,
-  onNextBlock,
+  liveSetEntry,
+  onSetEntryComplete,
+  onNextSetEntry,
   e1rmMap = {},
   onE1rmUpdate,
   lastPerformedWeightByExerciseId = {},
   lastSessionWeightByExerciseId = {},
   sessionId,
   assignmentId,
-  allBlocks = [],
-  currentBlockIndex = 0,
-  onBlockChange,
+  allSetEntries = [],
+  currentSetEntryIndex = 0,
+  onSetEntryChange,
   currentExerciseIndex = 0,
   onExerciseIndexChange,
   logSetToDatabase,
@@ -68,11 +79,11 @@ export function ClusterSetExecutor({
   onSetLogUpsert,
   onSetEditSaved,
   loggedSets,
-}: BaseBlockExecutorProps) {
+}: BaseSetEntryExecutorProps) {
   const { addToast } = useToast();
-  const currentExercise = block.block.exercises?.[currentExerciseIndex];
-  const totalSets = block.block.total_sets || 1;
-  const completedSets = block.completedSets || 0;
+  const currentExercise = liveSetEntry.setEntry.exercises?.[currentExerciseIndex];
+  const totalSets = liveSetEntry.setEntry.total_sets || 1;
+  const completedSets = liveSetEntry.completedSets || 0;
   const currentSetNumber = completedSets + 1;
 
   /** Parent-owned logged sets; single source of truth. Persists across block navigation. */
@@ -93,7 +104,6 @@ export function ClusterSetExecutor({
     Number((currentExercise as any)?.meta?.intra_cluster_rest) ||
     Number((currentExercise as any)?.cluster_sets?.[0]?.intra_cluster_rest) ||
     15;
-  const restBetweenSets = block.block.rest_seconds || 90;
 
   const [weight, setWeight] = useState("");
   const [isLoggingSet, setIsLoggingSet] = useState(false);
@@ -134,10 +144,10 @@ export function ClusterSetExecutor({
       if (idx === -1) return;
       const oldEntry = list[idx];
       const newEntry = { ...oldEntry, id: set_log_id };
-      onSetLogUpsert?.(block.block.id, newEntry, { replaceId: oldEntry.id });
+      onSetLogUpsert?.(liveSetEntry.setEntry.id, newEntry, { replaceId: oldEntry.id });
     });
     return () => {};
-  }, [registerSetLogIdResolved, onSetLogUpsert, block.block.id]);
+  }, [registerSetLogIdResolved, onSetLogUpsert, liveSetEntry.setEntry.id]);
   useEffect(() => {
     if (viewingSetIndex > loggedSetsList.length)
       setViewingSetIndex(loggedSetsList.length);
@@ -212,35 +222,46 @@ export function ClusterSetExecutor({
     exerciseId,
   ]);
 
-  const prescriptionItems: PrescriptionItem[] = [
-    { icon: Target, label: "Sets", value: totalSets },
-    {
-      icon: Layers,
-      label: "Clusters × reps",
-      value: `${clustersPerSet}×${repsPerCluster}`,
-    },
-    {
-      icon: Timer,
-      label: "Intra-cluster",
-      value: formatRestSeconds(intraClusterRest),
-      unit: "s",
-    },
-    {
-      icon: Clock,
-      label: "Between sets",
-      value: formatRestSeconds(restBetweenSets),
-      unit: "s",
-    },
-  ];
-
-  appendTargetEffortItem(
-    prescriptionItems,
-    currentExercise ? (currentExercise as { rir?: unknown }).rir : undefined,
-    Flame,
+  const restBetweenSets = resolveRestSeconds(
+    currentExercise?.rest_seconds,
+    liveSetEntry.setEntry.rest_seconds,
   );
 
   const instructions =
-    currentExercise?.notes || block.block.set_notes || undefined;
+    currentExercise?.notes || liveSetEntry.setEntry.set_notes || undefined;
+
+  const activeSetNumber = Math.min(
+    Math.max(1, completedSets + 1),
+    totalSets,
+  );
+  const activeTargets = resolveSetPrescriptionTargets(
+    currentExercise,
+    activeSetNumber,
+    liveSetEntry.setEntry.reps_per_set,
+  );
+  const activeEffort = effortFromPrescribedRir(activeTargets.rir);
+  /** Mockup: reps_per_cluster × clusters_per_set with unit "clusters". */
+  const liveTarget: LiveCardTarget = {
+    kind: "reps_weight",
+    reps: repsPerCluster,
+    weight: clustersPerSet,
+    unit: "clusters",
+  };
+  const lastSessionSetDetails =
+    exerciseId && previousPerformanceMap
+      ? (previousPerformanceMap.get(exerciseId)?.lastWorkout?.setDetails ?? null)
+      : null;
+  const lastForActiveSet = lastSessionSetDetails?.find(
+    (s) => s.set_number === activeSetNumber,
+  );
+  const lastLabel = formatLiveLast(
+    lastForActiveSet?.reps_completed ?? null,
+    lastForActiveSet?.weight_kg ?? null,
+  );
+  const tempoLabel =
+    activeTargets.tempo && String(activeTargets.tempo).trim()
+      ? String(activeTargets.tempo).trim()
+      : null;
 
   const handleEditSet = (setEntry: LoggedSet) => {
     setEditingSetId(setEntry.id);
@@ -257,7 +278,7 @@ export function ClusterSetExecutor({
       if (process.env.NODE_ENV !== "production") {
         console.log("[SAVE EDITS guard]", {
           executor: "ClusterSetExecutor",
-          blockTypeFromUI: block.block.set_type,
+          blockTypeFromUI: liveSetEntry.setEntry.set_type,
           editingSetId,
           isSavingEdit,
           timestamp: Date.now(),
@@ -282,7 +303,7 @@ export function ClusterSetExecutor({
     const totalReps = repsPerCluster * clustersPerSet;
     setIsSavingEdit(true);
     try {
-      const payload = buildSetEditPatchPayload(block.block.set_type, {
+      const payload = buildSetEditPatchPayload(liveSetEntry.setEntry.set_type, {
         weight: w,
         reps: totalReps,
         set_number: editDraft.set_number,
@@ -294,7 +315,7 @@ export function ClusterSetExecutor({
         console.log("[SAVE EDITS]", {
           executor: "ClusterSetExecutor",
           setId: editingSetId,
-          blockTypeFromUI: block.block.set_type,
+          blockTypeFromUI: liveSetEntry.setEntry.set_type,
           payloadKeys: Object.keys(payload),
         });
       }
@@ -310,13 +331,13 @@ export function ClusterSetExecutor({
           id: editingSetId,
           exercise_id:
             current?.exercise_id ?? currentExercise?.exercise_id ?? "",
-          set_entry_id: block.block.id,
+          set_entry_id: liveSetEntry.setEntry.id,
           set_number: editDraft.set_number,
           weight_kg: w,
           reps_completed: totalReps,
           completed_at: current?.completed_at ?? new Date(),
         };
-        onSetEditSaved?.(block.block.id, updatedEntry);
+        onSetEditSaved?.(liveSetEntry.setEntry.id, updatedEntry);
         setEditingSetId(null);
         setEditDraft(null);
         addToast({ title: "Set updated", variant: "success", duration: 2000 });
@@ -399,13 +420,13 @@ export function ClusterSetExecutor({
         const newLoggedSet: LoggedSet = {
           id: result.set_log_id || `temp-${currentSetNumber}-${Date.now()}`,
           exercise_id: currentExercise?.exercise_id || "",
-          set_entry_id: block.block.id,
+          set_entry_id: liveSetEntry.setEntry.id,
           set_number: currentSetNumber,
           weight_kg: weightNum,
           reps_completed: totalReps,
           completed_at: new Date(),
         } as LoggedSet;
-        onSetLogUpsert?.(block.block.id, newLoggedSet);
+        onSetLogUpsert?.(liveSetEntry.setEntry.id, newLoggedSet);
 
         if (result.e1rm && onE1rmUpdate) {
           onE1rmUpdate(currentExercise.exercise_id, result.e1rm);
@@ -431,7 +452,7 @@ export function ClusterSetExecutor({
         onSetComplete?.(newCompletedSets);
 
         if (newCompletedSets >= totalSets) {
-          onBlockComplete(block.block.id, [...loggedSetsList, newLoggedSet]);
+          onSetEntryComplete(liveSetEntry.setEntry.id, [...loggedSetsList, newLoggedSet]);
         }
 
         setCurrentClusterInSet(1);
@@ -464,7 +485,7 @@ export function ClusterSetExecutor({
   const isViewingLoggedSet = !!viewedSetEntry;
 
   const updateSetRpe = useUpdateSetRpe({
-    blockId: block.block.id,
+    setEntryId: liveSetEntry.setEntry.id,
     onSetLogUpsert,
   });
   const loggedSetRows: LoggedSetRow[] = loggedSetsList.map((setEntry) => ({
@@ -579,7 +600,7 @@ export function ClusterSetExecutor({
           {intraClusterRestPhase !== "ticking" && (
           <>
           <div className="flex min-h-0 min-w-0 flex-col space-y-2">
-            <LargeInput
+            <LiveCardLogField
               label="Weight"
               value={editDraft ? editDraft.weight : weight}
               onChange={(val) => {
@@ -590,12 +611,35 @@ export function ClusterSetExecutor({
                   setWeight(val);
                 }
               }}
-              placeholder="0"
-              step="0.5"
-              unit="kg"
-              showStepper
-              stepAmount={2.5}
-              />
+              onIncrement={() => {
+                const cur = parseWeightKgInput(
+                  (editDraft ? editDraft.weight : weight) || "0",
+                );
+                const next = String(
+                  Math.max(0, Math.round(((isNaN(cur) ? 0 : cur) + 2.5) * 2) / 2),
+                );
+                if (editDraft)
+                  setEditDraft((d) => (d ? { ...d, weight: next } : null));
+                else {
+                  setIsWeightPristine(false);
+                  setWeight(next);
+                }
+              }}
+              onDecrement={() => {
+                const cur = parseWeightKgInput(
+                  (editDraft ? editDraft.weight : weight) || "0",
+                );
+                const next = String(
+                  Math.max(0, Math.round(((isNaN(cur) ? 0 : cur) - 2.5) * 2) / 2),
+                );
+                if (editDraft)
+                  setEditDraft((d) => (d ? { ...d, weight: next } : null));
+                else {
+                  setIsWeightPristine(false);
+                  setWeight(next);
+                }
+              }}
+            />
             {!editDraft &&
               coachSuggestedWeight != null &&
               coachSuggestedWeight > 0 && (
@@ -622,7 +666,7 @@ export function ClusterSetExecutor({
         {intraClusterRestPhase === "ticking" && (
           <div className="mb-4 rounded-xl p-5 space-y-4" style={{ background: "var(--fc-surface-elevated)" }}>
             <p
-              className="text-center font-black tabular-nums tracking-tight text-cyan-300"
+              className="text-center font-black tabular-nums tracking-tight text-[color-mix(in_srgb,var(--fc-group-c)_70%,white)]"
               style={{ fontSize: "clamp(2.75rem, 11vw, 3.75rem)", lineHeight: 1.05 }}
               aria-live="polite"
               aria-label={`${intraClusterTimeLeft} seconds rest, next cluster`}
@@ -660,6 +704,17 @@ export function ClusterSetExecutor({
     clusterWeightReady;
 
   const isEditMode = !!editingSetId && !!editDraft;
+  const chrome = useWorkoutExecutionChrome();
+  const hideCompactBack = chrome?.hideCompactBack ?? false;
+  const totalSetEntries = allSetEntries.length || 1;
+  const canGoPrevious = currentSetEntryIndex > 0;
+  const canGoNext = currentSetEntryIndex < totalSetEntries - 1;
+  const previousPerfForExercise =
+    exerciseId && previousPerformanceMap
+      ? (previousPerformanceMap.get(exerciseId) ?? null)
+      : null;
+  const lastWorkoutForLastWeek = previousPerfForExercise?.lastWorkout ?? null;
+
   const logButton = isEditMode ? (
     <div className="flex gap-2 w-full">
       <Button
@@ -707,45 +762,110 @@ export function ClusterSetExecutor({
   );
 
   return (
-    <BaseBlockExecutorLayout
-      {...{
-        block,
-        onBlockComplete,
-        onNextBlock,
-        e1rmMap,
-        onE1rmUpdate,
-        sessionId,
-        assignmentId,
-        allBlocks,
-        currentBlockIndex,
-        onBlockChange,
-        currentExerciseIndex,
-        onExerciseIndexChange,
-        logSetToDatabase,
-        formatTime,
-        calculateSuggestedWeight,
-        onVideoClick,
-        onAlternativesClick,
-              onRestTimerClick,
-        onWorkoutBack,
-        progressionSuggestion,
-        previousPerformanceMap,
-      }}
-      exerciseName={currentExercise?.exercise?.name || "Exercise"}
-      prescriptionItems={prescriptionItems}
-      instructions={instructions}
-      currentSet={displaySetNumber}
-      totalSets={totalSets}
-      progressLabel="Set"
-      loggingInputs={loggingInputs}
-      logButton={logButton}
-      showNavigation={true}
-      currentExercise={currentExercise}
-      showRestTimer={!!intraClusterRest}
-      onApplySuggestion={(w, _r) => {
-        if (w != null) setWeight(String(w));
-      }}
-      aboveStickyContent={aboveStickyContent}
-    />
+    <>
+      <div className="flex flex-col border-b border-white/5">
+        <div className="flex flex-col gap-3 px-0 pb-2 pt-1 sm:px-1">
+          {onWorkoutBack && !hideCompactBack ? (
+            <button
+              type="button"
+              onClick={onWorkoutBack}
+              className="-ml-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/10 hover:text-white active:scale-95"
+              aria-label="Back"
+            >
+              <ChevronLeft className="h-5 w-5" aria-hidden />
+            </button>
+          ) : null}
+
+          <LiveCard
+            hue={groupIndexToHue(currentSetEntryIndex)}
+            heading={`Set ${activeSetNumber} of ${totalSets}`}
+            status={
+              completedSets >= totalSets
+                ? "complete"
+                : intraClusterRestPhase === "ticking"
+                  ? "resting"
+                  : "logging"
+            }
+          >
+            <div>
+              <LiveCardExerciseName
+                name={currentExercise?.exercise?.name || "Exercise"}
+                endSlot={
+                  currentExercise ? (
+                    <ExerciseActionButtons
+                      exercise={currentExercise}
+                      onVideoClick={onVideoClick}
+                      onAlternativesClick={onAlternativesClick}
+                    />
+                  ) : undefined
+                }
+              />
+            </div>
+            <LiveCardPrimary
+              target={liveTarget}
+              effort={activeEffort}
+              loadPct={loadPercentage}
+            />
+            <LiveCardStats
+              rest={formatLiveRest(restBetweenSets)}
+              tempo={tempoLabel}
+              last={lastLabel}
+            />
+            <LiveCardTechnique title="Cluster">
+              {formatClusterTechniqueBody({
+                repsPerCluster,
+                intraRest: intraClusterRest,
+                clustersPerSet,
+              })}
+            </LiveCardTechnique>
+            {instructions ? (
+              <LiveCardNote>{instructions}</LiveCardNote>
+            ) : null}
+            <LiveCardLog>
+              {loggingInputs}
+              <div className="mt-3">{logButton}</div>
+            </LiveCardLog>
+          </LiveCard>
+
+          {previousPerfForExercise?.lastWorkout != null ||
+          progressionSuggestion ? (
+            <div className="mx-4">
+              <ProgressionNudge
+                suggestion={progressionSuggestion}
+                previousPerformance={previousPerfForExercise}
+                previousSessionSetNumber={activeSetNumber}
+                showPreviousSession={false}
+                onApplySuggestion={(w) => {
+                  if (w != null) {
+                    setWeight(String(w));
+                    setIsWeightPristine(false);
+                  }
+                }}
+              />
+            </div>
+          ) : null}
+
+          {aboveStickyContent}
+
+          <NavigationControls
+            currentBlock={currentSetEntryIndex + 1}
+            totalBlocks={totalSetEntries}
+            onPrevious={() => {
+              if (onSetEntryChange && canGoPrevious) {
+                onSetEntryChange(currentSetEntryIndex - 1);
+              }
+            }}
+            onNext={() => {
+              if (onSetEntryChange && canGoNext) {
+                onSetEntryChange(currentSetEntryIndex + 1);
+              }
+            }}
+            canGoPrevious={canGoPrevious}
+            canGoNext={canGoNext}
+          />
+        </div>
+        <LastSessionSetsSection lastWorkout={lastWorkoutForLastWeek} />
+      </div>
+    </>
   );
 }

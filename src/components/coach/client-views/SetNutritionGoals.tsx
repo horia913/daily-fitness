@@ -1,6 +1,7 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Target, Info, Check, Trash2 } from "lucide-react";
@@ -34,6 +35,7 @@ export function SetNutritionGoals({
 }: SetNutritionGoalsProps) {
   const { user } = useAuth();
   const { addToast } = useToast();
+  const queryClient = useQueryClient();
   const coachId = coachIdProp ?? user?.id ?? "";
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -166,6 +168,8 @@ export function SetNutritionGoals({
       });
       
       await loadData();
+      await queryClient.invalidateQueries({ queryKey: ['coach-client', clientId, 'nutrition'] });
+      await queryClient.invalidateQueries({ queryKey: ['coach-client', clientId, 'summary'] });
     } catch (error) {
       console.error('Error saving nutrition goals:', error);
       addToast({
@@ -210,6 +214,8 @@ export function SetNutritionGoals({
       });
       
       await loadData();
+      await queryClient.invalidateQueries({ queryKey: ['coach-client', clientId, 'nutrition'] });
+      await queryClient.invalidateQueries({ queryKey: ['coach-client', clientId, 'summary'] });
     } catch (error) {
       console.error('Error removing nutrition goals:', error);
       addToast({
@@ -239,7 +245,7 @@ export function SetNutritionGoals({
   
   if (loading) {
     return (
-      <div className={layoutVariant === "coach" ? sec.section : "fc-card-shell p-6"}>
+      <div className={layoutVariant === "coach" ? sec.section : "rounded-[18px] border border-[color:rgba(255,255,255,0.08)] bg-transparent p-6"}>
         <div className="animate-pulse space-y-4">
           <div className="h-4 bg-[color:var(--fc-glass-highlight)] rounded w-1/3"></div>
           <div className="h-10 bg-[color:var(--fc-glass-highlight)] rounded"></div>
@@ -273,7 +279,7 @@ export function SetNutritionGoals({
         <div className={nut.infoStrip}>
           <Info className="w-[13px] h-[13px] shrink-0 text-[color:var(--fc-set-type-straight)] mt-0.5" />
           <p className={nut.infoText}>
-            Current mode <strong>{modeLabel}</strong> · Setting macro targets enables goal-based logging on the{" "}
+            Current mode <strong>{modeLabel}</strong> Â· Setting macro targets enables goal-based logging on the{" "}
             <strong>Fuel</strong> screen.
           </p>
         </div>
@@ -339,7 +345,7 @@ export function SetNutritionGoals({
 
         <div className={nut.field}>
           <label className={nut.labelRow}>
-            Water<span className={nut.unit}>ml/day · optional</span>
+            Water<span className={nut.unit}>ml/day Â· optional</span>
           </label>
           <input
             type="number"
@@ -355,7 +361,7 @@ export function SetNutritionGoals({
         <div className={nut.grid2}>
           <button type="button" className={nut.btnPrimary} onClick={handleSave} disabled={saving}>
             <Check className="w-4 h-4" strokeWidth={2.5} />
-            {saving ? "Saving…" : "Set targets"}
+            {saving ? "Savingâ€¦" : "Set targets"}
           </button>
           <button type="button" className={nut.btnDanger} onClick={handleRemoveAll} disabled={saving}>
             <Trash2 className="w-4 h-4" strokeWidth={2.5} />
@@ -367,7 +373,7 @@ export function SetNutritionGoals({
   }
 
   return (
-    <div className="fc-card-shell" data-nutrition-goals>
+    <div className="rounded-[18px] border border-[color:rgba(255,255,255,0.08)] bg-transparent" data-nutrition-goals>
       <div className="p-4 sm:p-6 border-b border-[color:var(--fc-glass-border)]">
         <div className="flex items-center gap-3">
           <div className="fc-icon-tile fc-icon-workouts">
@@ -392,7 +398,7 @@ export function SetNutritionGoals({
       <div className="p-4 sm:p-6 space-y-6">
         {/* Mode Indicator */}
         {nutritionMode && (
-          <div className="fc-glass-soft rounded-xl border border-[color:var(--fc-glass-border)] p-4">
+          <div className="bg-transparent rounded-xl border border-[color:var(--fc-glass-border)] p-4">
             <div className="flex items-start gap-3">
               <Info className="w-5 h-5 fc-text-workouts flex-shrink-0 mt-0.5" />
               <div className="flex-1 space-y-2">
@@ -520,7 +526,7 @@ export function SetNutritionGoals({
         {/* TODO: Macro Calculator Helper */}
         {/* 
         <div className="pt-4 border-t border-[color:var(--fc-glass-border)]">
-          <details className="fc-glass-soft rounded-xl border border-[color:var(--fc-glass-border)] p-4">
+          <details className="bg-transparent rounded-xl border border-[color:var(--fc-glass-border)] p-4">
             <summary className="cursor-pointer text-sm font-semibold fc-text-primary">
               Calculate from bodyweight (optional helper)
             </summary>

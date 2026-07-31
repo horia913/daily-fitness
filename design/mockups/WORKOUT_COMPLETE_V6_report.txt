@@ -1,0 +1,130 @@
+WORKOUT COMPLETE → v6
+Date: 2026-07-20
+Scope: /client/workouts/[id]/complete (+ post-complete RPE-only PATCH)
+
+================================================================================
+1. FILES MODIFIED
+================================================================================
+Page
+- src/app/client/workouts/[id]/complete/page.tsx
+
+API (required for post-workout rating; existing PATCH blocked completed logs)
+- src/app/api/sets/[id]/route.ts
+  → allows PATCH body `{ rpe }` only when workout_logs.completed_at is set
+  → all other edits / DELETE still require in-progress
+
+Presentation (v6)
+- src/components/client-workout-complete/clientWorkoutCompleteV6.module.css  (new)
+- src/components/client-workout-complete/CelebrationHero.tsx
+- src/components/client-workout-complete/CompleteStatsRow.tsx
+- src/components/client-workout-complete/PrBanner.tsx
+- src/components/client-workout-complete/StickyActionBar.tsx
+- src/components/client-workout-complete/WorkoutSummarySection.tsx
+- src/components/client-workout-complete/ExerciseSummaryRow.tsx
+- src/components/client-workout-complete/CompressedSetList.tsx
+- src/components/client-workout-complete/compressStrengthSets.ts
+- src/components/client-workout-complete/setLinesFromLogs.ts
+- src/components/client-workout-complete/buildExerciseSummary.ts
+- src/components/client-workout-complete/types.ts
+- src/components/client-workout-complete/workoutSetLogTypes.ts
+- src/components/client-workout-complete/CoachNoteBlock.tsx
+
+Unchanged / kept (not deleted)
+- src/components/client-workout-complete/clientWorkoutCompleteV1.module.css
+- src/components/client-workout-complete/StatDelta.tsx  (v1; unused by success path)
+
+================================================================================
+2. DIFF TABLE vs design/mockups/workout-complete-v6-rev2.html
+================================================================================
+| Mockup element                         | Implementation                                      | Status        |
+|----------------------------------------|-----------------------------------------------------|---------------|
+| Eyebrow ● Workout complete             | CelebrationHero                                     | Match         |
+| Headline                               | CelebrationHero title                               | Match         |
+| name · duration · date                 | CelebrationHero when line                           | Match         |
+| Big total volume + unit + label        | CelebrationHero vol                                 | Match         |
+| vs last session delta pill             | CelebrationHero delta                               | Match         |
+| Stats: PRs / Sets / Reps numbers       | CompleteStatsRow                                    | Match         |
+| Stats: labels + delta lines            | CompleteStatsRow                                    | Match         |
+| Stats: trophy / sets / reps icons      | Omitted by design brief                             | Intended omit |
+| Hairline separators (no gradient tiles)| V6 CSS stats strip                                  | Match         |
+| PR callout (count, names, tappable)    | PrBanner → /client/progress/personal-records        | Match         |
+| Section: What you lifted               | WorkoutSummarySection                               | Match         |
+| Key: effort · target / yours           | Section header                                      | Match         |
+| Letter badge + group hue               | formatSoloGroupBadge / groupIndexToHue              | Match         |
+| PR chip on exercise                    | prchip                                              | Match         |
+| Per-set: Set N · reps × weight         | CompressedSetList                                   | Match         |
+| Collapse identical consecutive sets    | compressSets (+ effort must match)                  | Match         |
+| same across all N sets footnote        | collapseFootnote                                    | Match         |
+| No STRAIGHT / DROP chips               | Removed from UI                                     | Match         |
+| Drop technique note                    | ↳ drop set · dropped to X kg                        | Match         |
+| Effort target muted / yours tier color | EffortCell                                          | Match         |
+| N/A dashed underline                   | .effNa button                                       | Match         |
+| Unprescribed target —                  | effortFromPrescribedRir → —                         | Match         |
+| tap N/A hint footnote                  | ↳ tap N/A to rate how these felt                    | Match         |
+| Done (glowing blue CTA)                | StickyActionBar .btn                                | Match         |
+| View PR history outlined               | StickyActionBar .btn2                               | Match         |
+| Tappable N/A → rate in place           | SetEffortPicker + PATCH                             | Added (asked) |
+
+================================================================================
+3. EFFORT MAPPING / RATING CONTROL / WRITE PATH REUSED
+================================================================================
+Labels / tiers
+- src/lib/workoutEffortLabels.ts
+  (clientEffortLabelFromStoredRpe, rpeToEffortTier)
+
+Prescribed target
+- src/components/client/workout-execution/live-card/effortFromPrescribedRir.ts
+
+Picker (Easy / Medium / Hard / Max → band-upper RPE)
+- src/components/client/workout-execution/ui/SetEffortPicker.tsx
+  (same control as in-workout “How hard was that?”)
+
+Write path (same as useUpdateSetRpe)
+- PATCH /api/sets/[id] with body { rpe }
+- Client: WorkoutSummarySection.onRate → fetchApi(`/api/sets/${setLogId}`, PATCH)
+- In-workout reference: src/components/client/workout-execution/hooks/useUpdateSetRpe.ts
+
+================================================================================
+4. RATING UPDATES BY set_log_id — NO INSERT
+================================================================================
+Confirmed:
+- Each rate call PATCHes existing workout_set_logs.id (set_log_id).
+- No POST /api/log-set and no insert path from this screen.
+- Parent handleSetRpeUpdated mutates local blockGroups.sets[].rpe in place.
+- On failure: picker closes, cell stays N/A, toast “Couldn't save effort”.
+- API: completed workouts may only receive rpe-only PATCH (no weight/reps edits).
+
+================================================================================
+5. VOLUME / PR / STAT CALCULATIONS — FLAGGED, NOT CHANGED
+================================================================================
+- Volume / PR / sets / reps math left untouched (presentation only).
+- Prescribed-RIR load fills slot-level RIR across set numbers 1…20 when per-set
+  rows are missing. That can over-apply a target to sets that never had a
+  prescription; flagged only — not rewritten in this pass.
+
+================================================================================
+6. OLD-SKIN COMPONENTS NO LONGER USED ON SUCCESS PATH (NOT DELETED)
+================================================================================
+- clientWorkoutCompleteV1.module.css (gradient tiles, glass, cyan pills)
+- StatDelta.tsx (v1 delta chrome)
+- AnimatedBackground still wraps loading / error / not-found only (not success)
+- Legacy aggregate summary helpers remain in page.tsx for unused block renderers;
+  success UI uses WorkoutSummarySection only (no STRAIGHT/DROP chips)
+
+================================================================================
+7. tsc
+================================================================================
+npx tsc -p tsconfig.json --noEmit → 0 errors
+
+================================================================================
+8. BROWSER VERIFY
+================================================================================
+Attempted iPhone-SE URL against local complete page with a real completed log.
+Browser session hit the marketing/sign-in wall (unauthenticated) — full UI / N/A
+rate / reload duplicate-check not exercised in automation.
+
+Manual QA still recommended:
+1. Complete a workout → confirm v6 hero, icon-less stats, PR callout.
+2. Per-set lines, collapse, drop note, no set-type chips.
+3. target / yours; N/A tappable; rate → in-place label; reload persists; no new set row.
+4. Long workout (5+ exercises) at 375px.

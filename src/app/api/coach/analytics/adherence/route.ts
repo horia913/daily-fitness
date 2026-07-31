@@ -6,7 +6,13 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { computeCurrentProgramWeekForAssignment } from '@/lib/programWeekCalendar'
+import {
+  resolveInstanceWeeksForAssignments,
+  loadInstanceWeekInputs,
+  resolveInstanceProgramWeek,
+  computeInstanceAdherenceForWeek,
+  isCoachSkipNote,
+} from '@/lib/programInstanceResolver'
 import {
   addCalendarDaysYmd,
   mondayYmdOfZonedWeekContaining,
@@ -198,7 +204,7 @@ export async function GET(request: NextRequest) {
       supabase
         .from('program_assignments')
         .select(
-          'id, client_id, program_id, start_date, duration_weeks, pause_accumulated_days, pause_status, paused_at, timezone_snapshot, status, updated_at'
+          'id, client_id, program_id, start_date, pause_accumulated_days, pause_status, paused_at, timezone_snapshot, status, updated_at'
         )
         .in('client_id', clientIds)
         .eq('status', 'active')
@@ -319,7 +325,6 @@ export async function GET(request: NextRequest) {
       client_id: string
       program_id: string
       start_date: string | null
-      duration_weeks: number | null
       pause_accumulated_days: number | null
       pause_status: string | null
       paused_at: string | null
@@ -340,65 +345,52 @@ export async function GET(request: NextRequest) {
       program_id: string
       week_number: number
     }
+    const assignmentIdsForWeek = [...assignmentByClientId.values()].map((pa) => pa.id)
+    // Canonical Week X of N per assignment (N = instance phases, X in client tz).
+    const weekByAssign = await resolveInstanceWeeksForAssignments(supabase, assignmentIdsForWeek)
+    // Cache of full inputs for per-date (historical) week resolution.
+    const weekInputsCache = new Map<
+      string,
+      Awaited<ReturnType<typeof loadInstanceWeekInputs>>
+    >()
     const weekTargets: WeekTarget[] = []
     for (const [clientId, pa] of assignmentByClientId) {
-      const tz = profileTzMap.get(clientId) || 'Europe/Bucharest'
-      const { week } = computeCurrentProgramWeekForAssignment(
-        {
-          start_date: pa.start_date ?? null,
-          duration_weeks: pa.duration_weeks ?? null,
-          pause_accumulated_days: pa.pause_accumulated_days ?? 0,
-          pause_status: pa.pause_status ?? null,
-          paused_at: pa.paused_at ?? null,
-          timezone_snapshot: pa.timezone_snapshot ?? null,
-        },
-        tz
-      )
       weekTargets.push({
         client_id: clientId,
         assignment_id: pa.id,
         program_id: pa.program_id,
-        week_number: week,
+        week_number: weekByAssign.get(pa.id)?.currentWeek ?? 1,
       })
     }
 
-    const uniqueProgramIds = [...new Set(weekTargets.map((t) => t.program_id))]
     const assignmentIds = weekTargets.map((t) => t.assignment_id)
 
     let scheduleRows: Array<{
       id: string
-      program_id: string
+      program_assignment_id: string
       week_number: number
-      day_of_week?: number | null
+      program_day: number | null
       is_optional?: boolean | null
     }> = []
     let completionRows: Array<{
       program_assignment_id: string
-      program_schedule_id: string
+      program_day_assignment_id: string | null
       notes?: string | null
     }> = []
 
-    if (uniqueProgramIds.length > 0 && assignmentIds.length > 0) {
+    if (assignmentIds.length > 0) {
       const [schedRes, compRes] = await Promise.all([
         supabase
-          .from('program_schedule')
-          .select('id, program_id, week_number, day_of_week, is_optional')
-          .in('program_id', uniqueProgramIds),
+          .from('program_day_assignments')
+          .select('id, program_assignment_id, week_number, program_day, is_optional')
+          .in('program_assignment_id', assignmentIds),
         supabase
           .from('program_day_completions')
-          .select('program_assignment_id, program_schedule_id, notes')
+          .select('program_assignment_id, program_day_assignment_id, notes')
           .in('program_assignment_id', assignmentIds),
       ])
       scheduleRows = (schedRes.data ?? []) as typeof scheduleRows
       completionRows = (compRes.data ?? []) as typeof completionRows
-    }
-
-    const maxWeekByProgram = new Map<string, number>()
-    for (const row of scheduleRows) {
-      const current = maxWeekByProgram.get(row.program_id) ?? 0
-      if (row.week_number > current) {
-        maxWeekByProgram.set(row.program_id, row.week_number)
-      }
     }
 
     const mealsByPlanId = new Map<string, Set<string>>()
@@ -430,37 +422,50 @@ export async function GET(request: NextRequest) {
     }
 
     const weekAdherence: WeekAdherenceRow[] = weekTargets.map((target) => {
-      const maxWeek = maxWeekByProgram.get(target.program_id) ?? target.week_number
-      const effectiveWeek =
-        maxWeek > 0 ? Math.min(target.week_number, maxWeek) : target.week_number
-      const requiredSlots = scheduleRows.filter(
+      // X is already clamped to N by the resolver — no authored-week clamp.
+      const effectiveWeek = target.week_number
+      const requiredSlotsAll = scheduleRows.filter(
         (s) =>
-          s.program_id === target.program_id &&
+          s.program_assignment_id === target.assignment_id &&
           s.week_number === effectiveWeek &&
           !s.is_optional
       )
-      const requiredIds = new Set(requiredSlots.map((s) => s.id))
-      const completedForWeek = completionRows.filter(
-        (c) =>
-          c.program_assignment_id === target.assignment_id &&
-          requiredIds.has(c.program_schedule_id) &&
-          !String(c.notes || '').startsWith('Skipped by coach')
+      const assignmentComps = completionRows.filter(
+        (c) => c.program_assignment_id === target.assignment_id
       )
-      const completedIds = new Set(completedForWeek.map((c) => c.program_schedule_id))
+      // Coach-skipped slots are excluded from the denominator entirely.
+      const skippedIds = new Set(
+        assignmentComps
+          .filter((c) => isCoachSkipNote(c.notes) && c.program_day_assignment_id)
+          .map((c) => c.program_day_assignment_id as string)
+      )
+      const requiredSlots = requiredSlotsAll.filter((s) => !skippedIds.has(s.id))
+      const requiredIds = new Set(requiredSlots.map((s) => s.id))
+      const completedIds = new Set(
+        assignmentComps
+          .filter(
+            (c) =>
+              !isCoachSkipNote(c.notes) &&
+              c.program_day_assignment_id &&
+              requiredIds.has(c.program_day_assignment_id)
+          )
+          .map((c) => c.program_day_assignment_id as string)
+      )
       const assignedRequired = requiredSlots.length
-      const completedRequired = completedForWeek.length
+      const completedRequired = completedIds.size
       const workoutAdherence =
         assignedRequired > 0
           ? Math.round((Math.min(assignedRequired, completedRequired) / assignedRequired) * 100)
           : 0
 
       const dayStrip = Array.from({ length: 7 }, (_, day) => {
-        const daySlots = requiredSlots.filter(
-          (s) =>
-            (typeof s.day_of_week === 'number' && s.day_of_week >= 0 && s.day_of_week <= 6
-              ? s.day_of_week
-              : 0) === day
-        )
+        const daySlots = requiredSlots.filter((s) => {
+          const idx =
+            typeof s.program_day === 'number'
+              ? Math.max(0, Math.min(6, s.program_day - 1))
+              : 0
+          return idx === day
+        })
         const has_slot = daySlots.length > 0
         const done = has_slot && daySlots.every((slot) => completedIds.has(slot.id))
         return { day_of_week: day, has_slot, done }
@@ -540,10 +545,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const completionByAssignment = new Map<string, Array<{ program_schedule_id: string; notes?: string | null }>>()
+    const completionByAssignment = new Map<string, Array<{ program_day_assignment_id: string | null; notes?: string | null }>>()
     for (const row of completionRows) {
       const list = completionByAssignment.get(row.program_assignment_id) ?? []
-      list.push({ program_schedule_id: row.program_schedule_id, notes: row.notes })
+      list.push({ program_day_assignment_id: row.program_day_assignment_id, notes: row.notes })
       completionByAssignment.set(row.program_assignment_id, list)
     }
 
@@ -590,36 +595,28 @@ export async function GET(request: NextRequest) {
           assignment &&
           (!assignment.start_date || weekEnd >= assignment.start_date.slice(0, 10))
         ) {
-          const { week } = computeCurrentProgramWeekForAssignment(
-            {
-              start_date: assignment.start_date ?? null,
-              duration_weeks: assignment.duration_weeks ?? null,
-              pause_accumulated_days: assignment.pause_accumulated_days ?? 0,
-              pause_status: assignment.pause_status ?? null,
-              paused_at: assignment.paused_at ?? null,
-              timezone_snapshot: assignment.timezone_snapshot ?? null,
-            },
-            tz,
-            weekEnd
-          )
-          const maxWeek = maxWeekByProgram.get(assignment.program_id) ?? week
-          const effectiveWeek = maxWeek > 0 ? Math.min(week, maxWeek) : week
-          const requiredSlots = scheduleRows.filter(
-            (s) =>
-              s.program_id === assignment.program_id &&
-              s.week_number === effectiveWeek &&
-              !s.is_optional
-          )
-          const requiredIds = new Set(requiredSlots.map((s) => s.id))
-          const completions = (completionByAssignment.get(assignment.id) ?? []).filter(
-            (c) =>
-              requiredIds.has(c.program_schedule_id) &&
-              !String(c.notes || '').startsWith('Skipped by coach')
-          )
-          workout =
-            requiredSlots.length > 0
-              ? Math.round((Math.min(requiredSlots.length, completions.length) / requiredSlots.length) * 100)
-              : 0
+          let inputs = weekInputsCache.get(assignment.id)
+          if (inputs === undefined) {
+            inputs = await loadInstanceWeekInputs(supabase, assignment.id)
+            weekInputsCache.set(assignment.id, inputs)
+          }
+          const week = inputs
+            ? resolveInstanceProgramWeek(inputs.assignment, inputs.phases, inputs.clientTz, weekEnd)
+                .currentWeek
+            : 1
+          const slots = scheduleRows
+            .filter((s) => s.program_assignment_id === assignment.id)
+            .map((s) => ({
+              id: s.id,
+              week_number: s.week_number,
+              is_optional: s.is_optional ?? null,
+            }))
+          const comps = (completionByAssignment.get(assignment.id) ?? []).map((c) => ({
+            program_day_assignment_id: c.program_day_assignment_id,
+            notes: c.notes,
+          }))
+          const { required, completed } = computeInstanceAdherenceForWeek(slots, comps, week)
+          workout = required > 0 ? Math.round((completed / required) * 100) : 0
         }
 
         let checkinsDays = 0

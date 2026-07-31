@@ -474,7 +474,7 @@ function CoachChallengeDetailContent() {
                     <label
                       key={client.id}
                       htmlFor={`invite-client-${client.id}`}
-                      className="flex items-center gap-2 fc-glass-soft px-3 py-2 rounded-xl border border-[color:var(--fc-glass-border)] cursor-pointer hover:border-[color:var(--fc-accent-cyan)] transition-colors"
+                      className="flex items-center gap-2 fc-glass-soft px-3 py-2 rounded-xl border border-[color:var(--fc-glass-border)] cursor-pointer hover:border-[color:var(--fc-accent)] transition-colors"
                     >
                       <Checkbox
                         id={`invite-client-${client.id}`}

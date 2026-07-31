@@ -21,11 +21,13 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SetEffortPicker } from "./SetEffortPicker";
+import { LoggedEffortInline } from "./LoggedEffortInline";
+import effortStyles from "./setEffortPicker.module.css";
 
 export interface LoggedSetRow {
   /** Stable key (set_log id, including temp ids). */
   id: string;
-  /** Human-readable title shown after the lime checkmark. */
+  /** Human-readable title shown after the action checkmark. */
   title: React.ReactNode;
   /** Stored RPE for highlighting + prompt visibility. */
   rpe: number | null | undefined;
@@ -70,7 +72,7 @@ export function LoggedSetsList({
   return (
     <div
       className={cn(
-        "mx-4 rounded-[18px] border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface-card)] px-4 py-3.5",
+        "mx-4 rounded-[18px] border border-[color:var(--fc-hairline-strong)] bg-transparent px-4 py-3.5",
         className,
       )}
     >
@@ -82,7 +84,7 @@ export function LoggedSetsList({
           <button
             type="button"
             onClick={() => setShowAll((v) => !v)}
-            className="inline-flex items-center gap-1 text-[11.5px] font-semibold normal-case tracking-normal text-[color:var(--fc-accent-cyan)] hover:opacity-90"
+            className="inline-flex items-center gap-1 text-[11.5px] font-semibold normal-case tracking-normal text-[color:var(--fc-accent)] hover:opacity-90"
           >
             {showAll ? (
               <>
@@ -108,12 +110,13 @@ export function LoggedSetsList({
               <div className="flex items-center justify-between gap-2">
                 <span className="flex min-w-0 items-center gap-2 text-[13px] font-semibold text-white">
                   <Check
-                    className="h-3.5 w-3.5 shrink-0 text-[color:var(--fc-accent-lime)]"
+                    className="h-3.5 w-3.5 shrink-0 text-[color:var(--fc-accent)]"
                     strokeWidth={3}
                     aria-hidden
                   />
                   <span className="min-w-0 truncate font-medium text-[color:var(--fc-text-primary)]">
                     {row.title}
+                    {hasRpe ? <LoggedEffortInline rpe={row.rpe} /> : null}
                   </span>
                 </span>
                 {row.menu ? (
@@ -121,15 +124,21 @@ export function LoggedSetsList({
                 ) : null}
               </div>
               {!hasRpe ? (
-                <p className="text-[11px] leading-tight text-[color:var(--fc-text-dim)]">
-                  How hard was that?
-                </p>
-              ) : null}
-              <SetEffortPicker
-                currentRPE={row.rpe ?? null}
-                onSelect={row.onEffortChange}
-                disabled={row.disabled}
-              />
+                <div className={effortStyles.promptBlock}>
+                  <p className={effortStyles.promptLabel}>How hard was that?</p>
+                  <SetEffortPicker
+                    currentRPE={row.rpe ?? null}
+                    onSelect={row.onEffortChange}
+                    disabled={row.disabled}
+                  />
+                </div>
+              ) : (
+                <SetEffortPicker
+                  currentRPE={row.rpe ?? null}
+                  onSelect={row.onEffortChange}
+                  disabled={row.disabled}
+                />
+              )}
             </li>
           );
         })}

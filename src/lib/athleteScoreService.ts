@@ -1,39 +1,12 @@
-/**
- * Athlete Score v2 — Mon–Sun client week; training core × recovery multiplier;
- * nutrition / extras bonuses scale with training adherence.
- */
+/** Athlete Score — training-only (completion + execution, rolling 14 days). */
 
 import { SupabaseClient } from "@supabase/supabase-js";
 import type { AthleteScore, AthleteScoreCalculateResult, AthleteScoreTierKey } from "@/types/athleteScore";
-import { getCurrentWeekBoundsForClient } from "@/lib/weekBounds";
-import {
-  computeCurrentProgramWeekForAssignment,
-  zonedYmdFromIsoTimestamp,
-} from "@/lib/programWeekCalendar";
-import { normalizeClientTimezone } from "@/lib/clientZonedCalendar";
-import {
-  getActiveProgramAssignment,
-  getProgramScheduleSlotsForAssignment,
-  type ProgramAssignment,
-} from "@/lib/programStateService";
-import {
-  averageNullable,
-  computeRepsScore,
-  computeRpeScore,
-  computeWeightScore,
-  intensityMultiplier,
-} from "@/lib/athleteScoreScoringPure";
-
-function assignmentWeekFields(pa: ProgramAssignment) {
-  return {
-    start_date: pa.start_date ?? null,
-    duration_weeks: pa.duration_weeks ?? null,
-    pause_accumulated_days: pa.pause_accumulated_days ?? null,
-    pause_status: pa.pause_status ?? null,
-    paused_at: pa.paused_at ?? null,
-    timezone_snapshot: pa.timezone_snapshot ?? null,
-  };
-}
+import { nullIfStaleAthleteScore } from "@/lib/athleteScoreFreshness";
+import { getActiveProgramAssignment } from "@/lib/programStateService";
+import { computeProgramAthleteScore } from "@/lib/athleteScoreScoringPure";
+import { getWorkoutAdherenceHistory } from "@/lib/workoutAdherenceHistoryService";
+import { batchAdherenceForWorkoutLogs } from "@/lib/coachClientSummaryServer";
 
 export function getTier(score: number): AthleteScoreTierKey {
   if (score >= 90) return "beast_mode";
@@ -47,16 +20,13 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+const SCORE_SELECT =
+  "id, client_id, score, tier, training_score, training_completion_score, training_execution_score, window_start, window_end, calculated_at";
+
 export async function calculateAthleteScore(
   clientId: string,
   supabaseAdmin: SupabaseClient
 ): Promise<AthleteScoreCalculateResult> {
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("timezone, sleep_target_hours, steps_target")
-    .eq("id", clientId)
-    .maybeSingle();
-
   const assignment = await getActiveProgramAssignment(supabaseAdmin, clientId);
   if (!assignment?.id || !assignment.program_id) {
     return { skipped: true, reason: "no_program" };
@@ -66,242 +36,59 @@ export async function calculateAthleteScore(
     return { skipped: true, reason: "paused" };
   }
 
-  const tz =
-    normalizeClientTimezone((profile as { timezone?: string | null } | null)?.timezone) ||
-    normalizeClientTimezone(assignment.timezone_snapshot) ||
-    "UTC";
+  const endYmd = new Date().toISOString().slice(0, 10);
+  const startDate = new Date(`${endYmd}T12:00:00Z`);
+  startDate.setUTCDate(startDate.getUTCDate() - 13);
+  const startYmd = startDate.toISOString().slice(0, 10);
 
-  const week = getCurrentWeekBoundsForClient(tz);
-  const sleepTarget = Number((profile as { sleep_target_hours?: number | null } | null)?.sleep_target_hours);
-  const sleepTargetH = Number.isFinite(sleepTarget) && sleepTarget > 0 ? sleepTarget : 7;
-  const stepsTargetRaw = (profile as { steps_target?: number | null } | null)?.steps_target;
-  const stepsTarget = typeof stepsTargetRaw === "number" && stepsTargetRaw > 0 ? stepsTargetRaw : 8000;
+  const history = await getWorkoutAdherenceHistory(clientId, {
+    db: supabaseAdmin,
+    startDate: startYmd,
+    endDate: endYmd,
+  });
 
-  const { week: ppWeek } = computeCurrentProgramWeekForAssignment(assignmentWeekFields(assignment), tz);
-
-  const slots = await getProgramScheduleSlotsForAssignment(
-    supabaseAdmin,
-    assignment.program_id,
-    assignment.id
+  const windowDays = history.days.filter((d) => d.date >= startYmd && d.date <= endYmd);
+  const scheduled = windowDays.reduce((sum, d) => sum + d.scheduled, 0);
+  const completed = windowDays.reduce(
+    (sum, d) => sum + (d.scheduled > 0 ? Math.min(d.completed, d.scheduled) : 0),
+    0,
   );
 
-  const scheduledSlots = slots.filter(
-    (s) =>
-      s.week_number === ppWeek &&
-      !s.is_optional &&
-      s.id != null &&
-      typeof s.template_id === "string" &&
-      s.template_id.length > 0
-  );
-
-  const scheduledIds = scheduledSlots.map((s) => s.id as string);
-  const scheduled = scheduledIds.length;
-
-  if (scheduled === 0) {
+  if (scheduled <= 0) {
     return { skipped: true, reason: "no_data" };
   }
 
-  const { data: weekLogsRaw } = await supabaseAdmin
+  const completionPct = Math.round((completed / scheduled) * 100);
+
+  const { data: logRows, error: logsErr } = await supabaseAdmin
     .from("workout_logs")
-    .select("id, program_schedule_id, completed_at")
+    .select("id")
     .eq("client_id", clientId)
     .eq("program_assignment_id", assignment.id)
     .not("completed_at", "is", null)
-    .not("program_schedule_id", "is", null)
-    .gte("completed_at", week.weekStartUtcIso)
-    .lte("completed_at", week.weekEndUtcIso)
-    .in("program_schedule_id", scheduledIds)
-    .order("completed_at", { ascending: false });
+    .gte("completed_at", `${startYmd}T00:00:00.000Z`)
+    .lte("completed_at", `${endYmd}T23:59:59.999Z`);
 
-  const latestBySchedule = new Map<string, { id: string; program_schedule_id: string }>();
-  for (const row of weekLogsRaw ?? []) {
-    const sid = row.program_schedule_id as string | null;
-    if (!sid || latestBySchedule.has(sid)) continue;
-    latestBySchedule.set(sid, {
-      id: row.id as string,
-      program_schedule_id: sid,
-    });
+  if (logsErr) {
+    throw new Error(`Failed to load workout logs for execution score: ${logsErr.message}`);
   }
-
-  const completed = latestBySchedule.size;
-  const completionPct = Math.min(100, (completed / scheduled) * 100);
-
-  const workoutLogIds = [...latestBySchedule.values()].map((r) => r.id);
-
+  const workoutLogIds = (logRows ?? []).map((r) => r.id as string).filter(Boolean);
   let executionPct: number | null = null;
   if (workoutLogIds.length > 0) {
-    const { data: setRows } = await supabaseAdmin
-      .from("workout_set_logs")
-      .select("workout_log_id, set_entry_id, exercise_id, reps, weight, rpe, set_type")
-      .in("workout_log_id", workoutLogIds)
-      .eq("set_type", "straight_set");
-
-    const straightSets = (setRows ?? []).filter((r) => r.set_entry_id && r.exercise_id) as {
-      workout_log_id: string;
-      set_entry_id: string;
-      exercise_id: string;
-      reps: number | null;
-      weight: number | null;
-      rpe: number | null;
-    }[];
-
-    const entryIds = [...new Set(straightSets.map((s) => s.set_entry_id))];
-    let prescribeByKey = new Map<
-      string,
-      { reps: string | null; weight_kg: number | null; rir: number | null }
-    >();
-    if (entryIds.length > 0) {
-      const { data: wseeRows } = await supabaseAdmin
-        .from("workout_set_entry_exercises")
-        .select("set_entry_id, exercise_id, reps, weight_kg, rir")
-        .in("set_entry_id", entryIds);
-      prescribeByKey = new Map(
-        (wseeRows ?? []).map((r) => [
-          `${r.set_entry_id}:${r.exercise_id}`,
-          {
-            reps: (r.reps as string | null) ?? null,
-            weight_kg: r.weight_kg != null ? Number(r.weight_kg) : null,
-            rir: r.rir != null ? Number(r.rir) : null,
-          },
-        ])
+    const byLog = await batchAdherenceForWorkoutLogs(supabaseAdmin, clientId, workoutLogIds);
+    const executionValues = Object.values(byLog)
+      .map((row) => row.adherencePercent)
+      .filter((v): v is number => v != null && Number.isFinite(v));
+    if (executionValues.length > 0) {
+      executionPct = Math.round(
+        executionValues.reduce((sum, value) => sum + value, 0) / executionValues.length,
       );
     }
-
-    const workoutQualities: number[] = [];
-    const byLog = new Map<string, typeof straightSets>();
-    for (const s of straightSets) {
-      const arr = byLog.get(s.workout_log_id) ?? [];
-      arr.push(s);
-      byLog.set(s.workout_log_id, arr);
-    }
-
-    for (const wid of workoutLogIds) {
-      const sets = byLog.get(wid) ?? [];
-      const setQualities: number[] = [];
-      for (const s of sets) {
-        const pr = prescribeByKey.get(`${s.set_entry_id}:${s.exercise_id}`);
-        if (!pr) continue;
-        const repsS = computeRepsScore(s.reps, pr.reps);
-        const wS = computeWeightScore(s.weight, pr.weight_kg);
-        const rS = computeRpeScore(s.rpe, pr.rir);
-        const parts = [repsS, wS, rS].filter((x): x is number => x != null);
-        if (!parts.length) continue;
-        setQualities.push(parts.reduce((a, b) => a + b, 0) / parts.length);
-      }
-      if (setQualities.length) {
-        workoutQualities.push(
-          setQualities.reduce((a, b) => a + b, 0) / setQualities.length
-        );
-      }
-    }
-
-    if (workoutQualities.length) {
-      const avgQ =
-        workoutQualities.reduce((a, b) => a + b, 0) / workoutQualities.length;
-      executionPct = Math.round(avgQ * 100);
-    }
   }
 
-  const trainingCompletionScore = round2(completionPct);
-  const trainingExecutionScore =
-    executionPct != null ? round2(executionPct) : null;
-  const trainingScore =
-    executionPct == null
-      ? round2(completionPct)
-      : round2(completionPct * 0.6 + executionPct * 0.4);
-
-  const { data: wellnessRows } = await supabaseAdmin
-    .from("daily_wellness_logs")
-    .select("log_date, sleep_hours, steps")
-    .eq("client_id", clientId)
-    .gte("log_date", week.mondayYmd)
-    .lte("log_date", week.sundayYmd);
-
-  const sleepScores: number[] = [];
-  const stepScores: number[] = [];
-  for (const row of wellnessRows ?? []) {
-    const sh = row.sleep_hours != null ? Number(row.sleep_hours) : null;
-    if (sh != null && Number.isFinite(sh)) {
-      sleepScores.push(Math.min(100, (sh / sleepTargetH) * 100));
-    }
-    const st = row.steps != null ? Number(row.steps) : null;
-    if (st != null && Number.isFinite(st) && stepsTarget > 0) {
-      stepScores.push(Math.min(100, (st / stepsTarget) * 100));
-    }
-  }
-
-  const sleepPct = averageNullable(sleepScores);
-  const stepsPct = averageNullable(stepScores);
-
-  let recoveryScore: number | null = null;
-  if (sleepPct != null && stepsPct != null) {
-    recoveryScore = round2(sleepPct * 0.7 + stepsPct * 0.3);
-  } else if (sleepPct != null) {
-    recoveryScore = round2(sleepPct);
-  } else if (stepsPct != null) {
-    recoveryScore = round2(stepsPct);
-  }
-
-  const recoverySleepScore = sleepPct != null ? round2(sleepPct) : null;
-  const recoveryStepsScore = stepsPct != null ? round2(stepsPct) : null;
-
-  const [{ data: mpa }, { data: amp }] = await Promise.all([
-    supabaseAdmin
-      .from("meal_plan_assignments")
-      .select("id")
-      .eq("client_id", clientId)
-      .eq("is_active", true)
-      .limit(1)
-      .maybeSingle(),
-    supabaseAdmin
-      .from("assigned_meal_plans")
-      .select("id")
-      .eq("client_id", clientId)
-      .limit(1)
-      .maybeSingle(),
-  ]);
-  const nutritionOn = !!(mpa ?? amp);
-
-  let nutritionScore = 0;
-  if (nutritionOn) {
-    const { data: meals } = await supabaseAdmin
-      .from("meal_completions")
-      .select("completed_at")
-      .eq("client_id", clientId)
-      .gte("completed_at", week.weekStartUtcIso)
-      .lte("completed_at", week.weekEndUtcIso);
-
-    const days = new Set<string>();
-    for (const row of meals ?? []) {
-      const iso = row.completed_at as string | null;
-      if (!iso) continue;
-      days.add(zonedYmdFromIsoTimestamp(iso, tz));
-    }
-    nutritionScore = Math.min(100, (days.size / 7) * 100);
-  }
-
-  const { data: acts } = await supabaseAdmin
-    .from("client_activities")
-    .select("duration_minutes, intensity")
-    .eq("client_id", clientId)
-    .gte("activity_date", week.mondayYmd)
-    .lte("activity_date", week.sundayYmd);
-
-  let weightedMinutes = 0;
-  for (const a of acts ?? []) {
-    const dm = Number(a.duration_minutes) || 0;
-    weightedMinutes += dm * intensityMultiplier(a.intensity as string | null);
-  }
-  const extrasScore = Math.min(100, (weightedMinutes / 90) * 100);
-
-  const trainingFactor = trainingScore / 100;
-  const recoveryFactor =
-    recoveryScore == null ? 1 : 0.7 + 0.3 * (recoveryScore / 100);
-
-  const core = trainingScore * recoveryFactor;
-  const nutritionBonus = nutritionScore * 0.1 * trainingFactor;
-  const extrasBonus = extrasScore * 0.05 * trainingFactor;
-  const finalScore = Math.round(Math.min(100, core + nutritionBonus + extrasBonus));
+  const completionScore = round2(completionPct);
+  const executionScore = executionPct != null ? round2(executionPct) : null;
+  const finalScore = computeProgramAthleteScore(completionPct, executionPct);
   const tier = getTier(finalScore);
   const calculatedAt = new Date().toISOString();
 
@@ -309,25 +96,21 @@ export async function calculateAthleteScore(
     client_id: clientId,
     score: finalScore,
     tier,
-    training_score: trainingScore,
-    training_completion_score: trainingCompletionScore,
-    training_execution_score: trainingExecutionScore,
-    recovery_score: recoveryScore,
-    recovery_sleep_score: recoverySleepScore,
-    recovery_steps_score: recoveryStepsScore,
-    nutrition_score: round2(nutritionScore),
-    extras_score: round2(extrasScore),
-    window_start: week.mondayYmd,
-    window_end: week.sundayYmd,
+    /** Mirrors composite score for legacy readers. */
+    training_score: finalScore,
+    /** Adherence % (completed / scheduled required slots, canonical ledger). */
+    training_completion_score: completionScore,
+    /** Execution % (sets on target / prescribed, instance prescriptions). */
+    training_execution_score: executionScore,
+    window_start: startYmd,
+    window_end: endYmd,
     calculated_at: calculatedAt,
   };
 
   const { data: saved, error } = await supabaseAdmin
     .from("athlete_scores")
     .upsert(rowPayload, { onConflict: "client_id,window_start,window_end" })
-    .select(
-      "id, client_id, score, tier, training_score, training_completion_score, training_execution_score, recovery_score, recovery_sleep_score, recovery_steps_score, nutrition_score, extras_score, window_start, window_end, calculated_at"
-    )
+    .select(SCORE_SELECT)
     .single();
 
   if (error) {
@@ -344,9 +127,7 @@ export async function getLatestAthleteScore(
 ): Promise<AthleteScore | null> {
   const { data, error } = await supabase
     .from("athlete_scores")
-    .select(
-      "id, client_id, score, tier, training_score, training_completion_score, training_execution_score, recovery_score, recovery_sleep_score, recovery_steps_score, nutrition_score, extras_score, window_start, window_end, calculated_at"
-    )
+    .select(SCORE_SELECT)
     .eq("client_id", clientId)
     .order("calculated_at", { ascending: false })
     .limit(1)
@@ -356,7 +137,7 @@ export async function getLatestAthleteScore(
     console.error("[athleteScoreService] getLatestAthleteScore:", error);
     return null;
   }
-  return data as AthleteScore | null;
+  return nullIfStaleAthleteScore(data as AthleteScore | null);
 }
 
 export async function getAthleteScoreHistory(

@@ -1,35 +1,28 @@
 /* Coach workout template edit v1 — scoped tokens (UI spec) */
 .wrap {
-  --bg: #07101a;
-  --card: #0e1f2e;
-  --card-2: #0b1824;
-  --card-3: #091420;
-  --line: rgba(255, 255, 255, 0.08);
-  --line-2: rgba(255, 255, 255, 0.05);
-  --t1: #fff;
-  --t2: rgba(255, 255, 255, 0.65);
-  --t3: rgba(255, 255, 255, 0.42);
-  --t4: rgba(255, 255, 255, 0.26);
-  --cyan: #4fe3e8;
-  --cyan-soft: rgba(79, 227, 232, 0.12);
-  --cyan-dim: rgba(79, 227, 232, 0.18);
-  --lime: #c5ff4a;
-  --lime-2: #7fe89a;
-  --lime-soft: rgba(197, 255, 74, 0.14);
-  --critical: #ff5a5f;
-  --critical-soft: rgba(255, 90, 95, 0.12);
-  --warning: #f5c242;
-  --warning-soft: rgba(245, 194, 66, 0.12);
-  --warning-dim: rgba(245, 194, 66, 0.25);
-  --good: #34d399;
-  --good-soft: rgba(52, 211, 153, 0.12);
-  --good-dim: rgba(52, 211, 153, 0.25);
+  --bg: var(--fc-bg-deep);
+  --card: var(--fc-surface-card);
+  --card-2: var(--fc-glass-soft);
+  --card-3: var(--fc-bg-basalt);
+  --line: var(--fc-glass-border);
+  --line-2: var(--fc-hairline);
+  --t1: var(--fc-text-primary);
+  --t2: var(--fc-text-dim);
+  --t3: var(--fc-text-subtle);
+  --t4: var(--fc-text-quaternary);
+  --critical: var(--fc-status-error);
+  --critical-soft: color-mix(in srgb, var(--fc-status-error) 14%, transparent);
+  --warning: var(--fc-status-warning);
+  --warning-soft: color-mix(in srgb, var(--fc-status-warning) 14%, transparent);
+  --warning-dim: color-mix(in srgb, var(--fc-status-warning) 30%, transparent);
+  --good: var(--fc-status-success);
+  --good-soft: color-mix(in srgb, var(--fc-status-success) 14%, transparent);
+  --good-dim: color-mix(in srgb, var(--fc-status-success) 30%, transparent);
   --purple: #a78bfa;
   --purple-soft: rgba(167, 139, 250, 0.12);
   --purple-dim: rgba(167, 139, 250, 0.25);
-  --lime-text: #0a1a18;
-  color: var(--t1);
-  font-family: var(--font-geist-sans, Geist, sans-serif);
+color: var(--fc-text-primary);
+  font-family: var(--font-body, ui-sans-serif);
 }
 
 .hero {
@@ -48,23 +41,31 @@
   top: -40%;
   width: 55%;
   height: 90%;
-  background: radial-gradient(ellipse at center, rgba(79, 227, 232, 0.18) 0%, transparent 70%);
+  background: radial-gradient(
+    ellipse at center,
+    var(--fc-accent-dim) 0%,
+    transparent 70%
+  );
   pointer-events: none;
 }
 
-.heroGlowLime::before {
+.heroGlowAction::before {
   content: "";
   position: absolute;
   right: -20%;
   top: -40%;
   width: 55%;
   height: 90%;
-  background: radial-gradient(ellipse at center, rgba(197, 255, 74, 0.14) 0%, transparent 70%);
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in srgb, var(--fc-accent) 14%, transparent) 0%,
+    transparent 70%
+  );
   pointer-events: none;
 }
 
 .eyebrow {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono, ui-monospace, monospace);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.14em;
@@ -72,12 +73,13 @@
   color: var(--t3);
 }
 
-.eyebrowLime {
-  color: var(--lime);
+.eyebrowAction {
+  color: var(--fc-accent);
 }
 
 .statNum {
-  font-family: var(--f-display, "Big Shoulders Display", sans-serif);
+  font-family: var(--f-display, ui-sans-serif);
+  font-stretch: 125%;
   font-size: 22px;
   font-weight: 700;
   line-height: 1.1;
@@ -88,7 +90,7 @@
 }
 
 .statLbl {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono, ui-monospace, monospace);
   font-size: 9.5px;
   font-weight: 600;
   letter-spacing: 0.12em;
@@ -97,7 +99,7 @@
 }
 
 .heroTitle {
-  font-family: var(--f-headline, "Bricolage Grotesque", sans-serif);
+  font-family: var(--f-headline, ui-sans-serif);
   font-size: 22px;
   font-weight: 700;
   line-height: 1.15;
@@ -138,12 +140,12 @@
   border-left: 1px solid var(--line);
 }
 
-.statValLime {
-  color: var(--lime);
+.statValAction {
+  color: var(--fc-accent);
 }
 
 .statValCyan {
-  color: var(--cyan);
+  color: var(--fc-accent);
 }
 
 .statusPill {
@@ -151,7 +153,7 @@
   align-items: center;
   padding: 3px 8px;
   border-radius: 999px;
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono, ui-monospace, monospace);
   font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.1em;
@@ -172,7 +174,7 @@
 }
 
 .statusDraft {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--fc-hairline);
   color: var(--t3);
   border-color: var(--line);
 }
@@ -186,7 +188,7 @@
   border: 1px solid var(--line);
   background: transparent;
   color: var(--t2);
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono, ui-monospace, monospace);
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
@@ -195,7 +197,7 @@
 
 .backBtn:hover {
   color: var(--t1);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
 }
 
 .formCard {
@@ -209,7 +211,7 @@
 }
 
 .sectionEyebrow {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono, ui-monospace, monospace);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.16em;
@@ -236,7 +238,7 @@
 }
 
 .optHelper {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono, ui-monospace, monospace);
   font-size: 10px;
   font-weight: 400;
   color: var(--t4);
@@ -258,8 +260,8 @@
 
 .inputLike:focus {
   outline: none;
-  border-color: var(--cyan);
-  box-shadow: 0 0 0 3px var(--cyan-soft);
+  border-color: var(--fc-accent);
+  box-shadow: 0 0 0 3px var(--fc-accent-dim);
 }
 
 .inputLike::placeholder {
@@ -295,7 +297,7 @@
 }
 
 .exercisesEyebrow {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono, ui-monospace, monospace);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.12em;
@@ -304,14 +306,15 @@
 }
 
 .exercisesCount {
-  font-family: var(--f-display, "Big Shoulders Display", sans-serif);
+  font-family: var(--f-display, ui-sans-serif);
+  font-stretch: 125%;
   font-size: 18px;
   font-weight: 700;
-  color: var(--lime);
+  color: var(--fc-accent);
   margin-left: 6px;
 }
 
-.btnLimePrimary {
+.btnActionPrimary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -322,16 +325,16 @@
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;
-  color: var(--lime-text);
-  background: linear-gradient(135deg, var(--lime) 0%, var(--lime-2) 100%);
+  color: var(--fc-ink);
+  background: linear-gradient(135deg, var(--fc-accent) 0%, var(--fc-accent) 100%);
   transition: filter 0.15s, transform 0.1s;
 }
 
-.btnLimePrimary:hover {
+.btnActionPrimary:hover {
   filter: brightness(1.05);
 }
 
-.btnLimePrimary:active {
+.btnActionPrimary:active {
   transform: scale(0.98);
 }
 
@@ -341,7 +344,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--fc-track);
   border-right: 1px solid var(--line-2);
   cursor: grab;
   align-self: stretch;
@@ -379,10 +382,10 @@
 
 .btnGhostCancel:hover {
   color: var(--t1);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
 }
 
-.btnLimeSave {
+.btnActionSave {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -392,11 +395,11 @@
   cursor: pointer;
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--lime-text);
-  background: linear-gradient(135deg, var(--lime) 0%, var(--lime-2) 100%);
+  color: var(--fc-ink);
+  background: linear-gradient(135deg, var(--fc-accent) 0%, var(--fc-accent) 100%);
 }
 
-.btnLimeSave:disabled {
+.btnActionSave:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
@@ -417,15 +420,15 @@
   width: 48px;
   height: 48px;
   border-radius: 10px;
-  background: var(--cyan-soft);
+  background: var(--fc-accent-dim);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--cyan);
+  color: var(--fc-accent);
 }
 
 .emptyTitle {
-  font-family: var(--f-headline, "Bricolage Grotesque", sans-serif);
+  font-family: var(--f-headline, ui-sans-serif);
   font-size: 14px;
   font-weight: 600;
   color: var(--t1);
@@ -459,8 +462,8 @@
   width: 32px;
   height: 32px;
   border-radius: 9px;
-  background: var(--cyan-soft);
-  color: var(--cyan);
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -476,30 +479,30 @@
 }
 
 .balanceEyebrow {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono, ui-monospace, monospace);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--cyan);
+  color: var(--fc-accent);
 }
 
 .balanceTitle {
-  font-family: var(--f-headline, "Bricolage Grotesque", sans-serif);
+  font-family: var(--f-headline, ui-sans-serif);
   font-size: 13.5px;
   font-weight: 600;
   color: var(--t1);
 }
 
 .groupsPill {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono, ui-monospace, monospace);
   font-size: 10px;
   font-weight: 600;
   padding: 4px 8px;
   border-radius: 999px;
-  background: var(--cyan-soft);
-  color: var(--cyan);
-  border: 1px solid var(--cyan-dim);
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
+  border: 1px solid var(--fc-accent-glow);
   white-space: nowrap;
 }
 
@@ -556,18 +559,19 @@
 .balanceBarFill {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--cyan) 0%, #34a8ad 100%);
+  background: linear-gradient(90deg, var(--fc-accent) 0%, color-mix(in srgb, var(--fc-accent) 75%, #0a3a40) 100%);
 }
 
 .balanceCount {
-  font-family: var(--f-display, "Big Shoulders Display", sans-serif);
+  font-family: var(--f-display, ui-sans-serif);
+  font-stretch: 125%;
   font-size: 14px;
   font-weight: 700;
-  color: var(--cyan);
+  color: var(--fc-accent);
 }
 
 .balanceUnit {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono, ui-monospace, monospace);
   font-size: 9px;
   color: var(--t3);
 }
@@ -592,7 +596,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--f-display, "Big Shoulders Display", sans-serif);
+  font-family: var(--f-display, ui-sans-serif);
+  font-stretch: 125%;
   font-size: 14px;
   font-weight: 700;
   color: var(--t2);
@@ -624,7 +629,7 @@
 }
 
 .exMeta {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono, ui-monospace, monospace);
   font-size: 9.5px;
   color: var(--t3);
   line-height: 1.35;
@@ -654,7 +659,7 @@
 
 .exIconBtn:hover {
   color: var(--t1);
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--fc-track);
 }
 
 .exIconBtnDanger:hover {
@@ -671,8 +676,8 @@
 }
 
 .exExpandedWrapCyan {
-  border-color: var(--cyan-dim);
-  background: rgba(79, 227, 232, 0.02);
+  border-color: var(--fc-accent-glow);
+  background: rgba(34, 211, 238, 0.02);
 }
 
 .exExpandedWrapPurple {
@@ -723,7 +728,7 @@
   width: 20px;
   height: 20px;
   border-radius: 5px;
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono, ui-monospace, monospace);
   font-size: 10px;
   font-weight: 700;
   display: flex;
@@ -739,7 +744,7 @@
 }
 
 .subExMeta {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono, ui-monospace, monospace);
   font-size: 9px;
   color: var(--t3);
   padding-left: 28px;
@@ -775,7 +780,7 @@
 }
 
 .stripeCyan {
-  background: var(--cyan);
+  background: var(--fc-accent);
 }
 .stripePurple {
   background: var(--purple);
@@ -804,8 +809,8 @@
 }
 
 .tileCyan {
-  background: var(--cyan-soft);
-  color: var(--cyan);
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
 }
 .tilePurple {
   background: var(--purple-soft);
@@ -821,7 +826,7 @@
 }
 
 .configEyebrow {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono, ui-monospace, monospace);
   font-size: 9.5px;
   font-weight: 600;
   letter-spacing: 0.14em;
@@ -829,7 +834,7 @@
 }
 
 .textAccentCyan {
-  color: var(--cyan);
+  color: var(--fc-accent);
 }
 .textAccentPurple {
   color: var(--purple);
@@ -842,7 +847,7 @@
 }
 
 .configTitle {
-  font-family: var(--f-headline, "Bricolage Grotesque", sans-serif);
+  font-family: var(--f-headline, ui-sans-serif);
   font-size: 14px;
   font-weight: 600;
   color: var(--t1);
@@ -876,7 +881,8 @@
   border-radius: 7px;
   background: var(--card-2);
   border: 1px solid var(--line);
-  font-family: var(--f-display, "Big Shoulders Display", sans-serif);
+  font-family: var(--f-display, ui-sans-serif);
+  font-stretch: 125%;
   font-size: 12px;
   font-weight: 700;
   color: var(--t2);
@@ -939,7 +945,7 @@
 }
 
 .loadToggleLabel {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono, ui-monospace, monospace);
   font-size: 10px;
   font-weight: 600;
   cursor: pointer;
@@ -947,7 +953,7 @@
 }
 
 .loadToggleLabelActive {
-  color: var(--cyan);
+  color: var(--fc-accent);
 }
 
 .loadToggleLabelIdle {
@@ -958,7 +964,7 @@
   width: 22px;
   height: 12px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--fc-track);
   position: relative;
   flex-shrink: 0;
   cursor: pointer;
@@ -967,7 +973,7 @@
 }
 
 .loadSwitchTrackOn {
-  background: rgba(79, 227, 232, 0.35);
+  background: color-mix(in srgb, var(--fc-accent) 35%, transparent);
 }
 
 .loadSwitchThumb {
@@ -976,13 +982,14 @@
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  background: #0a1a26;
+  background: var(--fc-ink);
   transition: left 0.15s ease;
 }
 
 /* Coach form scope — numeric + tempo */
 .wtCoachForm :global(.wt-num-input) {
-  font-family: var(--f-display, "Big Shoulders Display", sans-serif) !important;
+  font-family: var(--f-display, ui-sans-serif) !important;
+  font-stretch: 125% !important;
   font-size: 18px !important;
   font-weight: 700 !important;
   text-align: center !important;
@@ -990,7 +997,7 @@
 }
 
 .wtCoachForm :global(.wt-tempo-input) {
-  font-family: var(--f-mono, "Geist Mono", monospace) !important;
+  font-family: var(--f-mono, ui-monospace, monospace) !important;
   letter-spacing: 0.1em !important;
 }
 
@@ -1022,17 +1029,17 @@
   width: 100%;
   padding: 8px 10px;
   border-radius: 10px;
-  border: 1px dashed var(--cyan-dim);
+  border: 1px dashed var(--fc-accent-glow);
   background: transparent;
-  color: var(--cyan);
+  color: var(--fc-accent);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono, ui-monospace, monospace);
 }
 
 .addNestedBtn:hover {
-  background: var(--cyan-soft);
+  background: var(--fc-accent-dim);
 }
 
 .lineSep8 {
@@ -1058,14 +1065,14 @@
 }
 
 .tabataAddSetBtn {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono, ui-monospace, monospace);
   font-size: 10px;
   font-weight: 600;
   padding: 4px 10px;
   border-radius: 8px;
   border: none;
-  background: var(--cyan);
-  color: var(--lime-text);
+  background: var(--fc-accent);
+  color: var(--fc-ink);
   cursor: pointer;
 }
 

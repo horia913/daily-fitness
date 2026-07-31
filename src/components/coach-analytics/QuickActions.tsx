@@ -10,8 +10,8 @@ const ACTIONS = [
     title: "Message all",
     sub: "Send group msg",
     icon: MessageSquare,
-    bg: "var(--cyan-soft)",
-    fg: "var(--cyan)",
+    bg: "var(--fc-accent-dim)",
+    fg: "var(--fc-accent)",
     href: "/coach/clients",
   },
   {
@@ -19,8 +19,8 @@ const ACTIONS = [
     title: "Celebrate",
     sub: "Acknowledge wins",
     icon: Sparkles,
-    bg: "var(--lime-soft)",
-    fg: "var(--lime)",
+    bg: "var(--fc-accent-dim)",
+    fg: "var(--fc-accent)",
     href: "/coach",
   },
   {
@@ -52,7 +52,7 @@ export function QuickActions() {
         <div className={hub.sectionHeadLeft}>
           <Zap
             className="size-3 shrink-0"
-            style={{ color: "var(--lime)" }}
+            style={{ color: "var(--fc-accent)" }}
             aria-hidden
           />
           <span className={hub.sectionTitle}>Quick actions</span>

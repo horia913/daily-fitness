@@ -5,7 +5,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 type EyebrowTone =
-  | "lime"
+  | "action"
   | "cyan"
   | "cyanMuted"
   | "cyanEmphasis"
@@ -20,10 +20,10 @@ type EyebrowTone =
 type EyebrowDensity = "default" | "section" | "statStrip";
 
 const toneClassMap: Record<EyebrowTone, string> = {
-  lime: "text-[var(--fc-accent-lime)]",
-  cyan: "text-[var(--fc-accent-cyan)]",
-  cyanMuted: "text-cyan-300/70",
-  cyanEmphasis: "text-cyan-400/90",
+  action: "text-[var(--fc-accent)]",
+  cyan: "text-[var(--fc-accent)]",
+  cyanMuted: "text-[color-mix(in_srgb,var(--fc-group-c)_70%,white)]",
+  cyanEmphasis: "text-[color-mix(in_srgb,var(--fc-group-c)_90%,transparent)]",
   gold: "text-[var(--fc-accent-gold)]",
   dim: "text-[var(--fc-text-dim)]",
   subtle: "text-[color:var(--fc-text-subtle)]",
@@ -34,12 +34,12 @@ const toneClassMap: Record<EyebrowTone, string> = {
 };
 
 const toneGlowClassMap: Record<EyebrowTone, string> = {
-  lime: "shadow-[0_0_12px_color-mix(in_srgb,var(--fc-accent-lime)_40%,transparent)]",
-  cyan: "shadow-[0_0_12px_color-mix(in_srgb,var(--fc-accent-cyan)_40%,transparent)]",
+  action: "shadow-[0_0_12px_color-mix(in_srgb,var(--fc-accent)_40%,transparent)]",
+  cyan: "shadow-[0_0_12px_color-mix(in_srgb,var(--fc-accent)_40%,transparent)]",
   cyanMuted:
-    "shadow-[0_0_12px_color-mix(in_srgb,var(--fc-accent-cyan)_25%,transparent)]",
+    "shadow-[0_0_12px_color-mix(in_srgb,var(--fc-accent)_25%,transparent)]",
   cyanEmphasis:
-    "shadow-[0_0_12px_color-mix(in_srgb,var(--fc-accent-cyan)_30%,transparent)]",
+    "shadow-[0_0_12px_color-mix(in_srgb,var(--fc-accent)_30%,transparent)]",
   gold: "shadow-[0_0_12px_color-mix(in_srgb,var(--fc-accent-gold)_40%,transparent)]",
   dim: "shadow-[0_0_12px_color-mix(in_srgb,var(--fc-text-dim)_40%,transparent)]",
   subtle:

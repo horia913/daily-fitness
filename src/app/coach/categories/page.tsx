@@ -341,7 +341,7 @@ function CategoriesHubContent() {
                                 />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <h3 className="text-lg font-semibold fc-text-primary mb-1 leading-snug group-hover:text-[color:var(--fc-accent-cyan)] transition-colors m-0 truncate">
+                                <h3 className="text-lg font-semibold fc-text-primary mb-1 leading-snug group-hover:text-[color:var(--fc-accent)] transition-colors m-0 truncate">
                                   {category.name}
                                 </h3>
                                 <p className="text-sm font-normal fc-text-dim m-0 leading-normal line-clamp-2">
@@ -373,7 +373,7 @@ function CategoriesHubContent() {
                               setEditingCategory(category);
                               setShowCreateForm(true);
                             }}
-                            className="flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-2xl text-sm font-semibold border-2 border-[color:var(--fc-glass-border)] bg-transparent fc-text-primary hover:bg-[color:var(--fc-accent-cyan)] hover:border-[color:var(--fc-accent-cyan)] hover:text-white transition-colors duration-200"
+                            className="flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-2xl text-sm font-semibold border-2 border-[color:var(--fc-glass-border)] bg-transparent fc-text-primary hover:bg-[color:var(--fc-accent)] hover:border-[color:var(--fc-accent)] hover:text-white transition-colors duration-200"
                           >
                             <Edit className="w-4 h-4" />
                             Edit

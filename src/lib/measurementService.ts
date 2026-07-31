@@ -21,6 +21,8 @@ function sanitizeMeasurementPayload<T extends Record<string, unknown>>(payload: 
     'left_thigh_circumference', 'right_thigh_circumference', 'left_calf_circumference', 'right_calf_circumference',
   ] as const;
   const out = { ...payload };
+  // `photos` is not a body_metrics column — strip if present (latent landmine)
+  delete (out as Record<string, unknown>).photos;
   for (const key of numericKeys) {
     if (key in out && (out as Record<string, unknown>)[key] != null) {
       const v = (out as Record<string, unknown>)[key] as number;
@@ -68,10 +70,21 @@ export interface BodyMeasurement {
   // Context
   measurement_method?: string | null;
   notes?: string | null;
-  /** Storage paths in progress-photos bucket (use signed URLs for display) */
-  photos?: string[] | null;
   created_at: string;
   updated_at: string;
+}
+
+/** coach_id set → coach-measured; null → self-logged */
+export function isCoachMeasured(
+  m: Pick<BodyMeasurement, 'coach_id'>,
+): boolean {
+  return m.coach_id != null && m.coach_id !== ''
+}
+
+export function isSelfLoggedMeasurement(
+  m: Pick<BodyMeasurement, 'coach_id'>,
+): boolean {
+  return !isCoachMeasured(m)
 }
 
 export interface MeasurementProgress {
@@ -318,6 +331,19 @@ export async function createMeasurement(
       return null;
     }
 
+    if (data?.coach_id && data?.client_id && data?.id) {
+      try {
+        const { emitInAppNotification } = await import('@/lib/inAppNotificationEvents');
+        void emitInAppNotification({
+          event: 'client_measurement_recorded',
+          clientId: data.client_id,
+          measurementId: data.id,
+        });
+      } catch {
+        /* non-blocking */
+      }
+    }
+
     return data;
   } catch (error) {
     console.error('Error in createMeasurement:', error);
@@ -361,6 +387,7 @@ export async function upsertMeasurement(
 ): Promise<BodyMeasurement | null> {
   try {
     const existing = await getMeasurementForDate(measurement.client_id, measurement.measured_date);
+    let saved: BodyMeasurement | null = null;
     if (existing?.id) {
       // Merge: only include fields that are defined in the incoming payload so we don't overwrite existing values with null
       const updatableKeys = [
@@ -378,9 +405,31 @@ export async function upsertMeasurement(
         }
       }
       const sanitizedUpdates = sanitizeMeasurementPayload(updates) as Partial<Omit<BodyMeasurement, 'id' | 'client_id' | 'created_at'>>;
-      return updateMeasurement(existing.id, sanitizedUpdates);
+      saved = await updateMeasurement(existing.id, sanitizedUpdates);
+    } else {
+      saved = await createMeasurement(measurement);
     }
-    return createMeasurement(measurement);
+
+    // createMeasurement already emits when coach_id is set; for update path emit here
+    if (
+      saved?.id &&
+      measurement.coach_id &&
+      existing?.id &&
+      saved.client_id
+    ) {
+      try {
+        const { emitInAppNotification } = await import('@/lib/inAppNotificationEvents');
+        void emitInAppNotification({
+          event: 'client_measurement_recorded',
+          clientId: saved.client_id,
+          measurementId: saved.id,
+        });
+      } catch {
+        /* non-blocking */
+      }
+    }
+
+    return saved;
   } catch (error) {
     console.error('Error in upsertMeasurement:', error);
     return null;

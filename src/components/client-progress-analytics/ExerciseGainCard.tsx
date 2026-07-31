@@ -118,7 +118,7 @@ export function ExerciseGainCard({
               className="text-[24px] font-bold leading-none text-[var(--t1)]"
               style={{
                 fontFamily:
-                  '"Big Shoulders Display", var(--font-geist-sans, Geist), sans-serif',
+                  'var(--f-display), var(--font-geist-sans, Geist), sans-serif',
               }}
             >
               {progression.currentOneRM}
@@ -139,10 +139,10 @@ export function ExerciseGainCard({
             Since first
           </div>
           <span
-            className="text-[18px] font-bold leading-none text-[var(--cyan)]"
+            className="text-[18px] font-bold leading-none text-[var(--fc-accent)]"
             style={{
               fontFamily:
-                '"Big Shoulders Display", var(--font-geist-sans, Geist), sans-serif',
+                'var(--f-display), var(--font-geist-sans, Geist), sans-serif',
             }}
           >
             {sinceLabel}
@@ -163,7 +163,7 @@ export function ExerciseGainCard({
             fontFamily: 'var(--f-mono, "Geist Mono", monospace)',
           }}
         >
-          <Star className="h-2.5 w-2.5 shrink-0 text-[var(--lime)]" aria-hidden />
+          <Star className="h-2.5 w-2.5 shrink-0 text-[var(--fc-accent)]" aria-hidden />
           <span>
             All-time best: {progression.allTimeMax} × {progression.allTimeMaxReps}{" "}
             (

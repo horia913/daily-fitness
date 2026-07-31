@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<title>Program builder — volume rail</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;}
+  :root{
+    --page:#0A0B0D; --card:transparent; --well:#070809;
+    --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.14);
+    --teal:#19E3C4; --orange:#FF8A1F; 
+    --blue:#2E7BFF; --cyan:#22D3EE; --purple:#9D6BFF; --amber:#FFB020;
+    --good:#22E56A; --warn:#FFB020; --hot:#FF7A2F; --bad:#FF5A4D;
+    --text:#F2F5F8; --dim:#98A2B0; --subtle:#5C6470; --faint:#3D434D;
+    --f-d:'Archivo',sans-serif; --f-b:'Inter',sans-serif; --f-m:'JetBrains Mono',monospace;
+  }
+  body{background:var(--page);color:var(--text);font-family:var(--f-b);-webkit-font-smoothing:antialiased;font-size:13px;}
+  .d{font-family:var(--f-d);font-stretch:105%;}
+  svg{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;}
+
+  .banner{background:color-mix(in srgb,var(--warn) 13%,transparent);border-bottom:1px solid color-mix(in srgb,var(--warn) 30%,transparent);padding:9px 24px;text-align:center;}
+  .banner .t{font-family:var(--f-m);font-size:10.5px;color:var(--warn);font-weight:700;letter-spacing:.04em;}
+  .banner .s{font-family:var(--f-m);font-size:9.5px;color:var(--subtle);margin-top:3px;}
+
+  .top{display:flex;align-items:center;gap:13px;padding:13px 24px;border-bottom:1px solid var(--line);}
+  .back{font-family:var(--f-m);font-size:10.5px;color:var(--dim);display:flex;align-items:center;gap:6px;}
+  .tag{font-family:var(--f-m);font-size:9px;letter-spacing:.13em;text-transform:uppercase;font-weight:700;border-radius:5px;padding:4px 9px;}
+  .tag.station{color:var(--teal);background:color-mix(in srgb,var(--teal) 16%,transparent);}
+  .tag.fixed{color:var(--orange);background:color-mix(in srgb,var(--orange) 16%,transparent);}
+  .ttl{flex:1;text-align:center;font-family:var(--f-d);font-size:19px;font-weight:800;letter-spacing:-.015em;}
+  .btn{font-family:var(--f-m);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;border:1px solid var(--line-2);border-radius:8px;padding:8px 14px;color:var(--dim);}
+  .btn.off{opacity:.35;}
+
+  /* ===== PHASE BARS — full saturation, as they are ===== */
+  .phases{display:flex;gap:9px;padding:15px 24px 0;}
+  .ph{flex:1;border-radius:9px;padding:12px 16px;display:flex;align-items:center;justify-content:center;position:relative;
+      font-family:var(--f-m);font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#08090B;}
+  .ph.p1{background:linear-gradient(180deg,#26F2D2,#13C6AA);box-shadow:0 6px 22px -10px var(--teal);}
+  .ph.p2{background:linear-gradient(180deg,#FF9A34,#F07A0C);box-shadow:0 6px 22px -10px var(--orange);}
+  .ph .kebab{position:absolute;right:11px;opacity:.55;font-size:15px;}
+  .ph .wk{margin-left:10px;opacity:.62;font-weight:700;letter-spacing:.06em;}
+  .addph{border:1px dashed var(--line-2);border-radius:9px;padding:12px 18px;color:var(--subtle);font-family:var(--f-m);font-size:10.5px;display:flex;align-items:center;white-space:nowrap;}
+
+  .weeks{display:flex;align-items:center;gap:6px;padding:13px 24px 4px;overflow-x:auto;}
+  .wk{border:1px solid var(--line);border-radius:8px;padding:7px 13px;min-width:76px;text-align:center;flex-shrink:0;}
+  .wk .n{font-family:var(--f-m);font-size:10px;font-weight:700;color:var(--dim);letter-spacing:.09em;}
+  .wk .dt{font-family:var(--f-m);font-size:9px;color:var(--faint);margin-top:3px;}
+  .wk.on{border-color:var(--teal);background:color-mix(in srgb,var(--teal) 14%,transparent);}
+  .wk.on .n{color:var(--teal);} .wk.on .dt{color:color-mix(in srgb,var(--teal) 70%,white);}
+
+  .body{display:grid;grid-template-columns:1fr 320px;gap:18px;padding:8px 24px 40px;align-items:start;}
+  .seclbl{font-family:var(--f-m);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--subtle);margin:10px 0 12px;}
+
+  .days{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+  .day{background:transparent;border:1px solid var(--line);border-radius:12px;overflow:hidden;}
+  .dhead{display:flex;align-items:flex-start;gap:9px;padding:12px 13px;border-bottom:1px solid var(--line);}
+  .dhead .dow{font-family:var(--f-m);font-size:8.5px;letter-spacing:.15em;color:var(--teal);font-weight:700;}
+  .dhead .dn{font-family:var(--f-d);font-size:15px;font-weight:800;margin-top:3px;}
+  .dhead .wn{font-family:var(--f-m);font-size:9.5px;color:var(--subtle);margin-top:3px;}
+  .dhead .sp{flex:1;}
+  .prog{font-family:var(--f-m);font-size:9px;letter-spacing:.07em;text-transform:uppercase;font-weight:800;color:#08090B;
+        background:var(--good);border-radius:6px;padding:5px 9px;white-space:nowrap;}
+  .kb{color:var(--faint);font-size:14px;letter-spacing:1px;}
+
+  .dbody{padding:11px 13px 13px;}
+  .blk{font-family:var(--f-m);font-size:9.5px;color:var(--dim);display:flex;align-items:center;gap:7px;margin:10px 0 9px;font-weight:600;}
+  .bg{width:18px;height:18px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#08090B;}
+  .ex{padding:8px 0 9px 26px;border-bottom:1px solid var(--line);}
+  .ex:last-of-type{border-bottom:none;}
+  .ex .row{display:flex;align-items:center;gap:8px;}
+  .exb{width:18px;height:18px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-family:var(--f-m);font-size:8px;font-weight:800;color:#08090B;margin-left:-26px;}
+  .ex .nm{font-size:12.5px;font-weight:600;}
+  .ex .pr{font-family:var(--f-m);font-size:9.5px;color:var(--subtle);margin-top:4px;}
+  .ex .pr b{color:var(--text);font-weight:700;}
+  .ex .pr .pct{color:var(--amber);} .ex .pr .rir{color:var(--cyan);}
+  .addex{margin-top:11px;font-family:var(--f-m);font-size:10px;color:var(--subtle);border:1px dashed var(--line-2);border-radius:7px;padding:9px;text-align:center;}
+
+  .rest{padding:28px 14px;text-align:center;}
+  .rest .t{font-family:var(--f-m);font-size:10px;letter-spacing:.18em;color:var(--faint);font-weight:700;}
+  .rest .s{font-size:11.5px;color:var(--subtle);margin:9px 0 15px;line-height:1.5;}
+  .rest .b{display:flex;flex-direction:column;gap:8px;}
+  .rest .b span{font-family:var(--f-m);font-size:10px;border-radius:8px;padding:9px;border:1px solid var(--line-2);color:var(--dim);font-weight:700;letter-spacing:.05em;}
+  .rest .b span.pri{background:var(--blue);border-color:var(--blue);color:#fff;}
+
+  /* ===== VOLUME RAIL — loud, not grey ===== */
+  .rail{position:sticky;top:14px;background:transparent;border:1px solid var(--line);border-radius:13px;overflow:hidden;}
+  .rtop{background:linear-gradient(180deg,rgba(25,227,196,.16),rgba(25,227,196,.03));border-bottom:1px solid color-mix(in srgb,var(--teal) 24%,transparent);padding:13px 15px;}
+  .rtop .t{font-family:var(--f-m);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--teal);font-weight:800;}
+  .rtop .big{display:flex;align-items:baseline;gap:9px;margin-top:8px;}
+  .rtop .n{font-family:var(--f-d);font-size:38px;font-weight:900;line-height:1;letter-spacing:-.03em;color:var(--teal);}
+  .rtop .l{font-family:var(--f-m);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);line-height:1.35;}
+  .rbody{padding:13px 15px 15px;}
+
+  .mus{margin-bottom:14px;}
+  .mrow{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px;}
+  .mrow .nm{font-size:12px;font-weight:600;}
+  .mrow .v{font-family:var(--f-d);font-size:16px;font-weight:800;}
+  .mrow .v .tg{font-family:var(--f-m);font-size:9.5px;font-weight:500;color:var(--faint);margin-left:4px;}
+  .bar{height:8px;border-radius:4px;background:rgba(255,255,255,.055);position:relative;overflow:visible;}
+  .bar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;}
+  .bar .mark{position:absolute;top:-3px;bottom:-3px;width:2px;background:rgba(255,255,255,.45);border-radius:2px;}
+  .ok  i{background:linear-gradient(90deg,#1ED760,var(--good));box-shadow:0 0 12px -3px var(--good);}
+  .ok  .v{color:var(--good);}
+  .low i{background:linear-gradient(90deg,#FFC94D,var(--warn));box-shadow:0 0 12px -3px var(--warn);}
+  .low .v{color:var(--warn);}
+  .over i{background:linear-gradient(90deg,#FF9A4D,var(--hot));box-shadow:0 0 12px -3px var(--hot);}
+  .over .v{color:var(--hot);}
+  .mst{font-family:var(--f-m);font-size:9px;letter-spacing:.09em;text-transform:uppercase;margin-top:6px;font-weight:700;}
+  .mst.ok{color:var(--good);} .mst.low{color:var(--warn);} .mst.over{color:var(--hot);}
+  .mst em{font-style:normal;color:var(--faint);letter-spacing:0;text-transform:none;margin-left:6px;font-weight:500;}
+
+  .rfoot{border-top:1px solid var(--line);padding:11px;font-family:var(--f-m);font-size:9.5px;color:var(--teal);text-align:center;font-weight:700;letter-spacing:.08em;text-transform:uppercase;}
+
+  .note{margin:0 24px 34px;padding-left:14px;border-left:2px solid var(--teal);font-size:12px;line-height:1.8;color:var(--subtle);max-width:900px;}
+  .note b{color:var(--text);}
+</style></head>
+<body>
+
+<div class="banner">
+  <div class="t">EDITING MASTER TEMPLATE — changes affect future assignments, not active clients</div>
+  <div class="s">Active clients keep their own copies. Assign or re-assign to push changes.</div>
+</div>
+
+<div class="top">
+  <span class="back"><svg viewBox="0 0 24 24" width="13" height="13"><path d="M15 5l-7 7 7 7"/></svg>Programs</span>
+  <span class="tag station">The Station</span>
+  <span class="tag fixed">Fixed program</span>
+  <span class="ttl d">test nou 1</span>
+  <span class="btn off">Save</span><span class="btn">Settings</span>
+</div>
+
+<div class="phases">
+  <span class="ph p1">Block 1 <span class="wk">WK 1–9</span><span class="kebab">⋮</span></span>
+  <span class="ph p2">Phase 2 (test) <span class="wk">WK 10–13</span><span class="kebab">⋮</span></span>
+  <span class="addph">+ Add phase</span>
+</div>
+
+<div class="weeks">
+  <span class="wk on"><div class="n">WK 1</div><div class="dt">Jul 27</div></span>
+  <span class="wk"><div class="n">WK 2</div><div class="dt">Aug 3</div></span>
+  <span class="wk"><div class="n">WK 3</div><div class="dt">Aug 10</div></span>
+  <span class="wk"><div class="n">WK 4</div><div class="dt">Aug 17</div></span>
+  <span class="wk"><div class="n">WK 5</div><div class="dt">Aug 24</div></span>
+  <span class="wk"><div class="n">WK 6</div><div class="dt">Aug 31</div></span>
+  <span class="wk"><div class="n">WK 7</div><div class="dt">Sep 7</div></span>
+  <span class="wk"><div class="n">WK 8</div><div class="dt">Sep 14</div></span>
+  <span class="wk"><div class="n">WK 9</div><div class="dt">Sep 21</div></span>
+  <span class="wk" style="border-style:dashed"><div class="n" style="color:var(--faint)">+ ADD</div></span>
+</div>
+
+<div class="body">
+  <div>
+    <div class="seclbl">Week 1 · Sessions</div>
+    <div class="days">
+
+      <div class="day">
+        <div class="dhead"><span><div class="dow">MON</div><div class="dn d">Day 1</div><div class="wn">Andreea test — Day 1</div></span>
+          <span class="sp"></span><span class="prog">Progression</span><span class="kb">⋮</span></div>
+        <div class="dbody">
+          <div class="blk"><span class="bg" style="background:var(--blue)">A</span>SUPERSET · 3 ROUNDS · REST 2:00</div>
+          <div class="ex"><div class="row"><span class="exb" style="background:var(--blue)">A1</span><span class="nm">Leg Press Wide Stance</span></div>
+            <div class="pr">3 × <b>12/6/6</b> · <span class="pct">75% 1RM</span> · <span class="rir">RIR 10</span> · rest 2:00</div></div>
+          <div class="ex"><div class="row"><span class="exb" style="background:var(--blue)">A2</span><span class="nm">Bulgarian Split Squat</span></div>
+            <div class="pr">3 × <b>6/6/6</b> · <span class="pct">70% 1RM</span> · <span class="rir">RIR 8</span> · rest 2:00</div></div>
+          <div class="ex" style="padding-left:0"><div class="row"><span class="exb" style="background:var(--cyan);margin-left:0">B</span><span class="nm">Romanian Deadlift</span></div>
+            <div class="pr" style="margin-left:26px">4 × <b>12/12/12/12</b> · <span class="pct">60% 1RM</span> · <span class="rir">RIR 8</span></div></div>
+          <div class="ex" style="padding-left:0"><div class="row"><span class="exb" style="background:var(--amber);margin-left:0">C</span><span class="nm">Cable Glute Kickback</span></div>
+            <div class="pr" style="margin-left:26px">2 × <b>10/10</b> · <span class="pct">80% 1RM</span></div></div>
+          <div class="ex" style="padding-left:0"><div class="row"><span class="exb" style="background:var(--purple);margin-left:0">D</span><span class="nm">Jump Rope</span></div>
+            <div class="pr" style="margin-left:26px">4 × <b>30/30/30/30</b> · rest 1:00</div></div>
+          <div class="addex">+ ADD EXERCISE</div>
+        </div>
+      </div>
+
+      <div class="day">
+        <div class="dhead"><span><div class="dow">TUE</div><div class="dn d">Day 2</div><div class="wn">Day 5: Lower 2</div></span>
+          <span class="sp"></span><span class="prog">Progression</span><span class="kb">⋮</span></div>
+        <div class="dbody">
+          <div class="blk"><span class="bg" style="background:var(--blue)">A</span>GIANT SET · 3 ROUNDS</div>
+          <div class="ex"><div class="row"><span class="exb" style="background:var(--blue)">A1</span><span class="nm">CMJ (OVR Jump)</span></div>
+            <div class="pr">3 × <b>10/3/3</b> · 5 kg · Explosive</div></div>
+          <div class="ex"><div class="row"><span class="exb" style="background:var(--blue)">A2</span><span class="nm">Clean-Grip DL to Mid-Thigh</span></div>
+            <div class="pr">3 × <b>4/4/4</b> · Controlled · rest 2:00</div></div>
+          <div class="ex"><div class="row"><span class="exb" style="background:var(--blue)">A3</span><span class="nm">Box Squat (learn tempo)</span></div>
+            <div class="pr">3 × <b>3/3/3</b> · <span class="rir">RIR 5</span> · 4s ECC / 1s pause</div></div>
+          <div class="ex" style="padding-left:0"><div class="row"><span class="exb" style="background:var(--cyan);margin-left:0">B</span><span class="nm">Calf Raise (ecc focus)</span></div>
+            <div class="pr" style="margin-left:26px">3 × <b>12/12/12</b> · 3 sec lower · rest 1:30</div></div>
+          <div class="addex">+ ADD EXERCISE</div>
+        </div>
+      </div>
+
+      <div class="day">
+        <div class="dhead"><span><div class="dow">WED</div><div class="dn d">Day 3</div></span></div>
+        <div class="rest"><div class="t">REST</div>
+          <div class="s">Add a workout to this day, or leave it as recovery.</div>
+          <div class="b"><span class="pri">+ ADD WORKOUT</span><span>INSERT FROM LIBRARY</span></div></div>
+      </div>
+
+      <div class="day">
+        <div class="dhead"><span><div class="dow">THU</div><div class="dn d">Day 4</div><div class="wn">Upper push</div></span>
+          <span class="sp"></span><span class="kb">⋮</span></div>
+        <div class="dbody">
+          <div class="blk"><span class="bg" style="background:var(--blue)">A</span>STRAIGHT · REST 2:00</div>
+          <div class="ex" style="padding-left:0"><div class="row"><span class="exb" style="background:var(--blue);margin-left:0">A</span><span class="nm">Incline DB Press</span></div>
+            <div class="pr" style="margin-left:26px">4 × <b>8/8/8/8</b> · <span class="pct">72% 1RM</span> · <span class="rir">RIR 2</span></div></div>
+          <div class="ex" style="padding-left:0"><div class="row"><span class="exb" style="background:var(--cyan);margin-left:0">B</span><span class="nm">Seated Row</span></div>
+            <div class="pr" style="margin-left:26px">4 × <b>10/10/10/10</b> · <span class="rir">RIR 2</span></div></div>
+          <div class="addex">+ ADD EXERCISE</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- VOLUME RAIL -->
+  <div class="rail">
+    <div class="rtop">
+      <div class="t">Weekly volume</div>
+      <div class="big"><span class="n d">64</span><span class="l">working sets<br>week 1 · 4 sessions</span></div>
+    </div>
+    <div class="rbody">
+
+      <div class="mus ok">
+        <div class="mrow"><span class="nm">Quads</span><span class="v d">14<span class="tg">/ 12–18</span></span></div>
+        <div class="bar"><i style="width:66%"></i><span class="mark" style="left:80%"></span></div>
+        <div class="mst ok">On target</div>
+      </div>
+
+      <div class="mus ok">
+        <div class="mrow"><span class="nm">Hamstrings</span><span class="v d">16<span class="tg">/ 10–16</span></span></div>
+        <div class="bar"><i style="width:80%"></i><span class="mark" style="left:80%"></span></div>
+        <div class="mst ok">On target <em>· top of range</em></div>
+      </div>
+
+      <div class="mus over">
+        <div class="mrow"><span class="nm">Glutes</span><span class="v d">18<span class="tg">/ 10–16</span></span></div>
+        <div class="bar"><i style="width:100%"></i><span class="mark" style="left:80%"></span></div>
+        <div class="mst over">Over <em>· −2 sets</em></div>
+      </div>
+
+      <div class="mus low">
+        <div class="mrow"><span class="nm">Calves</span><span class="v d">3<span class="tg">/ 8–12</span></span></div>
+        <div class="bar"><i style="width:25%"></i><span class="mark" style="left:70%"></span></div>
+        <div class="mst low">Under <em>· +5 sets</em></div>
+      </div>
+
+      <div class="mus low">
+        <div class="mrow"><span class="nm">Chest</span><span class="v d">4<span class="tg">/ 10–16</span></span></div>
+        <div class="bar"><i style="width:25%"></i><span class="mark" style="left:80%"></span></div>
+        <div class="mst low">Under <em>· +6 sets</em></div>
+      </div>
+
+      <div class="mus low">
+        <div class="mrow"><span class="nm">Back</span><span class="v d">8<span class="tg">/ 10–18</span></span></div>
+        <div class="bar"><i style="width:44%"></i><span class="mark" style="left:78%"></span></div>
+        <div class="mst low">Under <em>· +2 sets</em></div>
+      </div>
+
+      <div class="mus ok">
+        <div class="mrow"><span class="nm">Shoulders</span><span class="v d">11<span class="tg">/ 8–14</span></span></div>
+        <div class="bar"><i style="width:79%"></i><span class="mark" style="left:82%"></span></div>
+        <div class="mst ok">On target</div>
+      </div>
+
+    </div>
+    <div class="rfoot">Full breakdown →</div>
+  </div>
+
+</div>
+
+<div class="note">
+  <b>Fixed:</b><br>
+  · <b>No lime.</b> Primary action ("+ Add workout") is the app's blue <code>#2E7BFF</code>, same as every other CTA. Lime doesn't exist as a colour any more.<br>
+  · <b>No grey card fills.</b> Day columns and the volume rail are <b>transparent + hairline</b> — the page's own black shows through, per the surface rule.<br><br>
+  <b>Kept saturated:</b> phase bars (solid teal / orange with glow), progression pills (solid green), block badges, load % in amber, RIR in cyan, and the volume bars in green / amber / orange with glow. The energy is in the accents, not in card fills.</div>
+
+</body></html>

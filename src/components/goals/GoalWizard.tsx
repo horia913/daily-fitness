@@ -7,8 +7,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
+import { X, ChevronLeft } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/toast-provider";
@@ -23,6 +22,7 @@ import { BodyCompositionForm } from "./wizard/BodyCompositionForm";
 import { PerformanceForm } from "./wizard/PerformanceForm";
 import { OutcomeForm } from "./wizard/OutcomeForm";
 import { NutritionForm } from "./wizard/NutritionForm";
+import { cn } from "@/lib/utils";
 
 export interface GoalWizardProps {
   open: boolean;
@@ -30,6 +30,45 @@ export interface GoalWizardProps {
   onSuccess: () => void;
   /** When set, wizard opens on this category's form (user can still go back to pick another). */
   initialCategory?: GoalWizardCategory | null;
+}
+
+function categoryMeta(category: GoalWizardCategory | null): {
+  label: string;
+  eyebrow: string;
+  accent: string;
+} {
+  switch (category) {
+    case "body_composition":
+      return {
+        label: "Body composition",
+        eyebrow: "Body · metrics",
+        accent: "var(--fc-group-d)",
+      };
+    case "performance":
+      return {
+        label: "Performance",
+        eyebrow: "Training · performance",
+        accent: "var(--fc-domain-workouts)",
+      };
+    case "outcome":
+      return {
+        label: "Outcome",
+        eyebrow: "Lifestyle · wellness",
+        accent: "var(--fc-status-warning)",
+      };
+    case "nutrition":
+      return {
+        label: "Nutrition",
+        eyebrow: "Fuel · nutrition",
+        accent: "var(--fc-domain-meals)",
+      };
+    default:
+      return {
+        label: "New goal",
+        eyebrow: "Me · goals",
+        accent: "var(--fc-accent)",
+      };
+  }
 }
 
 export function GoalWizard({
@@ -108,16 +147,7 @@ export function GoalWizard({
     }
   };
 
-  const categoryLabel =
-    category === "body_composition"
-      ? "Body composition"
-      : category === "performance"
-        ? "Performance"
-        : category === "outcome"
-          ? "Outcome"
-          : category === "nutrition"
-            ? "Nutrition"
-            : "";
+  const meta = categoryMeta(step === 1 ? category : null);
 
   return (
     <Dialog
@@ -128,65 +158,97 @@ export function GoalWizard({
     >
       <DialogContent
         showCloseButton={false}
-        className="max-w-lg max-h-[90vh] overflow-y-auto gap-0 p-4 my-4 sm:my-8"
+        className={cn(
+          "fc-modal my-4 max-h-[min(90vh,720px)] w-[calc(100%-1.5rem)] max-w-lg gap-0 overflow-hidden p-0 sm:my-8",
+          "border border-[color:var(--fc-hairline)] bg-[color:var(--fc-bg-deep)]",
+        )}
       >
         <DialogDescription className="sr-only">
           Set up a new goal by choosing a category and entering target details.
         </DialogDescription>
-        <div className="flex justify-between items-start gap-2 mb-4">
-          <div className="min-w-0">
-            <DialogTitle className="text-lg font-semibold fc-text-primary pr-2">
-              {step === 0 ? "New goal" : categoryLabel}
-            </DialogTitle>
+
+        <header
+          className="relative border-b border-[color:var(--fc-hairline)] px-4 pb-3.5 pt-4"
+          style={{ borderLeft: `3px solid ${meta.accent}` }}
+        >
+          <div className="flex items-start gap-2.5 pr-8">
             {step === 1 ? (
-              <p className="text-xs fc-text-dim mt-1">
-                Fill in the details below.
+              <button
+                type="button"
+                onClick={handleBackToCategories}
+                disabled={submitting}
+                className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] border border-[color:var(--fc-hairline)] bg-transparent fc-text-dim transition-colors hover:fc-text-primary disabled:opacity-50"
+                aria-label="Back to categories"
+              >
+                <ChevronLeft className="h-4 w-4" strokeWidth={2} />
+              </button>
+            ) : null}
+            <div className="min-w-0 flex-1">
+              <div className="mb-1 flex items-center gap-1.5">
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ background: meta.accent }}
+                  aria-hidden
+                />
+                <span
+                  className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em]"
+                  style={{ color: meta.accent }}
+                >
+                  {meta.eyebrow}
+                </span>
+              </div>
+              <DialogTitle
+                className="text-[20px] font-bold leading-tight tracking-tight fc-text-primary"
+                style={{ fontFamily: "var(--f-display)" }}
+              >
+                {meta.label}
+              </DialogTitle>
+              <p className="mt-1 text-xs fc-text-dim">
+                {step === 0
+                  ? "Pick a category to continue."
+                  : "Fill in the details below."}
               </p>
-            ) : (
-              <p className="text-xs fc-text-dim mt-1">
-                Pick a category to continue.
-              </p>
-            )}
+            </div>
           </div>
-          <Button
+          <button
             type="button"
-            variant="ghost"
-            size="icon"
-            className="shrink-0 h-8 w-8"
             onClick={handleClose}
+            className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-[8px] border border-[color:var(--fc-hairline)] bg-transparent fc-text-dim transition-colors hover:fc-text-primary"
             aria-label="Close"
           >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
+            <X className="h-4 w-4" strokeWidth={2} />
+          </button>
+        </header>
 
-        {step === 0 ? (
-          <CategoryPicker onPick={handlePickCategory} />
-        ) : category === "body_composition" ? (
-          <BodyCompositionForm
-            onSubmit={handlePayload}
-            onBack={handleBackToCategories}
-            submitting={submitting}
-          />
-        ) : category === "performance" ? (
-          <PerformanceForm
-            onSubmit={handlePayload}
-            onBack={handleBackToCategories}
-            submitting={submitting}
-          />
-        ) : category === "outcome" ? (
-          <OutcomeForm
-            onSubmit={handlePayload}
-            onBack={handleBackToCategories}
-            submitting={submitting}
-          />
-        ) : category === "nutrition" ? (
-          <NutritionForm
-            onSubmit={handlePayload}
-            onBack={handleBackToCategories}
-            submitting={submitting}
-          />
-        ) : null}
+        <div className="max-h-[min(70vh,560px)] overflow-y-auto overscroll-contain px-4 py-4">
+          {step === 0 ? (
+            <CategoryPicker onPick={handlePickCategory} />
+          ) : category === "body_composition" ? (
+            <BodyCompositionForm
+              onSubmit={handlePayload}
+              onBack={handleBackToCategories}
+              submitting={submitting}
+            />
+          ) : category === "performance" ? (
+            <PerformanceForm
+              onSubmit={handlePayload}
+              onBack={handleBackToCategories}
+              submitting={submitting}
+            />
+          ) : category === "outcome" ? (
+            <OutcomeForm
+              onSubmit={handlePayload}
+              onBack={handleBackToCategories}
+              submitting={submitting}
+            />
+          ) : category === "nutrition" ? (
+            <NutritionForm
+              onSubmit={handlePayload}
+              onBack={handleBackToCategories}
+              submitting={submitting}
+            />
+          ) : null}
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useCallback } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -57,7 +57,7 @@ export function CoachClientActivitiesPanel({
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="h-16 rounded-[11px] bg-[color:var(--fc-glass-highlight)] animate-pulse"
+              className="h-16 rounded-[11px] bg-transparent animate-pulse"
             />
           ))}
         </div>
@@ -115,7 +115,7 @@ export function CoachClientActivitiesPanel({
       {showPageHeader && (
         <>
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[color:var(--fc-group-c)] to-blue-600 flex items-center justify-center shadow-lg">
               <Activity className="w-6 h-6 text-white" />
             </div>
             <div>
@@ -130,7 +130,7 @@ export function CoachClientActivitiesPanel({
 
       {!showPageHeader && (
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[color:var(--fc-group-c)] to-blue-600 flex items-center justify-center shadow-lg">
             <Activity className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -142,12 +142,12 @@ export function CoachClientActivitiesPanel({
 
       {!loading && activities.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
-          <GlassCard elevation={1} className="fc-card-shell p-4 text-center">
+          <GlassCard elevation={1} className="rounded-[18px] border border-[color:rgba(255,255,255,0.08)] bg-transparent p-4 text-center">
             <TrendingUp className="w-4 h-4 fc-text-dim mx-auto mb-1" />
             <p className="text-xl font-bold fc-text-primary">{activities.length}</p>
             <p className="text-xs fc-text-dim">Activities</p>
           </GlassCard>
-          <GlassCard elevation={1} className="fc-card-shell p-4 text-center">
+          <GlassCard elevation={1} className="rounded-[18px] border border-[color:rgba(255,255,255,0.08)] bg-transparent p-4 text-center">
             <Clock className="w-4 h-4 fc-text-dim mx-auto mb-1" />
             <p className="text-xl font-bold fc-text-primary">{totalDuration}</p>
             <p className="text-xs fc-text-dim">Total Minutes</p>
@@ -160,7 +160,7 @@ export function CoachClientActivitiesPanel({
           {[1, 2, 3, 4].map((i) => (
             <div
               key={i}
-              className="h-16 rounded-2xl bg-[color:var(--fc-glass-highlight)] animate-pulse"
+              className="h-16 rounded-2xl bg-transparent animate-pulse"
             />
           ))}
         </div>
@@ -225,7 +225,7 @@ export function CoachClientActivitiesPanel({
           })}
         </div>
       ) : (
-        <GlassCard elevation={1} className="fc-card-shell p-12">
+        <GlassCard elevation={1} className="rounded-[18px] border border-[color:rgba(255,255,255,0.08)] bg-transparent p-12">
           <EmptyState
             icon={Activity}
             title="No extra activities"

@@ -1,0 +1,91 @@
+WAVE 4 TAIL — CODE CLEANUP (w4s2)
+Date: 2026-07-13
+Scope: code only — no DB/SQL/git
+
+================================================================================
+1. clientProgressionService.ts — legacy blocks removed (P0)
+================================================================================
+
+A) getExercisePreviousPerformance — Legacy Step 3 REMOVED
+   BEFORE: L546–612 queried workout_exercise_logs + workout_set_details
+   AFTER:  L546–557 goes directly from Step 2 (workout_set_logs) to
+           lastSessionForExerciseOnSameAssignment fallback; L559 returns
+           { lastWorkout, personalBest }.
+
+   Return shape unchanged: Promise<ExercisePreviousPerformance>
+     { lastWorkout: { weight, reps, sets, avgRpe, date, ... } | null,
+       personalBest: { maxWeight, maxReps, date } | null }
+   Fields legacy Step 3 would have filled remain null (tables were empty).
+
+B) getPreviousWeekWorkoutData — RPE legacy fallback REMOVED
+   BEFORE: L871–896 else-if queried workout_exercise_logs → workout_set_details
+   AFTER:  L797–801 uses golden workout_set_logs RPE only; averageRpe stays null
+           when no golden RPE (same as pre-drop empty legacy).
+
+   Return shape unchanged: PreviousWeekData | null (averageRpe, rpeCount, sets, …).
+
+C) Comments updated: header L492–495, JSDoc L674–677 (no legacy table names).
+
+D) Service-wide graveyard check: no other .from() on dropped tables in this file.
+
+================================================================================
+2. Three dead files (P1) — grep proof + delete status
+================================================================================
+
+Pre-delete import grep (src/, static + dynamic + JSX):
+  rg "schedulingService|ComplianceSnapshot|CoachClientSubscriptionSection" src/
+  → ZERO HITS (no imports, no barrels, no tests)
+
+Files:
+  src/lib/schedulingService.ts
+  src/components/coach/ComplianceSnapshot.tsx
+  src/components/coach/client-views/CoachClientSubscriptionSection.tsx
+
+Disposition: ALREADY ABSENT on disk (removed in w4s1 Step 1). Re-verified via
+  Test-Path → False, Read → file not found. No re-delete needed; zero-import
+  proof holds.
+
+================================================================================
+3. Definitive sweep — src/ (ripgrep on disk, 2026-07-13)
+================================================================================
+
+17 graveyard table names + .from('sessions') + 15 dropped RPC names:
+  rg workout_exercise_logs|workout_set_details|…|get_client_compliance src/
+  → ZERO HITS
+
+Additional comment-only cleanups (so sweep stays at zero):
+  src/components/client/workout-execution/types.ts:58
+    comment → workout_set_logs via clientProgressionService
+  src/lib/enrichWorkoutBlocksPrescribedRir.ts:93
+    comment → generic per-assignment overlay (no table name)
+  src/lib/validation/validators.ts:283
+    comment → legacy subscription (no clipcards)
+  src/lib/coachDashboardService.ts:904,906
+    comment → retired subscription field (no clipcards)
+
+================================================================================
+4. canvasSave.ts disposition
+================================================================================
+
+BEFORE L56–61: formatSaveError special-cased FK 23503 when Postgres message
+  contained string 'workout_exercise_assignments' (not a query — error text match).
+
+AFTER L50–58: generic return `[code] message` only. Branch removed — table is
+  graveyarded; special-case was stale and grep-noisy. Live save path unchanged.
+
+================================================================================
+5. tsc --noEmit
+================================================================================
+
+Command: npx tsc --noEmit
+Result:  EXIT 0 (no errors)
+
+================================================================================
+USER BROWSER CHECK (manual)
+================================================================================
+
+1. Popescu → workout start page → console: NO 404 on workout_exercise_logs
+   Previous-performance / PB / targets / coach notes render as before.
+   Start + log one set (regression).
+
+2. /client/progress/leaderboard (Me → Leaderboard) → "Current Champions" section.

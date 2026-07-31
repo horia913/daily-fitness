@@ -1,36 +1,30 @@
 /* Coach Analytics Hub v1 — scoped v6 tokens (match gym-console drawer) */
 .hub {
-  --bg: #07101a;
-  --card: #0e1f2e;
-  --card-2: #0b1824;
-  --card-3: #091420;
-  --line: rgba(255, 255, 255, 0.08);
-  --line-2: rgba(255, 255, 255, 0.05);
-  --t1: #fff;
-  --t2: rgba(255, 255, 255, 0.65);
-  --t3: rgba(255, 255, 255, 0.42);
-  --t4: rgba(255, 255, 255, 0.26);
-  --cyan: #4fe3e8;
-  --cyan-soft: rgba(79, 227, 232, 0.12);
-  --cyan-dim: rgba(79, 227, 232, 0.18);
-  --lime: #c5ff4a;
-  --lime-2: #7fe89a;
-  --lime-soft: rgba(197, 255, 74, 0.14);
-  --critical: #ff5a5f;
-  --critical-soft: rgba(255, 90, 95, 0.12);
-  --warning: #f5c242;
-  --warning-soft: rgba(245, 194, 66, 0.12);
-  --warning-dim: rgba(245, 194, 66, 0.25);
-  --good: #34d399;
-  --good-soft: rgba(52, 211, 153, 0.12);
-  --good-dim: rgba(52, 211, 153, 0.25);
+  --bg: var(--fc-bg-deep);
+  --card: var(--fc-surface-card);
+  --card-2: var(--fc-glass-soft);
+  --card-3: var(--fc-bg-basalt);
+  --line: var(--fc-glass-border);
+  --line-2: var(--fc-hairline);
+  --t1: var(--fc-text-primary);
+  --t2: var(--fc-text-dim);
+  --t3: var(--fc-text-subtle);
+  --t4: var(--fc-text-quaternary);
+  --critical: var(--fc-status-error);
+  --critical-soft: color-mix(in srgb, var(--fc-status-error) 14%, transparent);
+  --warning: var(--fc-status-warning);
+  --warning-soft: color-mix(in srgb, var(--fc-status-warning) 14%, transparent);
+  --warning-dim: color-mix(in srgb, var(--fc-status-warning) 30%, transparent);
+  --good: var(--fc-status-success);
+  --good-soft: color-mix(in srgb, var(--fc-status-success) 14%, transparent);
+  --good-dim: color-mix(in srgb, var(--fc-status-success) 30%, transparent);
   --purple: #a78bfa;
   --purple-soft: rgba(167, 139, 250, 0.12);
   --purple-dim: rgba(167, 139, 250, 0.25);
   --poor-bar: #f59e42;
   --rose: #fb7185;
   --rose-soft: rgba(251, 113, 133, 0.14);
-  color: var(--t1);
+  color: var(--fc-text-primary);
 }
 
 .tabNav {
@@ -63,12 +57,12 @@
   border: 1px solid transparent;
   background: transparent;
   cursor: pointer;
-  font-family: var(--font-geist-sans, Geist, sans-serif);
+  font-family: var(--font-body, ui-sans-serif);
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .tabBtn:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
   color: var(--t1);
 }
 
@@ -92,43 +86,53 @@
 }
 
 .tabActiveCyan {
-  background: var(--cyan-soft);
-  border-color: var(--cyan-dim);
-  color: var(--cyan);
+  background: var(--fc-accent-dim);
+  border-color: var(--fc-accent-glow);
+  color: var(--fc-accent);
 }
 .tabActiveCyan .activeDot {
-  background: var(--cyan);
-  box-shadow: 0 0 8px var(--cyan);
+  background: var(--fc-accent);
+}
+
+/* Solid go-forward blue — Reports active tab (Insights keeps soft cyan) */
+.tabActiveAccentSolid {
+  background: var(--fc-accent);
+  border-color: var(--fc-accent);
+  color: #fff;
+  box-shadow: 0 4px 20px -6px var(--fc-accent-glow);
+}
+.tabActiveAccentSolid .activeDot {
+  background: #fff;
+}
+.tabActiveAccentSolid .tabIcon {
+  opacity: 1;
 }
 
 .tabActiveWarning {
   background: var(--warning-soft);
-  border-color: rgba(245, 194, 66, 0.3);
+  border-color: color-mix(in srgb, var(--warning) 30%, transparent);
   color: var(--warning);
 }
 .tabActiveWarning .activeDot {
   background: var(--warning);
-  box-shadow: 0 0 8px var(--warning);
 }
 
 .tabActivePurple {
   background: var(--purple-soft);
-  border-color: rgba(167, 139, 250, 0.3);
+  border-color: color-mix(in srgb, var(--purple) 30%, transparent);
   color: var(--purple);
 }
 .tabActivePurple .activeDot {
   background: var(--purple);
-  box-shadow: 0 0 8px var(--purple);
 }
 
 .tabActiveGood {
   background: var(--good-soft);
-  border-color: rgba(52, 211, 153, 0.3);
+  border-color: color-mix(in srgb, var(--good) 30%, transparent);
   color: var(--good);
 }
 .tabActiveGood .activeDot {
   background: var(--good);
-  box-shadow: 0 0 8px var(--good);
 }
 
 .hero {
@@ -141,7 +145,11 @@
 }
 
 .heroGoodTint {
-  background: linear-gradient(135deg, var(--card) 0%, rgba(52, 211, 153, 0.04) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--card) 0%,
+    color-mix(in srgb, var(--fc-status-success) 4%, transparent) 100%
+  );
 }
 
 /* Buttons — sticky bar + CTAs */
@@ -157,12 +165,12 @@
   color: var(--t2);
   font-size: 10.5px;
   font-weight: 500;
-  font-family: var(--font-geist-sans, Geist, sans-serif);
+  font-family: var(--font-body, ui-sans-serif);
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 .btnOutline:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
   border-color: var(--line);
   color: var(--t1);
 }
@@ -179,12 +187,12 @@
   gap: 6px;
   padding: 10px 14px;
   border-radius: 11px;
-  border: 1px solid var(--cyan-dim);
-  background: linear-gradient(135deg, var(--cyan) 0%, color-mix(in srgb, var(--cyan) 75%, #0a3a40) 100%);
-  color: #0a1a26;
+  border: 1px solid var(--fc-accent-glow);
+  background: linear-gradient(135deg, var(--fc-accent) 0%, color-mix(in srgb, var(--fc-accent) 75%, #0a3a40) 100%);
+  color: var(--fc-ink);
   font-size: 12.5px;
   font-weight: 600;
-  font-family: var(--font-geist-sans, Geist, sans-serif);
+  font-family: var(--font-body, ui-sans-serif);
   cursor: pointer;
   transition: opacity 0.15s ease, filter 0.15s ease;
 }
@@ -196,7 +204,7 @@
   cursor: not-allowed;
 }
 
-.btnPrimaryLime {
+.btnPrimaryAction {
   display: inline-flex;
   width: 100%;
   align-items: center;
@@ -204,19 +212,19 @@
   gap: 6px;
   padding: 10px 14px;
   border-radius: 11px;
-  border: 1px solid rgba(197, 255, 74, 0.35);
-  background: linear-gradient(135deg, var(--lime) 0%, var(--lime-2) 100%);
-  color: var(--lime-text, #0a1a18);
+  border: 1px solid color-mix(in srgb, var(--fc-accent) 35%, transparent);
+  background: linear-gradient(135deg, var(--fc-accent) 0%, var(--fc-accent) 100%);
+  color: var(--fc-ink);
   font-size: 12.5px;
   font-weight: 600;
-  font-family: var(--font-geist-sans, Geist, sans-serif);
+  font-family: var(--font-body, ui-sans-serif);
   cursor: pointer;
   transition: opacity 0.15s ease, filter 0.15s ease;
 }
-.btnPrimaryLime:hover:not(:disabled) {
+.btnPrimaryAction:hover:not(:disabled) {
   filter: brightness(1.05);
 }
-.btnPrimaryLime:disabled {
+.btnPrimaryAction:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
@@ -241,7 +249,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono, ui-monospace, monospace);
   font-size: 10px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -256,7 +264,7 @@
 }
 
 .heroTitle {
-  font-family: var(--f-headline, "Bricolage Grotesque", sans-serif);
+  font-family: var(--f-headline, ui-sans-serif);
   font-weight: 700;
   font-size: 24px;
   line-height: 1.1;
@@ -269,7 +277,7 @@
   color: var(--t3);
   line-height: 1.4;
   margin-top: 3px;
-  font-family: var(--font-geist-sans, Geist, sans-serif);
+  font-family: var(--font-body, ui-sans-serif);
 }
 
 .controlsRow {
@@ -290,14 +298,15 @@
 }
 
 .statNum {
-  font-family: var(--f-display, "Big Shoulders Display", sans-serif);
+  font-family: var(--f-display, ui-sans-serif);
+  font-stretch: 125%;
   font-weight: 700;
   font-size: 22px;
   line-height: 1;
 }
 
 .statLabel {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono, ui-monospace, monospace);
   font-size: 9.5px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -328,14 +337,14 @@
 }
 
 .sectionTitle {
-  font-family: var(--f-headline, "Bricolage Grotesque", sans-serif);
+  font-family: var(--f-headline, ui-sans-serif);
   font-weight: 600;
   font-size: 15px;
   color: var(--t1);
 }
 
 .sectionMeta {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono, ui-monospace, monospace);
   font-size: 10px;
   letter-spacing: 0.06em;
   color: var(--t4);

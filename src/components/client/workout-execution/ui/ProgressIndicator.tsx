@@ -28,7 +28,7 @@ export function SetProgressIndicator({
         <Eyebrow as="span" tone="dim" density="section" className="!mb-0">
           {label} {current} of {total}
         </Eyebrow>
-        <span className="text-xs font-bold font-mono text-cyan-400 tabular-nums">
+        <span className="text-xs font-bold font-mono text-[color:var(--fc-group-c)] tabular-nums">
           {Math.round(percentage)}%
         </span>
       </div>
@@ -58,7 +58,7 @@ export function SetProgressIndicator({
           <Progress
             value={percentage}
             className="h-2 bg-[color:var(--fc-surface-sunken)]"
-            indicatorClassName="bg-gradient-to-r from-cyan-600 to-cyan-400"
+            indicatorClassName="bg-gradient-to-r from-[color-mix(in_srgb,var(--fc-group-c)_75%,black)] to-[color:var(--fc-group-c)]"
           />
         ))}
     </div>

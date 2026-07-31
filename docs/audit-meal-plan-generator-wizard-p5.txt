@@ -1,0 +1,319 @@
+# AUDIT (READ-ONLY) — MEAL PLAN GENERATOR WIZARD (for P5 reskin)
+**Date:** 2026-07-05  
+**Scope:** Current-state map only. No code changes. No mockup exists for this screen.
+
+---
+
+## PART 1 — Location & the logic boundary
+
+### Route(s) and entry
+
+| Item | Detail |
+|------|--------|
+| **Route** | `/coach/nutrition/generator` |
+| **Page file** | `src/app/coach/nutrition/generator/page.tsx` (~1297 lines, single file) |
+| **Entry type** | **Full-page route** (not a modal) |
+| **Entry points (confirmed)** | 1) `CoachNutritionWorkspace` header — `Link href="/coach/nutrition/generator"` with `styles.ghostBtn` (`src/components/coach/nutrition/CoachNutritionWorkspace.tsx` L130). 2) Coach menu — `{ title: "Generator", href: "/coach/nutrition/generator" }` (`src/app/coach/menu/page.tsx` L61). P3 did **not** remove or redirect this route. |
+
+There is **no client picker** in the wizard. The three steps are **Targets → Food Rules → Review** (confirmed in code: `stepLabels = ["Targets", "Food Rules", "Review"]`, L599).
+
+### Top-level and sub-components
+
+Everything is defined **inline in the page file** — no separate generator component folder, no module CSS file.
+
+| Symbol | Location | Role |
+|--------|----------|------|
+| `GeneratorPage` (default export) | `page.tsx` L359 | Main wizard shell + all step state/handlers |
+| `StepIndicator` | `page.tsx` L139 | Numbered circle per step |
+| `MacroBar` | `page.tsx` L159 | Deviation progress bar (review summary) |
+| `FoodSearchBox` | `page.tsx` L184 | Portal-based food search (exclude/required lists) |
+| `FoodRow` | `page.tsx` L302 | Table row for generated food (portion ±, swap) |
+
+**Shared UI primitives used (not generator-owned):**
+- `ProtectedRoute`, `AnimatedBackground`, `FloatingParticles`, `CoachPageShell`
+- `GlassCard`, `Button`, `Input`, `Label` (shadcn + fc-* classes)
+- `useAuth`, `useTheme`, `useToast`, `fetchApi`, direct `supabase` client (presets + food search only)
+
+### Presentation / logic line
+
+#### OFF-LIMITS — generation logic (P5 must not touch)
+
+| File / symbol | Role |
+|---------------|------|
+| **`src/lib/mealPlanGeneratorService.ts`** | Core engine: types (`GeneratorConfig`, `GeneratorResult`, …), `autoMacros`, `calculateMacroTargets`, **`generateMealPlanWithClient`**, `generateMealPlan`, `validateGeneratorConfig`, `getSwapAlternatives`, `recalculateTotals`, `swapFood`, `adjustPortion`, **`saveGeneratedPlan`**, template filling, scoring, DB writes |
+| **`src/app/api/coach/nutrition/generate/route.ts`** | **POST `/api/coach/nutrition/generate`** — auth, `validateGeneratorConfig`, calls `generateMealPlanWithClient`, returns `{ result, foodsBySlot }` |
+| **`src/lib/apiClient.ts`** (`fetchApi`) | Transport only — used by page to call API; not reskin surface |
+
+#### RESKIN SURFACE — presentation only (P5 may change)
+
+| File / area | Role |
+|-------------|------|
+| **`src/app/coach/nutrition/generator/page.tsx`** | Entire wizard UI: layout, steps, inline sub-components, swap modal overlay, loading/error states, handler **wiring** (calls into logic; handlers themselves stay, styling around them changes) |
+| **Imports used for chrome only** | `CoachPageShell`, `GlassCard`, `Button`, `Input`, `Label`, Lucide icons — restyle usage, not component source (unless shared primitive updates are scoped elsewhere) |
+
+#### Borderline (presentation-adjacent — restyle OK, behavior frozen)
+
+- **`FoodSearchBox`** — direct `supabase.from("foods").select(...)` for autocomplete (L225). Presentation-owned data fetch; restyle dropdown/portal, do not change query contract.
+- **Step 2 preset load** — `supabase.from("restriction_presets")` (L419). Same.
+- **Handler functions in page** — `runGeneration`, `handleGoToReview`, `handleSave`, `handleAdjust`, `handleSwap`, `handleSwapConfirm`, `cancelGeneration`. These orchestrate logic calls + local React state. P5 restyles what they render; do not change `GeneratorConfig` shape, API payload, or save merge logic.
+
+---
+
+## PART 2 — The 3 steps
+
+### Step 1 — Targets (`step === 1`)
+
+**Purpose:** Name the plan and set daily macro/structure targets.
+
+**Controls:**
+- Plan name — text `Input` (optional; defaults to "Generated Meal Plan" at generation)
+- Daily calories — number `Input` (required, min 800, max 6000; default 2000)
+- Macro mode — toggle pills: **Auto-Calculate** | **Manual**
+  - Auto: read-only grid showing `autoMacros(targetKcal)` protein/carbs/fat/fiber in bordered mini-cards
+  - Manual: four number inputs + kcal-sum validation banner (success/warning with CheckCircle2/AlertTriangle)
+- Meals / day — `<select>` 3–6 (default 4)
+- Options / meal — `<select>` 1–3 (default 3)
+- **Next** — `setStep(2)`; disabled if `targetKcal < 800`
+
+**No Generate on step 1.** No client assignment.
+
+---
+
+### Step 2 — Food Rules (`step === 2`)
+
+**Purpose:** Dietary constraints, meal-style preferences, food include/exclude lists.
+
+**Controls (four `GlassCard` sections + footer bar):**
+
+1. **Dietary Restrictions** — checkbox-style preset buttons from `restriction_presets` table; derives `excludedTags`; shows tag chips when selected. Loading spinner until `sessionReady` + presets load.
+
+2. **Meal Styles** — per-type `<select>` from `MEAL_STYLE_OPTIONS` constant:
+   - Breakfast, Lunch, Dinner always
+   - Snack only if `mealCount >= 4`
+   - Values map to generator `breakfastStyle` / `lunchStyle` / etc.
+
+3. **Exclude Specific Foods** — `FoodSearchBox` + removable pill chips (error-colored)
+
+4. **Required Foods** — `FoodSearchBox` + removable pill chips (success-colored)
+
+**Footer:** **Back** → step 1 | **Generate Plan** (Sparkles icon) → `handleGoToReview()`
+
+**Generate trigger:** `handleGoToReview` sets `step(3)` and immediately calls `runGeneration()` (L531–534). There is no separate "review before generate" — generation starts on entering step 3.
+
+---
+
+### Step 3 — Review (`step === 3`)
+
+**Purpose:** Show generation progress, errors, editable preview, save.
+
+**States (mutually rendered sections):**
+
+| State | UI |
+|-------|-----|
+| **Generating** (`generating === true`) | Centered `GlassCard`: Loader2 in cyan-tinted circle, copy "Generating your meal plan…", subtext, **Cancel** button (`cancelGeneration`) |
+| **Error** (`!generating && generationError`) | Error card with split message lines, **Back** (step 2), **Retry** (`runGeneration`) |
+| **Success** (`!generating && result`) | Summary card + expandable meal cards + bottom action bar |
+
+**Review / edit UI (on success):**
+- Summary: plan name, raw-portions notice (emoji badge), tolerance pill, kcal + fiber pills, **Regenerate** + **Save Plan** (top)
+- `MacroBar` ×4 (protein/carbs/fat/fiber vs targets)
+- Warning list (if `result.warnings`)
+- Per-meal `GlassCard`: accordion header (meal index badge, name, per-meal target line, option kcal)
+  - Expanded: option tabs (if >1 option), template name, **HTML table** of foods via `FoodRow` (portion ±5g, swap icon), totals row, per-macro deviation pills
+- Bottom bar: **Back to Rules**, **Regenerate**, **Save Plan**
+
+**Save:** `handleSave` merges `localOptions` into `result`, calls **`saveGeneratedPlan(mergedResult, user.id)`**, toast, `router.push(/coach/nutrition/meal-plans/${planId})`.
+
+**Post-save edits before save:** `adjustPortion` / `swapFood` (client-side via service helpers) + swap modal listing `getSwapAlternatives(...)`.
+
+**Loading/streaming:** **No streaming.** Single POST, blocking spinner until JSON returns or 60s abort. Cancel sets `cancelledRef` and shows error string (does not abort fetch server-side — UI-only cancel).
+
+---
+
+## PART 3 — Shell & layout
+
+### Overall structure
+
+```
+ProtectedRoute (coach)
+  AnimatedBackground
+    [FloatingParticles — opt-in]
+    CoachPageShell (default-5xl, px-4 sm:px-6)
+      Header row: h1 "Meal plan generator" + text Back link → /coach/nutrition
+      Step nav bar: 3 × (StepIndicator + label) + hairline connectors (sm+)
+      Step content (conditional step 1 | 2 | 3)
+      Swap modal (fixed overlay, conditional)
+```
+
+**Not a modal wizard.** Full route with stacked card sections.
+
+### Width treatment
+
+| Surface | Shell variant | Effective width |
+|---------|---------------|-----------------|
+| **Generator (current)** | `CoachPageShell widthVariant="default-5xl"` + `px-4 sm:px-6` | **max-w-5xl (~1024px)** — centered column |
+| Nutrition workspace | `data-7xl` | max-w-7xl (1280px) |
+| Plan builder (post P2 follow-up) | `canvas-full` | full viewport, page-level gutters |
+
+**Finding:** Generator is **narrower than both** the nutrition workspace and the full-width builder. Step 3's food table will feel cramped on wide monitors relative to peer surfaces. P5 should decide: `canvas-full` (match builder station) or `data-7xl` (match workspace) — not stay on `default-5xl` unless intentional form-wizard narrowness (`form-2xl` is even narrower per 95-STANDARD).
+
+### Step indicator
+
+**Current:** Horizontal **numbered circles** (1–3) with checkmark when complete; active step = filled `--fc-accent-cyan` circle; inactive = `--fc-glass-border`. Labels "Targets / Food Rules / Review" in `text-xs font-medium` beside each circle. Between steps on `sm+`: flex `h-px` hairline connectors.
+
+**Not** tabs, not a progress bar, not mono uppercase stepper like mockup `.mono` chips. This is custom inline JSX — primary wizard chrome needing system-native treatment.
+
+---
+
+## PART 4 — Current presentation vs the system (off-system worklist)
+
+Ground truth: Phase A tokens in `src/styles/ui-system.css` (`--fc-accent` #2E7BFF, `--fc-hairline`, `--f-display`, `--f-mono`), open patterns in `design/mockups/coach-02-nutrition.html` (open tables, hairlines, no grey cards) and `coach-05-plan-builder.html` (macro strip, badge·name·mono line, group chrome for options).
+
+### What already uses Phase A tokens (partial credit)
+
+- Most text colors via `var(--fc-text-primary|dim|…)` Tailwind arbitrary values
+- Status semantics via `--fc-status-success|warning|error` for deviation coloring
+- Root route tree matches standard: `ProtectedRoute` → `AnimatedBackground` → `CoachPageShell`
+- `fc-btn fc-btn-primary|secondary` on main CTAs
+- No module-CSS island file for generator (all inline Tailwind in page.tsx)
+- No raw hex in generator page (confirmed grep)
+- No Big Shoulders / Bricolage / Geist font references in this file
+
+### Off-system worklist (concrete, file = `src/app/coach/nutrition/generator/page.tsx` unless noted)
+
+#### Layout / surfaces (boxes vs open-by-default)
+
+| # | Issue | Location | System target |
+|---|-------|----------|---------------|
+| 1 | **Every step wrapped in `GlassCard elevation={2} fc-card-shell`** — elevated grey cards | Step 1 L640; Step 2 L776,835,897,927,956; Step 3 L977,993,1022,1099,1219; swap modal L1245 | Open content on background + `--fc-hairline` separators (coach-02 / coach-05) |
+| 2 | Auto-macro readout uses **bordered mini-tiles** (`fc-surface border rounded-xl p-3`) | L694–700 | Open stat/mono line or macro-strip grammar |
+| 3 | Step 3 meal review uses **accordion GlassCards** with tinted index badge boxes | L1099–1214 | Plan builder `MealListDisplay` row grammar (badge · name · mono data line, group chrome for options) |
+| 4 | Step 3 food layout is **HTML `<table>`** with bordered rows | L1155–1190 | Builder food rows / hairline list (see `mealDisplay.module.css`) |
+
+#### Width / shell
+
+| # | Issue | Location | System target |
+|---|-------|----------|---------------|
+| 5 | **`default-5xl`** shell — narrower than workspace and builder | L605 | `canvas-full` or `data-7xl` + workspace gutters; align with nutrition editing surfaces |
+
+#### Typography
+
+| # | Issue | Location | System target |
+|---|-------|----------|---------------|
+| 6 | Page title `text-lg font-semibold` — generic, not Archivo display | L608 | `styles.h1` / `var(--f-display)` like workspace L32–40 in `coachNutritionWorkspace.module.css` |
+| 7 | Back link plain `text-xs font-medium` — not mono uppercase eyebrow | L611–617 | JetBrains mono back link like builder `.back` (`mealDisplay.module.css` `.back`) |
+| 8 | Section headings `text-sm font-semibold` — no display/mono label hierarchy | Throughout | Archivo section titles + JetBrains mono labels (mockup `.sect`, `.mono`, `.th`) |
+| 9 | Table headers `uppercase tracking-wide` but **Inter default**, not `--f-mono` | L1159–1165 | JetBrains mono column headers |
+| 10 | Portion values use `font-mono` (good) but most numeric data does not | L327 vs L338–341 | Consistent `--f-mono` for all macro/qty data lines |
+
+#### Inputs (bordered vs borderless)
+
+| # | Issue | Location | System target |
+|---|-------|----------|---------------|
+| 11 | shadcn `Input` with **border + rounded** (`border-[color:var(--fc-glass-border)]`) | L646–664, L713–718 | Borderless underline / hairline-bottom (workspace `.search`, builder inline inputs) |
+| 12 | `FoodSearchBox` native `<input>` — **rounded-xl bordered box** | L283–293 | Borderless search row with bottom hairline |
+| 13 | Native `<select>` elements — bordered rounded boxes | L736–752, L845–890 | System select/chip pattern or underline variant |
+| 14 | Macro mode toggle — **filled cyan pills** + bordered inactive | L672–683 | System `.chip` / ghost pattern (coach-02 L34–36) |
+
+#### Accent / legacy token usage
+
+| # | Issue | Location | System target |
+|---|-------|----------|---------------|
+| 15 | Heavy use of **`--fc-accent-cyan`** for active/hover/focus | StepIndicator L149, macro pills L677, tabs L1138, etc. | Canonical **`--fc-accent`** (same hex in ui-system.css but naming + pairing with `--fc-accent-glow` for CTA only) |
+| 16 | Hover states use **`--fc-aurora`** (`hover:bg-[color:var(--fc-aurora)]/5`) | L267,312,345,1103, etc. | **`--fc-aurora` is not defined** in `ui-system.css` (grep: no `--fc-aurora:`) — dead/legacy token; replace with system hover mix |
+| 17 | Raw-portions badge uses **`--fc-accent-green` / `--fc-aurora-green`** | L1029 | Semantic success pill or mono chip; avoid extra green accent axis |
+| 18 | **`--fc-glass-border`** used for dividers | Many | Prefer **`--fc-hairline`** for open layout rhythm (mockups + builder) |
+
+#### Buttons / glow budget
+
+| # | Issue | Location | System target |
+|---|-------|----------|---------------|
+| 19 | **`fc-btn-primary` on Regenerate** (secondary action) | L1053, L1225 | Ghost/secondary only; **glow budget = Generate Plan + Save Plan** |
+| 20 | Loading state: decorative **cyan aurora circle** behind spinner | L978–979 | Minimal loading row; no faux-glow ornament |
+| 21 | Workspace enters generator via **`ghostBtn`** (correct); generator's own CTAs don't match that ghost/primary split styling | Compare workspace L58–94 vs page buttons | Reuse `coachNutritionWorkspace.module.css` ghost/primary classes or equivalent |
+
+#### Step indicator (wizard-specific)
+
+| # | Issue | Location | System target |
+|---|-------|----------|---------------|
+| 22 | **Numbered filled circles** (success green when done, cyan when active) | L139–156, L620–634 | System-native stepper: mono uppercase labels, hairline progress, single accent — not traffic-light step circles |
+| 23 | Connectors are plain `h-px bg-glass-border` | L630 | Hairline step rail matching mockup tab/step patterns |
+
+#### Inline styles / portal dropdown
+
+| # | Issue | Location | System target |
+|---|-------|----------|---------------|
+| 24 | `FoodSearchBox` dropdown uses **inline `style={{}}`** with rgba fallbacks, blur, box-shadow | L207–214, L245–254, L266 | CSS module or token-only classes; no raw `rgba(0,0,0,0.6)` / `boxShadow: "0 20px 60px..."` |
+| 25 | Swap modal overlay **`bg-black/60 backdrop-blur-sm`** | L1244 | System modal scrim token if one exists; avoid ad-hoc black/60 |
+
+#### Option tabs / review chrome
+
+| # | Issue | Location | System target |
+|---|-------|----------|---------------|
+| 26 | Option switcher = **underline tabs with cyan accent** | L1131–1145 | Builder group chrome (tinted left rule + sub-rows per coach-05) |
+| 27 | Meal index badge = **rounded-xl cyan-tint box** | L1106–1108 | Sanctioned hue badge sequence (A/B/C/D) from builder |
+
+#### Misc presentation
+
+| # | Issue | Location | System target |
+|---|-------|----------|---------------|
+| 28 | Emoji in UI (🥩, 🌾, ✓, ⚠, ★) | L1029–1034, L1047, L1274 | Lucide icons + mono pills (system law) |
+| 29 | Restriction presets use **custom checkbox buttons in bordered tiles** | L799–817 | Chip/toggle pattern from workspace filters |
+| 30 | `FloatingParticles` enabled on generator | L604 | Workspace/builder omit particles on data surfaces — consider dropping for coherence |
+
+#### Shared primitives (note for P5, change usage not necessarily source)
+
+- `GlassCard` + `fc-card-shell` — prescription shell; contradicts open-by-default nutrition mockups when used as page sections
+- shadcn `Input` / `Label` — default bordered styling propagates off-system look
+
+---
+
+## PART 5 — Reskin vs redesign judgment
+
+### Verdict: **Cleanly reskinnable** — structure is sound; primary work is tokens + chrome + alignment with nutrition surfaces.
+
+**Why reskin (not redesign):**
+- The **3-step flow is logical** and matches coach mental model: targets → constraints → generate/review/save.
+- **Step boundaries and validation gates are clear** (kcal min on Next; Generate only from step 2; review states are well-separated).
+- **Logic is already extracted** to `mealPlanGeneratorService.ts` + API route; the page is a fat but coherent view layer.
+- No fundamental UX conflict with the design system — the mockups describe **how** nutrition content should look, not a different wizard paradigm.
+
+**What pushes toward “presentation refactor” (still not a full redesign):**
+- Step 3 review **layout grammar diverges** from the plan builder (table + GlassCard accordion vs badge·name·mono + macro strip). Matching builder display components (`PlanMacroStrip`, meal row patterns from `meal-display/`) is **structural presentation work**, but can be done **without touching generation/save logic** — reuse read-only/display components with existing adjust/swap handlers wired to the same props.
+- **Monolithic single file** (~1300 lines) makes reskin tedious but is an organization concern, not a behavior change. P5 can restyle in place or extract presentational sub-components — either is reskin if handlers/config/save path stay frozen.
+
+**Load-bearing tangles (restyle carefully — do not “fix” behavior in P5):**
+| Area | Risk |
+|------|------|
+| `FoodSearchBox` portal positioning | Clipping fix depends on `fixed` + `getBoundingClientRect`; restyle dropdown shell without changing open/close/blur timing |
+| `handleGoToReview` = step 3 + immediate `runGeneration` | UI must keep this coupling; don’t add a “review config” interstitial without product sign-off |
+| `localOptions` merge before `saveGeneratedPlan` | Save path must still merge edits; restyle table rows only |
+| `getSwapAlternatives` rendered in swap modal map | Keep slotType/foodId inputs identical |
+| 60s `AbortController` + `cancelledRef` | Loading UI only; don’t change timeout semantics |
+
+**Not P5 (logic observations only):**
+- `requiredFoodIds` collected in UI but **unused in generator engine** (documented in `MEAL_PLAN_GENERATOR_AUDIT.md`). Reskin should keep the Required Foods UI unless product removes it separately.
+
+### Recommended P5 approach
+
+1. **Reskin in place** on `page.tsx` (or extract presentational components into `src/components/coach/nutrition/generator/` — presentation only).
+2. **Align shell width** with builder (`canvas-full`) or workspace (`data-7xl`).
+3. **Replace GlassCard stacks** with open sections + hairlines; borrow classes from `coachNutritionWorkspace.module.css` and `mealDisplay.module.css`.
+4. **Step 3:** Consider reusing `PlanMacroStrip` + meal row patterns for coherence with `/coach/nutrition/meal-plans/[id]` — still reskin if handlers unchanged.
+5. **Glow budget:** primary glow on **Generate Plan** and **Save Plan** only.
+6. **No mockup required** for product sign-off if P5 follows coach-02 + coach-05 patterns; optional lightweight mockup only if step indicator treatment needs stakeholder preview.
+
+---
+
+## Appendix — quick reference
+
+| Question | Answer |
+|----------|--------|
+| Client picker? | **No** |
+| Modal or route? | **Full route** `/coach/nutrition/generator` |
+| API route | `POST /api/coach/nutrition/generate` |
+| Generate when? | Step 2 **Generate Plan** → step 3 + API call |
+| Save when? | Step 3 **Save Plan** → `saveGeneratedPlan` → redirect to builder |
+| Module CSS? | **None** (all inline Tailwind in page) |
+| Generator mockup? | **None** in `design/mockups/` |
+| Prior audit | `MEAL_PLAN_GENERATOR_AUDIT.md` (logic pipeline, Mar 2026) — complementary, not UI |

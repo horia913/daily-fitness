@@ -8,10 +8,10 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        primary: '#3B82F6', // Action Blue
-        secondary: '#E2E8F0', // slate-200
-        accent: '#F59E0B', // Celebration Gold
-        destructive: '#EF4444', // Delete actions
+        primary: '#2E7BFF',
+        secondary: '#1B1E24',
+        accent: '#2E7BFF',
+        destructive: '#FF5A4D',
       },
     },
   },

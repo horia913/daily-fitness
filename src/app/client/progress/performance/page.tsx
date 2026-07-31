@@ -1,138 +1,110 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  useCallback,
+} from "react";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "@/contexts/ThemeContext";
-import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
-import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { ArrowLeft, Timer, Plus, HeartPulse } from "lucide-react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import {
-  getClientPerformanceTests,
-  PerformanceTest,
+  fetchActivePerformanceCatalog,
+  fetchClientPerformanceResults,
+  getRosterPerformanceRank,
+  deletePerformanceResult,
+  formatResultValue,
+  formatCategoryLabel,
+  groupCatalogByCategory,
+  improvementPercent,
+  isCoachTested,
+  isImprovement,
+  isSelfLogged,
+  sparkBarFraction,
+  type PerformanceTestCatalogItem,
+  type PerformanceTestResult,
+  type RosterPerformanceRank,
 } from "@/lib/performanceTestService";
 import { LogPerformanceTestModal } from "@/components/client/LogPerformanceTestModal";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { ClientPageShell } from "@/components/client-ui";
+import { ClientPageShell, ConfirmActionDialog } from "@/components/client-ui";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
+import { PsHero, PsSectionEyebrow } from "@/components/client/progress-suite";
+import ps from "@/components/client/progress-suite/progressSuiteV1.module.css";
+import { useToast } from "@/components/ui/toast-provider";
+import { cn } from "@/lib/utils";
 
-type TestType = "1km_run" | "step_test";
-
-function formatRunTime(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+function formatShortDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
-function formatRunTimeForTrend(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins}:${secs.toString().padStart(2, "0")}s`;
-}
-
-function getTrendPercent(
-  tests: PerformanceTest[],
-  type: TestType
-): number | null {
-  if (tests.length < 2) return null;
-  const latest = tests[0];
-  const previous = tests[1];
-  if (type === "1km_run") {
-    const a = latest.time_seconds;
-    const b = previous.time_seconds;
-    if (a == null || b == null || b === 0) return null;
-    return Math.round(((b - a) / b) * 1000) / 10;
-  }
-  const a = latest.recovery_score;
-  const b = previous.recovery_score;
-  if (a == null || b == null || b === 0) return null;
-  return Math.round(((b - a) / b) * 1000) / 10;
-}
-
-function getImprovement(
-  tests: PerformanceTest[],
-  type: TestType
-): string | null {
-  if (tests.length < 2) return null;
-  const latest = tests[0];
-  const previous = tests[1];
-  if (type === "1km_run") {
-    const a = latest.time_seconds;
-    const b = previous.time_seconds;
-    if (a == null || b == null) return null;
-    const diff = a - b;
-    if (diff === 0) return "—";
-    const sign = diff < 0 ? "-" : "+";
-    return `${sign}${formatRunTimeForTrend(Math.abs(diff))} ${diff < 0 ? "↓" : "↑"}`;
-  }
-  const a = latest.recovery_score;
-  const b = previous.recovery_score;
-  if (a == null || b == null) return null;
-  const diff = a - b;
-  if (diff === 0) return "—";
-  const sign = diff < 0 ? "-" : "+";
-  return `${sign}${Math.abs(diff)} BPM ${diff < 0 ? "↓" : "↑"}`;
-}
-
-function getHistoryTrend(
-  current: PerformanceTest,
-  previous: PerformanceTest | undefined,
-  type: TestType
-): string {
-  if (!previous) return "—";
-  if (type === "1km_run") {
-    const a = current.time_seconds;
-    const b = previous.time_seconds;
-    if (a == null || b == null) return "—";
-    const diff = a - b;
-    if (diff === 0) return "—";
-    const sign = diff < 0 ? "" : "+";
-    return `${sign}${formatRunTimeForTrend(Math.abs(diff))}`;
-  }
-  const a = current.recovery_score;
-  const b = previous.recovery_score;
-  if (a == null || b == null) return "—";
-  const diff = a - b;
-  if (diff === 0) return "—";
-  const sign = diff < 0 ? "" : "+";
-  return `${sign}${diff} BPM`;
+function CoachTestedTag({ testedAt }: { testedAt: string }) {
+  return (
+    <span
+      className="inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+      style={{
+        borderColor: "color-mix(in srgb, var(--fc-accent) 45%, transparent)",
+        color: "var(--fc-accent)",
+      }}
+    >
+      Coach tested · {formatShortDate(testedAt)}
+    </span>
+  );
 }
 
 function PerformancePageContent() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const { performanceSettings } = useTheme();
+  const { addToast } = useToast();
 
-  const [runTests, setRunTests] = useState<PerformanceTest[]>([]);
-  const [stepTests, setStepTests] = useState<PerformanceTest[]>([]);
+  const [catalog, setCatalog] = useState<PerformanceTestCatalogItem[]>([]);
+  const [results, setResults] = useState<PerformanceTestResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedTestId, setSelectedTestId] = useState<string | null>(null);
   const [showLogModal, setShowLogModal] = useState(false);
-  const [selectedType, setSelectedType] = useState<TestType>("1km_run");
+  const [editResult, setEditResult] = useState<PerformanceTestResult | null>(
+    null,
+  );
+  const [pendingDelete, setPendingDelete] =
+    useState<PerformanceTestResult | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [rosterRank, setRosterRank] = useState<RosterPerformanceRank>({
+    kind: "unavailable",
+  });
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadData = useCallback(async () => {
     if (!user?.id) return;
     setLoading(true);
     setLoadError(null);
-    setLoadingStartedAt(Date.now());
     try {
-      const [run, step] = await Promise.all([
-        getClientPerformanceTests(user.id, "1km_run"),
-        getClientPerformanceTests(user.id, "step_test"),
+      const [cat, rows] = await Promise.all([
+        fetchActivePerformanceCatalog(),
+        fetchClientPerformanceResults(user.id),
       ]);
-      setRunTests(run);
-      setStepTests(step);
+      setCatalog(cat);
+      setResults(rows);
+      setSelectedTestId((prev) => {
+        if (prev && cat.some((c) => c.id === prev)) return prev;
+        return cat[0]?.id ?? null;
+      });
     } catch (err) {
       console.error("Error loading performance tests:", err);
-      setLoadError(err instanceof Error ? err.message : "Failed to load performance data");
-      setRunTests([]);
-      setStepTests([]);
+      setLoadError(
+        err instanceof Error ? err.message : "Failed to load performance data",
+      );
+      setResults([]);
     } finally {
       setLoading(false);
-      setLoadingStartedAt(null);
     }
   }, [user]);
 
@@ -158,330 +130,486 @@ function PerformancePageContent() {
     };
   }, [loadData, user, authLoading]);
 
-  const currentTests = selectedType === "1km_run" ? runTests : stepTests;
-  const runTrendPercent = getTrendPercent(runTests, "1km_run");
-  const stepTrendPercent = getTrendPercent(stepTests, "step_test");
-  const improvement = getImprovement(currentTests, selectedType);
+  const selectedTest = useMemo(
+    () => catalog.find((c) => c.id === selectedTestId) ?? null,
+    [catalog, selectedTestId],
+  );
+
+  const currentTests = useMemo(() => {
+    if (!selectedTestId) return [];
+    return results.filter((r) => r.test_id === selectedTestId);
+  }, [results, selectedTestId]);
+
+  const groups = useMemo(() => groupCatalogByCategory(catalog), [catalog]);
+
   const latest = currentTests[0];
+  const previous = currentTests[1];
+  const direction = selectedTest?.direction ?? "higher_better";
+
+  const trendPct =
+    latest && previous
+      ? improvementPercent(
+          Number(latest.result_value),
+          Number(previous.result_value),
+          direction,
+        )
+      : null;
+
+  useEffect(() => {
+    if (!user?.id || !selectedTestId) return;
+    let cancelled = false;
+    (async () => {
+      const rank = await getRosterPerformanceRank(user.id, selectedTestId);
+      if (!cancelled) setRosterRank(rank);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, selectedTestId, currentTests]);
+
+  const sparkValues = useMemo(() => {
+    return [...currentTests]
+      .reverse()
+      .map((t) => Number(t.result_value))
+      .filter((v) => Number.isFinite(v));
+  }, [currentTests]);
+
+  const confirmDelete = async () => {
+    if (!pendingDelete || !user?.id) return;
+    if (!isSelfLogged(pendingDelete)) {
+      addToast({
+        title: "Can't delete coach-tested results",
+        variant: "destructive",
+      });
+      setPendingDelete(null);
+      return;
+    }
+    setDeleting(true);
+    try {
+      await deletePerformanceResult(pendingDelete.id);
+      addToast({ title: "Test deleted", variant: "success" });
+      setPendingDelete(null);
+      void loadData();
+    } catch {
+      addToast({ title: "Failed to delete test", variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const rosterRankLabel = (() => {
+    if (rosterRank.kind === "solo") return "Only result so far";
+    if (rosterRank.kind === "ranked") {
+      return `#${rosterRank.rank} of ${rosterRank.total}`;
+    }
+    return "—";
+  })();
 
   if (loadError) {
     return (
-      <ProtectedRoute requiredRole="client">
-        <AnimatedBackground>
-          {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
-            <div className="fc-card-shell p-4 text-center">
-              <p className="text-sm text-[color:var(--fc-text-dim)] mb-3">{loadError}</p>
-              <button type="button" onClick={() => { setLoadError(null); loadData(); }} className="fc-btn fc-btn-secondary fc-press h-10 px-4 text-sm">Retry</button>
-            </div>
-          </ClientPageShell>
-        </AnimatedBackground>
-      </ProtectedRoute>
+      <ClientPageShell
+        className={cn(ps.psV1, "mx-auto max-w-lg lg:max-w-3xl px-4 pb-[var(--fc-bottom-safe-area)] pt-4")}
+      >
+        <div className="py-8 text-center">
+          <p className="mb-3 text-sm" style={{ color: "var(--ps-t2)" }}>
+            {loadError}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setLoadError(null);
+              void loadData();
+            }}
+            className="text-sm font-medium"
+            style={{ color: "var(--fc-accent)" }}
+          >
+            Retry
+          </button>
+        </div>
+      </ClientPageShell>
     );
   }
 
   if (authLoading || loading) {
     return (
-      <ProtectedRoute requiredRole="client">
-        <AnimatedBackground>
-          {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
-            <PageSkeleton variant="dashboard" />
-          </ClientPageShell>
-        </AnimatedBackground>
-      </ProtectedRoute>
+      <ClientPageShell
+        className={cn(ps.psV1, "mx-auto max-w-lg lg:max-w-3xl px-4 pb-[var(--fc-bottom-safe-area)] pt-4")}
+      >
+        <PageSkeleton variant="dashboard" />
+      </ClientPageShell>
     );
   }
 
   return (
-    <AnimatedBackground>
-      {performanceSettings.floatingParticles && <FloatingParticles />}
-      <ClientPageShell className="max-w-lg mx-auto px-4 pb-40 pt-6 overflow-x-hidden">
-        <div className="border-b border-[color:var(--fc-glass-border)] mb-4 pb-4">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <button
-              type="button"
-              onClick={() => router.push("/client/progress")}
-              className="fc-surface w-9 h-9 flex items-center justify-center rounded-lg shrink-0 border border-[color:var(--fc-glass-border)]"
-              aria-label="Back to progress"
-            >
-              <ArrowLeft className="w-4 h-4 text-[color:var(--fc-text-primary)]" />
-            </button>
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent-cyan)] shrink-0">
-                <Timer className="w-4 h-4" />
-              </div>
-              <div className="min-w-0">
-                <h1 className="text-xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
-                  Performance Tests
-                </h1>
-                <p className="text-xs text-[color:var(--fc-text-dim)] mt-0.5">
-                  Benchmarks and aerobic tests
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+    <>
+      <ClientPageShell
+        className={cn(
+          ps.psV1,
+          "relative mx-auto max-w-lg lg:max-w-3xl px-4 pb-40 pt-4 overflow-x-hidden",
+        )}
+      >
+        <PsHero
+          glow="cyan"
+          onBack={() => router.push("/client/progress")}
+          eyebrow="Progress"
+          eyebrowColor="var(--fc-accent)"
+          title="Performance"
+          subtitle="Jumps, sprints, carries & cardio"
+        />
 
-        <main className="space-y-4">
-          <section
-            role="tablist"
-            aria-label="Performance test type"
-            className="flex flex-col gap-2"
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={selectedType === "1km_run"}
-              onClick={() => setSelectedType("1km_run")}
-              className={`flex-1 min-w-0 rounded-xl border px-3 py-2.5 text-left transition-all ${
-                selectedType === "1km_run"
-                  ? "border-[color:var(--fc-glass-border-strong)] bg-[color:var(--fc-glass-highlight)]"
-                  : "border-[color:var(--fc-glass-border)] fc-surface hover:bg-[color:var(--fc-glass-highlight)]"
-              }`}
-            >
-              <div className="flex items-center justify-between gap-2 mb-1">
-                <span className="flex items-center gap-1.5 text-xs font-bold fc-text-primary">
-                  <Timer className="w-3.5 h-3.5 text-[color:var(--fc-accent-cyan)]" aria-hidden />
-                  1km run
-                </span>
-                {runTrendPercent !== null && runTests.length >= 2 && (
-                  <span className="fc-text-success font-mono text-[10px] font-bold">
-                    {runTrendPercent > 0 ? "+" : ""}
-                    {runTrendPercent}%
-                  </span>
-                )}
-              </div>
-              <p className="text-[10px] fc-text-subtle truncate">Aerobic · last {runTests.length > 0 && runTests[0].time_seconds != null ? formatRunTime(runTests[0].time_seconds) : "—"}</p>
-            </button>
-
-            <button
-              type="button"
-              role="tab"
-              aria-selected={selectedType === "step_test"}
-              onClick={() => setSelectedType("step_test")}
-              className={`flex-1 min-w-0 rounded-xl border px-3 py-2.5 text-left transition-all ${
-                selectedType === "step_test"
-                  ? "border-[color:var(--fc-glass-border-strong)] bg-[color:var(--fc-glass-highlight)]"
-                  : "border-[color:var(--fc-glass-border)] fc-surface hover:bg-[color:var(--fc-glass-highlight)]"
-              }`}
-            >
-              <div className="flex items-center justify-between gap-2 mb-1">
-                <span className="flex items-center gap-1.5 text-xs font-bold fc-text-primary">
-                  <HeartPulse className="w-3.5 h-3.5 text-[color:var(--fc-status-error)]" aria-hidden />
-                  Step test
-                </span>
-                {stepTrendPercent !== null && stepTests.length >= 2 && (
-                  <span className="fc-text-success font-mono text-[10px] font-bold">
-                    {stepTrendPercent > 0 ? "+" : ""}
-                    {stepTrendPercent}%
-                  </span>
-                )}
-              </div>
-              <p className="text-[10px] fc-text-subtle truncate">
-                Recovery · last {stepTests.length > 0 && stepTests[0].recovery_score != null ? `${stepTests[0].recovery_score} BPM` : "—"}
-              </p>
-            </button>
-          </section>
-
-          {/* Main display */}
+        {catalog.length === 0 ? (
           <div
-            className="fc-card-shell overflow-hidden p-4"
+            className="mt-8 border-y py-8"
+            style={{ borderColor: "var(--ps-line)" }}
           >
-            <div className="flex flex-col gap-4">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 mb-4 flex-wrap">
-                  <span className="px-3 py-1 rounded-full bg-[color-mix(in_srgb,var(--fc-accent-cyan)_10%,transparent)] border border-[color-mix(in_srgb,var(--fc-accent-cyan)_20%,transparent)] text-[color:var(--fc-accent-cyan)] text-[10px] font-bold uppercase tracking-widest">
-                    Selected test
-                  </span>
-                  {latest && (
-                    <span className="text-sm font-mono fc-text-subtle">
-                      {new Date(latest.tested_at).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </span>
-                  )}
-                </div>
-                <h2 className="text-lg font-bold fc-text-primary mb-3">
-                  {selectedType === "1km_run" ? "1km Run" : "Step Test"}
-                </h2>
-                <div className="relative inline-block pr-10">
-                  {latest ? (
-                    selectedType === "1km_run" && latest.time_seconds != null ? (
-                      <>
-                        <div className="text-3xl sm:text-4xl font-bold font-mono tracking-tight fc-text-primary">
-                          {formatRunTime(latest.time_seconds)}
-                        </div>
-                        <div className="absolute right-0 bottom-1 text-xs font-mono fc-text-subtle">
-                          min
-                        </div>
-                      </>
-                    ) : selectedType === "step_test" && latest.recovery_score != null ? (
-                      <>
-                        <div className="text-3xl sm:text-4xl font-bold font-mono tracking-tight fc-text-primary">
-                          {latest.recovery_score}
-                        </div>
-                        <div className="absolute right-0 bottom-1 text-xs font-mono fc-text-subtle">
-                          BPM
-                        </div>
-                      </>
-                    ) : (
-                      <div className="text-2xl font-bold font-mono fc-text-subtle">—</div>
-                    )
-                  ) : (
-                    <div className="text-lg font-bold font-mono fc-text-subtle">No result yet</div>
-                  )}
-                </div>
-              </div>
-              <div className="flex flex-col gap-1 text-sm">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="fc-text-subtle">Improvement</span>
-                  <span className="font-mono font-bold fc-text-success">
-                    {improvement ?? "—"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="fc-text-subtle">Percentile</span>
-                  <span className="font-mono font-bold fc-text-subtle">—</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Mini sparkline */}
-            {currentTests.length > 0 && (
-              <div className="mt-4 h-12 w-full flex items-end gap-1 min-w-0 overflow-x-auto">
-                {currentTests.slice(0, 6).reverse().map((_, index, arr) => {
-                  const i = arr.length - 1 - index;
-                  const isLast = index === arr.length - 1;
-                  const heights = [0.5, 0.65, 0.75, 0.5, 0.65, 1];
-                  const h = heights[Math.min(index, heights.length - 1)];
-                  return (
-                    <div
-                      key={currentTests[i]?.id ?? index}
-                      className="flex-1 rounded-t-lg min-w-0 transition-opacity"
-                      style={{
-                        height: `${(isLast ? 1 : h) * 100}%`,
-                        background: isLast
-                          ? "linear-gradient(to top, var(--fc-accent-cyan), var(--fc-accent-cyan))"
-                          : "var(--fc-glass-highlight)",
-                        borderTop: isLast ? "2px solid var(--fc-accent-cyan)" : undefined,
-                      }}
-                    />
-                  );
-                })}
-              </div>
-            )}
+            <p
+              className={cn(ps.psFontDisplay, "text-[18px] font-semibold")}
+              style={{ color: "var(--ps-t1)" }}
+            >
+              No tests available
+            </p>
           </div>
-
-          {/* History table */}
-          <section className="space-y-2">
-            <h3 className="text-sm font-semibold fc-text-primary px-0.5">Historical logs</h3>
-            <div className="fc-card-shell overflow-hidden">
-              {currentTests.length === 0 ? (
-                <div className="p-4">
-                  <EmptyState
-                    icon={Timer}
-                    title="No performance tests"
-                    description="Log a test to track improvement"
-                    action={{ label: "Log test", onClick: () => setShowLogModal(true) }}
-                  />
-                </div>
-              ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="text-[10px] uppercase tracking-widest fc-text-subtle border-b border-[color:var(--fc-glass-border)]">
-                      <th className="p-2 font-bold">Date</th>
-                      <th className="p-2 font-bold">Result</th>
-                      <th className="p-2 font-bold">Trend</th>
-                      <th className="p-2 font-bold text-right">Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-sm font-mono">
-                    {
-                      currentTests.map((test, index) => {
-                        const prev = currentTests[index + 1];
-                        const trend = getHistoryTrend(test, prev, selectedType);
-                        const result =
-                          selectedType === "1km_run"
-                            ? test.time_seconds != null
-                              ? formatRunTime(test.time_seconds)
-                              : "—"
-                            : test.recovery_score != null
-                              ? `${test.recovery_score} BPM`
-                              : "—";
-                        const isImprove =
-                          selectedType === "1km_run"
-                            ? prev && test.time_seconds != null && prev.time_seconds != null && test.time_seconds < prev.time_seconds
-                            : prev && test.recovery_score != null && prev.recovery_score != null && test.recovery_score < prev.recovery_score;
+        ) : (
+          <div className="mt-6 space-y-6">
+            <section>
+              <PsSectionEyebrow accent="cyan" className="mb-3">
+                Tests
+              </PsSectionEyebrow>
+              <div className="space-y-4">
+                {groups.map((g) => (
+                  <div key={g.category}>
+                    <p
+                      className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]"
+                      style={{ color: "var(--ps-t3)" }}
+                    >
+                      {formatCategoryLabel(g.category)}
+                    </p>
+                    <div className="flex flex-col gap-1.5">
+                      {g.items.map((t) => {
+                        const latestFor = results.find((r) => r.test_id === t.id);
+                        const selected = t.id === selectedTestId;
                         return (
-                          <tr
-                            key={test.id}
-                            className="border-b border-[color:var(--fc-glass-border)] last:border-0 hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => setSelectedTestId(t.id)}
+                            className="rounded-none border px-3 py-2.5 text-left transition-colors"
+                            style={{
+                              borderColor: selected
+                                ? "var(--fc-accent)"
+                                : "var(--ps-line)",
+                              background: "transparent",
+                            }}
                           >
-                            <td className="p-4 md:p-6 fc-text-dim">
-                              {new Date(test.tested_at).toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })}
-                            </td>
-                            <td className="p-2 font-bold fc-text-primary text-xs">{result}</td>
-                            <td className="p-2 text-xs">
-                              {trend === "—" ? (
-                                <span className="fc-text-subtle">—</span>
-                              ) : (
-                                <span
-                                  className={
-                                    isImprove ? "font-bold fc-text-success" : "font-bold fc-text-warning"
-                                  }
-                                >
-                                  {trend}
-                                </span>
-                              )}
-                            </td>
-                            <td className="p-4 md:p-6 text-right fc-text-subtle max-w-[120px] truncate">
-                              {test.notes || "—"}
-                            </td>
-                          </tr>
+                            <div className="flex items-center justify-between gap-2">
+                              <span
+                                className={cn(ps.psFontHeadline, "text-[13px]")}
+                                style={{ color: "var(--ps-t1)" }}
+                              >
+                                {t.display_name}
+                              </span>
+                              <span
+                                className={cn(ps.psFontMono, "text-[12px]")}
+                                style={{ color: "var(--ps-t2)" }}
+                              >
+                                {latestFor
+                                  ? formatResultValue(
+                                      latestFor.result_value,
+                                      t.result_unit,
+                                    )
+                                  : "—"}
+                              </span>
+                            </div>
+                          </button>
                         );
                       })}
-                  </tbody>
-                </table>
+                    </div>
+                  </div>
+                ))}
               </div>
-              )}
-            </div>
-          </section>
-        </main>
+            </section>
 
-        {/*
-          Phase 0b 6-FAB extension — performance FAB migration.
-          Spec ref: design-system-v4 §6.21. Was: fixed bottom-24 right-4,
-          fc-btn fc-btn-primary, w-12 h-12 rounded-xl, Plus w-6 h-6.
-          Now: fab-action (standard FAB slot).
-        */}
+            {selectedTest && (
+              <section>
+                <PsSectionEyebrow accent="action" className="mb-3">
+                  Latest
+                </PsSectionEyebrow>
+                <div
+                  className="border-y py-4"
+                  style={{ borderColor: "var(--ps-line)" }}
+                >
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <h2
+                      className={cn(ps.psFontDisplay, "text-[16px] font-semibold")}
+                      style={{ color: "var(--ps-t1)" }}
+                    >
+                      {selectedTest.display_name}
+                    </h2>
+                    {latest && isCoachTested(latest) ? (
+                      <CoachTestedTag testedAt={latest.tested_at} />
+                    ) : null}
+                  </div>
+
+                  {latest ? (
+                    <p
+                      className={cn(ps.psFontMono, "text-3xl font-semibold")}
+                      style={{ color: "var(--ps-t1)" }}
+                    >
+                      {formatResultValue(
+                        latest.result_value,
+                        selectedTest.result_unit,
+                      )}
+                      {latest.secondary_value != null &&
+                      selectedTest.secondary_unit
+                        ? ` · ${selectedTest.secondary_label ?? "Sec"} ${formatResultValue(latest.secondary_value, selectedTest.secondary_unit)}`
+                        : ""}
+                    </p>
+                  ) : (
+                    <p className="text-sm" style={{ color: "var(--ps-t2)" }}>
+                      No result yet for this test.
+                    </p>
+                  )}
+
+                  <div className="mt-4 space-y-1.5 text-sm">
+                    <div className="flex justify-between gap-2">
+                      <span style={{ color: "var(--ps-t3)" }}>Change</span>
+                      <span
+                        className={cn(ps.psFontMono, "font-semibold")}
+                        style={{
+                          color:
+                            trendPct == null
+                              ? "var(--ps-t3)"
+                              : trendPct >= 0
+                                ? "var(--ps-good)"
+                                : "var(--ps-warning)",
+                        }}
+                      >
+                        {trendPct == null
+                          ? "—"
+                          : `${trendPct > 0 ? "+" : ""}${trendPct}%`}
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <span style={{ color: "var(--ps-t3)" }}>Roster rank</span>
+                      <span
+                        className={cn(ps.psFontMono, "font-semibold")}
+                        style={{ color: "var(--ps-t1)" }}
+                      >
+                        {rosterRankLabel}
+                      </span>
+                    </div>
+                  </div>
+
+                  {sparkValues.length >= 2 ? (
+                    <div className="mt-4 flex h-12 w-full items-end gap-1 overflow-x-auto">
+                      {(() => {
+                        const min = Math.min(...sparkValues);
+                        const max = Math.max(...sparkValues);
+                        return sparkValues.map((value, index) => {
+                          const isLast = index === sparkValues.length - 1;
+                          const h = sparkBarFraction(
+                            value,
+                            min,
+                            max,
+                            direction,
+                          );
+                          return (
+                            <div
+                              key={`${value}-${index}`}
+                              className="min-w-0 flex-1 rounded-t-sm"
+                              style={{
+                                height: `${h * 100}%`,
+                                background: isLast
+                                  ? "var(--fc-accent)"
+                                  : "color-mix(in srgb, var(--ps-line) 80%, transparent)",
+                              }}
+                              title={String(value)}
+                            />
+                          );
+                        });
+                      })()}
+                    </div>
+                  ) : currentTests.length > 0 ? (
+                    <p className="mt-3 text-[11px]" style={{ color: "var(--ps-t3)" }}>
+                      Need at least 2 sessions to show chart.
+                    </p>
+                  ) : null}
+                </div>
+              </section>
+            )}
+
+            <section>
+              <PsSectionEyebrow accent="purple" className="mb-3">
+                History
+              </PsSectionEyebrow>
+              {currentTests.length === 0 ? (
+                <div
+                  className="border-y py-8"
+                  style={{ borderColor: "var(--ps-line)" }}
+                >
+                  <p
+                    className={cn(ps.psFontDisplay, "text-[16px] font-semibold")}
+                    style={{ color: "var(--ps-t1)" }}
+                  >
+                    No results yet
+                  </p>
+                  <p
+                    className="mt-2 max-w-sm text-[13px] leading-relaxed"
+                    style={{ color: "var(--ps-t2)" }}
+                  >
+                    Log a test yourself, or your coach may administer one
+                    in-person. Both show up here — coach-tested rows are tagged.
+                  </p>
+                  <button
+                    type="button"
+                    className="mt-4 text-sm font-medium"
+                    style={{ color: "var(--fc-accent)" }}
+                    onClick={() => {
+                      setEditResult(null);
+                      setShowLogModal(true);
+                    }}
+                  >
+                    Log a test →
+                  </button>
+                </div>
+              ) : (
+                <ul
+                  className="divide-y border-y"
+                  style={{ borderColor: "var(--ps-line)" }}
+                >
+                  {currentTests.map((test, index) => {
+                    const prev = currentTests[index + 1];
+                    const unit = selectedTest?.result_unit ?? "";
+                    const improved =
+                      prev &&
+                      isImprovement(
+                        Number(test.result_value),
+                        Number(prev.result_value),
+                        direction,
+                      );
+                    const canEdit = isSelfLogged(test);
+                    return (
+                      <li key={test.id} className="py-3">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p
+                                className={cn(ps.psFontMono, "text-[14px] font-semibold")}
+                                style={{ color: "var(--ps-t1)" }}
+                              >
+                                {formatResultValue(test.result_value, unit)}
+                              </p>
+                              {isCoachTested(test) ? (
+                                <CoachTestedTag testedAt={test.tested_at} />
+                              ) : null}
+                            </div>
+                            <p
+                              className="mt-0.5 text-[12px]"
+                              style={{ color: "var(--ps-t3)" }}
+                            >
+                              {formatShortDate(test.tested_at)}
+                              {prev ? (
+                                <span
+                                  style={{
+                                    color: improved
+                                      ? "var(--ps-good)"
+                                      : "var(--ps-warning)",
+                                  }}
+                                >
+                                  {" · "}
+                                  {improved ? "Improved" : "Declined"} vs prior
+                                </span>
+                              ) : null}
+                            </p>
+                            {test.notes ? (
+                              <p
+                                className="mt-1 text-[12px] truncate max-w-[220px]"
+                                style={{ color: "var(--ps-t2)" }}
+                              >
+                                {test.notes}
+                              </p>
+                            ) : null}
+                          </div>
+                          {canEdit ? (
+                            <div className="flex shrink-0 gap-1">
+                              <button
+                                type="button"
+                                className="p-1.5"
+                                aria-label="Edit test"
+                                onClick={() => {
+                                  setEditResult(test);
+                                  setShowLogModal(true);
+                                }}
+                              >
+                                <Pencil
+                                  className="h-3.5 w-3.5"
+                                  style={{ color: "var(--ps-t3)" }}
+                                />
+                              </button>
+                              <button
+                                type="button"
+                                className="p-1.5"
+                                aria-label="Delete test"
+                                onClick={() => setPendingDelete(test)}
+                              >
+                                <Trash2
+                                  className="h-3.5 w-3.5"
+                                  style={{ color: "var(--ps-critical)" }}
+                                />
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+          </div>
+        )}
+
         <button
           type="button"
-          onClick={() => setShowLogModal(true)}
+          onClick={() => {
+            setEditResult(null);
+            setShowLogModal(true);
+          }}
           className="fab-action"
           aria-label="Log new test result"
+          disabled={!selectedTest}
         >
           <Plus />
         </button>
       </ClientPageShell>
 
-      {user && (
+      {user && selectedTest && (
         <LogPerformanceTestModal
           open={showLogModal}
           clientId={user.id}
-          testType={selectedType}
-          onClose={() => setShowLogModal(false)}
-          onSuccess={() => loadData()}
+          catalogTest={editResult?.test ?? selectedTest}
+          editResult={editResult}
+          onClose={() => {
+            setShowLogModal(false);
+            setEditResult(null);
+          }}
+          onSuccess={() => void loadData()}
         />
       )}
-    </AnimatedBackground>
+
+      <ConfirmActionDialog
+        open={pendingDelete != null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+        title="Delete this test?"
+        description="This removes your self-logged result permanently."
+        confirmLabel="Delete"
+        variant="destructive"
+        confirming={deleting}
+        onConfirm={() => void confirmDelete()}
+      />
+    </>
   );
 }
 

@@ -1,43 +1,42 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "@/contexts/ThemeContext";
-import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
-import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import {
-  ChevronRight,
-  Dumbbell,
-  Star,
-  Trophy,
-  Award,
-  TrendingUp,
-  TrendingDown,
   AlertTriangle,
+  ArrowLeft,
+  Trophy,
+  Activity,
+  Scale,
+  Accessibility,
+  HeartPulse,
   LineChart,
+  Footprints,
+  ChevronRight,
 } from "lucide-react";
 import { ClientPageShell } from "@/components/client-ui";
 import { withTimeout } from "@/lib/withTimeout";
 import { cn } from "@/lib/utils";
-import { PsSegmented, PsSectionEyebrow } from "@/components/client/progress-suite";
 import ps from "@/components/client/progress-suite/progressSuiteV1.module.css";
-import { ClientScoreInsightsSection } from "@/components/client/ClientScoreInsightsSection";
-import { usePageData } from "@/hooks/usePageData";
+import hub from "@/components/client/progress/clientProgressHub.module.css";
+import { TrainingVolumeSection } from "@/components/client-progress-analytics/TrainingVolumeSection";
+import { WorkoutLogCard } from "@/components/client/WorkoutLogCard";
 import {
-  fetchDashboardPageData,
-  type DashboardPageData,
-} from "@/lib/clientDashboardPageData";
-import {
-  getProgressDashboard,
-  type ProgressDashboardPayload,
-} from "@/lib/progressHubCardsService";
-import type { ProgressMonthHubSnapshot, ProgressWeekHubSnapshot } from "@/lib/progressStatsService";
+  fetchClientProgressPageData,
+  fetchHubRangeSlice,
+  hubRangeToVolumeWeeks,
+  type HubPageRange,
+} from "@/lib/clientProgressPageData";
 
-const CYAN = "#4FE3E8";
-const CYAN_BAR_END = "#34A8AD";
+const RANGE_OPTS: { value: HubPageRange; label: string }[] = [
+  { value: "week", label: "This week" },
+  { value: "4w", label: "4 weeks" },
+  { value: "3m", label: "3 months" },
+];
 
 function formatHubDuration(totalMin: number): string {
   if (!totalMin || totalMin <= 0) return "0m";
@@ -47,944 +46,461 @@ function formatHubDuration(totalMin: number): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
-function truncate(s: string, max: number): string {
-  if (s.length <= max) return s;
-  return `${s.slice(0, max - 1)}…`;
+function formatVolCompact(v: number): string {
+  if (v >= 1000) return `${(v / 1000).toFixed(1)}k`;
+  return `${Math.round(v)}`;
 }
 
-function formatRecentWorkoutMeta(row: {
-  dateLabel: string;
-  volumeKg: number | null;
-  durationMin: number | null;
-}): string {
-  const vol =
-    row.volumeKg != null && row.volumeKg > 0
-      ? `${Math.round(row.volumeKg).toLocaleString()} kg`
-      : "—";
-  const dur =
-    row.durationMin != null && row.durationMin > 0
-      ? `${Math.round(row.durationMin)} min`
-      : "—";
-  return `${row.dateLabel} · ${vol} · ${dur}`;
+function pctClass(pct: number): string {
+  if (Math.abs(pct) < 0.05) return hub.pcFlat;
+  return pct > 0 ? hub.pcUp : hub.pcDn;
 }
 
-function MiniSparkline80({
-  values,
-  color,
-}: {
-  values: number[];
-  color: string;
-}) {
-  if (values.length < 2) return null;
-  const w = 80;
-  const h = 32;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-  const pts = values
-    .map((v, i) => {
-      const x = (i / (values.length - 1)) * w;
-      const y = h - ((v - min) / range) * (h - 4) - 2;
-      return `${x},${y}`;
-    })
-    .join(" ");
-  return (
-    <svg
-      width={w}
-      height={h}
-      viewBox={`0 0 ${w} ${h}`}
-      className="shrink-0"
-      aria-hidden
-    >
-      <polyline
-        points={pts}
-        fill="none"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+function formatPct(pct: number): string {
+  if (Math.abs(pct) < 0.05) return "— 0%";
+  const sign = pct > 0 ? "+" : "";
+  return `${sign}${Math.round(pct)}%`;
 }
 
-function ProgressHubContent() {
+function ProgressPageContent() {
   const router = useRouter();
   const { user } = useAuth();
-  const { performanceSettings } = useTheme();
 
-  const [recapMode, setRecapMode] = useState<"week" | "month">("month");
-  const [dash, setDash] = useState<ProgressDashboardPayload | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [pageRange, setPageRange] = useState<HubPageRange>("week");
 
-  const fetchFn = useCallback(async (): Promise<DashboardPageData> => {
-    if (!user?.id) {
+  const mainQuery = useQuery({
+    queryKey: ["client-progress", user?.id],
+    queryFn: () =>
+      withTimeout(
+        fetchClientProgressPageData(user!.id),
+        28000,
+        "progress-page",
+      ),
+    enabled: !!user?.id,
+  });
+
+  const data = mainQuery.data ?? null;
+  const clientTimezone = data?.clientTimezone;
+
+  const rangeSliceQuery = useQuery({
+    queryKey: ["client-progress-range", user?.id, pageRange, clientTimezone],
+    queryFn: () =>
+      fetchHubRangeSlice(user!.id, clientTimezone!, pageRange),
+    enabled: !!user?.id && !!clientTimezone && pageRange !== "week",
+  });
+
+  const { volumeStats, topProgressions } = useMemo(() => {
+    if (pageRange === "week") {
       return {
-        dashboard: null,
-        athleteScore: null,
-        hasCheckInToday: null,
-        todayWellnessLog: null,
-        checkinStreak: 0,
-        hasScheduledCheckInThisPeriod: false,
-        scoreError: null,
+        volumeStats: data?.volumeStats ?? null,
+        topProgressions: data?.topProgressions ?? [],
       };
     }
-    return withTimeout(fetchDashboardPageData(user.id), 25000, "dashboard");
-  }, [user?.id]);
+    return {
+      volumeStats: rangeSliceQuery.data?.volumeStats ?? null,
+      topProgressions: rangeSliceQuery.data?.topProgressions ?? [],
+    };
+  }, [pageRange, data?.volumeStats, data?.topProgressions, rangeSliceQuery.data]);
 
-  const { data: pageData } = usePageData(fetchFn, [user?.id]);
+  const loading = mainQuery.isLoading;
+  const loadError = mainQuery.isError
+    ? mainQuery.error instanceof Error
+      ? mainQuery.error.message
+      : "Failed to load progress"
+    : null;
+  const rangeBusy = pageRange !== "week" && rangeSliceQuery.isFetching;
 
-  const loadDashboard = useCallback(async () => {
-    if (!user?.id) return;
-    try {
-      setLoading(true);
-      setLoadError(null);
-      const d = await withTimeout(
-        getProgressDashboard(user.id),
-        26000,
-        "progress-dashboard",
-      );
-      setDash(d);
-    } catch (e: unknown) {
-      console.error(e);
-      setLoadError(
-        e instanceof Error ? e.message : "Failed to load progress dashboard",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id]);
-
-  useEffect(() => {
-    void loadDashboard();
-  }, [loadDashboard]);
-
-  const monthHub = dash?.monthSnapshot.data;
+  const dash = data?.dashboard;
   const weekHub = dash?.weekSnapshot.data;
+  const monthHub = dash?.monthSnapshot.data;
+  const adherence = data?.programAdherence;
+  const explore = data?.explore;
 
-  const recap = recapMode === "week" ? weekHub : monthHub;
-  const recapWorkouts = recap?.workouts ?? 0;
+  const volumeWeeks = hubRangeToVolumeWeeks(pageRange);
+
+  const rhythmFromVolume = (() => {
+    if (!volumeStats?.weeklyData?.length || pageRange === "week") return null;
+    const wd = volumeStats.weeklyData;
+    const workouts = wd.reduce((s, w) => s + w.workoutCount, 0);
+    const volumeKg = wd.reduce((s, w) => s + w.totalVolume, 0);
+    return {
+      workouts,
+      volumeKg,
+      bars: wd.map((w) => w.workoutCount),
+      labels: wd.map((w) => {
+        const d = new Date(w.weekStart + "T12:00:00");
+        return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      }),
+    };
+  })();
+
+  const recapWorkouts =
+    pageRange === "week"
+      ? (weekHub?.workouts ?? 0)
+      : (rhythmFromVolume?.workouts ?? monthHub?.workouts ?? 0);
   const recapDuration =
-    recapMode === "week"
+    pageRange === "week"
       ? (weekHub?.totalDurationMinutes ?? 0)
       : (monthHub?.totalDurationMinutes ?? 0);
   const recapVol =
-    recapMode === "week"
+    pageRange === "week"
       ? (weekHub?.volumeKg ?? 0)
-      : (monthHub?.volumeKg ?? 0);
-  const recapPrs =
-    recapMode === "week"
-      ? (weekHub?.newPRs ?? 0)
-      : (monthHub?.newPRs ?? 0);
+      : (rhythmFromVolume?.volumeKg ?? monthHub?.volumeKg ?? 0);
+  const streakDays =
+    pageRange === "week"
+      ? (weekHub?.checkinStreak ?? 0)
+      : (monthHub?.streakDays ?? weekHub?.checkinStreak ?? 0);
 
-  const periodLabelUpper = useMemo(() => {
-    if (recapMode === "month" && monthHub?.monthYearLabel) {
-      return monthHub.monthYearLabel.toUpperCase();
-    }
-    if (recapMode === "week" && weekHub?.weekRangeLabel) {
-      const parts = weekHub.weekRangeLabel.split("–");
-      if (parts.length === 2) {
-        return `${parts[0].trim().toUpperCase()} – ${parts[1].trim().toUpperCase()}`;
-      }
-      return weekHub.weekRangeLabel.toUpperCase();
-    }
-    return "";
-  }, [recapMode, monthHub, weekHub]);
+  const periodLabel =
+    pageRange === "week"
+      ? (weekHub?.weekRangeLabel ?? "")
+      : pageRange === "4w"
+        ? "Last 4 weeks"
+        : "Last 3 months";
 
-  const barCounts = useMemo(() => {
-    if (recapMode === "month" && monthHub) {
-      return monthHub.weeklyBarsW1toW5 ?? [0, 0, 0, 0, 0];
-    }
-    if (recapMode === "week" && weekHub) {
-      return weekHub.dailyWorkoutCounts ?? [0, 0, 0, 0, 0, 0, 0];
-    }
-    return recapMode === "month" ? [0, 0, 0, 0, 0] : [0, 0, 0, 0, 0, 0, 0];
-  }, [recapMode, monthHub, weekHub]);
-
+  const barCounts =
+    pageRange === "week"
+      ? (weekHub?.dailyWorkoutCounts ?? [0, 0, 0, 0, 0, 0, 0])
+      : (rhythmFromVolume?.bars ?? monthHub?.weeklyBarsW1toW5 ?? [0, 0, 0, 0, 0]);
+  const barLabels =
+    pageRange === "week"
+      ? ["M", "T", "W", "T", "F", "S", "S"]
+      : (rhythmFromVolume?.labels ??
+        barCounts.map((_, i) => `W${i + 1}`));
   const maxBar = Math.max(...barCounts, 1);
-  const barMaxPx = 56;
-  const todayIdx =
-    recapMode === "week" && weekHub
-      ? weekHub.todayWeekdayIndex
-      : -1;
 
-  const goalsData = dash?.goals.data;
-  const goalPct = useMemo(() => {
-    if (!goalsData || goalsData.total <= 0) return 0;
-    return Math.round((goalsData.completed / goalsData.total) * 100);
-  }, [goalsData]);
-
-  const ach = dash?.achievements.data;
-  const achTotalDenom = (ach?.unlockedCount ?? 0) + (ach?.inProgressCount ?? 0);
-  const achBarPct =
-    achTotalDenom > 0
-      ? Math.round(((ach?.unlockedCount ?? 0) / achTotalDenom) * 100)
-      : 0;
+  const exploreTiles = [
+    {
+      href: "/client/progress/personal-records",
+      hue: "var(--hub-gold)",
+      icon: Trophy,
+      name: "Personal records",
+      sub: "Full list & timeline",
+      value: loading ? "—" : String(explore?.personalRecords ?? 0),
+    },
+    {
+      href: "/client/progress/performance",
+      hue: "var(--hub-aqua)",
+      icon: Activity,
+      name: "Performance",
+      sub: "Jumps, sprints, cardio",
+      value: loading ? "—" : String(explore?.performanceTests ?? 0),
+    },
+    {
+      href: "/client/progress/body-metrics",
+      hue: "var(--hub-good)",
+      icon: Scale,
+      name: "Body",
+      sub: "Weight & measurements",
+      value:
+        loading || explore?.bodyWeightKg == null
+          ? "—"
+          : `${explore.bodyWeightKg}`,
+      valueSuffix: explore?.bodyWeightKg != null ? " kg" : undefined,
+    },
+    {
+      href: "/client/progress/mobility",
+      hue: "var(--hub-purple)",
+      icon: Accessibility,
+      name: "Mobility",
+      sub: "Coach assessments",
+      value: loading ? "—" : String(explore?.mobilityAssessments ?? 0),
+    },
+    {
+      href: "/client/progress/recovery",
+      hue: "var(--hub-hot)",
+      icon: HeartPulse,
+      name: "Recovery",
+      sub: "Load, sleep, soreness",
+      value: loading ? "—" : (explore?.recoveryStatus ?? "—"),
+    },
+    {
+      href: "/client/progress/analytics",
+      hue: "var(--hub-accent)",
+      icon: LineChart,
+      name: "Full analytics",
+      sub: "All charts & trends",
+      value: "→",
+    },
+    {
+      href: "/client/activity?tab=trends",
+      hue: "var(--hub-warn)",
+      icon: Footprints,
+      name: "Activities",
+      sub: "Cardio, walks & other",
+      value: loading ? "—" : String(explore?.activityCount30d ?? 0),
+    },
+  ];
 
   if (loadError) {
     return (
-      <AnimatedBackground>
-        {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
-          <div className="py-6 px-4 text-center">
-            <AlertTriangle
-              className="w-7 h-7 mx-auto mb-3 fc-text-dim"
-              strokeWidth={1.5}
-              aria-hidden
-            />
-            <p className="text-sm fc-text-dim mb-4">{loadError}</p>
-            <button
-              type="button"
-              onClick={() => void loadDashboard()}
-              className="fc-btn fc-btn-primary fc-press h-11 px-5 text-sm"
-            >
-              Retry
-            </button>
-          </div>
-        </ClientPageShell>
-      </AnimatedBackground>
+      <ClientPageShell className={cn("mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6", hub.shell)}>
+        <div className="py-6 text-center">
+          <AlertTriangle className="mx-auto mb-3 h-7 w-7 fc-text-dim" />
+          <p className="mb-4 text-sm fc-text-dim">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => void mainQuery.refetch()}
+            className="fc-btn fc-btn-primary fc-press h-11 px-5 text-sm"
+          >
+            Retry
+          </button>
+        </div>
+      </ClientPageShell>
     );
   }
 
   return (
-    <AnimatedBackground>
-      {performanceSettings.floatingParticles && <FloatingParticles />}
-
-      <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
-        <div className={ps.psV1}>
-          <div className="mb-4 min-w-0">
-            <ClientScoreInsightsSection
-              userId={user?.id ?? null}
-              athleteScore={pageData?.athleteScore ?? null}
-              scoreError={pageData?.scoreError ?? null}
-            />
-          </div>
-
-          <section className="mb-5">
-            <div className={ps.psMonthHero}>
-              <div className="relative z-[1] mb-3 flex flex-wrap items-start justify-between gap-2">
-                <p
-                  className={cn(ps.psFontMono, "text-[9px] uppercase")}
-                  style={{ color: "var(--ps-t3)", letterSpacing: "0.16em" }}
-                >
-                  {recapMode === "month" ? "THIS MONTH" : "THIS WEEK"}
-                </p>
-                <div className="flex flex-wrap items-center justify-end">
-                  <PsSegmented
-                    ariaLabel="Recap period"
-                    options={[
-                      { value: "week" as const, label: "Week" },
-                      { value: "month" as const, label: "Month" },
-                    ]}
-                    value={recapMode}
-                    onChange={setRecapMode}
-                  />
-                </div>
-              </div>
-
-              <div className="relative z-[1] flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <span
-                    className={cn(ps.psFontDisplay, "text-4xl font-bold tabular-nums leading-none")}
-                    style={{ color: CYAN }}
-                  >
-                    {loading ? "—" : recapWorkouts}
-                  </span>
-                  <p
-                    className={cn(ps.psFontBody, "mt-1 text-[12px]")}
-                    style={{ color: "var(--ps-t3)" }}
-                  >
-                    workouts
-                  </p>
-                </div>
-                {periodLabelUpper ? (
-                  <p
-                    className={cn(ps.psFontMono, "max-w-[55%] text-right text-[9px] uppercase leading-snug")}
-                    style={{ color: "var(--ps-t3)", letterSpacing: "0.1em" }}
-                  >
-                    {periodLabelUpper}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="relative z-[1] mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <div className={ps.psQuickTile}>
-                  <span
-                    className={cn(ps.psFontDisplay, "text-lg font-bold tabular-nums")}
-                    style={{ color: CYAN }}
-                  >
-                    {loading ? "—" : recapWorkouts}
-                  </span>
-                  <span
-                    className={cn(ps.psFontMono, "text-[8.5px] uppercase")}
-                    style={{ color: "var(--ps-t3)", letterSpacing: "0.08em" }}
-                  >
-                    Workouts
-                  </span>
-                </div>
-                <div className={ps.psQuickTile}>
-                  <span
-                    className={cn(ps.psFontDisplay, "text-lg font-bold tabular-nums")}
-                    style={{ color: "var(--ps-lime)" }}
-                  >
-                    {loading ? "—" : formatHubDuration(recapDuration)}
-                  </span>
-                  <span
-                    className={cn(ps.psFontMono, "text-[8.5px] uppercase")}
-                    style={{ color: "var(--ps-t3)", letterSpacing: "0.08em" }}
-                  >
-                    Hours
-                  </span>
-                </div>
-                <div className={ps.psQuickTile}>
-                  <span
-                    className={cn(ps.psFontDisplay, "text-lg font-bold tabular-nums")}
-                    style={{ color: "var(--ps-t1)" }}
-                  >
-                    {loading ? "—" : Math.round(recapVol).toLocaleString()}
-                  </span>
-                  <span
-                    className={cn(ps.psFontMono, "text-[8.5px] uppercase")}
-                    style={{ color: "var(--ps-t3)", letterSpacing: "0.08em" }}
-                  >
-                    Vol kg
-                  </span>
-                </div>
-                <div className={ps.psQuickTile}>
-                  <span
-                    className={cn(ps.psFontDisplay, "text-lg font-bold tabular-nums")}
-                    style={{ color: "var(--ps-warning)" }}
-                  >
-                    {loading ? "—" : recapPrs}
-                  </span>
-                  <span
-                    className={cn(ps.psFontMono, "text-[8.5px] uppercase")}
-                    style={{ color: "var(--ps-t3)", letterSpacing: "0.08em" }}
-                  >
-                    New PRs
-                  </span>
-                </div>
-              </div>
-
-              <div
-                className="relative z-[1] border-t pt-2 mt-3"
-                style={{ borderColor: "var(--ps-line-2)", paddingTop: 8 }}
-              >
-                <p
-                  className={cn(ps.psFontMono, "mb-2 text-[9px] uppercase")}
-                  style={{ color: "var(--ps-t3)", letterSpacing: "0.16em" }}
-                >
-                  {recapMode === "month"
-                    ? "Workouts per week (W1–W5)"
-                    : "Workouts per day"}
-                </p>
-                <div
-                  className={cn(
-                    "flex justify-between gap-1.5",
-                    recapMode === "month" ? "" : "",
-                  )}
-                >
-                  {barCounts.map((count, i) => {
-                    const hPx =
-                      loading
-                        ? 4
-                        : Math.max(4, (count / maxBar) * barMaxPx);
-                    const label =
-                      recapMode === "month"
-                        ? `W${i + 1}`
-                        : ["M", "T", "W", "T", "F", "S", "S"][i] ?? "";
-                    const highlight =
-                      recapMode === "week" && i === todayIdx;
-                    return (
-                      <div
-                        key={`${recapMode}-${i}`}
-                        className="flex min-w-0 flex-1 flex-col items-center"
-                      >
-                        <span
-                          className={cn(
-                            ps.psFontDisplay,
-                            "mb-1 text-sm font-bold tabular-nums",
-                          )}
-                          style={{
-                            color:
-                              count === 0 ? "var(--ps-t4)" : "var(--ps-t1)",
-                          }}
-                        >
-                          {loading ? "—" : count}
-                        </span>
-                        <div className="flex h-[72px] w-full flex-col justify-end">
-                          <div
-                            className="w-full rounded-t-[6px] transition-opacity"
-                            style={{
-                              height: `${hPx}px`,
-                              minHeight: 4,
-                              opacity: count > 0 ? 0.9 : 0.35,
-                              boxShadow: highlight
-                                ? `0 0 0 2px ${CYAN}, 0 0 12px rgba(79,227,232,0.35)`
-                                : undefined,
-                              background: `linear-gradient(180deg, ${CYAN} 0%, ${CYAN_BAR_END} 100%)`,
-                            }}
-                          />
-                        </div>
-                        <span
-                          className={cn(ps.psFontMono, "mt-1 text-[9px]")}
-                          style={{ color: "var(--ps-t3)" }}
-                        >
-                          {label}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-                {!loading && recapWorkouts === 0 ? (
-                  <p
-                    className={cn(ps.psFontBody, "mt-3 text-center text-[11px] leading-snug")}
-                    style={{ color: "var(--ps-t3)" }}
-                  >
-                    No workouts logged this{" "}
-                    {recapMode === "month" ? "month" : "week"} yet — start
-                    training to see your numbers
-                  </p>
-                ) : null}
-              </div>
-            </div>
-          </section>
-
-          <div
-            role="button"
-            tabIndex={0}
-            className="fc-card-shell backdrop-blur-[8px] mb-5 w-full cursor-pointer p-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ps-purple)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--fc-bg-base)]"
-            style={{ borderLeft: "3px solid var(--ps-purple)" }}
-            onClick={() => router.push("/client/progress/analytics")}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                router.push("/client/progress/analytics");
-              }
-            }}
+    <ClientPageShell
+      className={cn(
+        "mx-auto max-w-lg px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden",
+        hub.shell,
+        hub.hub,
+      )}
+    >
+      <div className={ps.psV1}>
+        <header className="mb-4 flex items-start gap-3">
+          <button
+            type="button"
+            onClick={() => router.push("/client/me")}
+            className="fc-surface mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[color:var(--fc-glass-border)]"
+            aria-label="Back to Me"
           >
-            <div className="flex items-start gap-3">
-              <span
-                className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xl leading-none"
-                style={{
-                  background: "color-mix(in srgb, var(--ps-purple) 18%, transparent)",
-                  color: "var(--ps-purple)",
-                }}
-                aria-hidden
-              >
-                <LineChart className="h-5 w-5" strokeWidth={2} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p
-                  className={cn(ps.psFontMono, "text-[9px] uppercase")}
-                  style={{ color: "var(--ps-t3)", letterSpacing: "0.16em" }}
-                >
-                  Full analytics
-                </p>
-                <p
-                  className={cn(ps.psFontBody, "mt-2 text-[13px] leading-snug")}
-                  style={{ color: "var(--ps-t2)" }}
-                >
-                  Charts, strength, volume & wellness trends
-                </p>
-                <button
-                  type="button"
-                  className="mt-4 w-full rounded-lg bg-cyan-600/90 py-2.5 text-sm font-semibold text-white hover:bg-cyan-500"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    router.push("/client/progress/analytics");
-                  }}
-                >
-                  View analytics
-                </button>
-              </div>
-            </div>
+            <ArrowLeft className="h-4 w-4 fc-text-primary" />
+          </button>
+          <div className="min-w-0">
+            <h1
+              className={cn(ps.psFontDisplay, "text-[26px] font-extrabold fc-text-primary")}
+              style={{ letterSpacing: "-0.025em" }}
+            >
+              Progress
+            </h1>
+            <p className={cn(ps.psFontBody, "mt-1 text-[12px]")} style={{ color: "var(--hub-dim)" }}>
+              How am I progressing?
+            </p>
           </div>
+        </header>
 
-          <PsSectionEyebrow accent="cyan" className="mb-2 mt-1">
-            Recent workouts
-          </PsSectionEyebrow>
-          <section className="mb-5">
-            <div className="fc-glass-soft rounded-[13px] border border-[color:var(--fc-glass-border)] overflow-hidden">
-              {dash?.recentWorkouts.hasData &&
-              dash.recentWorkouts.data &&
-              dash.recentWorkouts.data.length > 0 ? (
-                <ul>
-                  {dash.recentWorkouts.data.map((row, idx) => (
-                    <li
-                      key={row.completedAt + row.name}
-                      className={cn(
-                        "px-3 py-2.5",
-                        idx > 0 && "border-t border-[color:var(--fc-glass-border)]",
-                      )}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div
-                          className={cn(
-                            ps.psIconTile,
-                            ps.psIconTileCyan,
-                            "mt-0.5 h-9 w-9 shrink-0",
-                          )}
-                        >
-                          <Dumbbell className="h-4 w-4" aria-hidden />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <p
-                              className={cn(
-                                ps.psFontBody,
-                                "min-w-0 truncate text-[13px] font-medium",
-                              )}
-                              style={{ color: "var(--ps-t1)" }}
-                            >
-                              {truncate(row.name, 24)}
-                            </p>
-                            <ChevronRight
-                              className="h-4 w-4 shrink-0"
-                              style={{ color: "var(--ps-t3)" }}
-                              aria-hidden
-                            />
-                          </div>
-                          <p
-                            className={cn(
-                              ps.psFontBody,
-                              "mt-1 min-w-0 truncate text-[11px] leading-snug fc-text-dim",
-                            )}
-                          >
-                            {formatRecentWorkoutMeta(row)}
-                          </p>
-                        </div>
+        <div
+          className={hub.range}
+          role="tablist"
+          aria-label="Progress time range"
+        >
+          {RANGE_OPTS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              role="tab"
+              aria-selected={pageRange === opt.value}
+              className={cn(hub.rangeBtn, pageRange === opt.value && hub.rangeBtnOn)}
+              onClick={() => setPageRange(opt.value)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        <div className={hub.cols}>
+          <div className={hub.colLeft}>
+            {/* Rhythm */}
+            <section className={cn(hub.card, hub.cardRail)} style={{ ["--h" as string]: "var(--hub-accent)" }}>
+              <div className={hub.rhythmBig}>
+                <span className={hub.rhythmN}>{loading ? "—" : recapWorkouts}</span>
+                <span className={hub.rhythmL}>workouts</span>
+                {periodLabel ? <span className={hub.rhythmDt}>{periodLabel}</span> : null}
+              </div>
+              <div className={hub.tiles}>
+                <div className={hub.tile}>
+                  <div className={hub.tileV}>
+                    {loading ? "—" : formatHubDuration(recapDuration)}
+                  </div>
+                  <div className={hub.tileK}>Duration</div>
+                </div>
+                <div className={hub.tile}>
+                  <div className={hub.tileV}>
+                    {loading ? "—" : formatVolCompact(recapVol)}
+                  </div>
+                  <div className={hub.tileK}>Volume kg</div>
+                </div>
+                <div className={hub.tile}>
+                  <div className={hub.tileV} style={{ color: "var(--hub-gold)" }}>
+                    {loading ? "—" : streakDays}
+                  </div>
+                  <div className={hub.tileK}>Streak</div>
+                </div>
+                <div className={hub.tile}>
+                  <div className={hub.tileV} style={{ color: "var(--hub-good)" }}>
+                    {loading
+                      ? "—"
+                      : adherence?.adherencePct != null
+                        ? `${adherence.adherencePct}%`
+                        : "—"}
+                  </div>
+                  <div className={hub.tileK}>Adherence</div>
+                </div>
+              </div>
+              {adherence && adherence.scheduledThisWeek > 0 ? (
+                <p className={hub.prog}>
+                  Program ·{" "}
+                  <b>
+                    {adherence.completedThisWeek} of {adherence.scheduledThisWeek}
+                  </b>{" "}
+                  required workouts this week
+                </p>
+              ) : null}
+              <div
+                className={cn(
+                  hub.days,
+                  pageRange !== "week" && barCounts.length === 4 && hub.daysFour,
+                  pageRange !== "week" && barCounts.length === 5 && hub.daysFive,
+                )}
+              >
+                {barCounts.map((count, i) => {
+                  const hPct = loading ? 0 : Math.round((count / maxBar) * 100);
+                  return (
+                    <div key={`${pageRange}-${i}`} className={hub.day}>
+                      <div className={hub.dayBar}>
+                        {hPct > 0 ? (
+                          <i className={hub.dayFill} style={{ height: `${Math.max(18, hPct)}%` }} />
+                        ) : null}
                       </div>
+                      <div className={hub.dayLbl}>{barLabels[i] ?? ""}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* Recent */}
+            <div className={hub.eyebrow}>Recent sessions</div>
+            <section>
+              {loading ? (
+                <p className="px-1 py-3 text-center text-sm fc-text-dim">Loading…</p>
+              ) : data?.historyItems && data.historyItems.length > 0 ? (
+                <ul className="space-y-0">
+                  {data.historyItems.map((item) => (
+                    <li key={`${item.kind}-${item.id}`}>
+                      {item.kind === "workout" ? (
+                        <WorkoutLogCard log={item.log} />
+                      ) : (
+                        <Link
+                          href="/client/activity?tab=trends"
+                          className={ps.psLogRow}
+                        >
+                          <span className={ps.psLogStripe} aria-hidden />
+                          <div className={ps.psLogInfo}>
+                            <p className="truncate text-[13px] font-semibold fc-text-primary">
+                              {item.title}
+                            </p>
+                            <p className="mt-1 text-[11px] fc-text-dim">{item.meta}</p>
+                          </div>
+                          <ChevronRight className="h-3.5 w-3.5 self-center fc-text-dim" />
+                        </Link>
+                      )}
                     </li>
                   ))}
                 </ul>
               ) : (
-                <div className="px-3 py-4 text-center">
-                  <p
-                    className={cn(ps.psFontBody, "text-[13px]")}
-                    style={{ color: "var(--ps-t2)" }}
-                  >
-                    No workouts logged yet
-                  </p>
-                  <Link
-                    href="/client/train"
-                    className={cn(
-                      ps.psFontBody,
-                      "mt-2 inline-block text-[12px] font-semibold",
-                    )}
-                    style={{ color: "var(--ps-cyan)" }}
-                  >
-                    Start your first workout →
-                  </Link>
-                </div>
-              )}
-              <div className="border-t border-[color:var(--fc-glass-border)] px-3 py-2">
-                <button
-                  type="button"
-                  onClick={() => router.push("/client/progress/workout-logs")}
-                  className={cn(
-                    ps.psFontBody,
-                    "text-[12px] font-medium",
-                  )}
-                  style={{ color: "var(--ps-cyan)" }}
-                >
-                  View history →
-                </button>
-              </div>
-            </div>
-          </section>
-
-          <PsSectionEyebrow accent="good" className="mb-2">
-            Body
-          </PsSectionEyebrow>
-          <section className="mb-5">
-            <div
-              role="button"
-              tabIndex={0}
-              className="fc-card-shell backdrop-blur-[8px] w-full cursor-pointer p-4 text-left"
-              onClick={() => router.push("/client/progress/body-metrics")}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  router.push("/client/progress/body-metrics");
-                }
-              }}
-            >
-              <div className="flex items-start gap-3">
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={cn(
-                      ps.psFontDisplay,
-                      "text-2xl font-bold tabular-nums leading-tight",
-                    )}
-                    style={{ color: "var(--ps-t1)" }}
-                  >
-                    {dash?.body.data?.currentWeightKg != null
-                      ? `${dash.body.data.currentWeightKg} kg`
-                      : "—"}
-                  </p>
-                  <p
-                    className={cn(ps.psFontBody, "mt-1 text-[11px]")}
-                    style={{ color: "var(--ps-t3)" }}
-                  >
-                    Body metrics &amp; measurements
-                  </p>
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                  {dash?.body.data?.delta30dKg != null ? (
-                    <span
-                      className={cn(
-                        ps.psFontMono,
-                        "inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[10px]",
-                      )}
-                      style={{
-                        borderColor: "var(--ps-line)",
-                        color: "var(--ps-t2)",
-                      }}
-                    >
-                      {dash.body.data.delta30dKg < 0 ? (
-                        <TrendingDown
-                          className="h-3.5 w-3.5 text-emerald-400"
-                          aria-hidden
-                        />
-                      ) : dash.body.data.delta30dKg > 0 ? (
-                        <TrendingUp
-                          className="h-3.5 w-3.5 text-amber-400"
-                          aria-hidden
-                        />
-                      ) : null}
-                      {dash.body.data.delta30dKg > 0 ? "+" : ""}
-                      {dash.body.data.delta30dKg} kg in 30d
-                    </span>
-                  ) : null}
-                  {dash?.body.data?.sparkline90d &&
-                  dash.body.data.sparkline90d.length >= 2 ? (
-                    <MiniSparkline80
-                      values={dash.body.data.sparkline90d}
-                      color="var(--ps-good)"
-                    />
-                  ) : null}
-                  <ChevronRight
-                    className="h-4 w-4 shrink-0"
-                    style={{ color: "var(--ps-t3)" }}
-                    aria-hidden
-                  />
-                </div>
-              </div>
-              <Link
-                href="/client/progress/body-metrics?tab=photos"
-                onClick={(e) => e.stopPropagation()}
-                className={cn(
-                  ps.psFontBody,
-                  "mt-2 inline-block text-[11px]",
-                )}
-                style={{ color: "var(--ps-cyan)" }}
-              >
-                View photos →
-              </Link>
-              {!dash?.body.hasData ? (
-                <p
-                  className={cn(ps.psFontBody, "mt-2 text-[11px]")}
-                  style={{ color: "var(--ps-t3)" }}
-                >
-                  No weight logged yet — log your weight to track changes
+                <p className="px-1 py-3 text-center text-[13px] fc-text-dim">
+                  No sessions yet
                 </p>
-              ) : null}
+              )}
+              <Link href="/client/progress/workout-logs" className={hub.linkOut}>
+                View full history →
+              </Link>
+            </section>
+
+            {/* Volume */}
+            <div className={hub.eyebrow}>Training volume</div>
+            <TrainingVolumeSection
+              stats={volumeStats}
+              volumeWeeks={volumeWeeks}
+              hideRangeTabs
+              busy={loading || rangeBusy}
+            />
+          </div>
+
+          <div className={hub.colRight}>
+            {/* Strength summary */}
+            <div className={hub.eyebrow}>Strength</div>
+            <section className={hub.card}>
+              {!loading && topProgressions.length === 0 ? (
+                <p className="text-[12px] fc-text-dim">
+                  Log loaded resistance work to see est. 1RM gains.
+                </p>
+              ) : (
+                topProgressions.map((p) => {
+                  const sessions =
+                    data?.trainedExercises.find((e) => e.id === p.exerciseId)
+                      ?.sessionCount ?? p.dataPoints.length;
+                  return (
+                    <div key={p.exerciseId} className={hub.sg}>
+                      <span className={hub.sgNm}>
+                        <div className={hub.sgE}>{p.exerciseName}</div>
+                        <div className={hub.sgS}>
+                          est 1RM · {sessions} sessions
+                        </div>
+                      </span>
+                      <span className={hub.sgRm}>
+                        <div className={hub.sgV}>
+                          {Math.round(p.currentOneRM * 10) / 10}
+                          <span className={hub.sgU}> kg</span>
+                        </div>
+                      </span>
+                      <span className={cn(hub.sgPc, pctClass(p.progressPercent))}>
+                        {formatPct(p.progressPercent)}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+              <Link
+                href="/client/progress/strength"
+                className={hub.linkOut}
+                style={{ marginTop: 12 }}
+              >
+                All lifts & charts →
+              </Link>
+            </section>
+
+            {/* Explore */}
+            <div className={hub.eyebrow}>Explore</div>
+            <div className={hub.explore}>
+              {exploreTiles.map((t) => {
+                const Icon = t.icon;
+                return (
+                  <Link
+                    key={t.href}
+                    href={t.href}
+                    className={hub.exploreTile}
+                    style={{ ["--h" as string]: t.hue }}
+                  >
+                    <span className={hub.exploreIc}>
+                      <Icon className="h-3.5 w-3.5" strokeWidth={1.9} aria-hidden />
+                    </span>
+                    <div className={hub.exploreN}>{t.name}</div>
+                    <div className={hub.exploreS}>{t.sub}</div>
+                    <div className={hub.exploreV}>
+                      {t.value}
+                      {t.valueSuffix ? (
+                        <span style={{ fontSize: 10 }}>{t.valueSuffix}</span>
+                      ) : null}
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
-          </section>
-
-          <PsSectionEyebrow accent="lime" className="mb-2">
-            Goals
-          </PsSectionEyebrow>
-          <section className="mb-5">
-            <button
-              type="button"
-              onClick={() => router.push("/client/goals")}
-              className="fc-card-shell backdrop-blur-[8px] w-full text-left p-4"
-            >
-              <div className="flex items-center gap-4">
-                <div className="relative h-16 w-16 shrink-0">
-                  <svg className="h-16 w-16 -rotate-90" viewBox="0 0 64 64">
-                    <circle
-                      cx="32"
-                      cy="32"
-                      r="26"
-                      fill="none"
-                      stroke="var(--fc-glass-border)"
-                      strokeWidth="5"
-                    />
-                    <circle
-                      cx="32"
-                      cy="32"
-                      r="26"
-                      fill="none"
-                      stroke="var(--fc-accent-cyan)"
-                      strokeWidth="5"
-                      strokeLinecap="round"
-                      strokeDasharray={`${(goalPct / 100) * 163.4} 999`}
-                    />
-                  </svg>
-                  <span
-                    className="absolute inset-0 flex items-center justify-center text-sm font-black tabular-nums"
-                    style={{ color: "var(--ps-t1)" }}
-                  >
-                    {goalPct}%
-                  </span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  {goalsData && goalsData.total > 0 ? (
-                    <>
-                      <p
-                        className={cn(ps.psFontBody, "text-[14px] font-semibold leading-tight")}
-                        style={{ color: "var(--ps-t1)" }}
-                      >
-                        {truncate(goalsData.nextDueGoalName ?? "Goals", 28)}
-                      </p>
-                      <p
-                        className={cn(ps.psFontMono, "mt-1 text-[10px]")}
-                        style={{ color: "var(--ps-t3)" }}
-                      >
-                        {goalPct >= 100
-                          ? "All goals complete!"
-                          : goalsData.nextDueDateLabel
-                            ? `Next due: ${goalsData.nextDueDateLabel}`
-                            : "Next due: —"}
-                      </p>
-                    </>
-                  ) : (
-                    <p
-                      className={cn(ps.psFontBody, "text-[14px] font-semibold")}
-                      style={{ color: "var(--ps-t1)" }}
-                    >
-                      Set a goal to track momentum
-                    </p>
-                  )}
-                </div>
-                <ChevronRight
-                  className="h-4 w-4 shrink-0"
-                  style={{ color: "var(--ps-t3)" }}
-                  aria-hidden
-                />
-              </div>
-            </button>
-          </section>
-
-          <PsSectionEyebrow accent="purple" className="mb-2">
-            Strength &amp; rank
-          </PsSectionEyebrow>
-          <section className="mb-5 grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => router.push("/client/progress/personal-records")}
-              className={ps.psQuickTile}
-            >
-              <Star
-                className="mx-auto mb-1 h-4 w-4 text-amber-400"
-                aria-hidden
-              />
-              <span
-                className={cn(ps.psFontDisplay, "text-lg font-bold tabular-nums")}
-                style={{ color: "var(--ps-t1)" }}
-              >
-                {loading ? "—" : dash?.strengthRank.data?.totalPRs ?? 0}
-              </span>
-              <span
-                className={cn(ps.psFontMono, "text-[8.5px] uppercase")}
-                style={{ color: "var(--ps-t3)", letterSpacing: "0.08em" }}
-              >
-                PRs
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/client/progress/leaderboard")}
-              className={ps.psQuickTile}
-            >
-              <Trophy
-                className="mx-auto mb-1 h-4 w-4 text-rose-400"
-                aria-hidden
-              />
-              <span
-                className={cn(ps.psFontDisplay, "text-lg font-bold tabular-nums")}
-                style={{ color: "var(--ps-t1)" }}
-              >
-                {loading
-                  ? "—"
-                  : dash?.strengthRank.data?.bestRank != null
-                    ? `#${dash.strengthRank.data.bestRank}`
-                    : "—"}
-              </span>
-              <span
-                className={cn(ps.psFontMono, "text-[8.5px] uppercase")}
-                style={{ color: "var(--ps-t3)", letterSpacing: "0.08em" }}
-              >
-                Best rank
-              </span>
-            </button>
-          </section>
-
-          <PsSectionEyebrow accent="warning" className="mb-2">
-            Achievements
-          </PsSectionEyebrow>
-          <section className="mb-5">
-            <button
-              type="button"
-              onClick={() => router.push("/client/progress/achievements")}
-              className="fc-card-shell backdrop-blur-[8px] w-full text-left p-4"
-            >
-              <div className="flex items-start gap-3">
-                <div className={cn(ps.psIconTile, ps.psIconTileWarning, "shrink-0")}>
-                  <Award className="h-4 w-4" aria-hidden />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <p
-                      className={cn(ps.psFontBody, "truncate text-[13px] font-semibold")}
-                      style={{ color: "var(--ps-t1)" }}
-                    >
-                      Latest:{" "}
-                      {ach?.latestName
-                        ? truncate(ach.latestName, 22)
-                        : "—"}
-                    </p>
-                    <ChevronRight
-                      className="h-4 w-4 shrink-0"
-                      style={{ color: "var(--ps-t3)" }}
-                      aria-hidden
-                    />
-                  </div>
-                  <p
-                    className={cn(ps.psFontMono, "mt-1 text-[10px]")}
-                    style={{ color: "var(--ps-t3)" }}
-                  >
-                    {ach?.unlockedCount ?? 0} unlocked ·{" "}
-                    {ach?.inProgressCount ?? 0} in progress
-                  </p>
-                  <div
-                    className="relative mt-3 h-2 w-full overflow-hidden rounded-full"
-                    style={{ background: "var(--fc-surface-sunken)" }}
-                  >
-                    <div
-                      className="h-full rounded-full transition-all duration-300"
-                      style={{
-                        width: `${Math.min(100, Math.max(0, achBarPct))}%`,
-                        background: "var(--fc-domain-habits)",
-                      }}
-                    />
-                  </div>
-                  {!dash?.achievements.hasData ? (
-                    <p
-                      className={cn(ps.psFontBody, "mt-2 text-[11px]")}
-                      style={{ color: "var(--ps-t3)" }}
-                    >
-                      Complete workouts and check-ins to unlock your first
-                      achievement
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-            </button>
-          </section>
-
-          {dash?.recovery.hasData && dash.recovery.data ? (
-            <>
-              <PsSectionEyebrow accent="purple" className="mb-2">
-                Recovery
-              </PsSectionEyebrow>
-              <section className="mb-5">
-                <button
-                  type="button"
-                  onClick={() => router.push("/client/progress/recovery")}
-                  className="fc-card-shell backdrop-blur-[8px] w-full text-left p-4"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p
-                        className={cn(ps.psFontBody, "text-[14px] font-semibold leading-snug")}
-                        style={{ color: "var(--ps-t1)" }}
-                      >
-                        {dash.recovery.data.insightText}
-                      </p>
-                      <p
-                        className={cn(ps.psFontMono, "mt-2 text-[10px]")}
-                        style={{ color: "var(--ps-t3)" }}
-                      >
-                        Soreness{" "}
-                        {dash.recovery.data.sorenessAvg != null
-                          ? `${dash.recovery.data.sorenessAvg}/5`
-                          : "—"}{" "}
-                        · Sleep{" "}
-                        {dash.recovery.data.sleepAvgHrs != null
-                          ? `${dash.recovery.data.sleepAvgHrs}h`
-                          : "—"}{" "}
-                        this week
-                      </p>
-                    </div>
-                    <ChevronRight
-                      className="h-4 w-4 shrink-0"
-                      style={{ color: "var(--ps-t3)" }}
-                      aria-hidden
-                    />
-                  </div>
-                </button>
-              </section>
-            </>
-          ) : null}
-
-          {dash?.activities.hasData && dash.activities.data ? (
-            <>
-              <PsSectionEyebrow accent="cyan" className="mb-2">
-                Extra activities
-              </PsSectionEyebrow>
-              <section className="mb-5">
-                <button
-                  type="button"
-                  onClick={() => router.push("/client/progress/activities")}
-                  className="fc-card-shell backdrop-blur-[8px] w-full text-left p-4"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p
-                        className={cn(ps.psFontDisplay, "text-2xl font-bold tabular-nums")}
-                        style={{ color: CYAN }}
-                      >
-                        {dash.activities.data.weeklyMinutes}
-                      </p>
-                      <p
-                        className={cn(ps.psFontMono, "text-[9px] uppercase")}
-                        style={{ color: "var(--ps-t3)", letterSpacing: "0.08em" }}
-                      >
-                        min (last 7 days)
-                      </p>
-                      <p
-                        className={cn(ps.psFontBody, "mt-2 text-[12px]")}
-                        style={{ color: "var(--ps-t2)" }}
-                      >
-                        Top: {dash.activities.data.topActivityType ?? "—"} ·{" "}
-                        {dash.activities.data.topActivityMinutes} min
-                      </p>
-                    </div>
-                    <ChevronRight
-                      className="h-4 w-4 shrink-0"
-                      style={{ color: "var(--ps-t3)" }}
-                      aria-hidden
-                    />
-                  </div>
-                </button>
-              </section>
-            </>
-          ) : null}
+          </div>
         </div>
-      </ClientPageShell>
-    </AnimatedBackground>
+      </div>
+    </ClientPageShell>
   );
 }
 
 export default function ProgressHub() {
   return (
     <ProtectedRoute requiredRole="client">
-      <ProgressHubContent />
+      <ProgressPageContent />
     </ProtectedRoute>
   );
 }

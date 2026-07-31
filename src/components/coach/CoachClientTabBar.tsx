@@ -6,7 +6,6 @@ import {
   Eye,
   Dumbbell,
   Utensils,
-  TrendingUp,
   CalendarCheck,
   User,
   ChevronLeft,
@@ -32,7 +31,7 @@ function buildTabs(clientId: string): TabDef[] {
       shortLabel: "Home",
       href: base,
       icon: Eye,
-      isActive: (pathname) => pathname === base,
+      isActive: (pathname) => pathname === base || pathname === `${base}/stats`,
       activeAccent: "cyan",
     },
     {
@@ -44,14 +43,6 @@ function buildTabs(clientId: string): TabDef[] {
         pathname.startsWith(`${base}/workouts`) ||
         pathname.startsWith(`${base}/workout-logs`) ||
         pathname.includes(`${base}/programs/`),
-      activeAccent: "cyan",
-    },
-    {
-      label: "Stats",
-      shortLabel: "Stats",
-      href: `${base}/stats`,
-      icon: TrendingUp,
-      isActive: (pathname) => pathname.startsWith(`${base}/stats`),
       activeAccent: "cyan",
     },
     {

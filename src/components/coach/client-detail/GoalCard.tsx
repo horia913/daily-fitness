@@ -28,7 +28,7 @@ function accentVar(p: GoalCardPillar): string {
 
 function barGradient(p: GoalCardPillar): string {
   if (p === "training")
-    return "linear-gradient(90deg, var(--fc-set-type-straight), var(--fc-accent-lime-2))";
+    return "linear-gradient(90deg, var(--fc-set-type-straight), var(--fc-accent))";
   if (p === "nutrition")
     return "linear-gradient(90deg, var(--fc-effort-easy), var(--fc-set-type-straight))";
   if (p === "body") return "linear-gradient(90deg, var(--fc-effort-medium), var(--fc-effort-medium))";

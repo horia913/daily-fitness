@@ -1,0 +1,366 @@
+================================================================================
+public.get_client_dashboard() — live pg_get_functiondef
+================================================================================
+Source: select pg_get_functiondef('public.get_client_dashboard()'::regprocedure);
+Captured: 2026-07-12 (read-only Supabase MCP)
+
+================================================================================
+
+CREATE OR REPLACE FUNCTION public.get_client_dashboard()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_client_id UUID;
+  v_result JSONB;
+  v_avatar_url TEXT;
+  v_first_name TEXT;
+  v_client_type TEXT;
+  v_monday DATE;
+  v_sunday DATE;
+  v_monday_ts TIMESTAMPTZ;
+  v_sunday_ts TIMESTAMPTZ;
+  v_streak INT := 0;
+  v_weekly_current INT := 0;
+  v_weekly_goal INT := 0;
+  v_weekly_volume NUMERIC := 0;
+  v_weekly_time INT := 0;
+  v_prs_count INT := 0;
+  v_body_weight_current NUMERIC;
+  v_body_weight_change NUMERIC;
+  v_next_session JSONB;
+  v_todays_workout JSONB;
+  v_workout_days JSONB;
+  v_today_wellness JSONB;
+  v_checkin_streak INT := 0;
+  v_prs_this_month INT := 0;
+  v_latest_achievement JSONB;
+  v_best_leaderboard JSONB;
+  v_athlete_score JSONB;
+  v_score_history JSONB;
+  v_first_day DATE;
+  v_last_day DATE;
+  v_prog_total_slots INT;
+  v_prog_completed_count INT;
+  v_program_progress JSONB;
+  v_active_pa_id UUID;
+  v_active_prog_id UUID;
+  v_resolver_week INT;
+  v_resolver_total INT;
+  v_adh RECORD;
+BEGIN
+  v_client_id := auth.uid();
+  IF v_client_id IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  v_monday := date_trunc('week', CURRENT_DATE)::DATE;
+  v_sunday := v_monday + INTERVAL '6 days';
+  v_monday_ts := v_monday::TIMESTAMPTZ;
+  v_sunday_ts := (v_sunday + INTERVAL '1 day')::TIMESTAMPTZ;
+  v_first_day := date_trunc('month', CURRENT_DATE)::DATE;
+  v_last_day := v_first_day + INTERVAL '1 month' - INTERVAL '1 day';
+
+  SELECT avatar_url, first_name INTO v_avatar_url, v_first_name
+  FROM profiles WHERE id = v_client_id;
+
+  v_client_type := 'online';
+
+  SELECT pa.id, pa.program_id
+  INTO v_active_pa_id, v_active_prog_id
+  FROM program_assignments pa
+  WHERE pa.client_id = v_client_id AND pa.status = 'active'
+  ORDER BY pa.created_at DESC LIMIT 1;
+
+  IF v_active_pa_id IS NOT NULL THEN
+    SELECT current_week, total_weeks
+    INTO v_resolver_week, v_resolver_total
+    FROM public.get_program_instance_week(v_active_pa_id, NULL);
+    v_resolver_week := COALESCE(v_resolver_week, 1);
+    v_resolver_total := COALESCE(v_resolver_total, 0);
+  END IF;
+
+  IF v_client_type = 'in_gym' THEN
+    SELECT jsonb_build_object(
+      'id', s.id, 'scheduled_at', s.scheduled_at, 'duration_minutes', s.duration_minutes,
+      'title', s.title, 'coach_name', TRIM(COALESCE(p.first_name, '') || ' ' || COALESCE(p.last_name, ''))
+    ) INTO v_next_session
+    FROM sessions s
+    LEFT JOIN profiles p ON p.id = s.coach_id
+    WHERE s.client_id = v_client_id AND s.status = 'scheduled' AND s.scheduled_at > NOW()
+    ORDER BY s.scheduled_at ASC LIMIT 1;
+  END IF;
+
+  IF v_active_pa_id IS NULL THEN
+    v_streak := 0;
+    v_weekly_current := 0;
+    v_weekly_goal := 0;
+  ELSE
+    SELECT required, completed INTO v_adh
+    FROM public.instance_adherence_for_week(v_active_pa_id, v_resolver_week);
+    v_weekly_goal := COALESCE(v_adh.required, 0);
+    v_weekly_current := COALESCE(v_adh.completed, 0);
+
+    WITH workout_dates AS (
+      SELECT DISTINCT DATE(ws.completed_at) AS workout_date
+      FROM workout_sessions ws
+      WHERE ws.client_id = v_client_id
+        AND ws.status = 'completed'
+        AND ws.completed_at IS NOT NULL
+        AND ws.program_assignment_id = v_active_pa_id
+        AND ws.program_day_assignment_id IS NOT NULL
+    ),
+    streak_calc AS (
+      SELECT workout_date,
+             workout_date - (ROW_NUMBER() OVER (ORDER BY workout_date DESC))::INT AS grp
+      FROM workout_dates
+      WHERE workout_date >= CURRENT_DATE - INTERVAL '365 days'
+    )
+    SELECT COUNT(*) INTO v_streak
+    FROM streak_calc
+    WHERE grp = (SELECT grp FROM streak_calc WHERE workout_date = CURRENT_DATE OR workout_date = CURRENT_DATE - 1 LIMIT 1);
+    v_streak := COALESCE(v_streak, 0);
+  END IF;
+
+  WITH weekly_logs AS (
+    SELECT id, total_duration_minutes FROM workout_logs
+    WHERE client_id = v_client_id
+      AND completed_at >= v_monday_ts AND completed_at < v_sunday_ts
+      AND completed_at IS NOT NULL
+  )
+  SELECT
+    COALESCE(SUM(total_duration_minutes), 0),
+    (SELECT COALESCE(SUM((wsl.weight * wsl.reps)::NUMERIC), 0)
+     FROM workout_set_logs wsl
+     WHERE wsl.client_id = v_client_id AND wsl.workout_log_id IN (SELECT id FROM weekly_logs)
+       AND wsl.weight IS NOT NULL AND wsl.reps IS NOT NULL)
+  INTO v_weekly_time, v_weekly_volume FROM weekly_logs;
+  v_weekly_volume := ROUND(v_weekly_volume / 1000, 1);
+
+  WITH weekly_workout_days AS (
+    SELECT DISTINCT
+      CASE EXTRACT(DOW FROM completed_at) WHEN 0 THEN 6 ELSE EXTRACT(DOW FROM completed_at)::INT - 1 END AS day_index
+    FROM workout_logs
+    WHERE client_id = v_client_id
+      AND completed_at >= v_monday_ts AND completed_at < v_sunday_ts
+      AND completed_at IS NOT NULL
+  )
+  SELECT jsonb_agg(day_index ORDER BY day_index) INTO v_workout_days FROM weekly_workout_days;
+  v_workout_days := COALESCE(v_workout_days, '[]'::jsonb);
+
+  SELECT COUNT(DISTINCT exercise_id) INTO v_prs_count
+  FROM user_exercise_metrics
+  WHERE user_id = v_client_id AND (best_weight IS NOT NULL OR best_volume IS NOT NULL);
+  v_prs_count := COALESCE(v_prs_count, 0);
+
+  WITH recent_weights AS (
+    SELECT weight_kg, measured_date FROM body_metrics
+    WHERE client_id = v_client_id AND weight_kg IS NOT NULL
+    ORDER BY measured_date DESC LIMIT 2
+  )
+  SELECT
+    (SELECT weight_kg FROM recent_weights ORDER BY measured_date DESC LIMIT 1),
+    (SELECT weight_kg FROM recent_weights ORDER BY measured_date DESC LIMIT 1) -
+    COALESCE((SELECT weight_kg FROM recent_weights ORDER BY measured_date DESC OFFSET 1 LIMIT 1),
+             (SELECT weight_kg FROM recent_weights ORDER BY measured_date DESC LIMIT 1))
+  INTO v_body_weight_current, v_body_weight_change;
+
+  SELECT row_to_json(dwl) INTO v_today_wellness
+  FROM daily_wellness_logs dwl
+  WHERE dwl.client_id = v_client_id AND dwl.log_date = CURRENT_DATE
+  LIMIT 1;
+
+  WITH wellness_dates AS (
+    SELECT log_date
+    FROM daily_wellness_logs
+    WHERE client_id = v_client_id
+      AND log_date <= CURRENT_DATE
+      AND sleep_hours IS NOT NULL AND sleep_quality IS NOT NULL
+      AND stress_level IS NOT NULL AND soreness_level IS NOT NULL
+    ORDER BY log_date DESC
+    LIMIT 365
+  ),
+  streak_grp AS (
+    SELECT log_date,
+           log_date - (ROW_NUMBER() OVER (ORDER BY log_date DESC))::INT AS grp
+    FROM wellness_dates
+  ),
+  current_grp AS (
+    SELECT grp FROM streak_grp WHERE log_date >= CURRENT_DATE - 1 LIMIT 1
+  )
+  SELECT COUNT(*)::INT INTO v_checkin_streak
+  FROM streak_grp
+  WHERE grp = (SELECT grp FROM current_grp);
+  v_checkin_streak := COALESCE(v_checkin_streak, 0);
+
+  SELECT COUNT(*)::INT INTO v_prs_this_month
+  FROM personal_records
+  WHERE client_id = v_client_id
+    AND achieved_date >= v_first_day AND achieved_date <= v_last_day;
+
+  SELECT jsonb_build_object(
+    'name', COALESCE(at.name, 'Achievement'),
+    'icon', at.icon,
+    'tier', ua.tier
+  ) INTO v_latest_achievement
+  FROM user_achievements ua
+  LEFT JOIN achievement_templates at ON at.id = ua.achievement_template_id
+  WHERE ua.client_id = v_client_id
+  ORDER BY ua.achieved_date DESC, ua.earned_at DESC NULLS LAST
+  LIMIT 1;
+
+  SELECT jsonb_build_object(
+    'rank', le.rank,
+    'exerciseName', e.name
+  ) INTO v_best_leaderboard
+  FROM (
+    SELECT rank, exercise_id
+    FROM leaderboard_entries
+    WHERE client_id = v_client_id AND rank <= 10
+    ORDER BY rank ASC
+    LIMIT 1
+  ) le
+  LEFT JOIN exercises e ON e.id = le.exercise_id;
+
+  SELECT jsonb_build_object(
+    'id', s.id,
+    'score', s.score,
+    'tier', s.tier,
+    'trainingScore', s.training_score,
+    'trainingCompletionScore', s.training_completion_score,
+    'trainingExecutionScore', s.training_execution_score,
+    'recoveryScore', s.recovery_score,
+    'recoverySleepScore', s.recovery_sleep_score,
+    'recoveryStepsScore', s.recovery_steps_score,
+    'nutritionScore', s.nutrition_score,
+    'extrasScore', s.extras_score,
+    'windowStart', s.window_start::text,
+    'windowEnd', s.window_end::text,
+    'calculatedAt', s.calculated_at::text
+  ) INTO v_athlete_score
+  FROM (
+    SELECT id, score, tier, training_score, training_completion_score, training_execution_score,
+           recovery_score, recovery_sleep_score, recovery_steps_score,
+           nutrition_score, extras_score, window_start, window_end, calculated_at
+    FROM athlete_scores
+    WHERE client_id = v_client_id
+    ORDER BY calculated_at DESC
+    LIMIT 1
+  ) s;
+
+  SELECT COALESCE(
+    (SELECT jsonb_agg(jsonb_build_object('date', (t.calculated_at::date)::text, 'score', t.score) ORDER BY t.calculated_at ASC)
+     FROM (
+       SELECT calculated_at, score
+       FROM (
+         SELECT calculated_at, score
+         FROM athlete_scores
+         WHERE client_id = v_client_id
+         ORDER BY window_start DESC NULLS LAST, calculated_at DESC
+         LIMIT 4
+       ) sub
+       ORDER BY calculated_at ASC
+     ) t),
+    '[]'::jsonb
+  ) INTO v_score_history;
+
+  -- todaysWorkout: global next incomplete instance slot (no program_progress pointer).
+  DECLARE
+    v_program_assignment RECORD;
+    v_schedule_row RECORD;
+  BEGIN
+    SELECT pa.id, pa.program_id, pa.name AS program_name INTO v_program_assignment
+    FROM program_assignments pa
+    WHERE pa.client_id = v_client_id AND pa.status = 'active'
+    ORDER BY pa.created_at DESC LIMIT 1;
+
+    IF v_program_assignment.id IS NOT NULL THEN
+      SELECT
+        slot.schedule_id,
+        slot.template_id,
+        slot.week_number,
+        slot.program_day AS day_number,
+        slot.template_name,
+        slot.estimated_duration,
+        slot.total_sets
+      INTO v_schedule_row
+      FROM public.get_next_incomplete_program_slot(v_program_assignment.id) slot;
+
+      IF v_schedule_row.schedule_id IS NOT NULL THEN
+        v_todays_workout := jsonb_build_object(
+          'hasWorkout', true, 'type', 'program',
+          'templateId', v_schedule_row.template_id, 'scheduleId', v_schedule_row.schedule_id,
+          'name', COALESCE(v_schedule_row.template_name, v_program_assignment.program_name),
+          'weekNumber', v_schedule_row.week_number, 'dayNumber', v_schedule_row.day_number,
+          'totalSets', COALESCE(v_schedule_row.total_sets, 0),
+          'estimatedDuration', COALESCE(v_schedule_row.estimated_duration, 45)
+        );
+      END IF;
+    END IF;
+
+    IF v_todays_workout IS NULL THEN
+      SELECT jsonb_build_object(
+        'hasWorkout', true, 'type', 'assignment', 'assignmentId', wa.id,
+        'templateId', wa.workout_template_id, 'name', COALESCE(wa.name, wt.name, 'Workout'),
+        'totalSets', (SELECT COUNT(*) FROM workout_set_entries WHERE template_id = wa.workout_template_id),
+        'estimatedDuration', COALESCE(wt.estimated_duration, 45)
+      ) INTO v_todays_workout
+      FROM workout_assignments wa
+      LEFT JOIN workout_templates wt ON wt.id = wa.workout_template_id
+      WHERE wa.client_id = v_client_id AND wa.status IN ('assigned', 'active')
+      ORDER BY wa.scheduled_date DESC NULLS LAST, wa.created_at DESC LIMIT 1;
+    END IF;
+
+    IF v_todays_workout IS NULL THEN
+      v_todays_workout := jsonb_build_object('hasWorkout', false, 'message', 'No workout assigned');
+    END IF;
+  END;
+
+  IF v_active_pa_id IS NOT NULL AND v_active_prog_id IS NOT NULL THEN
+    SELECT COUNT(*)::INT INTO v_prog_total_slots
+    FROM program_day_assignments
+    WHERE program_assignment_id = v_active_pa_id
+      AND COALESCE(is_optional, false) = false;
+    SELECT COUNT(DISTINCT pdc.program_day_assignment_id)::INT INTO v_prog_completed_count
+    FROM program_day_completions pdc
+    WHERE pdc.program_assignment_id = v_active_pa_id
+      AND pdc.program_day_assignment_id IS NOT NULL
+      AND COALESCE(pdc.notes, '') NOT LIKE 'Skipped by coach%';
+    v_prog_total_slots := COALESCE(v_prog_total_slots, 0);
+    v_prog_completed_count := COALESCE(v_prog_completed_count, 0);
+    v_program_progress := jsonb_build_object(
+      'currentWeek', COALESCE(v_resolver_week, 1),
+      'totalWeeks', COALESCE(v_resolver_total, 0),
+      'completedCount', v_prog_completed_count,
+      'totalSlots', v_prog_total_slots,
+      'percent', CASE WHEN v_prog_total_slots > 0 THEN ROUND((v_prog_completed_count::NUMERIC / v_prog_total_slots) * 100)::INT ELSE 0 END
+    );
+  ELSE
+    v_program_progress := NULL;
+  END IF;
+
+  v_result := jsonb_build_object(
+    'avatarUrl', v_avatar_url, 'firstName', v_first_name, 'clientType', v_client_type,
+    'nextSession', v_next_session, 'streak', v_streak,
+    'weeklyProgress', jsonb_build_object('current', v_weekly_current, 'goal', v_weekly_goal),
+    'weeklyStats', jsonb_build_object('volume', v_weekly_volume, 'time', v_weekly_time, 'prsCount', v_prs_count),
+    'workoutDays', v_workout_days,
+    'bodyWeight', CASE WHEN v_body_weight_current IS NOT NULL THEN
+      jsonb_build_object('current', v_body_weight_current, 'change', COALESCE(v_body_weight_change, 0)) ELSE NULL END,
+    'todaysWorkout', v_todays_workout,
+    'todayWellnessLog', v_today_wellness,
+    'checkinStreak', v_checkin_streak,
+    'highlights', jsonb_build_object(
+      'prsThisMonth', COALESCE(v_prs_this_month, 0),
+      'latestAchievement', v_latest_achievement,
+      'bestLeaderboardRank', v_best_leaderboard
+    ),
+    'athleteScore', v_athlete_score,
+    'scoreHistory', v_score_history,
+    'programProgress', v_program_progress
+  );
+  RETURN v_result;
+END;
+$function$

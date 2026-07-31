@@ -14,6 +14,7 @@ import type { ProgramScheduleSlot } from '../src/lib/programStateService'
 
 const mkSlot = (id: string, week: number, dayNum: number, dayOfWeek: number): ProgramScheduleSlot => ({
   id,
+  program_day_assignment_id: id,
   program_id: 'p1',
   week_number: week,
   day_number: dayNum,

@@ -1,0 +1,60 @@
+PROTOCOL CLEANUP — honest log controls
+Date: 2026-07-17
+No git. No write-payload / schema change.
+
+================================================================================
+1. FILES MODIFIED
+================================================================================
+  src/components/client/workout-execution/blocks/AmrapExecutor.tsx
+    (label only: "Total Reps" → "Total reps"; controls already matched write)
+  src/components/client/workout-execution/blocks/ForTimeExecutor.tsx
+  src/components/client/workout-execution/blocks/TabataExecutor.tsx
+
+  EmomExecutor: untouched
+
+================================================================================
+2. CONTROL vs WRITE (match)
+================================================================================
+AMRAP
+  Control:  Weight + Total reps + ✓
+  Writes:   weight (when > 0) + amrap_total_reps
+  Match:    Yes
+
+For-time
+  Control:  After Stop → Total reps + Time (finish from timer, read-only) + ✓
+  Writes:   fortime_total_reps + fortime_time_taken_sec
+            (weight still optional in payload if set; card no longer shows/prefills weight)
+  Match:    Yes for the two primary fields shown
+
+Tabata
+  Control:  Open Timer + Complete (no reps field, no disabled ✓)
+  Writes:   completion via handleComplete → onSetEntryComplete(..., [])
+            (same path as TabataTimerModal onComplete)
+  Match:    Yes — completion-only; no score field invented
+
+EMOM
+  Control:  Weight + Reps + ✓  (unchanged)
+  Writes:   per-minute weight/reps (unchanged)
+  Match:    Yes
+
+================================================================================
+3. TABATA COMPLETE WIRING
+================================================================================
+  Card "Complete" Button → handleComplete()
+    → onSetEntryComplete(liveSetEntry.setEntry.id, [])
+  TabataTimerModal onComplete still closes modal then calls the same handleComplete().
+  Dead "Reps this round" + disabled ✓ removed.
+
+================================================================================
+4. UNTOUCHED CONFIRMATION
+================================================================================
+  - No write-payload / schema / DB change
+  - EmomExecutor unchanged
+  - Non-protocol cards untouched
+  - Glue clocks + round/minute headings unchanged
+  - page.tsx chrome, resolveSetPrescriptionTargets, restore/complete/deriveSetType: untouched
+
+================================================================================
+5. TSC
+================================================================================
+  npx tsc --noEmit → 0 errors

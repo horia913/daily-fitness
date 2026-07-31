@@ -1,35 +1,31 @@
 /* Client workout complete v1 — v6 tokens (scoped, dark) */
 .root {
-  --bg: #07101a;
-  --card: #0e1f2e;
-  --card-2: #0b1824;
-  --line: rgba(255, 255, 255, 0.08);
-  --line-2: rgba(255, 255, 255, 0.05);
-  --t1: #fff;
-  --t2: rgba(255, 255, 255, 0.65);
-  --t3: rgba(255, 255, 255, 0.42);
-  --t4: rgba(255, 255, 255, 0.26);
+  --bg: var(--fc-bg-deep);
+  --card: var(--fc-surface-card);
+  --card-2: var(--fc-bg-deep);
+  --line: var(--fc-glass-border);
+  --line-2: var(--fc-hairline);
+  --t1: var(--fc-text-primary);
+  --t2: var(--fc-text-dim);
+  --t3: var(--fc-text-subtle);
+  --t4: var(--fc-text-quaternary);
+  --good: var(--fc-status-success);
+  --good-soft: color-mix(in srgb, var(--fc-status-success) 12%, transparent);
+  --good-dim: color-mix(in srgb, var(--fc-status-success) 25%, transparent);
+  --warning: var(--fc-status-warning);
+  --warning-soft: color-mix(in srgb, var(--fc-status-warning) 12%, transparent);
+  --warning-dim: color-mix(in srgb, var(--fc-status-warning) 25%, transparent);
+  --critical: var(--fc-status-error);
+  --critical-soft: color-mix(in srgb, var(--fc-status-error) 12%, transparent);
+  --f-head: var(--f-headline);
+  --f-body: var(--font-body);
+  --f-mono: var(--f-mono);
+  --f-display: var(--f-display);
+
   --rose: #fb7185;
-  --cyan: #4fe3e8;
-  --cyan-soft: rgba(79, 227, 232, 0.12);
-  --cyan-dim: rgba(79, 227, 232, 0.18);
-  --lime: #c5ff4a;
-  --lime-2: #7fe89a;
-  --lime-soft: rgba(197, 255, 74, 0.14);
-  --lime-text: #0a1a18;
   --purple: #a78bfa;
   --purple-soft: rgba(167, 139, 250, 0.12);
   --purple-dim: rgba(167, 139, 250, 0.22);
-  --warning: #f5c242;
-  --warning-soft: rgba(245, 194, 66, 0.12);
-  --good: #34d399;
-  --good-soft: rgba(52, 211, 153, 0.12);
-  --critical: #ff5a5f;
-  --critical-soft: rgba(255, 90, 95, 0.12);
-  --f-head: "Bricolage Grotesque", var(--font-geist-sans, system-ui, sans-serif);
-  --f-body: var(--font-geist-sans, "Geist", system-ui, sans-serif);
-  --f-mono: var(--font-geist-mono, "Geist Mono", ui-monospace, monospace);
-  --f-display: "Big Shoulders Display", var(--font-geist-sans, system-ui, sans-serif);
   color: var(--t1);
 }
 
@@ -50,13 +46,13 @@
   gap: 14px;
   padding: 22px 16px 18px;
   border-radius: 22px;
-  border: 1px solid rgba(197, 255, 74, 0.2);
-  background: linear-gradient(180deg, rgba(197, 255, 74, 0.06) 0%, var(--card) 100%);
+  border: 1px solid var(--fc-accent-glow);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--fc-accent) 6%, transparent) 0%, var(--card) 100%);
 }
 
 .hero[data-accent="cyan"] {
-  border-color: rgba(79, 227, 232, 0.22);
-  background: linear-gradient(180deg, rgba(79, 227, 232, 0.06) 0%, var(--card) 100%);
+  border-color: var(--fc-accent-dim);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--fc-accent) 6%, transparent) 0%, var(--card) 100%);
 }
 
 .hero[data-accent="purple"] {
@@ -65,8 +61,8 @@
 }
 
 .hero[data-accent="warning"] {
-  border-color: rgba(245, 194, 66, 0.28);
-  background: linear-gradient(180deg, rgba(245, 194, 66, 0.07) 0%, var(--card) 100%);
+  border-color: color-mix(in srgb, var(--fc-status-warning) 28%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--fc-status-warning) 7%, transparent) 0%, var(--card) 100%);
 }
 
 .heroGlow {
@@ -80,7 +76,7 @@
   pointer-events: none;
   background: radial-gradient(
     circle,
-    rgba(197, 255, 74, 0.18) 0%,
+    var(--fc-accent-dim) 0%,
     transparent 60%
   );
 }
@@ -88,7 +84,7 @@
 .hero[data-accent="cyan"] .heroGlow {
   background: radial-gradient(
     circle,
-    rgba(79, 227, 232, 0.16) 0%,
+    var(--fc-accent-dim) 0%,
     transparent 60%
   );
 }
@@ -119,20 +115,20 @@
   background: linear-gradient(
     90deg,
     transparent 10%,
-    var(--lime) 50%,
+    var(--fc-accent) 50%,
     transparent 90%
   );
-  box-shadow: 0 0 12px var(--lime);
+  box-shadow: none;
 }
 
 .hero[data-accent="cyan"] .heroTopBar {
   background: linear-gradient(
     90deg,
     transparent 10%,
-    var(--cyan) 50%,
+    var(--fc-accent) 50%,
     transparent 90%
   );
-  box-shadow: 0 0 12px rgba(79, 227, 232, 0.45);
+  box-shadow: 0 0 12px var(--fc-accent-glow);
 }
 
 .hero[data-accent="purple"] .heroTopBar {
@@ -142,7 +138,7 @@
     var(--purple) 50%,
     transparent 90%
   );
-  box-shadow: 0 0 12px rgba(167, 139, 250, 0.45);
+  box-shadow: none;
 }
 
 .hero[data-accent="warning"] .heroTopBar {
@@ -152,7 +148,7 @@
     var(--warning) 50%,
     transparent 90%
   );
-  box-shadow: 0 0 12px rgba(245, 194, 66, 0.4);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--fc-status-warning) 40%, transparent);
 }
 
 .confetti {
@@ -187,31 +183,25 @@
   display: grid;
   place-items: center;
   box-shadow:
-    0 12px 32px rgba(197, 255, 74, 0.35),
+    0 12px 32px var(--fc-accent-glow),
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  background: linear-gradient(135deg, var(--lime), var(--lime-2));
-  color: var(--lime-text);
+  background: linear-gradient(135deg, var(--fc-accent), var(--fc-accent));
+  color: var(--fc-ink);
 }
 
 .hero[data-accent="cyan"] .trophy {
-  background: linear-gradient(135deg, var(--cyan), rgba(79, 227, 232, 0.55));
-  box-shadow:
-    0 12px 32px rgba(79, 227, 232, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  background: linear-gradient(135deg, var(--fc-accent), color-mix(in srgb, var(--fc-accent) 55%, transparent));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .hero[data-accent="purple"] .trophy {
   background: linear-gradient(135deg, var(--purple), rgba(124, 58, 237, 0.75));
-  box-shadow:
-    0 12px 32px rgba(167, 139, 250, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
 .hero[data-accent="warning"] .trophy {
   background: linear-gradient(135deg, var(--warning), rgba(245, 194, 66, 0.55));
-  box-shadow:
-    0 12px 28px rgba(245, 194, 66, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
 .trophyBadge {
@@ -222,15 +212,15 @@
   height: 28px;
   border-radius: 50%;
   background: var(--bg);
-  border: 2px solid var(--lime);
-  color: var(--lime);
+  border: 2px solid var(--fc-accent);
+  color: var(--fc-accent);
   display: grid;
   place-items: center;
 }
 
 .hero[data-accent="cyan"] .trophyBadge {
-  border-color: var(--cyan);
-  color: var(--cyan);
+  border-color: var(--fc-accent);
+  color: var(--fc-accent);
 }
 
 .hero[data-accent="purple"] .trophyBadge {
@@ -254,11 +244,11 @@
   font-weight: 600;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--lime);
+  color: var(--fc-accent);
 }
 
 .hero[data-accent="cyan"] .eyebrowRow {
-  color: var(--cyan);
+  color: var(--fc-accent);
 }
 
 .hero[data-accent="purple"] .eyebrowRow {
@@ -314,6 +304,7 @@
 
 .subtitleDur {
   font-family: var(--f-display);
+  font-stretch: 125%;
   font-size: 16px;
   font-weight: 700;
   color: var(--t1);
@@ -331,15 +322,16 @@
 
 .headlineNum {
   font-family: var(--f-display);
+  font-stretch: 125%;
   font-weight: 800;
   font-size: 56px;
   line-height: 0.9;
   letter-spacing: 0.02em;
-  color: var(--lime);
+  color: var(--fc-accent);
 }
 
 .hero[data-accent="cyan"] .headlineNum {
-  color: var(--cyan);
+  color: var(--fc-accent);
 }
 
 .hero[data-accent="purple"] .headlineNum {
@@ -377,26 +369,26 @@
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.06em;
-  border: 1px solid rgba(52, 211, 153, 0.25);
+  border: 1px solid color-mix(in srgb, var(--fc-status-success) 25%, transparent);
   background: var(--good-soft);
   color: var(--good);
 }
 
 .deltaPill[data-tier="same"] {
-  border-color: rgba(245, 194, 66, 0.28);
+  border-color: color-mix(in srgb, var(--fc-status-warning) 28%, transparent);
   background: var(--warning-soft);
   color: var(--warning);
 }
 
 .deltaPill[data-tier="down"] {
-  border-color: rgba(255, 90, 95, 0.28);
+  border-color: color-mix(in srgb, var(--fc-status-error) 28%, transparent);
   background: var(--critical-soft);
   color: var(--critical);
 }
 
 .deltaPill[data-tier="baseline"] {
   border-color: var(--line);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
   color: var(--t3);
 }
 
@@ -410,11 +402,11 @@
   gap: 10px;
   padding: 12px 14px;
   border-radius: 14px;
-  border: 1px solid rgba(197, 255, 74, 0.3);
+  border: 1px solid var(--fc-accent-glow);
   background: linear-gradient(
     135deg,
-    rgba(197, 255, 74, 0.1),
-    rgba(197, 255, 74, 0.02)
+    var(--fc-accent-dim),
+    color-mix(in srgb, var(--fc-accent) 2%, transparent)
   );
 }
 
@@ -428,7 +420,7 @@
   border-radius: 50%;
   background: radial-gradient(
     circle,
-    rgba(197, 255, 74, 0.2),
+    var(--fc-accent-glow),
     transparent 70%
   );
   pointer-events: none;
@@ -441,9 +433,9 @@
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, var(--lime), var(--lime-2));
-  color: var(--lime-text);
-  box-shadow: 0 4px 12px rgba(197, 255, 74, 0.3);
+  background: linear-gradient(135deg, var(--fc-accent), var(--fc-accent));
+  color: var(--fc-ink);
+  box-shadow: 0 4px 12px var(--fc-accent-glow);
 }
 
 .prBannerMeta {
@@ -457,7 +449,7 @@
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--lime);
+  color: var(--fc-accent);
 }
 
 .prBannerTitle {
@@ -477,7 +469,7 @@
 
 .prBannerChevron {
   flex-shrink: 0;
-  color: var(--lime);
+  color: var(--fc-accent);
 }
 
 /* --- Stats row --- */
@@ -500,11 +492,11 @@
 }
 
 .statTilePr {
-  border-color: rgba(197, 255, 74, 0.25);
+  border-color: var(--fc-accent-glow);
   background: linear-gradient(
     135deg,
-    rgba(197, 255, 74, 0.08),
-    rgba(197, 255, 74, 0.02)
+    color-mix(in srgb, var(--fc-accent) 8%, transparent),
+    color-mix(in srgb, var(--fc-accent) 2%, transparent)
   );
 }
 
@@ -518,7 +510,7 @@
   border-radius: 50%;
   background: radial-gradient(
     circle,
-    rgba(197, 255, 74, 0.18),
+    var(--fc-accent-dim),
     transparent 70%
   );
   pointer-events: none;
@@ -537,12 +529,13 @@
 }
 
 .statTilePr .statHead {
-  color: var(--lime);
+  color: var(--fc-accent);
 }
 
 .statNum {
   margin-top: 2px;
   font-family: var(--f-display);
+  font-stretch: 125%;
   font-weight: 700;
   font-size: 22px;
   line-height: 1;
@@ -553,8 +546,8 @@
   color: var(--t4);
 }
 
-.statNumLime {
-  color: var(--lime);
+.statNumAction {
+  color: var(--fc-accent);
 }
 
 .statUnit {
@@ -593,9 +586,9 @@
   align-items: flex-start;
   padding: 11px 12px;
   border-radius: 13px;
-  background: rgba(79, 227, 232, 0.04);
-  border: 1px solid var(--cyan-dim);
-  border-left: 3px solid var(--cyan);
+  background: color-mix(in srgb, var(--fc-accent) 4%, transparent);
+  border: 1px solid var(--fc-accent-glow);
+  border-left: 3px solid var(--fc-accent);
 }
 
 .coachAvatar {
@@ -605,11 +598,11 @@
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, var(--cyan), rgba(79, 227, 232, 0.45));
+  background: linear-gradient(135deg, var(--fc-accent), var(--fc-accent-glow));
   font-family: var(--f-head);
   font-weight: 700;
   font-size: 10px;
-  color: var(--lime-text);
+  color: var(--fc-ink);
 }
 
 .coachEyebrow {
@@ -618,7 +611,7 @@
   font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(79, 227, 232, 0.85);
+  color: color-mix(in srgb, var(--fc-accent) 85%, transparent);
 }
 
 .coachText {
@@ -672,13 +665,13 @@
 }
 
 .exerciseRow:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--fc-surface-sunken);
   border-color: var(--line);
 }
 
 .exerciseRow[data-open="true"] {
-  background: rgba(79, 227, 232, 0.03);
-  border-color: var(--cyan-dim);
+  background: color-mix(in srgb, var(--fc-accent) 3%, transparent);
+  border-color: var(--fc-accent-glow);
 }
 
 .exerciseRow + .exerciseRow {
@@ -732,9 +725,9 @@
 }
 
 .pillStraight {
-  background: var(--cyan-soft);
-  color: var(--cyan);
-  border: 1px solid var(--cyan-dim);
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
+  border: 1px solid var(--fc-accent-glow);
 }
 
 .pillCluster {
@@ -746,11 +739,11 @@
 .pillDrop {
   background: var(--warning-soft);
   color: var(--warning);
-  border: 1px solid rgba(245, 194, 66, 0.28);
+  border: 1px solid color-mix(in srgb, var(--fc-status-warning) 28%, transparent);
 }
 
 .pillOther {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--fc-surface-sunken);
   color: var(--t3);
   border: 1px solid var(--line-2);
 }
@@ -783,8 +776,8 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  background: linear-gradient(135deg, var(--lime), var(--lime-2));
-  color: var(--lime-text);
+  background: linear-gradient(135deg, var(--fc-accent), var(--fc-accent));
+  color: var(--fc-ink);
 }
 
 .chevron {
@@ -795,7 +788,7 @@
 
 .exerciseRow[data-open="true"] .chevron {
   transform: rotate(180deg);
-  color: var(--cyan);
+  color: var(--fc-accent);
 }
 
 .expandBody {
@@ -817,7 +810,7 @@
 }
 
 .setGroupRowPr {
-  background: rgba(197, 255, 74, 0.04);
+  background: color-mix(in srgb, var(--fc-accent) 4%, transparent);
   padding: 6px 7px;
   margin: 0 -7px;
   border-radius: 6px;
@@ -834,7 +827,7 @@
 }
 
 .rangeLabelPr {
-  color: var(--lime);
+  color: var(--fc-accent);
 }
 
 .valueCol {
@@ -855,7 +848,7 @@
 .countBadge {
   padding: 1px 6px;
   border-radius: 5px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--fc-surface-sunken);
   color: var(--t3);
   font-family: var(--f-mono);
   font-size: 8.5px;
@@ -864,8 +857,8 @@
 }
 
 .countBadgePr {
-  background: var(--lime-soft);
-  color: var(--lime);
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
 }
 
 /* --- Sticky bar --- */
@@ -894,8 +887,8 @@
   padding: 13px;
   border-radius: 14px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--cyan);
+  background: var(--fc-surface-sunken);
+  color: var(--fc-accent);
   cursor: pointer;
   display: grid;
   place-items: center;
@@ -903,8 +896,8 @@
 }
 
 .btnOutline:hover {
-  background: rgba(79, 227, 232, 0.06);
-  border-color: var(--cyan-dim);
+  background: color-mix(in srgb, var(--fc-accent) 6%, transparent);
+  border-color: var(--fc-accent-glow);
 }
 
 .btnPrimary {
@@ -920,9 +913,9 @@
   font-family: var(--f-body);
   font-weight: 600;
   font-size: 14px;
-  color: var(--lime-text);
-  background: linear-gradient(135deg, var(--lime), var(--lime-2));
-  box-shadow: 0 4px 16px rgba(197, 255, 74, 0.25);
+  color: var(--fc-ink);
+  background: linear-gradient(135deg, var(--fc-accent), var(--fc-accent));
+  box-shadow: 0 4px 16px var(--fc-accent-glow);
 }
 
 .btnPrimary:disabled {

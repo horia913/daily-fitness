@@ -5,39 +5,21 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import ProtectedRoute from '@/components/ProtectedRoute'
-import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { useToast } from '@/components/ui/toast-provider'
-import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { DatabaseService } from '@/lib/database'
+import { getLatestClientWeight, type LatestClientWeight } from '@/lib/metrics/body'
 import { Button } from '@/components/ui/button'
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
   User,
-  Lock,
-  LogOut,
-  CheckCircle,
-  CreditCard,
-  Dumbbell,
   Star,
   Heart,
-  Target,
-  Shield,
-  Trophy,
-  Crosshair,
+  Scale,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { useTheme } from '@/contexts/ThemeContext'
-import { ClientPageShell } from '@/components/client-ui'
+import { ClientPageShell, ConfirmActionDialog } from '@/components/client-ui'
 import { PageSkeleton } from '@/components/ui/PageSkeleton'
 import { cn } from '@/lib/utils'
+import { PsHero } from '@/components/client/progress-suite'
 import styles from '@/components/client-profile/clientProfileV1.module.css'
 import {
   ProfileHero,
@@ -49,9 +31,6 @@ import {
   ProfileTextarea,
   ProfileSelect,
   UnitInput,
-  InfoCallout,
-  ProfileHubRow,
-  AccountRow,
   StickySaveBar,
 } from '@/components/client-profile'
 
@@ -74,7 +53,6 @@ const PROFILE_FIELD_LABELS: Record<keyof ProfileForm, string> = {
   bio: 'Bio',
   medical_conditions: 'Medical conditions',
   injuries: 'Injuries',
-  bodyweight: 'Bodyweight',
 }
 
 function dirtyKeys(form: ProfileForm, snap: ProfileForm): (keyof ProfileForm)[] {
@@ -111,7 +89,6 @@ type ProfileForm = {
   bio: string
   medical_conditions: string
   injuries: string
-  bodyweight: string
 }
 
 function emptyForm(): ProfileForm {
@@ -126,7 +103,6 @@ function emptyForm(): ProfileForm {
     bio: '',
     medical_conditions: '',
     injuries: '',
-    bodyweight: '',
   }
 }
 
@@ -138,7 +114,6 @@ function profileRowToForm(row: Record<string, unknown> | null): ProfileForm {
     dobStr = dob.slice(0, 10)
   }
   const hw = row.height_cm
-  const bw = row.bodyweight
   return {
     first_name: String(row.first_name ?? ''),
     last_name: String(row.last_name ?? ''),
@@ -150,7 +125,6 @@ function profileRowToForm(row: Record<string, unknown> | null): ProfileForm {
     bio: String(row.bio ?? ''),
     medical_conditions: String(row.medical_conditions ?? ''),
     injuries: String(row.injuries ?? ''),
-    bodyweight: bw != null && bw !== '' ? String(bw) : '',
   }
 }
 
@@ -176,7 +150,6 @@ function buildUpdatePayload(form: ProfileForm): Record<string, unknown> {
   const inj = trim(form.injuries)
 
   const heightNum = form.height_cm.trim() === '' ? null : Number(form.height_cm)
-  const weightNum = form.bodyweight.trim() === '' ? null : Number(form.bodyweight)
 
   const payload: Record<string, unknown> = {
     first_name: first || null,
@@ -189,41 +162,31 @@ function buildUpdatePayload(form: ProfileForm): Record<string, unknown> {
     bio: bio || null,
     medical_conditions: med || null,
     injuries: inj || null,
-    bodyweight: weightNum != null && !Number.isNaN(weightNum) ? weightNum : null,
   }
 
   return payload
 }
 
 export default function ClientProfilePage() {
-  const { user, signOut } = useAuth()
+  const { user } = useAuth()
   const router = useRouter()
   const { addToast } = useToast()
-  const { performanceSettings } = useTheme()
   const [viewAsUserId, setViewAsUserId] = useState<string | null>(null)
   const PROFILE_LOAD_TIMEOUT_MS = 30000
   const [profile, setProfile] = useState<Record<string, unknown> | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [avatarUrlKey, setAvatarUrlKey] = useState(0)
   const profileUserIdRef = useRef<string | null>(null)
-  const [showPasswordModal, setShowPasswordModal] = useState(false)
-  const [passwordData, setPasswordData] = useState({
-    newPassword: '',
-    confirmPassword: '',
-  })
-  const [passwordError, setPasswordError] = useState('')
-  const [passwordSuccess, setPasswordSuccess] = useState(false)
-  const [changingPassword, setChangingPassword] = useState(false)
 
   const [formData, setFormData] = useState<ProfileForm>(emptyForm())
   /** Last saved baseline; dirty when formData differs (client-only; viewAs ignores). */
   const [savedSnapshot, setSavedSnapshot] = useState<ProfileForm>(emptyForm())
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof ProfileForm, string>>>({})
-
-  const [subscriptionLine, setSubscriptionLine] = useState<string | null>(null)
+  const [latestWeight, setLatestWeight] = useState<LatestClientWeight | null>(null)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -255,6 +218,10 @@ export default function ClientProfilePage() {
         setFormData(next)
         setSavedSnapshot(next)
         setFieldErrors({})
+        const weight = await getLatestClientWeight(userId)
+        setLatestWeight(weight)
+      } else {
+        setLatestWeight(null)
       }
     } catch (error) {
       console.error('Error loading profile:', error)
@@ -292,59 +259,6 @@ export default function ClientProfilePage() {
       }
     }
   }, [user?.id, viewAsUserId, loadProfile])
-
-  useEffect(() => {
-    const uid = viewAsUserId || user?.id
-    if (!uid) {
-      setSubscriptionLine(null)
-      return
-    }
-    void (async () => {
-      const today = new Date().toISOString().slice(0, 10)
-      const { data, error } = await supabase
-        .from('clipcards')
-        .select(
-          'subscription_plan_label, start_date, end_date, subscription_status, is_active'
-        )
-        .eq('client_id', uid)
-        .order('created_at', { ascending: false })
-        .limit(10)
-      if (error) {
-        setSubscriptionLine(null)
-        return
-      }
-      const rows = (data || []) as Array<{
-        subscription_plan_label: string | null
-        start_date: string
-        end_date: string
-        subscription_status: string | null
-        is_active: boolean | null
-      }>
-      const row = rows.find((r) => {
-        if (!r.is_active) return false
-        const st = String(r.subscription_status || '').toLowerCase()
-        if (st === 'cancelled' || st === 'expired') return false
-        return r.end_date >= today
-      })
-      if (!row) {
-        setSubscriptionLine(null)
-        return
-      }
-      const start = new Date(row.start_date + 'T12:00:00Z').toLocaleDateString(undefined, {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      })
-      const end = new Date(row.end_date + 'T12:00:00Z').toLocaleDateString(undefined, {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      })
-      setSubscriptionLine(
-        `${row.subscription_plan_label || 'Active subscription'} · ${start} – ${end}`
-      )
-    })()
-  }, [user?.id, viewAsUserId])
 
   const effectiveUserId = viewAsUserId || user?.id
   const canEdit = !viewAsUserId
@@ -476,12 +390,6 @@ export default function ClientProfilePage() {
       return
     }
 
-    const weightNum = formData.bodyweight.trim() === '' ? null : Number(formData.bodyweight)
-    if (formData.bodyweight.trim() !== '' && (Number.isNaN(weightNum) || weightNum! < 0)) {
-      addToast({ title: 'Bodyweight must be a valid number (kg).', variant: 'destructive' })
-      return
-    }
-
     const payload = buildUpdatePayload(formData)
 
     try {
@@ -521,63 +429,20 @@ export default function ClientProfilePage() {
     }
   }
 
+  const discardChanges = () => {
+    setFormData(savedSnapshot)
+    setFieldErrors({})
+    setShowDiscardConfirm(false)
+  }
+
   const handleDiscard = () => {
     if (!canEdit) return
     const keys = dirtyKeys(formData, savedSnapshot)
     if (keys.length >= 3) {
-      const ok = window.confirm(`Discard changes to ${keys.length} fields?`)
-      if (!ok) return
-    }
-    setFormData(savedSnapshot)
-    setFieldErrors({})
-  }
-
-  const handleSignOut = async () => {
-    try {
-      await signOut()
-      window.location.href = '/'
-    } catch (error) {
-      console.error('Error signing out:', error)
-    }
-  }
-
-  const handlePasswordChange = async () => {
-    setPasswordError('')
-    setPasswordSuccess(false)
-
-    if (passwordData.newPassword.length < 6) {
-      setPasswordError('Password must be at least 6 characters')
+      setShowDiscardConfirm(true)
       return
     }
-
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setPasswordError('Passwords do not match')
-      return
-    }
-
-    try {
-      setChangingPassword(true)
-      const { error } = await supabase.auth.updateUser({
-        password: passwordData.newPassword,
-      })
-
-      if (error) {
-        setPasswordError(error.message)
-        return
-      }
-
-      setPasswordSuccess(true)
-      setPasswordData({ newPassword: '', confirmPassword: '' })
-
-      setTimeout(() => {
-        setShowPasswordModal(false)
-        setPasswordSuccess(false)
-      }, 2000)
-    } catch (error: unknown) {
-      setPasswordError(error instanceof Error ? error.message : 'Failed to change password')
-    } finally {
-      setChangingPassword(false)
-    }
+    discardChanges()
   }
 
   const displayEmail =
@@ -587,23 +452,29 @@ export default function ClientProfilePage() {
     const retryUserId = profileUserIdRef.current || viewAsUserId || user?.id
     return (
       <ProtectedRoute requiredRole="client">
-        <AnimatedBackground>
-          {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 flex items-center justify-center min-h-[50vh]">
-            <div className="p-4 max-w-md w-full text-center space-y-3 rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft">
-              <p className="text-sm fc-text-dim">{loadError}</p>
-              <Button
-                onClick={() => {
-                  if (retryUserId) loadProfile(retryUserId)
-                  else loadProfile(user?.id)
-                }}
-                className="fc-btn fc-btn-primary"
-              >
-                Retry
-              </Button>
-            </div>
-          </ClientPageShell>
-        </AnimatedBackground>
+        <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
+          <PsHero
+            glow="action"
+            onBack={() => router.push('/client/me')}
+            backAriaLabel="Back to Me"
+            eyebrow="Me · profile"
+            eyebrowColor="var(--fc-accent)"
+            title="Profile"
+            subtitle="Personal info and training context"
+          />
+          <div className="mt-4 rounded-[13px] border border-[color:var(--fc-hairline)] px-4 py-8 text-center">
+            <p className="mb-3 text-sm fc-text-dim">{loadError}</p>
+            <Button
+              onClick={() => {
+                if (retryUserId) loadProfile(retryUserId)
+                else loadProfile(user?.id)
+              }}
+              className="fc-btn fc-btn-primary"
+            >
+              Retry
+            </Button>
+          </div>
+        </ClientPageShell>
       </ProtectedRoute>
     )
   }
@@ -611,12 +482,9 @@ export default function ClientProfilePage() {
   if (loading) {
     return (
       <ProtectedRoute requiredRole="client">
-        <AnimatedBackground>
-          {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
-            <PageSkeleton variant="form" />
-          </ClientPageShell>
-        </AnimatedBackground>
+        <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
+          <PageSkeleton variant="form" />
+        </ClientPageShell>
       </ProtectedRoute>
     )
   }
@@ -632,372 +500,250 @@ export default function ClientProfilePage() {
 
   return (
     <ProtectedRoute requiredRole="client">
-      <AnimatedBackground>
-        {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell
-          className={cn(
-            'max-w-lg mx-auto px-4 pt-6 overflow-x-hidden',
-            canEdit
-              ? 'pb-[calc(var(--fc-bottom-safe-area)+3rem)]'
-              : 'pb-[var(--fc-bottom-safe-area)]',
-          )}
-        >
-          <div className={styles.root}>
-            <div className={styles.sectionStack}>
-              <ProfileHero
-                avatarUrl={avatarUrl}
-                avatarUrlKey={avatarUrlKey}
-                firstName={formData.first_name}
-                lastName={formData.last_name}
-                displayEmail={displayEmail}
-                memberSinceLabel={memberSince}
-                coachingState={null}
-                canEdit={canEdit}
-                uploadingImage={uploadingImage}
-                onPhotoChange={handleImageUpload}
+      <ClientPageShell
+        className={cn(
+          'max-w-lg lg:max-w-3xl mx-auto px-4 pt-6 overflow-x-hidden',
+          canEdit
+            ? 'pb-[calc(var(--fc-bottom-safe-area)+3rem)]'
+            : 'pb-[var(--fc-bottom-safe-area)]',
+        )}
+      >
+        <div className={styles.root}>
+          <div className={styles.sectionStack}>
+            <PsHero
+              glow="action"
+              onBack={canEdit ? () => router.push('/client/me') : undefined}
+              backAriaLabel="Back to Me"
+              eyebrow="Me · profile"
+              eyebrowColor="var(--fc-accent)"
+              title="Profile"
+              subtitle="Personal info and training context"
+            />
+
+            <ProfileHero
+              avatarUrl={avatarUrl}
+              avatarUrlKey={avatarUrlKey}
+              firstName={formData.first_name}
+              lastName={formData.last_name}
+              displayEmail={displayEmail}
+              memberSinceLabel={memberSince}
+              coachingState={null}
+              canEdit={canEdit}
+              uploadingImage={uploadingImage}
+              onPhotoChange={handleImageUpload}
+            />
+
+            <ProfileSection>
+              <SectionHead
+                tone="cyan"
+                title="Personal info"
+                description="Identity and contact details"
+                icon={<User size={14} strokeWidth={2} aria-hidden />}
               />
-
-              {subscriptionLine && (
-                <div className={styles.subscriptionNote}>
-                  <CreditCard className="w-3.5 h-3.5 shrink-0 mt-0.5 opacity-80" aria-hidden />
-                  <span>{subscriptionLine}</span>
-                </div>
-              )}
-
-              <ProfileSection>
-                <SectionHead
-                  tone="cyan"
-                  title="Personal info"
-                  description="Identity and contact details"
-                  icon={<User size={14} strokeWidth={2} aria-hidden />}
-                />
-                <FieldGroup2>
-                  <ProfileField label="First name" required error={fieldErrors.first_name}>
-                    <ProfileTextInput
-                      value={formData.first_name}
-                      onChange={(v) => patchForm({ first_name: v })}
-                      disabled={!canEdit}
-                      dirty={fieldDirty('first_name')}
-                      error={fieldErrors.first_name}
-                    />
-                  </ProfileField>
-                  <ProfileField label="Last name" required error={fieldErrors.last_name}>
-                    <ProfileTextInput
-                      value={formData.last_name}
-                      onChange={(v) => patchForm({ last_name: v })}
-                      disabled={!canEdit}
-                      dirty={fieldDirty('last_name')}
-                      error={fieldErrors.last_name}
-                    />
-                  </ProfileField>
-                </FieldGroup2>
-                <ProfileField label="Phone" optional>
+              <FieldGroup2>
+                <ProfileField label="First name" required error={fieldErrors.first_name}>
                   <ProfileTextInput
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(v) => patchForm({ phone: v })}
+                    value={formData.first_name}
+                    onChange={(v) => patchForm({ first_name: v })}
                     disabled={!canEdit}
-                    dirty={fieldDirty('phone')}
+                    dirty={fieldDirty('first_name')}
+                    error={fieldErrors.first_name}
                   />
                 </ProfileField>
-                <FieldGroup2>
-                  <ProfileField label="Date of birth">
-                    <ProfileTextInput
-                      type="date"
-                      value={formData.date_of_birth}
-                      onChange={(v) => patchForm({ date_of_birth: v })}
-                      disabled={!canEdit}
-                      dirty={fieldDirty('date_of_birth')}
-                    />
-                  </ProfileField>
-                  <ProfileField label="Sex">
-                    <ProfileSelect
-                      value={formData.sex}
-                      onChange={(v) => patchForm({ sex: v })}
-                      disabled={!canEdit}
-                      ariaLabel="Sex"
-                      dirty={fieldDirty('sex')}
-                    >
-                      <option value="">Select</option>
-                      {SEX_OPTIONS.map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </ProfileSelect>
-                  </ProfileField>
-                </FieldGroup2>
-              </ProfileSection>
-
-              <ProfileSection>
-                <SectionHead
-                  tone="purple"
-                  title="Body stats"
-                  description={
-                    <>
-                      Profile baseline · history under{' '}
-                      <Link href="/client/progress" className={styles.cyanLink}>
-                        Progress
-                      </Link>
-                    </>
-                  }
-                  icon={<Dumbbell size={14} strokeWidth={2} aria-hidden />}
-                />
-                <InfoCallout>
-                  <>
-                    Updates your profile weight for your coach. Body metrics history lives under{' '}
-                    <Link href="/client/progress" className={styles.cyanLink}>
-                      Progress
-                    </Link>
-                    .
-                  </>
-                </InfoCallout>
-                <FieldGroup2>
-                  <ProfileField label="Height">
-                    <UnitInput
-                      value={formData.height_cm}
-                      onChange={(v) => patchForm({ height_cm: v })}
-                      disabled={!canEdit}
-                      unit="cm"
-                      inputMode="decimal"
-                      min={0}
-                      step="0.1"
-                      dirty={fieldDirty('height_cm')}
-                    />
-                  </ProfileField>
-                  <ProfileField label="Bodyweight">
-                    <UnitInput
-                      value={formData.bodyweight}
-                      onChange={(v) => patchForm({ bodyweight: v })}
-                      disabled={!canEdit}
-                      unit="kg"
-                      inputMode="decimal"
-                      min={0}
-                      step="0.1"
-                      dirty={fieldDirty('bodyweight')}
-                    />
-                  </ProfileField>
-                </FieldGroup2>
-              </ProfileSection>
-
-              <ProfileSection>
-                <SectionHead
-                  tone="warn"
-                  title="Training"
-                  description="How you train and what your coach should know"
-                  icon={<Star size={14} strokeWidth={2} aria-hidden />}
-                />
-                <ProfileField label="Fitness level">
-                  <ProfileSelect
-                    value={formData.fitness_level}
-                    onChange={(v) => patchForm({ fitness_level: v })}
+                <ProfileField label="Last name" required error={fieldErrors.last_name}>
+                  <ProfileTextInput
+                    value={formData.last_name}
+                    onChange={(v) => patchForm({ last_name: v })}
                     disabled={!canEdit}
-                    ariaLabel="Fitness level"
-                    dirty={fieldDirty('fitness_level')}
+                    dirty={fieldDirty('last_name')}
+                    error={fieldErrors.last_name}
+                  />
+                </ProfileField>
+              </FieldGroup2>
+              <ProfileField label="Phone" optional>
+                <ProfileTextInput
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(v) => patchForm({ phone: v })}
+                  disabled={!canEdit}
+                  dirty={fieldDirty('phone')}
+                />
+              </ProfileField>
+              <FieldGroup2>
+                <ProfileField label="Date of birth">
+                  <ProfileTextInput
+                    type="date"
+                    value={formData.date_of_birth}
+                    onChange={(v) => patchForm({ date_of_birth: v })}
+                    disabled={!canEdit}
+                    dirty={fieldDirty('date_of_birth')}
+                  />
+                </ProfileField>
+                <ProfileField label="Sex">
+                  <ProfileSelect
+                    value={formData.sex}
+                    onChange={(v) => patchForm({ sex: v })}
+                    disabled={!canEdit}
+                    ariaLabel="Sex"
+                    dirty={fieldDirty('sex')}
                   >
                     <option value="">Select</option>
-                    <option value="beginner">Beginner</option>
-                    <option value="intermediate">Intermediate</option>
-                    <option value="advanced">Advanced</option>
+                    {SEX_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
                   </ProfileSelect>
                 </ProfileField>
-                <ProfileField label="Bio" optional>
-                  <ProfileTextarea
-                    rows={3}
-                    maxLength={2000}
-                    placeholder="Tell your coach a bit about yourself (optional)"
-                    value={formData.bio}
-                    onChange={(v) => patchForm({ bio: v })}
+              </FieldGroup2>
+            </ProfileSection>
+
+            <ProfileSection>
+              <SectionHead
+                tone="purple"
+                title="Body stats"
+                description={
+                  <>
+                    Height on your profile · weight from{' '}
+                    <Link href="/client/progress/body-metrics" className={styles.cyanLink}>
+                      Body metrics
+                    </Link>
+                  </>
+                }
+                icon={<Scale size={14} strokeWidth={2} aria-hidden />}
+              />
+              <FieldGroup2>
+                <ProfileField label="Height">
+                  <UnitInput
+                    value={formData.height_cm}
+                    onChange={(v) => patchForm({ height_cm: v })}
                     disabled={!canEdit}
-                    dirty={fieldDirty('bio')}
+                    unit="cm"
+                    inputMode="decimal"
+                    min={0}
+                    step="0.1"
+                    dirty={fieldDirty('height_cm')}
                   />
                 </ProfileField>
-              </ProfileSection>
-
-              <ProfileSection>
-                <SectionHead
-                  tone="rose"
-                  title="Health"
-                  description="Safety context for programming and check-ins"
-                  icon={<Heart size={14} strokeWidth={2} aria-hidden />}
-                />
-                <ProfileField label="Medical conditions" optional>
-                  <ProfileTextarea
-                    rows={3}
-                    placeholder="Anything your coach should know about your health"
-                    value={formData.medical_conditions}
-                    onChange={(v) => patchForm({ medical_conditions: v })}
-                    disabled={!canEdit}
-                    dirty={fieldDirty('medical_conditions')}
-                  />
-                </ProfileField>
-                <ProfileField label="Injuries" optional>
-                  <ProfileTextarea
-                    rows={3}
-                    placeholder="Past or current injuries"
-                    value={formData.injuries}
-                    onChange={(v) => patchForm({ injuries: v })}
-                    disabled={!canEdit}
-                    dirty={fieldDirty('injuries')}
-                  />
-                </ProfileField>
-              </ProfileSection>
-
-              <ProfileSection>
-                <SectionHead
-                  tone="lime"
-                  title="Profile hub"
-                  description="Achievements and goals live on their own screens"
-                  icon={<Target size={14} strokeWidth={2} aria-hidden />}
-                />
-                <div className={styles.hubStack}>
-                  <ProfileHubRow
-                    icon={<Trophy size={15} strokeWidth={2} aria-hidden />}
-                    iconClassName={styles.hubIconWarn}
-                    title="Achievements"
-                    subtitle="Milestones and badges earned"
-                    onClick={() => router.push('/client/progress/achievements')}
-                  />
-                  <ProfileHubRow
-                    icon={<Crosshair size={15} strokeWidth={2} aria-hidden />}
-                    iconClassName={styles.hubIconGood}
-                    title="Goal history"
-                    subtitle="Active targets and completed goals"
-                    onClick={() => router.push('/client/goals/history')}
-                  />
-                </div>
-              </ProfileSection>
-
-              {canEdit && (
-                <ProfileSection>
-                  <SectionHead
-                    tone="cyan"
-                    title="Account"
-                    description="Security and session"
-                    icon={<Shield size={14} strokeWidth={2} aria-hidden />}
-                  />
-                  <div className={styles.accountStack}>
-                    <AccountRow
-                      variant="neutral"
-                      icon={<Lock size={14} strokeWidth={2} aria-hidden />}
-                      label="Change password"
-                      onClick={() => setShowPasswordModal(true)}
-                    />
-                    <AccountRow
-                      variant="danger"
-                      icon={<LogOut size={14} strokeWidth={2} aria-hidden />}
-                      label="Sign out"
-                      onClick={() => void handleSignOut()}
-                    />
+                <ProfileField label="Current weight">
+                  <div className={styles.weightReadonly}>
+                    {latestWeight ? (
+                      <>
+                        <p className={styles.weightValue}>{latestWeight.weightKg} kg</p>
+                        <p className={styles.weightMeta}>
+                          Logged{' '}
+                          {new Date(latestWeight.measuredDate + 'T12:00:00').toLocaleDateString(
+                            'en-US',
+                            { month: 'short', day: 'numeric', year: 'numeric' },
+                          )}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-sm fc-text-dim">—</p>
+                    )}
+                    <Link
+                      href="/client/progress/body-metrics"
+                      className={cn(styles.cyanLink, 'mt-1.5 inline-block')}
+                    >
+                      {latestWeight ? 'Update in Body metrics →' : 'Log weight in Body metrics →'}
+                    </Link>
                   </div>
-                </ProfileSection>
-              )}
-            </div>
+                </ProfileField>
+              </FieldGroup2>
+            </ProfileSection>
 
-            <StickySaveBar
-              visible={canEdit}
-              isDirty={isDirty}
-              dirtyCount={dirtyKeyList.length}
-              dirtySummaryLine={dirtySummary}
-              saving={saving}
-              onSave={() => {
-                if (saving) return
-                void handleSave()
-              }}
-              onDiscard={handleDiscard}
-              discardDisabled={saving}
-            />
+            <ProfileSection>
+              <SectionHead
+                tone="warn"
+                title="Training"
+                description="How you train and what your coach should know"
+                icon={<Star size={14} strokeWidth={2} aria-hidden />}
+              />
+              <ProfileField label="Fitness level">
+                <ProfileSelect
+                  value={formData.fitness_level}
+                  onChange={(v) => patchForm({ fitness_level: v })}
+                  disabled={!canEdit}
+                  ariaLabel="Fitness level"
+                  dirty={fieldDirty('fitness_level')}
+                >
+                  <option value="">Select</option>
+                  <option value="beginner">Beginner</option>
+                  <option value="intermediate">Intermediate</option>
+                  <option value="advanced">Advanced</option>
+                </ProfileSelect>
+              </ProfileField>
+              <ProfileField label="Bio" optional>
+                <ProfileTextarea
+                  rows={3}
+                  maxLength={2000}
+                  placeholder="Tell your coach a bit about yourself (optional)"
+                  value={formData.bio}
+                  onChange={(v) => patchForm({ bio: v })}
+                  disabled={!canEdit}
+                  dirty={fieldDirty('bio')}
+                />
+              </ProfileField>
+            </ProfileSection>
+
+            <ProfileSection>
+              <SectionHead
+                tone="rose"
+                title="Health"
+                description="Safety context for programming and check-ins"
+                icon={<Heart size={14} strokeWidth={2} aria-hidden />}
+              />
+              <p className="mb-1 text-xs leading-relaxed fc-text-dim">
+                Your coach can see this, so they can train around injuries.
+              </p>
+              <ProfileField label="Medical conditions" optional>
+                <ProfileTextarea
+                  rows={3}
+                  placeholder="Conditions that affect training"
+                  value={formData.medical_conditions}
+                  onChange={(v) => patchForm({ medical_conditions: v })}
+                  disabled={!canEdit}
+                  dirty={fieldDirty('medical_conditions')}
+                />
+              </ProfileField>
+              <ProfileField label="Injuries" optional>
+                <ProfileTextarea
+                  rows={3}
+                  placeholder="Past or current injuries"
+                  value={formData.injuries}
+                  onChange={(v) => patchForm({ injuries: v })}
+                  disabled={!canEdit}
+                  dirty={fieldDirty('injuries')}
+                />
+              </ProfileField>
+            </ProfileSection>
           </div>
-        </ClientPageShell>
 
-        <Dialog
-          open={showPasswordModal}
-          onOpenChange={(open) => {
-            setShowPasswordModal(open)
-            if (!open) {
-              setPasswordData({ newPassword: '', confirmPassword: '' })
-              setPasswordError('')
-              setPasswordSuccess(false)
-            }
-          }}
-        >
-          <DialogContent className="max-w-md border border-[color:var(--fc-glass-border)]">
-            <DialogHeader>
-              <DialogTitle className="fc-text-primary">Change password</DialogTitle>
-            </DialogHeader>
+          <StickySaveBar
+            visible={canEdit}
+            isDirty={isDirty}
+            dirtyCount={dirtyKeyList.length}
+            dirtySummaryLine={dirtySummary}
+            saving={saving}
+            onSave={() => {
+              if (saving) return
+              void handleSave()
+            }}
+            onDiscard={handleDiscard}
+            discardDisabled={saving}
+          />
+        </div>
+      </ClientPageShell>
 
-            {passwordSuccess ? (
-              <div className="text-center py-6">
-                <CheckCircle className="w-14 h-14 mx-auto mb-3 fc-text-success" aria-hidden />
-                <p className="text-base font-semibold fc-text-success">Password changed successfully!</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div>
-                  <Label htmlFor="newPassword" className="text-xs fc-text-dim">
-                    New password
-                  </Label>
-                  <Input
-                    id="newPassword"
-                    type="password"
-                    placeholder="Enter new password"
-                    value={passwordData.newPassword}
-                    onChange={(e) =>
-                      setPasswordData((prev) => ({ ...prev, newPassword: e.target.value }))
-                    }
-                    className="mt-1 h-11 rounded-lg"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="confirmPassword" className="text-xs fc-text-dim">
-                    Confirm password
-                  </Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    placeholder="Confirm new password"
-                    value={passwordData.confirmPassword}
-                    onChange={(e) =>
-                      setPasswordData((prev) => ({ ...prev, confirmPassword: e.target.value }))
-                    }
-                    className="mt-1 h-11 rounded-lg"
-                  />
-                </div>
-
-                {passwordError && (
-                  <div className="p-2.5 rounded-lg border border-[color-mix(in_srgb,var(--fc-status-error)_35%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-error)_12%,transparent)] fc-text-error text-sm">
-                    {passwordError}
-                  </div>
-                )}
-
-                <DialogFooter className="gap-2 sm:gap-2 pt-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-11 rounded-lg sm:flex-1"
-                    onClick={() => {
-                      setShowPasswordModal(false)
-                      setPasswordData({ newPassword: '', confirmPassword: '' })
-                      setPasswordError('')
-                      setPasswordSuccess(false)
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="button"
-                    className="h-11 rounded-lg fc-btn fc-btn-primary sm:flex-1"
-                    onClick={() => void handlePasswordChange()}
-                    disabled={changingPassword}
-                  >
-                    {changingPassword ? 'Changing…' : 'Change password'}
-                  </Button>
-                </DialogFooter>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-      </AnimatedBackground>
+      <ConfirmActionDialog
+        open={showDiscardConfirm}
+        onOpenChange={setShowDiscardConfirm}
+        title="Discard changes?"
+        description={`You’ll lose edits to ${dirtyKeyList.length} fields. This can’t be undone.`}
+        confirmLabel="Discard"
+        variant="destructive"
+        onConfirm={discardChanges}
+      />
     </ProtectedRoute>
   )
 }

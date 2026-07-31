@@ -11,6 +11,7 @@ import { ToastProvider } from "@/components/ui/toast-provider";
 import { PrefetchProvider } from "@/components/PrefetchProvider";
 import MobileCompatibilityProvider from "@/components/MobileCompatibilityProvider";
 import NavigationProgress from "@/components/NavigationProgress";
+import { QueryProvider } from "@/components/providers/QueryProvider";
 
 export const metadata: Metadata = {
   title: "DailyFitness",
@@ -41,7 +42,7 @@ export default function RootLayout({
           crossOrigin=""
         />
         <link
-          href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;600;700;800;900&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
           rel="stylesheet"
         />
       </head>
@@ -57,19 +58,21 @@ export default function RootLayout({
 `,
           }}
         />
-        <MobileCompatibilityProvider />
-        <ServiceWorkerProvider />
-        <ToastProvider>
-          <ThemeProvider>
-            <AuthProvider>
-              <PrefetchProvider>
-                <OneSignalProvider>
-                  <AppLayout>{children}</AppLayout>
-                </OneSignalProvider>
-              </PrefetchProvider>
-            </AuthProvider>
-          </ThemeProvider>
-        </ToastProvider>
+        <QueryProvider>
+          <MobileCompatibilityProvider />
+          <ServiceWorkerProvider />
+          <ToastProvider>
+            <ThemeProvider>
+              <AuthProvider>
+                <PrefetchProvider>
+                  <OneSignalProvider>
+                    <AppLayout>{children}</AppLayout>
+                  </OneSignalProvider>
+                </PrefetchProvider>
+              </AuthProvider>
+            </ThemeProvider>
+          </ToastProvider>
+        </QueryProvider>
       </body>
     </html>
   );

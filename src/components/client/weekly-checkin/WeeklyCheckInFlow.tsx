@@ -12,6 +12,7 @@ import type { WeeklyCheckInFlowProps } from "./WeeklyCheckInFlowTypes";
 import { getClientMeasurements, getFirstMeasurement, upsertMeasurement } from "@/lib/measurementService";
 import { uploadPhoto } from "@/lib/progressPhotoService";
 import { getLogRange, dbToUiScale } from "@/lib/wellnessService";
+import { toLocalDateString } from "@/lib/clientActivityService";
 import { AchievementService } from "@/lib/achievementService";
 import { AchievementUnlockModal } from "@/components/ui/AchievementUnlockModal";
 import type { Achievement } from "@/components/ui/AchievementCard";
@@ -92,7 +93,7 @@ export function WeeklyCheckInFlow({
   useEffect(() => {
     if (step !== 3) return;
     let cancelled = false;
-    const today = new Date().toISOString().split("T")[0];
+    const today = toLocalDateString(new Date());
     const endThis = new Date();
     const startThis = new Date();
     startThis.setDate(startThis.getDate() - 6);
@@ -104,8 +105,8 @@ export function WeeklyCheckInFlow({
       const [measurements, first, logsThis, logsLast] = await Promise.all([
         getClientMeasurements(clientId, 2),
         getFirstMeasurement(clientId),
-        getLogRange(clientId, startThis.toISOString().split("T")[0], today),
-        getLogRange(clientId, startLast.toISOString().split("T")[0], endLast.toISOString().split("T")[0]),
+        getLogRange(clientId, toLocalDateString(startThis), today),
+        getLogRange(clientId, toLocalDateString(startLast), toLocalDateString(endLast)),
       ]);
       if (!cancelled) {
         setPreviousMeasurement(measurements[1] ?? null);
@@ -125,7 +126,7 @@ export function WeeklyCheckInFlow({
     if (bodyData.weight_kg == null || bodyData.weight_kg <= 0) return;
     setSubmitting(true);
     try {
-      const today = new Date().toISOString().split("T")[0];
+      const today = toLocalDateString(new Date());
       const measurement = await upsertMeasurement({
         client_id: clientId,
         measured_date: today,
@@ -147,6 +148,15 @@ export function WeeklyCheckInFlow({
       if (!measurement) {
         if (mountedRef.current) setSubmitError("Failed to save measurement.");
         return;
+      }
+      try {
+        const { emitInAppNotification } = await import("@/lib/inAppNotificationEvents");
+        void emitInAppNotification({
+          event: "coach_periodical_checkin",
+          periodKey: today,
+        });
+      } catch {
+        /* non-blocking */
       }
       const order: ("front" | "side" | "back")[] = ["front", "side", "back"];
       for (const type of order) {
@@ -227,17 +237,21 @@ export function WeeklyCheckInFlow({
   }, [clientId, bodyData, photoFiles, notesToCoach, onComplete, firstMeasurement]);
 
   const photosEnabled = config?.photos_enabled ?? true;
+  const totalSteps = photosEnabled ? 3 : 2;
   const notesEnabled = config?.notes_to_coach_enabled ?? true;
+  const bodyStepLabel = `Step 1 of ${totalSteps}`;
+  const photosStepLabel = `Step 2 of ${totalSteps}`;
+  const reviewStepLabel = `Step ${totalSteps} of ${totalSteps}`;
 
   return (
     <div className="space-y-6">
       <CheckinHero
         onBack={onBack}
         backAriaLabel="Back"
-        eyebrow="Scheduled check-in"
-        eyebrowColor="var(--cs-cyan)"
-        title="Weekly review"
-        subtitle="3 quick steps · ~2 minutes"
+        eyebrow="Check-in"
+        eyebrowColor="var(--fc-accent)"
+        title="Periodical check-in"
+        subtitle={`${totalSteps} quick steps · ~${photosEnabled ? 2 : 1} minutes`}
       />
 
       {step === 1 && (
@@ -246,16 +260,18 @@ export function WeeklyCheckInFlow({
           setBodyData={setBodyData}
           config={config}
           lastMeasurement={lastMeasurement}
-          onNext={() => setStep(2)}
+          stepLabel={bodyStepLabel}
+          onNext={() => setStep(photosEnabled ? 2 : 3)}
         />
       )}
 
-      {step === 2 && (
+      {photosEnabled && step === 2 && (
         <StepPhotos
           photoFiles={photoFiles}
           setPhotoFiles={setPhotoFiles}
           lastPhotoDate={lastPhotoDate}
           weightKg={bodyData.weight_kg}
+          stepLabel={photosStepLabel}
           onSkip={() => setStep(3)}
           onNext={() => setStep(3)}
         />
@@ -271,6 +287,7 @@ export function WeeklyCheckInFlow({
           notesToCoach={notesToCoach}
           setNotesToCoach={setNotesToCoach}
           notesEnabled={notesEnabled}
+          stepLabel={reviewStepLabel}
           onSubmit={handleSubmit}
           submitting={submitting}
           frequencyDays={config?.frequency_days}

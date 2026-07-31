@@ -1,0 +1,97 @@
+REPLUMB — per-set prescriptions → execution UI (instance path)
+Date: 2026-07-16
+Scope: TypeScript only; no DB / no reskin / standalone path untouched
+
+================================================================================
+1. FILES CHANGED
+================================================================================
+Types / carry-through
+  src/types/workoutSetEntries.ts
+    + prescriptions?: Prescription[] on WorkoutSetEntryExercise
+    (reuses Prescription from @/lib/groupModel/types — CanvasExercise element type)
+  src/lib/groupModel/toLegacyBlockShape.ts
+    mapSlotToExercise copies slot.prescriptions onto the exercise
+  src/lib/instanceWorkoutBlocksMapper.ts
+    comment only — already attached prescriptions[] + firstRx scalar fallback
+  src/app/client/workouts/[id]/start/types.ts
+    ClientBlockExerciseRecord.prescriptions?
+  src/app/client/workouts/[id]/start/page.tsx
+    clientBlocks + workoutBlocksConverted pass prescriptions through
+
+Shared resolve (insertion point)
+  src/components/client/workout-execution/ui/set-rows/resolveSetPrescriptionTargets.ts  (NEW)
+  src/components/client/workout-execution/ui/set-rows/resolveSetRowWeightDefault.ts
+    + prescribedWeightKg as highest priority when non-null
+
+Row consumers (createDefaultRow + fillRemaining only)
+  src/components/client/workout-execution/blocks/StraightSetExecutor.tsx
+  src/components/client/workout-execution/blocks/SupersetExecutor.tsx
+  src/components/client/workout-execution/blocks/GiantSetExecutor.tsx
+  src/components/client/workout-execution/blocks/DropSetExecutor.tsx
+
+================================================================================
+2. WHERE PER-SET RESOLUTION LANDED
+================================================================================
+Shared point (preferred):
+  resolveSetPrescriptionTargets(exercise, setNumber) — match by set_number
+  resolveSetRowWeightDefault({ ..., prescribedWeightKg }) — weight hierarchy entry
+
+Wired into the 4 executors that use useSetRowsState + SetRowShell row prefills
+(Straight / Superset / Giant / Drop). Those are the only surfaces that show
+"one target per set row" today.
+
+Other 9 executors (Amrap, Emom, Tabata, ForTime, Cluster, RestPause, Timed,
+Speed, Endurance, PreExhaustion) do not use that shared row-prefill path;
+they keep scalar / protocol-specific UIs. No bespoke edits there.
+
+LiveWorkoutSetEntry uses WorkoutSetEntry → WorkoutSetEntryExercise, so the
+type addition covers the live path without a separate Live exercise type.
+
+================================================================================
+3. PREFILL HIERARCHY (as implemented)
+================================================================================
+Per field for set N (resolveSetPrescriptionTargets):
+  1. prescriptions.find(p => p.set_number === N).field  when non-null / non-empty
+  2. exercise-level scalar (reps, weight_kg, load_percentage, rir, tempo)
+     — reps also falls back to block.reps_per_set
+  3. null → caller continues
+
+Weight row prefill (resolveSetRowWeightDefault):
+  1. prescribedWeightKg (from step above, includes exercise scalar if rx null)
+  2. last-session weight for that set_number (unchanged)
+  3. previous row weight when set > 1 (unchanged)
+  4. session sticky / defaultWeight (unchanged)
+  5. suggestedWeight (unchanged)
+  6. blank
+
+Reps row prefill: parseRepsTarget(targets.reps).numericDefault when > 0,
+else previous row — same as before, but source is per-set targets.
+
+Null per-set values (e.g. CMJ set 2–3 weight null) fall through to exercise
+scalar / last-time / blank — never hard-copied from set 1's prescription row.
+
+================================================================================
+4. STANDALONE + LOGGING UNTOUCHED
+================================================================================
+Standalone: workoutBlocksRpcMapper.ts / adaptRpcBlockToLegacy — not modified.
+  Template path still omits prescriptions[]; scalars work as before.
+
+Logging: buildLogSetInsertData, /api/log-set, deriveSetType — not modified.
+  Log payload remains byte-identical.
+
+================================================================================
+5. tsc
+================================================================================
+npx tsc --noEmit → exit 0
+
+================================================================================
+VERIFY (manual)
+================================================================================
+Author an instance exercise with different non-null weights on sets 1/2/3 in
+the coach canvas, open /client/workouts/<wa-id>/start — each SetRowShell weight
+field should match its set_number prescription.
+
+Fallback: Popescu CMJ (set1 weight set, 2–3 null) — sets 2–3 must not show
+set1 weight from prescriptions; they fall through hierarchy.
+
+END

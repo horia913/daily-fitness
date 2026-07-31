@@ -48,7 +48,7 @@ export function WeeklyStrip({ weekStart, todayStr, logsThisWeek }: WeeklyStripPr
       <div className="flex items-center justify-between gap-2">
         <span
           className={cn(checkinSuiteStyles.fontMono, "text-[10px] font-semibold uppercase tracking-[0.16em]")}
-          style={{ color: "var(--cs-cyan)" }}
+          style={{ color: "var(--fc-accent)" }}
         >
           This week
         </span>
@@ -69,7 +69,7 @@ export function WeeklyStrip({ weekStart, todayStr, logsThisWeek }: WeeklyStripPr
             <div key={dateStr} className="flex flex-col items-center gap-1">
               <div
                 className={cn(checkinSuiteStyles.fontMono, "text-[9px] font-medium uppercase tracking-[0.1em]")}
-                style={{ color: isToday ? "var(--cs-cyan)" : "var(--cs-t3)" }}
+                style={{ color: isToday ? "var(--fc-accent)" : "var(--cs-t3)" }}
               >
                 {label}
               </div>
@@ -99,8 +99,8 @@ export function WeeklyStrip({ weekStart, todayStr, logsThisWeek }: WeeklyStripPr
                         ? {
                             cursor: "pointer",
                             background: "var(--cs-card-2)",
-                            borderColor: "var(--cs-cyan)",
-                            boxShadow: "0 0 0 2px var(--cs-cyan-soft)",
+                            borderColor: "var(--fc-accent)",
+                            boxShadow: "0 0 0 2px var(--fc-accent-dim)",
                           }
                         : {
                             cursor: "pointer",

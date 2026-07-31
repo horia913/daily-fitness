@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
@@ -74,9 +74,9 @@ export default function CoachClientWorkoutLogsListPage() {
   }, [load]);
 
   const formatWeight = (v: number | string | null) => {
-    if (v == null || v === "") return "—";
+    if (v == null || v === "") return "â€”";
     const n = Number(v);
-    if (Number.isNaN(n)) return "—";
+    if (Number.isNaN(n)) return "â€”";
     return `${Math.round(n)} kg`;
   };
 
@@ -114,7 +114,7 @@ export default function CoachClientWorkoutLogsListPage() {
             <li key={r.id}>
               <Link
                 href={`/coach/clients/${clientId}/workout-logs/${r.id}`}
-                className="block rounded-2xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4 hover:border-[color:var(--fc-domain-workouts)]/50 transition-colors"
+                className="block rounded-2xl border border-[color:var(--fc-glass-border)] bg-transparent p-4 hover:border-[color:var(--fc-domain-workouts)]/50 transition-colors"
               >
                 <p className="font-medium fc-text-primary">{r.workoutName}</p>
                 <p className="text-xs fc-text-dim mt-1">
@@ -125,8 +125,8 @@ export default function CoachClientWorkoutLogsListPage() {
                   })}
                 </p>
                 <p className="text-xs fc-text-subtle mt-2">
-                  {r.total_duration_minutes != null ? `${r.total_duration_minutes} min` : "—"} ·{" "}
-                  {r.total_sets_completed != null ? `${r.total_sets_completed} sets` : "—"} · Vol{" "}
+                  {r.total_duration_minutes != null ? `${r.total_duration_minutes} min` : "â€”"} Â·{" "}
+                  {r.total_sets_completed != null ? `${r.total_sets_completed} sets` : "â€”"} Â· Vol{" "}
                   {formatWeight(r.total_weight_lifted)}
                 </p>
               </Link>

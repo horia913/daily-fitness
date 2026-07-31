@@ -108,7 +108,7 @@ export default function V4LabPage() {
         <header className="mb-8">
           <div
             className="text-[10px] font-bold tracking-[0.16em] uppercase"
-            style={{ color: "var(--fc-accent-cyan)" }}
+            style={{ color: "var(--fc-accent)" }}
           >
             Dev only · v4-lab
           </div>
@@ -265,7 +265,7 @@ export default function V4LabPage() {
             <WeekMiniGrid
               ariaLabel="Sets logged last 7 days (scaled)"
               mode="scale"
-              accent="var(--fc-accent-lime)"
+              accent="var(--fc-accent)"
               days={[
                 { label: "M", value: 6 },
                 { label: "T", value: 0 },

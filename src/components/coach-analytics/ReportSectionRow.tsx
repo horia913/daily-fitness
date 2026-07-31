@@ -22,16 +22,19 @@ export function ReportSectionRow({
   onRequiredClick: () => void
 }) {
   const showRequiredStyle = required && checked
+  const showSelectedStyle = !required && checked
 
-  const row = (
+  return (
     <div
       role={required ? undefined : 'button'}
       tabIndex={required ? -1 : 0}
       className={cn(
-        'flex cursor-pointer items-center gap-2.5 rounded-[11px] border px-3 py-2.5 transition-colors',
+        'flex cursor-pointer items-center gap-2.5 rounded-[10px] border px-3 py-2.5 transition-colors',
         showRequiredStyle
-          ? 'border-[rgba(52,211,153,0.18)] bg-[rgba(52,211,153,0.04)]'
-          : 'border-[color:var(--line-2)] bg-[color:var(--card-2)] hover:bg-[rgba(255,255,255,0.03)]',
+          ? 'border-[color-mix(in_srgb,var(--fc-status-success)_38%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-success)_7%,transparent)]'
+          : showSelectedStyle
+            ? 'border-[color-mix(in_srgb,var(--fc-accent)_42%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent)_7%,transparent)]'
+            : 'border-[color:var(--line)] bg-transparent hover:bg-[rgba(255,255,255,0.03)]',
       )}
       onClick={() => {
         if (required) onRequiredClick()
@@ -50,56 +53,63 @@ export function ReportSectionRow({
         style={
           showRequiredStyle
             ? { background: 'var(--good-soft)', color: 'var(--good)' }
-            : { background: 'rgba(255,255,255,0.04)', color: 'var(--t3)' }
+            : showSelectedStyle
+              ? { background: 'var(--fc-accent-dim)', color: 'var(--fc-accent)' }
+              : { background: 'rgba(255,255,255,0.06)', color: 'var(--t2)' }
         }
       >
         <Icon className="size-3" strokeWidth={2} aria-hidden />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs font-medium" style={{ color: 'var(--t1)' }}>
+        <div className="flex items-center gap-1.5">
+          <span
+            className="truncate text-xs font-semibold"
+            style={{ color: 'var(--t1)' }}
+          >
             {name}
           </span>
           {required ? (
             <span
-              className="rounded border px-1 py-px font-semibold uppercase"
+              className="shrink-0 rounded px-[5px] py-0.5 font-bold uppercase"
               style={{
-                fontFamily: 'var(--f-mono, "Geist Mono", monospace)',
+                fontFamily: 'var(--f-mono, ui-monospace, monospace)',
                 fontSize: '7.5px',
                 letterSpacing: '0.1em',
-                background: 'var(--good-soft)',
-                color: 'var(--good)',
-                borderColor: 'rgba(52,211,153,0.2)',
+                background: 'color-mix(in srgb, var(--fc-status-success) 18%, transparent)',
+                color: 'var(--fc-status-success)',
               }}
             >
               Required
             </span>
           ) : null}
         </div>
-        <p className="mt-0.5 text-[10.5px] leading-snug" style={{ color: 'var(--t3)' }}>
+        <p
+          className="mt-0.5 truncate text-[10px] leading-snug"
+          style={{ color: 'var(--t3)' }}
+        >
           {description}
         </p>
       </div>
       <button
         type="button"
         title={required ? 'Required for this template' : undefined}
-        className="flex size-[18px] shrink-0 items-center justify-center rounded-[5px] border transition-colors"
+        className="flex size-[19px] shrink-0 items-center justify-center rounded-[6px] border transition-colors"
         style={
           required
             ? {
-                background: 'var(--good)',
-                borderColor: 'var(--good)',
-                color: '#0a1a18',
+                background: 'var(--fc-status-success)',
+                borderColor: 'var(--fc-status-success)',
+                color: '#08120A',
               }
             : checked
               ? {
-                  background: 'var(--cyan)',
-                  borderColor: 'var(--cyan)',
-                  color: '#0a1a26',
+                  background: 'var(--fc-accent)',
+                  borderColor: 'var(--fc-accent)',
+                  color: '#fff',
                 }
               : {
-                  background: 'rgba(255,255,255,0.04)',
-                  borderColor: 'var(--line)',
+                  background: 'transparent',
+                  borderColor: 'var(--line-2)',
                 }
         }
         onClick={(e) => {
@@ -117,6 +127,4 @@ export function ReportSectionRow({
       </button>
     </div>
   )
-
-  return row
 }

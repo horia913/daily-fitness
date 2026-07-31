@@ -1,0 +1,80 @@
+# ATHLETE SCORE — recompute stale scores on clients list
+**Date:** 2026-07-07  
+**Scope:** `GET /api/coach/clients` inline stale recompute only
+
+---
+
+## 1. Files changed
+
+| Path | Change |
+|------|--------|
+| `src/app/api/coach/clients/route.ts` | Import `calculateAthleteScore`; add `recomputeStaleAthleteScoresForList`; invoke after client rows assembled |
+
+**Untouched:** `src/lib/athleteScoreService.ts`, `src/app/api/cron/daily-sync/route.ts`, `src/lib/discardWorkoutSession.ts`, `athlete_scores` migrations/schema, list/grid UI components, `getClientMetrics`, training payload, meal-plan fetch, batched score summaries.
+
+---
+
+## 2. Target-set criteria, cap, error handling
+
+### Recompute targets (all must hold)
+
+| Criterion | Implementation |
+|-----------|----------------|
+| Stale | `scoreIsStale === true` (existing `computeScoreIsStale(athleteScore, lastActive)`) |
+| Active program | `hasActiveProgram === true` |
+| Not paused | `pauseStatus !== 'paused'` |
+| Throttle | `athleteScore.calculated_at` at least **1 hour** old (`scoreCalculatedBeforeOneHourAgo`) — mirrors `GET /api/client/athlete-score` |
+| Cap | First **5** matching clients in roster order (`STALE_SCORE_RECOMPUTE_CAP = 5`) |
+
+### Per-target behavior
+
+- `await calculateAthleteScore(clientId, supabaseAdmin)` with service-role client (same pattern as cron/discard).
+- **Success** (`skipped: false`): replace `athleteScore` with `{ score, tier, calculated_at, paused }` and set **`scoreIsStale = false`**.
+- **Skipped** (`no_program` / `paused` / `no_data`): log `console.warn`, keep prior `athleteScore` + `scoreIsStale` (UI stays "—").
+- **Thrown error**: log `console.error`, keep prior values — **list response never fails** on recompute.
+
+Recompute runs only when `SUPABASE_SERVICE_ROLE_KEY` and `NEXT_PUBLIC_SUPABASE_URL` are set.
+
+---
+
+## 3. Fences & preserved behavior
+
+| Item | Status |
+|------|--------|
+| `calculateAthleteScore` | **Not modified** — only called |
+| Daily-sync cron | **Untouched** |
+| Discard path | **Untouched** |
+| `athlete_scores` schema | **No migration** |
+| List response shape | **Unchanged** — same client fields; fresh scores swapped in for recomputed clients only |
+| `getClientMetrics`, training payload, `mealPlanName`, score summary batch | **Unchanged** (run before recompute) |
+
+---
+
+## 4. Idempotency / no duplicate rows
+
+Recompute uses the existing **`calculateAthleteScore` upsert** on `UNIQUE(client_id, window_start, window_end)`. Repeated list loads update the **current week row** — no new insert path added.
+
+---
+
+## 5. UI confirmation (no change required)
+
+List and grid already render the score ring when:
+
+```ts
+athleteScore != null && !scoreIsStale
+```
+
+(`CoachClientListCard.tsx`, `CoachClientGridCard.tsx`)
+
+After a successful recompute, Popescu (or any stale eligible client) receives a fresh `athleteScore` with `scoreIsStale: false` → **real ring on first load**. No card changes made.
+
+---
+
+## 6. `tsc` result
+
+```
+npx tsc --noEmit
+exit code: 0
+```
+
+No git commits.

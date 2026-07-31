@@ -1,13 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { CoachPageShell } from "@/components/coach-ui/CoachPageShell";
-import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/IconButton";
 import {
@@ -26,13 +24,13 @@ import { withTimeout } from "@/lib/withTimeout";
 import { fetchApi } from "@/lib/apiClient";
 import type { Client } from "./coachClientsTypes";
 import {
-  coachClientAvatarSeverity,
-  coachClientListVisualTierFromTraining,
   coachClientNeedsTrainingAttention,
   coachClientTrainingAttentionSortKey,
 } from "./coachClientsUtils";
-import { CoachClientListRow } from "./CoachClientListRow";
-import { CoachClientGridCard } from "./CoachClientGridCard";
+import {
+  CoachAthleteCard,
+  CoachAthleteCardStack,
+} from "@/components/coach/CoachAthleteCard";
 import styles from "./coachClients.module.css";
 
 type ViewMode = "grid" | "list";
@@ -62,30 +60,60 @@ function readInitialViewMode(): ViewMode {
 }
 
 function needsAttention(client: Client): boolean {
-  return coachClientNeedsTrainingAttention(client.trainingStatus);
+  return coachClientNeedsTrainingAttention(client);
 }
 
 function ClientManagementContent() {
   const { user, profile } = useAuth();
-  const { performanceSettings } = useTheme();
+  const queryClient = useQueryClient();
 
-  const [clients, setClients] = useState<Client[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortBy, setSortBy] = useState<SortOption>("lastActive");
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const loadingRef = useRef(false);
-  const didLoadRef = useRef(false);
 
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const sortWrapRef = useRef<HTMLDivElement>(null);
 
-  const patchClient = useCallback((clientId: string, patch: Partial<Client>) => {
-    setClients((prev) => prev.map((c) => (c.id === clientId ? { ...c, ...patch } : c)));
-  }, []);
+  const clientsQuery = useQuery({
+    queryKey: ["coach-clients", user?.id],
+    queryFn: async ({ signal }) => {
+      const res = await withTimeout(
+        fetchApi("/api/coach/clients", { signal: signal ?? null }),
+        25_000,
+        "timeout",
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error ?? `HTTP ${res.status}`);
+      }
+      const { clients: list } = await res.json();
+      return (Array.isArray(list) ? list : []) as Client[];
+    },
+    enabled: !!user,
+  });
+
+  const clients = clientsQuery.data ?? [];
+  const loading = clientsQuery.isLoading;
+  const loadError = clientsQuery.isError
+    ? clientsQuery.error instanceof Error
+      ? clientsQuery.error.message
+      : "Failed to load clients"
+    : null;
+
+  const patchClient = useCallback(
+    (clientId: string, patch: Partial<Client>) => {
+      queryClient.setQueryData(
+        ["coach-clients", user?.id],
+        (old: Client[] | undefined) => {
+          if (!old) return old;
+          return old.map((c) => (c.id === clientId ? { ...c, ...patch } : c));
+        },
+      );
+    },
+    [queryClient, user?.id],
+  );
 
   useEffect(() => {
     setViewMode(readInitialViewMode());
@@ -108,51 +136,6 @@ function ClientManagementContent() {
       /* ignore */
     }
   };
-
-  const loadClients = useCallback(async (signal?: AbortSignal) => {
-    if (!user) return;
-    if (didLoadRef.current) return;
-    if (loadingRef.current) return;
-    didLoadRef.current = true;
-    loadingRef.current = true;
-    try {
-      setLoading(true);
-      setLoadError(null);
-      const res = await withTimeout(
-        fetchApi("/api/coach/clients", { signal: signal ?? null }),
-        25_000,
-        "timeout"
-      );
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body?.error ?? `HTTP ${res.status}`);
-      }
-      const { clients: list } = await res.json();
-      setClients(Array.isArray(list) ? list : []);
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name === "AbortError") {
-        didLoadRef.current = false;
-        return;
-      }
-      console.error("Error loading clients:", err);
-      setLoadError(err instanceof Error ? err.message : "Failed to load clients");
-      didLoadRef.current = false;
-    } finally {
-      setLoading(false);
-      loadingRef.current = false;
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (!user) return;
-    const ac = new AbortController();
-    loadClients(ac.signal);
-    return () => {
-      didLoadRef.current = false;
-      loadingRef.current = false;
-      ac.abort();
-    };
-  }, [user, loadClients]);
 
   const formatRelativeTime = (dateStr: string | null): { text: string; color: string } => {
     if (!dateStr) {
@@ -217,8 +200,8 @@ function ClientManagementContent() {
         case "workouts":
           return b.metrics.workoutsThisWeek - a.metrics.workoutsThisWeek;
         case "needsAttention": {
-          const ak = coachClientTrainingAttentionSortKey(a.trainingStatus);
-          const bk = coachClientTrainingAttentionSortKey(b.trainingStatus);
+          const ak = coachClientTrainingAttentionSortKey(a);
+          const bk = coachClientTrainingAttentionSortKey(b);
           if (ak !== bk) return ak - bk;
           const aDate2 = a.metrics.lastActive || "";
           const bDate2 = b.metrics.lastActive || "";
@@ -240,10 +223,8 @@ function ClientManagementContent() {
 
   return (
     <AnimatedBackground>
-      {performanceSettings.floatingParticles && <FloatingParticles />}
-
-      <CoachPageShell widthVariant="data-7xl" className="pb-[var(--fc-bottom-safe-area)] px-0 sm:px-0">
-        <header className="sticky top-0 z-40 border-b border-[color:var(--fc-glass-border)] bg-[color:color-mix(in_srgb,var(--fc-bg-deep)_88%,transparent)] backdrop-blur-md">
+      <CoachPageShell widthVariant="canvas-full" className="pb-[var(--fc-bottom-safe-area)] px-0 sm:px-0">
+        <header className="sticky top-0 z-40 border-b border-[color:var(--fc-hairline)] bg-[color:var(--fc-bg-deep)]">
           <div className="px-4 pt-1 sm:px-6 sm:pt-2">
             <div className={styles.topbar}>
               <div className={styles.coachAvatar} aria-hidden>
@@ -315,7 +296,7 @@ function ClientManagementContent() {
                 <button
                   key={filter}
                   type="button"
-                  className={cn(styles.pill, quickFilter === filter && styles.pillActiveLime)}
+                  className={cn(styles.pill, quickFilter === filter && styles.pillActiveAction)}
                   onClick={() => setQuickFilter(quickFilter === filter ? "all" : filter)}
                 >
                   {filter === "needsAttention" ? (
@@ -401,20 +382,14 @@ function ClientManagementContent() {
 
         <main className="px-0 pb-6 pt-2">
           {loadError && !loading ? (
-            <div className="px-4 sm:px-6">
-              <GlassCard elevation={2} className="fc-card-shell p-8 text-center">
-                <p className="mb-4 text-sm text-[color:var(--fc-status-error)]">{loadError}</p>
-                <Button
-                  className="fc-btn fc-btn-primary"
-                  onClick={() => {
-                    setLoadError(null);
-                    didLoadRef.current = false;
-                    loadClients();
-                  }}
-                >
-                  Retry
-                </Button>
-              </GlassCard>
+            <div className={styles.emptyPanel}>
+              <p className="mb-4 text-sm text-[color:var(--fc-status-error)]">{loadError}</p>
+              <Button
+                className="fc-btn fc-btn-primary"
+                onClick={() => void clientsQuery.refetch()}
+              >
+                Retry
+              </Button>
             </div>
           ) : loading ? (
             <div className="space-y-4 px-4 sm:px-6">
@@ -422,41 +397,39 @@ function ClientManagementContent() {
               <div className="fc-skeleton rounded-2xl" style={{ height: 120 }} />
             </div>
           ) : filteredClients.length === 0 ? (
-            <div className="px-4 sm:px-6">
-              <GlassCard elevation={2} className="fc-card-shell p-12 text-center">
-                <Users className="mx-auto mb-6 h-24 w-24 text-[color:var(--fc-text-subtle)]" />
-                <h3 className="mb-2 text-2xl font-bold text-[color:var(--fc-text-primary)]">
-                  {searchQuery || statusFilter !== "all" || quickFilter !== "all"
-                    ? "No clients found"
-                    : "Build your coaching roster"}
-                </h3>
-                <p className="mb-6 text-sm text-[color:var(--fc-text-dim)]">
-                  {searchQuery || statusFilter !== "all" || quickFilter !== "all"
-                    ? "Try adjusting your search or filters"
-                    : "Start by adding your first client to begin tracking their progress"}
-                </p>
-                <div className="flex flex-wrap items-center justify-center gap-4">
-                  <Link href="/coach/clients/add">
-                    <Button className="fc-btn fc-btn-primary">
-                      <Plus className="mr-2 h-5 w-5" />
-                      Add your first client
-                    </Button>
-                  </Link>
-                  {(searchQuery || statusFilter !== "all" || quickFilter !== "all") && (
-                    <Button
-                      variant="ghost"
-                      className="fc-btn fc-btn-ghost"
-                      onClick={() => {
-                        setSearchQuery("");
-                        setStatusFilter("all");
-                        setQuickFilter("all");
-                      }}
-                    >
-                      Clear filters
-                    </Button>
-                  )}
-                </div>
-              </GlassCard>
+            <div className={styles.emptyPanel}>
+              <Users className="mx-auto mb-5 h-16 w-16 text-[color:var(--fc-text-subtle)]" />
+              <h3 className={styles.emptyTitle}>
+                {searchQuery || statusFilter !== "all" || quickFilter !== "all"
+                  ? "No clients found"
+                  : "Build your coaching roster"}
+              </h3>
+              <p className={styles.emptyBody}>
+                {searchQuery || statusFilter !== "all" || quickFilter !== "all"
+                  ? "Try adjusting your search or filters"
+                  : "Start by adding your first client to begin tracking their progress"}
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <Link href="/coach/clients/add">
+                  <Button className="fc-btn fc-btn-primary">
+                    <Plus className="mr-2 h-5 w-5" />
+                    Add your first client
+                  </Button>
+                </Link>
+                {(searchQuery || statusFilter !== "all" || quickFilter !== "all") && (
+                  <Button
+                    variant="ghost"
+                    className="fc-btn fc-btn-ghost"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setStatusFilter("all");
+                      setQuickFilter("all");
+                    }}
+                  >
+                    Clear filters
+                  </Button>
+                )}
+              </div>
             </div>
           ) : viewMode === "grid" ? (
             <div className={styles.gridWrap}>
@@ -464,10 +437,21 @@ function ClientManagementContent() {
                 const act = formatRelativeTime(client.metrics.lastActive);
                 const chk = formatRelativeTime(client.metrics.lastCheckinDate);
                 return (
-                  <CoachClientGridCard
+                  <CoachAthleteCard
                     key={client.id}
-                    client={client}
+                    variant="grid"
+                    clientId={client.id}
+                    name={client.name}
+                    email={client.email}
+                    avatarUrl={client.avatar}
                     href={`/coach/clients/${client.id}`}
+                    attention={
+                      client.attention ?? {
+                        level: "on_track",
+                        reasons: [],
+                      }
+                    }
+                    client={client}
                     lastActivityLabel={act.text}
                     lastActivityColor={act.color}
                     lastCheckinLabel={chk.text}
@@ -478,36 +462,34 @@ function ClientManagementContent() {
               })}
             </div>
           ) : (
-            <div className={styles.listCol}>
+            <CoachAthleteCardStack className={styles.listCol}>
               {filteredClients.map((client) => {
-                const tier = coachClientListVisualTierFromTraining(
-                  client.status,
-                  client.trainingStatus,
-                );
-                const avatarSev = coachClientAvatarSeverity(tier);
                 const act = formatMetaPart(client.metrics.lastActive, "Never trained");
                 const chk = formatMetaPart(client.metrics.lastCheckinDate, "Never checked in");
-                const metaNeverOnly = !client.metrics.lastActive && !client.metrics.lastCheckinDate;
-                const weekShort =
-                  client.metrics.programCurrentWeek != null ? `W${client.metrics.programCurrentWeek}` : null;
                 return (
-                  <CoachClientListRow
+                  <CoachAthleteCard
                     key={client.id}
-                    client={client}
+                    variant="list"
+                    clientId={client.id}
+                    name={client.name}
+                    avatarUrl={client.avatar}
                     href={`/coach/clients/${client.id}`}
-                    tier={tier}
-                    avatarSev={avatarSev}
+                    attention={
+                      client.attention ?? {
+                        level: "on_track",
+                        reasons: [],
+                      }
+                    }
+                    client={client}
                     activityText={act.text}
                     activityColor={act.color}
                     checkinText={chk.text}
                     checkinColor={chk.color}
-                    weekShort={weekShort}
-                    metaNeverOnly={metaNeverOnly}
                     onPatch={(patch) => patchClient(client.id, patch)}
                   />
                 );
               })}
-            </div>
+            </CoachAthleteCardStack>
           )}
         </main>
       </CoachPageShell>

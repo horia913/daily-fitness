@@ -2,13 +2,10 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { ClientPageShell } from "@/components/client-ui";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { Button } from "@/components/ui/button";
-import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
-import { FloatingParticles } from "@/components/ui/FloatingParticles";
 
 import { supabase } from "@/lib/supabase";
 import { ChevronLeft } from "lucide-react";
@@ -41,7 +38,6 @@ const calculateNutritionForServing = (food: Food, servingSize: number) => {
 export default function FoodDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { performanceSettings } = useTheme();
 
   const foodId = Array.isArray(params.id) ? params.id[0] : params.id;
   const [food, setFood] = useState<Food | null>(null);
@@ -98,8 +94,7 @@ export default function FoodDetailPage() {
   if (loadError) {
     return (
       <ProtectedRoute requiredRole="client">
-        <AnimatedBackground>
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden flex flex-col items-center justify-center min-h-[50vh]">
+          <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden flex flex-col items-center justify-center min-h-[50vh]">
             <div className="py-8 px-4 text-center w-full">
               <p className="text-sm fc-text-dim mb-1">{loadError}</p>
               <p className="text-xs fc-text-subtle mb-4">Check your connection and try again.</p>
@@ -126,7 +121,6 @@ export default function FoodDetailPage() {
               </div>
             </div>
           </ClientPageShell>
-        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
@@ -134,12 +128,9 @@ export default function FoodDetailPage() {
   if (loading) {
     return (
       <ProtectedRoute requiredRole="client">
-        <AnimatedBackground>
-          {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
+          <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
             <PageSkeleton variant="dashboard" />
           </ClientPageShell>
-        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
@@ -147,9 +138,7 @@ export default function FoodDetailPage() {
   if (!food) {
     return (
       <ProtectedRoute requiredRole="client">
-        <AnimatedBackground>
-          {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
+          <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
             <div className="py-8 px-4 text-center">
               <h2 className="text-sm fc-text-dim font-medium">Food not found</h2>
               <p className="mt-1 text-xs fc-text-subtle">This food item is no longer available.</p>
@@ -163,7 +152,6 @@ export default function FoodDetailPage() {
               </div>
             </div>
           </ClientPageShell>
-        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
@@ -176,14 +164,12 @@ export default function FoodDetailPage() {
 
   return (
     <ProtectedRoute requiredRole="client">
-      <AnimatedBackground>
-        {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 space-y-4 overflow-x-hidden">
+        <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 space-y-4 overflow-x-hidden">
           <nav className="flex items-center justify-between">
             <button
               type="button"
               onClick={() => router.push("/client/nutrition")}
-              className="w-10 h-10 rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft flex items-center justify-center fc-text-dim hover:fc-text-primary transition-colors"
+              className="w-10 h-10 rounded-xl border border-[color:var(--fc-glass-border)] bg-transparent flex items-center justify-center fc-text-dim hover:fc-text-primary transition-colors"
               aria-label="Back"
             >
               <ChevronLeft className="w-5 h-5" />
@@ -191,7 +177,7 @@ export default function FoodDetailPage() {
           </nav>
 
           <header className="mb-1">
-            <h1 className="text-xl font-bold fc-text-primary tracking-tight mb-2 break-words">{food.name}</h1>
+            <h1 className="text-xl font-bold fc-text-primary tracking-tight mb-2 break-words [font-family:var(--f-headline)]">{food.name}</h1>
             {food.brand ? <p className="text-xs fc-text-dim mb-2">{food.brand}</p> : null}
             <p className="text-xs fc-text-dim">
               <span className="fc-text-subtle">·</span> {food.category}
@@ -206,7 +192,7 @@ export default function FoodDetailPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className="min-h-[44px] min-w-[44px] p-0 border-[color:var(--fc-glass-border)] fc-glass-soft fc-text-primary"
+                className="min-h-[44px] min-w-[44px] p-0 border-[color:var(--fc-glass-border)] bg-transparent fc-text-primary"
                 onClick={() => setFoodServingSize(Math.max(0.1, foodServingSize - 0.1))}
                 aria-label="Decrease serving"
               >
@@ -218,7 +204,7 @@ export default function FoodDetailPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className="min-h-[44px] min-w-[44px] p-0 border-[color:var(--fc-glass-border)] fc-glass-soft fc-text-primary"
+                className="min-h-[44px] min-w-[44px] p-0 border-[color:var(--fc-glass-border)] bg-transparent fc-text-primary"
                 onClick={() => setFoodServingSize(foodServingSize + 0.1)}
                 aria-label="Increase serving"
               >
@@ -228,47 +214,47 @@ export default function FoodDetailPage() {
             </div>
           </header>
 
-          <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3">
-            <p className="text-[10px] font-bold uppercase tracking-wider fc-text-dim mb-2">Energy</p>
+          <div className="rounded-xl border border-[color:var(--fc-glass-border)] bg-transparent p-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] fc-text-dim [font-family:var(--f-mono)] mb-2">Energy</p>
             <div className="flex flex-wrap items-end gap-1 mb-3">
-              <span className="text-2xl font-semibold tabular-nums fc-text-primary">{nutrition.calories}</span>
+              <span className="text-2xl font-semibold tabular-nums fc-text-primary [font-family:var(--f-display)]">{nutrition.calories}</span>
               <span className="text-sm font-medium fc-text-dim uppercase tracking-wide pb-0.5">kcal</span>
             </div>
             <div className="flex flex-wrap items-stretch gap-0 rounded-lg border border-[color:var(--fc-glass-border)] overflow-hidden bg-[color:var(--fc-bg-deep)]/50">
               <div className="flex flex-1 min-w-[4.5rem] flex-col items-center justify-center py-2.5 px-2">
-                <span className="text-base font-semibold tabular-nums fc-text-primary">{nutrition.protein}</span>
+                <span className="text-base font-semibold tabular-nums fc-text-primary [font-family:var(--f-mono)]">{nutrition.protein}</span>
                 <span className="text-[10px] uppercase tracking-wider fc-text-dim">Protein g</span>
               </div>
               <div className="w-px self-stretch min-h-[2rem] bg-[color:var(--fc-glass-border)]" />
               <div className="flex flex-1 min-w-[4.5rem] flex-col items-center justify-center py-2.5 px-2">
-                <span className="text-base font-semibold tabular-nums fc-text-primary">{nutrition.carbs}</span>
+                <span className="text-base font-semibold tabular-nums fc-text-primary [font-family:var(--f-mono)]">{nutrition.carbs}</span>
                 <span className="text-[10px] uppercase tracking-wider fc-text-dim">Carbs g</span>
               </div>
               <div className="w-px self-stretch min-h-[2rem] bg-[color:var(--fc-glass-border)]" />
               <div className="flex flex-1 min-w-[4.5rem] flex-col items-center justify-center py-2.5 px-2">
-                <span className="text-base font-semibold tabular-nums fc-text-primary">{nutrition.fat}</span>
+                <span className="text-base font-semibold tabular-nums fc-text-primary [font-family:var(--f-mono)]">{nutrition.fat}</span>
                 <span className="text-[10px] uppercase tracking-wider fc-text-dim">Fat g</span>
               </div>
               <div className="w-px self-stretch min-h-[2rem] bg-[color:var(--fc-glass-border)]" />
               <div className="flex flex-1 min-w-[4.5rem] flex-col items-center justify-center py-2.5 px-2">
-                <span className="text-base font-semibold tabular-nums fc-text-primary">{nutrition.fiber}</span>
+                <span className="text-base font-semibold tabular-nums fc-text-primary [font-family:var(--f-mono)]">{nutrition.fiber}</span>
                 <span className="text-[10px] uppercase tracking-wider fc-text-dim">Fiber g</span>
               </div>
             </div>
           </div>
 
-          <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4">
-            <h3 className="text-[10px] font-bold uppercase tracking-wider fc-text-dim mb-4">Macro mix</h3>
+          <div className="rounded-xl border border-[color:var(--fc-glass-border)] bg-transparent p-4">
+            <h3 className="text-[10px] font-bold uppercase tracking-[0.14em] fc-text-dim [font-family:var(--f-mono)] mb-4">Macro mix</h3>
             <div className="space-y-5">
               <div>
                 <div className="flex justify-between items-end mb-2">
                   <span className="text-sm font-semibold fc-text-primary tracking-tight">Protein</span>
-                  <span className="font-mono text-sm font-semibold tabular-nums text-[color:var(--fc-macro-protein,var(--fc-accent-cyan))]">
+                  <span className="font-mono text-sm font-semibold tabular-nums text-[color:var(--fc-macro-protein,var(--fc-accent))]">
                     {nutrition.protein}g <span className="fc-text-dim font-normal">/ {proteinPct}%</span>
                   </span>
                 </div>
                 <div className="h-2 w-full rounded-full bg-[color:var(--fc-glass-border)] overflow-hidden">
-                  <div className="h-full rounded-full bg-[color:var(--fc-macro-protein,var(--fc-accent-cyan))]" style={{ width: `${proteinPct}%` }} />
+                  <div className="h-full rounded-full bg-[color:var(--fc-macro-protein,var(--fc-accent))]" style={{ width: `${proteinPct}%` }} />
                 </div>
               </div>
               <div>
@@ -297,7 +283,6 @@ export default function FoodDetailPage() {
           </div>
 
         </ClientPageShell>
-      </AnimatedBackground>
     </ProtectedRoute>
   );
 }

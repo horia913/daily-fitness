@@ -1,786 +1,223 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
-import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { ClientPageShell } from "@/components/client-ui";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-
+import { ChevronLeft } from "lucide-react";
+import { useToast } from "@/components/ui/toast-provider";
+import MealCardWithOptions from "@/components/client/MealCardWithOptions";
+import {
+  completeMeal,
+  addPhotoToCompletion,
+  undoCompletion,
+} from "@/lib/mealCompletionService";
+import { fetchClientNutritionPage } from "@/lib/clientNutritionPageData";
 import { supabase } from "@/lib/supabase";
-import { withTimeout } from "@/lib/withTimeout";
-import { ChevronLeft, Edit3, Trash2, CheckCircle2 } from "lucide-react";
+import type { MappedMeal } from "@/lib/nutritionPageDataMapper";
 
-interface MealItem {
-  id: string;
-  meal_id: string;
-  food_name: string;
-  quantity: number;
-  unit: string;
-  calories_per_unit: number;
-  protein_per_unit: number;
-  carbs_per_unit: number;
-  fat_per_unit: number;
-  order_index: number;
+function todayStr() {
+  return new Date().toISOString().split("T")[0];
 }
 
-interface Meal {
-  id: string;
-  meal_plan_id: string;
-  name: string;
-  meal_type: "breakfast" | "lunch" | "dinner" | "snack";
-  notes?: string;
-  order_index: number;
-  meal_items?: MealItem[];
-}
-
-const MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack"] as const;
-type MealType = (typeof MEAL_TYPES)[number];
-
-function isLegacyCompositeMealId(mealId: string): boolean {
-  const firstDash = mealId.indexOf("-");
-  if (firstDash <= 0) return false;
-  const prefix = mealId.substring(0, firstDash);
-  return (MEAL_TYPES as readonly string[]).includes(prefix);
-}
-
-function mapFoodRowsToMealItems(
-  mealId: string,
-  rows: Array<{
-    id: string;
-    quantity: number | string;
-    unit?: string | null;
-    foods?: {
-      name?: string;
-      serving_size?: number;
-      serving_unit?: string;
-      calories_per_serving?: number;
-      protein?: number;
-      carbs?: number;
-      fat?: number;
-    } | Array<{
-      name?: string;
-      serving_size?: number;
-      serving_unit?: string;
-      calories_per_serving?: number;
-      protein?: number;
-      carbs?: number;
-      fat?: number;
-    }> | null;
-    order_index?: number | null;
-  }>
-): MealItem[] {
-  return rows.map((item, index) => {
-    const food = Array.isArray(item.foods) ? item.foods[0] : item.foods;
-    const servingSize = food?.serving_size || 100;
-    return {
-      id: item.id,
-      meal_id: mealId,
-      food_name: food?.name || "Unknown Food",
-      quantity: Number(item.quantity),
-      unit: item.unit || food?.serving_unit || "g",
-      calories_per_unit: (food?.calories_per_serving || 0) / servingSize,
-      protein_per_unit: (food?.protein || 0) / servingSize,
-      carbs_per_unit: (food?.carbs || 0) / servingSize,
-      fat_per_unit: (food?.fat || 0) / servingSize,
-      order_index: item.order_index ?? index,
-    };
-  });
-}
-
-/** Badge surface + border from design tokens (no raw Tailwind palette). */
-function getMealTypeBadgeClasses(mealType: string): string {
-  switch (mealType) {
-    case "breakfast":
-      return "bg-[color-mix(in_srgb,var(--fc-status-warning)_18%,transparent)] border-[color-mix(in_srgb,var(--fc-status-warning)_35%,transparent)]";
-    case "lunch":
-      return "bg-[color-mix(in_srgb,var(--fc-domain-meals)_18%,transparent)] border-[color-mix(in_srgb,var(--fc-domain-meals)_35%,transparent)]";
-    case "dinner":
-      return "bg-[color-mix(in_srgb,var(--fc-accent-purple)_18%,transparent)] border-[color-mix(in_srgb,var(--fc-accent-purple)_35%,transparent)]";
-    case "snack":
-      return "bg-[color-mix(in_srgb,var(--fc-accent-cyan)_18%,transparent)] border-[color-mix(in_srgb,var(--fc-accent-cyan)_35%,transparent)]";
-    default:
-      return "bg-[color-mix(in_srgb,var(--fc-text-subtle)_18%,transparent)] border-[color:var(--fc-glass-border)]";
+async function resolvePhotoUrl(meal: MappedMeal): Promise<MappedMeal> {
+  if (!meal.photoUrl || /^https?:\/\//i.test(meal.photoUrl)) return meal;
+  try {
+    const { data, error } = await supabase.storage
+      .from("meal-photos")
+      .createSignedUrl(meal.photoUrl, 3600);
+    if (error || !data?.signedUrl) return { ...meal, photoUrl: undefined };
+    return { ...meal, photoUrl: data.signedUrl };
+  } catch {
+    return meal;
   }
 }
 
-export default function MealDetailPage() {
+function MealDetailContent() {
   const params = useParams();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const { performanceSettings } = useTheme();
+  const { addToast } = useToast();
+  const mealId = String(params?.id || "");
 
-  const mealId = Array.isArray(params.id) ? params.id[0] : params.id;
-  const [meal, setMeal] = useState<Meal | null>(null);
   const [loading, setLoading] = useState(true);
+  const [meal, setMeal] = useState<MappedMeal | null>(null);
+  const [assignmentId, setAssignmentId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
-    // Wait for auth to finish loading before attempting to load meal data
-    if (authLoading) {
-      // Still loading auth, wait
-      return;
-    }
-
-    if (!mealId) {
+  const load = useCallback(async () => {
+    if (!user?.id || !mealId) {
       setLoading(false);
       return;
     }
-
-    if (!user?.id) {
-      // Auth finished but no user - stop loading
-      console.error("No user available after auth loaded");
-      setLoading(false);
-      return;
-    }
-
-    // All conditions met, load meal
-    loadMeal();
-  }, [mealId, user?.id, authLoading]);
-
-  const loadMealByUuid = async (id: string, clientId: string) => {
-    const { data: mealRow, error: mealError } = await supabase
-      .from("meals")
-      .select("id, meal_plan_id, name, meal_type, order_index, notes")
-      .eq("id", id)
-      .maybeSingle();
-
-    if (mealError) throw mealError;
-    if (!mealRow) return;
-
-    const mealType = mealRow.meal_type as MealType;
-    if (!(MEAL_TYPES as readonly string[]).includes(mealType)) {
-      throw new Error("Invalid meal type");
-    }
-
-    const { data: assignment, error: assignmentError } = await supabase
-      .from("meal_plan_assignments")
-      .select("id")
-      .eq("client_id", clientId)
-      .eq("meal_plan_id", mealRow.meal_plan_id)
-      .eq("is_active", true)
-      .maybeSingle();
-
-    if (assignmentError) throw assignmentError;
-    if (!assignment) {
-      throw new Error("No active meal plan assignment found");
-    }
-
-    const today = new Date().toISOString().split("T")[0];
-    const { data: completion } = await supabase
-      .from("meal_completions")
-      .select("meal_option_id")
-      .eq("client_id", clientId)
-      .eq("meal_id", id)
-      .eq("date", today)
-      .maybeSingle();
-
-    const { data: options } = await supabase
-      .from("meal_options")
-      .select("id, name, order_index")
-      .eq("meal_id", id)
-      .order("order_index", { ascending: true });
-
-    const { data: foodRows, error: foodError } = await supabase
-      .from("meal_food_items")
-      .select(
-        `
-        id,
-        quantity,
-        unit,
-        meal_option_id,
-        foods(name, serving_size, serving_unit, calories_per_serving, protein, carbs, fat)
-      `
-      )
-      .eq("meal_id", id);
-
-    if (foodError) throw foodError;
-
-    const allItems = foodRows ?? [];
-    const loggedOptionId = completion?.meal_option_id ?? null;
-    const hasOptions = (options?.length ?? 0) > 0;
-
-    let itemsForDisplay = allItems;
-    if (hasOptions) {
-      if (loggedOptionId) {
-        itemsForDisplay = allItems.filter(
-          (row) => row.meal_option_id === loggedOptionId
-        );
-      } else if (options?.[0]?.id) {
-        itemsForDisplay = allItems.filter(
-          (row) => row.meal_option_id === options[0].id
-        );
-      } else {
-        itemsForDisplay = [];
-      }
-    } else {
-      itemsForDisplay = allItems.filter((row) => !row.meal_option_id);
-    }
-
-    const mealItems = mapFoodRowsToMealItems(id, itemsForDisplay);
-
-    setMeal({
-      id: mealRow.id,
-      meal_plan_id: mealRow.meal_plan_id,
-      name: mealRow.name,
-      meal_type: mealType,
-      order_index: mealRow.order_index ?? 0,
-      notes: mealRow.notes ?? undefined,
-      meal_items: mealItems,
-    });
-  };
-
-  const loadLegacyCompositeMeal = async (compositeId: string, clientId: string) => {
-    const firstDashIndex = compositeId.indexOf("-");
-    if (firstDashIndex === -1) {
-      throw new Error("Invalid meal ID format");
-    }
-
-    const mealType = compositeId.substring(0, firstDashIndex) as MealType;
-    const mealPlanId = compositeId.substring(firstDashIndex + 1);
-
-    if (!(MEAL_TYPES as readonly string[]).includes(mealType)) {
-      throw new Error("Invalid meal type");
-    }
-
-    const { data: assignmentData, error: assignmentError } = await supabase
-      .from("meal_plan_assignments")
-      .select("meal_plan_id")
-      .eq("client_id", clientId)
-      .eq("is_active", true)
-      .order("start_date", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (assignmentError) {
-      console.error("Error loading meal plan assignment:", assignmentError);
-    }
-
-    const targetMealPlanId = assignmentData?.meal_plan_id || mealPlanId;
-    if (!targetMealPlanId) {
-      throw new Error("No active meal plan assignment found");
-    }
-
-    const { data: mealPlanItems, error: itemsError } = await supabase
-      .from("meal_plan_items")
-      .select(
-        `
-        *,
-        food:foods(*)
-      `
-      )
-      .eq("meal_plan_id", targetMealPlanId)
-      .eq("meal_type", mealType);
-
-    if (itemsError) throw itemsError;
-    if (!mealPlanItems || mealPlanItems.length === 0) return;
-
-    const servingSize = mealPlanItems[0]?.food?.serving_size || 100;
-    const mealItems: MealItem[] = mealPlanItems.map((item: {
-      id: string;
-      quantity: number;
-      order_index?: number | null;
-      food?: {
-        name?: string;
-        serving_unit?: string;
-        calories_per_serving?: number;
-        protein?: number;
-        carbs?: number;
-        fat?: number;
-      } | null;
-    }) => ({
-      id: item.id,
-      meal_id: compositeId,
-      food_name: item.food?.name || "Unknown Food",
-      quantity: item.quantity,
-      unit: item.food?.serving_unit || "g",
-      calories_per_unit: (item.food?.calories_per_serving || 0) / servingSize,
-      protein_per_unit: (item.food?.protein || 0) / servingSize,
-      carbs_per_unit: (item.food?.carbs || 0) / servingSize,
-      fat_per_unit: (item.food?.fat || 0) / servingSize,
-      order_index: item.order_index || 0,
-    }));
-
-    setMeal({
-      id: compositeId,
-      meal_plan_id: targetMealPlanId,
-      name: mealType.charAt(0).toUpperCase() + mealType.slice(1),
-      meal_type: mealType,
-      order_index: 0,
-      meal_items: mealItems,
-    });
-  };
-
-  const loadMeal = async () => {
+    setLoading(true);
+    setLoadError(null);
     try {
-      setLoading(true);
-      setLoadError(null);
-      if (!mealId || !user?.id) {
-        setLoading(false);
+      const { mapped } = await fetchClientNutritionPage(user.id, todayStr());
+      if (!mapped?.hasAssignment) {
+        setMeal(null);
+        setAssignmentId(null);
+        setLoadError("No active meal plan.");
         return;
       }
-
-      await withTimeout(
-        (async () => {
-          if (isLegacyCompositeMealId(mealId)) {
-            await loadLegacyCompositeMeal(mealId, user.id);
-          } else {
-            await loadMealByUuid(mealId, user.id);
-          }
-        })(),
-        30000,
-        "timeout"
-      );
-    } catch (error) {
-      console.error("Error loading meal:", error);
-      setLoadError(error instanceof Error ? error.message : "Failed to load meal");
+      const found = mapped.meals.find((m) => m.id === mealId) ?? null;
+      if (!found) {
+        setMeal(null);
+        setLoadError("Meal not found.");
+        return;
+      }
+      setAssignmentId(mapped.assignmentId);
+      setMeal(await resolvePhotoUrl(found));
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Failed to load meal");
+      setMeal(null);
     } finally {
       setLoading(false);
     }
+  }, [user?.id, mealId]);
+
+  useEffect(() => {
+    if (!authLoading && user?.id) void load();
+    if (!authLoading && !user) setLoading(false);
+  }, [authLoading, user, load]);
+
+  const handleMarkComplete = async (
+    id: string,
+    optionId: string | null,
+  ) => {
+    if (!user?.id || !assignmentId) return;
+    try {
+      await completeMeal({
+        clientId: user.id,
+        mealId: id,
+        mealOptionId: optionId,
+        mealPlanAssignmentId: assignmentId,
+        date: todayStr(),
+      });
+      await load();
+    } catch (e) {
+      addToast({
+        title: "Could not complete meal",
+        description: e instanceof Error ? e.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  if (loadError) {
-    return (
-      <ProtectedRoute requiredRole="client">
-        <AnimatedBackground>
-          {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
-            <div className="fc-card-shell p-4 text-center text-sm">
-              <p className="fc-text-dim mb-4">{loadError}</p>
-              <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadMeal(); }} className="fc-btn fc-btn-primary">Retry</Button>
-                <Button
-                  variant="outline"
-                  className="fc-btn fc-btn-secondary"
-                  onClick={() => router.push("/client/nutrition")}
-                >
-                  <ChevronLeft className="w-4 h-4 mr-2" />
-                  Back to Nutrition
-                </Button>
-              </div>
-            </div>
-          </ClientPageShell>
-        </AnimatedBackground>
-      </ProtectedRoute>
-    );
-  }
+  const handleUndo = async () => {
+    if (!user?.id || !meal) return;
+    try {
+      await undoCompletion(user.id, meal.id, todayStr());
+      await load();
+    } catch (e) {
+      addToast({
+        title: "Could not undo",
+        description: e instanceof Error ? e.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
-  if (loading) {
+  const handleAddPhoto = async (id: string, file: File) => {
+    if (!user?.id) return;
+    try {
+      await addPhotoToCompletion(user.id, id, todayStr(), file);
+      await load();
+      addToast({
+        title: "Photo added",
+        description: "Your meal photo has been saved.",
+        variant: "default",
+      });
+    } catch (e) {
+      addToast({
+        title: "Photo upload failed",
+        description: e instanceof Error ? e.message : "Please try again.",
+        variant: "destructive",
+      });
+      throw e;
+    }
+  };
+
+  if (authLoading || loading) {
     return (
-      <ProtectedRoute requiredRole="client">
-        <AnimatedBackground>
-          {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
-            <PageSkeleton variant="dashboard" />
-          </ClientPageShell>
-        </AnimatedBackground>
-      </ProtectedRoute>
+      <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
+        <PageSkeleton variant="list" />
+      </ClientPageShell>
     );
   }
 
   if (!meal) {
     return (
-      <ProtectedRoute requiredRole="client">
-        <AnimatedBackground>
-          {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 text-center">
-            <div className="fc-card-shell p-4 text-sm">
-              <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
-                Meal not found
-              </h2>
-              <p className="mt-2 text-[color:var(--fc-text-dim)]">
-                This meal is not available or has been removed.
-              </p>
-              <div className="mt-4 flex justify-center">
-                <Button
-                  className="fc-btn fc-btn-secondary h-10 text-sm"
-                  onClick={() => router.push("/client/nutrition")}
-                >
-                  Back to Nutrition
-                </Button>
-              </div>
-            </div>
-          </ClientPageShell>
-        </AnimatedBackground>
-      </ProtectedRoute>
+      <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
+        <button
+          type="button"
+          onClick={() => router.push("/client/nutrition")}
+          className="w-10 h-10 rounded-xl border border-[color:var(--fc-glass-border)] bg-transparent flex items-center justify-center fc-text-primary mb-4"
+          aria-label="Back"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <div className="rounded-xl border border-[color:var(--fc-glass-border)] bg-transparent p-4 text-sm">
+          <h2 className="text-lg font-semibold fc-text-primary">
+            {loadError ?? "Meal not found"}
+          </h2>
+          <div className="mt-4">
+            <Button
+              className="fc-btn fc-btn-secondary h-10 text-sm"
+              onClick={() => router.push("/client/nutrition")}
+            >
+              Back to Fuel
+            </Button>
+          </div>
+        </div>
+      </ClientPageShell>
     );
   }
 
-  const mealItems = meal.meal_items ?? [];
-  const mealTotals = mealItems.reduce(
-    (acc, item) => {
-      acc.calories += item.quantity * item.calories_per_unit;
-      acc.protein += item.quantity * item.protein_per_unit;
-      acc.carbs += item.quantity * item.carbs_per_unit;
-      acc.fat += item.quantity * item.fat_per_unit;
-      return acc;
-    },
-    { calories: 0, protein: 0, carbs: 0, fat: 0 }
+  return (
+    <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
+      <nav className="mb-3">
+        <button
+          type="button"
+          onClick={() => router.push("/client/nutrition")}
+          className="w-10 h-10 rounded-xl border border-[color:var(--fc-glass-border)] bg-transparent flex items-center justify-center fc-text-primary"
+          aria-label="Back"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+      </nav>
+      <MealCardWithOptions
+        meal={{
+          id: meal.id,
+          name: meal.name,
+          meal_type: meal.type,
+          emoji: meal.emoji,
+          options: meal.options ?? [],
+          legacyItems: meal.items,
+          logged: meal.logged,
+          loggedOptionId: meal.loggedOptionId,
+          photoUrl: meal.photoUrl,
+          logged_at: meal.logged_at,
+        }}
+        clientId={user?.id ?? ""}
+        onMarkComplete={handleMarkComplete}
+        onUndo={handleUndo}
+        onAddPhoto={handleAddPhoto}
+        onFoodClick={(foodId) =>
+          router.push(`/client/nutrition/foods/${foodId}`)
+        }
+      />
+    </ClientPageShell>
   );
-  const totalCalories = Math.round(mealTotals.calories);
-  const totalProtein = Math.round(mealTotals.protein);
-  const totalCarbs = Math.round(mealTotals.carbs);
-  const totalFat = Math.round(mealTotals.fat);
-  const macroCalories = totalProtein * 4 + totalCarbs * 4 + totalFat * 9;
-  const proteinPercent =
-    macroCalories > 0 ? (totalProtein * 4) / macroCalories : 0;
-  const carbsPercent = macroCalories > 0 ? (totalCarbs * 4) / macroCalories : 0;
-  const fatPercent = macroCalories > 0 ? (totalFat * 9) / macroCalories : 0;
+}
 
+export default function MealDetailPage() {
   return (
     <ProtectedRoute requiredRole="client">
-      <AnimatedBackground>
-        {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell className="max-w-lg mx-auto pb-[var(--fc-bottom-safe-area)] overflow-x-hidden">
-          <nav className="mb-2">
-            <button
-              type="button"
-              onClick={() => router.push("/client/nutrition")}
-              className="w-10 h-10 rounded-xl fc-glass border border-[color:var(--fc-glass-border)] flex items-center justify-center fc-text-primary hover:fc-glass-soft transition-colors"
-              aria-label="Back"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-          </nav>
-
-          <div className="relative h-36 sm:h-40 bg-gradient-to-b from-[color:var(--fc-glass-highlight)] to-[color:var(--fc-bg-base)] rounded-b-2xl overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-t from-[color:var(--fc-bg-base)] via-transparent to-transparent opacity-80" />
-            <div className="absolute bottom-4 left-4 right-4">
-              <div className="flex items-center gap-2 mb-1">
-                <span
-                  className={cn(
-                    "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest border text-[color:var(--fc-text-primary)]",
-                    getMealTypeBadgeClasses(meal.meal_type)
-                  )}
-                >
-                  {meal.meal_type}
-                </span>
-              </div>
-              <h1 className="text-xl font-bold tracking-tight fc-text-primary line-clamp-2">
-                {meal.name}
-              </h1>
-            </div>
-          </div>
-
-          <main className="px-1 -mt-4 relative z-10 w-full">
-            <div className="fc-surface rounded-2xl p-4 border border-[color:var(--fc-surface-card-border)] space-y-4">
-              <div className="flex justify-between items-center border-b border-[color:var(--fc-glass-border)] pb-3">
-                <div>
-                  <p className="text-[10px] fc-text-subtle uppercase tracking-widest font-bold mb-1">Meal</p>
-                  <p className="text-lg font-semibold font-mono fc-text-primary">{meal.name}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] fc-text-subtle uppercase tracking-widest font-bold mb-1">Status</p>
-                  <p className="fc-text-success flex items-center gap-1.5 font-semibold text-sm">
-                    <CheckCircle2 className="w-4 h-4" />
-                    Logged
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between items-end mb-6">
-                  <h3 className="text-xl font-bold fc-text-primary">Macronutrients</h3>
-                  <div className="text-right">
-                    <span className="text-2xl font-bold font-mono fc-text-primary">{totalCalories}</span>
-                    <span className="fc-text-dim text-sm ml-1">kcal</span>
-                  </div>
-                </div>
-                <div className="space-y-5">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="fc-text-workouts font-medium flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-[color:var(--fc-domain-workouts)]" /> Protein
-                      </span>
-                      <span className="font-mono">{totalProtein}g <span className="fc-text-dim text-xs">/ {Math.round(proteinPercent * 100)}%</span></span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-[color:var(--fc-glass-highlight)] overflow-hidden">
-                      <div className="h-full rounded-full bg-[color:var(--fc-domain-workouts)] transition-all" style={{ width: `${Math.round(proteinPercent * 100)}%` }} />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="fc-text-success font-medium flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-[color:var(--fc-status-success)]" /> Carbs
-                      </span>
-                      <span className="font-mono">{totalCarbs}g <span className="fc-text-dim text-xs">/ {Math.round(carbsPercent * 100)}%</span></span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-[color:var(--fc-glass-highlight)] overflow-hidden">
-                      <div className="h-full rounded-full bg-[color:var(--fc-status-success)] transition-all" style={{ width: `${Math.round(carbsPercent * 100)}%` }} />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="fc-text-error font-medium flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-[color:var(--fc-status-error)]" /> Fats
-                      </span>
-                      <span className="font-mono">{totalFat}g <span className="fc-text-dim text-xs">/ {Math.round(fatPercent * 100)}%</span></span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-[color:var(--fc-glass-highlight)] overflow-hidden">
-                      <div className="h-full rounded-full bg-[color:var(--fc-status-error)] transition-all" style={{ width: `${Math.round(fatPercent * 100)}%` }} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {mealItems.length > 0 ? (
-              <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-                <section className="space-y-4">
-                  <div>
-                    <h3 className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
-                      Ingredients
-                    </h3>
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">
-                      Per-item breakdown with macro split.
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    {mealItems.map((item) => {
-                      const itemCalories = Math.round(
-                        item.quantity * item.calories_per_unit
-                      );
-                      const itemProtein = Math.round(
-                        item.quantity * item.protein_per_unit
-                      );
-                      const itemCarbs = Math.round(
-                        item.quantity * item.carbs_per_unit
-                      );
-                      const itemFat = Math.round(
-                        item.quantity * item.fat_per_unit
-                      );
-                      const itemMacroCalories =
-                        itemProtein * 4 + itemCarbs * 4 + itemFat * 9;
-                      const itemProteinPercent =
-                        itemMacroCalories > 0
-                          ? (itemProtein * 4) / itemMacroCalories
-                          : 0;
-                      const itemCarbsPercent =
-                        itemMacroCalories > 0
-                          ? (itemCarbs * 4) / itemMacroCalories
-                          : 0;
-                      const itemFatPercent =
-                        itemMacroCalories > 0
-                          ? (itemFat * 9) / itemMacroCalories
-                          : 0;
-
-                      return (
-                        <div key={item.id} className="fc-surface p-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <h4 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
-                                {item.food_name}
-                              </h4>
-                              <p className="text-sm text-[color:var(--fc-text-dim)]">
-                                {item.quantity}
-                                {item.unit}
-                              </p>
-                            </div>
-                            <span className="text-sm font-semibold text-[color:var(--fc-text-primary)]">
-                              {itemCalories} cal
-                            </span>
-                          </div>
-
-                          <div className="mt-4 grid grid-cols-[96px_1fr] gap-4">
-                            <div className="flex items-center justify-center">
-                              <div className="relative h-20 w-20">
-                                <div className="relative h-full w-full overflow-hidden rounded-full">
-                                  <div
-                                    className="absolute inset-0 rounded-full"
-                                    style={{
-                                      background: `conic-gradient(
-                                        var(--fc-domain-workouts) 0deg ${itemProteinPercent * 360}deg,
-                                        var(--fc-status-success) ${itemProteinPercent * 360}deg ${
-                                        (itemProteinPercent + itemCarbsPercent) * 360
-                                      }deg,
-                                        var(--fc-status-error) ${
-                                          (itemProteinPercent + itemCarbsPercent) *
-                                          360
-                                        }deg 360deg
-                                      )`,
-                                    }}
-                                  />
-                                  <div className="absolute inset-2 rounded-full bg-[color:var(--fc-bg-basalt)] flex items-center justify-center">
-                                    <div className="text-center">
-                                      <div className="text-xs font-semibold text-[color:var(--fc-text-primary)]">
-                                        {itemCalories}
-                                      </div>
-                                      <div className="text-[10px] text-[color:var(--fc-text-dim)]">
-                                        cal
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-2">
-                                <div className="h-2.5 w-2.5 rounded-full bg-[color:var(--fc-domain-workouts)]" />
-                                <div className="flex-1">
-                                  <div className="text-xs font-semibold text-[color:var(--fc-text-primary)]">
-                                    Protein
-                                  </div>
-                                  <div className="text-xs text-[color:var(--fc-text-dim)]">
-                                    {itemProtein}g
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <div className="h-2.5 w-2.5 rounded-full bg-[color:var(--fc-status-success)]" />
-                                <div className="flex-1">
-                                  <div className="text-xs font-semibold text-[color:var(--fc-text-primary)]">
-                                    Carbs
-                                  </div>
-                                  <div className="text-xs text-[color:var(--fc-text-dim)]">
-                                    {itemCarbs}g
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <div className="h-2.5 w-2.5 rounded-full bg-[color:var(--fc-status-error)]" />
-                                <div className="flex-1">
-                                  <div className="text-xs font-semibold text-[color:var(--fc-text-primary)]">
-                                    Fat
-                                  </div>
-                                  <div className="text-xs text-[color:var(--fc-text-dim)]">
-                                    {itemFat}g
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-
-                <div className="fc-card-shell p-4">
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
-                        Meal totals
-                      </h3>
-                      <p className="text-sm text-[color:var(--fc-text-dim)]">
-                        Macro distribution for the full meal.
-                      </p>
-                    </div>
-                    <div className="flex items-center justify-center">
-                      <div className="relative h-40 w-40">
-                        <div className="relative h-full w-full overflow-hidden rounded-full">
-                          <div
-                            className="absolute inset-0 rounded-full"
-                            style={{
-                              background: `conic-gradient(
-                                var(--fc-domain-workouts) 0deg ${proteinPercent * 360}deg,
-                                var(--fc-status-success) ${proteinPercent * 360}deg ${
-                                (proteinPercent + carbsPercent) * 360
-                              }deg,
-                                var(--fc-status-error) ${
-                                  (proteinPercent + carbsPercent) * 360
-                                }deg 360deg
-                              )`,
-                            }}
-                          />
-                          <div className="absolute inset-4 rounded-full bg-[color:var(--fc-bg-basalt)] flex items-center justify-center">
-                            <div className="text-center">
-                              <div className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
-                                {totalCalories}
-                              </div>
-                              <div className="text-xs text-[color:var(--fc-text-dim)]">
-                                calories
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3">
-                        <div className="h-3 w-3 rounded-full bg-[color:var(--fc-domain-workouts)]" />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between text-sm font-semibold text-[color:var(--fc-text-primary)]">
-                            <span>Protein</span>
-                            <span>{totalProtein}g</span>
-                          </div>
-                          <div className="text-xs text-[color:var(--fc-text-dim)]">
-                            {macroCalories > 0
-                              ? Math.round((totalProtein * 4 * 100) / macroCalories)
-                              : 0}
-                            % of calories
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="h-3 w-3 rounded-full bg-[color:var(--fc-status-success)]" />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between text-sm font-semibold text-[color:var(--fc-text-primary)]">
-                            <span>Carbs</span>
-                            <span>{totalCarbs}g</span>
-                          </div>
-                          <div className="text-xs text-[color:var(--fc-text-dim)]">
-                            {macroCalories > 0
-                              ? Math.round((totalCarbs * 4 * 100) / macroCalories)
-                              : 0}
-                            % of calories
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="h-3 w-3 rounded-full bg-[color:var(--fc-status-error)]" />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between text-sm font-semibold text-[color:var(--fc-text-primary)]">
-                            <span>Fat</span>
-                            <span>{totalFat}g</span>
-                          </div>
-                          <div className="text-xs text-[color:var(--fc-text-dim)]">
-                            {macroCalories > 0
-                              ? Math.round((totalFat * 9 * 100) / macroCalories)
-                              : 0}
-                            % of calories
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="fc-surface p-12 text-center">
-                <p className="text-sm text-[color:var(--fc-text-dim)]">
-                  No ingredients added yet.
-                </p>
-              </div>
-            )}
-
-            {meal.notes && (
-              <div className="fc-card-shell p-4">
-                <h3 className="text-lg font-semibold fc-text-primary">Notes</h3>
-                <p className="mt-2 text-sm fc-text-dim leading-relaxed">{meal.notes}</p>
-              </div>
-            )}
-          </main>
-
-          <div className="fixed bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-[color:var(--fc-bg-base)] via-[color:var(--fc-bg-base)]/95 to-transparent z-50 pointer-events-none">
-            <div className="max-w-lg mx-auto w-full grid grid-cols-2 gap-2 pointer-events-auto">
-              <Button variant="outline" className="h-10 rounded-xl fc-glass border text-sm font-semibold gap-1.5">
-                <Edit3 className="w-4 h-4" />
-                Edit
-              </Button>
-              <Button variant="outline" className="h-10 rounded-xl border-[color:var(--fc-status-error)]/40 fc-text-error text-sm font-semibold gap-1.5 bg-[color:var(--fc-status-error)]/10">
-                <Trash2 className="w-4 h-4" />
-                Delete
-              </Button>
-            </div>
-          </div>
-        </ClientPageShell>
-      </AnimatedBackground>
+      <MealDetailContent />
     </ProtectedRoute>
   );
 }

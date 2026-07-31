@@ -29,7 +29,6 @@ import {
 } from "@/components/ui/dialog";
 import {
   RefreshCw,
-  Plus,
   Dumbbell,
   Grid3X3,
   List,
@@ -375,12 +374,6 @@ export default function WorkoutTemplatesPage() {
                   <RefreshCw className="w-4 h-4 sm:mr-1.5" />
                   <span className="hidden sm:inline">Refresh</span>
                 </Button>
-                <Link href="/coach/workouts/templates/create">
-                  <Button size="sm" className="fc-btn fc-btn-primary h-9">
-                    <Plus className="w-4 h-4 sm:mr-1.5" />
-                    Create Template
-                  </Button>
-                </Link>
               </div>
             </div>
             {templates.length > 0 && (
@@ -481,18 +474,9 @@ export default function WorkoutTemplatesPage() {
                   selectedDifficulty !== "all" ||
                   selectedDuration !== "all"
                     ? "Try adjusting your search or filter criteria to find the templates you're looking for."
-                    : "Create your first workout template to get started building your training library."
+                    : "Workouts are created inside programs. Save a program day to the library to add entries here."
                 }
-                action={
-                  !searchTerm &&
-                  selectedDifficulty === "all" &&
-                  selectedDuration === "all"
-                    ? {
-                        label: "Create Your First Template",
-                        onClick: () => router.push("/coach/workouts/templates/create"),
-                      }
-                    : undefined
-                }
+                action={undefined}
               />
             ) : (
               <>

@@ -3,12 +3,9 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "@/contexts/ThemeContext";
 import { useRouter } from "next/navigation";
-import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { ClientPageShell } from "@/components/client-ui";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
-import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { BarChart3, Dumbbell } from "lucide-react";
 import { PsHero } from "@/components/client/progress-suite";
 import ps from "@/components/client/progress-suite/progressSuiteV1.module.css";
@@ -23,18 +20,26 @@ import { getWellnessTrends, type WellnessStats } from "@/lib/wellnessAnalytics";
 import { WellnessTrendChart } from "@/components/progress/WellnessTrendChart";
 import { supabase } from "@/lib/supabase";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { progressBackHref } from "@/lib/clientProgressNav";
 
 export default function RecoveryProgressPage() {
   const { user } = useAuth();
-  const { performanceSettings } = useTheme();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [fromCheckIns, setFromCheckIns] = useState(false);
   const [volumeStats, setVolumeStats] = useState<VolumeStats | null>(null);
   const [wellnessStats, setWellnessStats] = useState<WellnessStats | null>(null);
   const [workoutsForSleepAnalysis, setWorkoutsForSleepAnalysis] = useState<
     WorkoutWithVolumeForSleep[]
   >([]);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setFromCheckIns(params.get("from") === "check-ins");
+  }, []);
+
+  const backHref = progressBackHref(fromCheckIns);
 
   const loadData = useCallback(async () => {
     if (!user?.id) {
@@ -243,33 +248,32 @@ export default function RecoveryProgressPage() {
   if (loading) {
     return (
       <ProtectedRoute requiredRole="client">
-        <AnimatedBackground>
-          {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
+        <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
             <PageSkeleton variant="dashboard" />
           </ClientPageShell>
-        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
 
   return (
     <ProtectedRoute requiredRole="client">
-      <AnimatedBackground>
-        {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
+      <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
           <div className={ps.psV1}>
             <PsHero
               glow="purple"
-              onBack={() => router.push("/client/progress")}
-              backAriaLabel="Back to progress hub"
-              eyebrow="Progress · recovery"
-              eyebrowColor="#A78BFA"
+              onBack={() => router.push(backHref)}
+              backAriaLabel={
+                fromCheckIns ? "Back to check-ins" : "Back to progress hub"
+              }
+              eyebrow={
+                fromCheckIns ? "Check-in · recovery" : "Progress · recovery"
+              }
+              eyebrowColor="var(--fc-group-b)"
               title="Recovery & Wellness"
               subtitle="Training load, soreness, sleep, and trends"
             />
 
-            <div className="fc-card-shell backdrop-blur-[8px] p-4 mt-4">
+            <div className="fc-card-shell p-4 mt-4">
               <div className="mb-4 flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--fc-domain-habits)] shadow-[0_10px_20px_color-mix(in_srgb,var(--fc-domain-habits)_25%,transparent)]">
                   <Dumbbell className="h-6 w-6 text-white" />
@@ -288,6 +292,8 @@ export default function RecoveryProgressPage() {
                   variant="compact"
                   title="Not enough data yet"
                   description="Keep logging workouts and check-ins to see recovery insights."
+                  actionLabel="Go to check-ins"
+                  actionHref="/client/check-ins"
                 />
               ) : (
                 <>
@@ -312,13 +318,13 @@ export default function RecoveryProgressPage() {
                           >
                             <stop
                               offset="0%"
-                              stopColor="rgb(139, 92, 246)"
+                              stopColor="var(--fc-group-b)"
                               stopOpacity="0.9"
                             />
                             <stop
                               offset="100%"
-                              stopColor="rgb(99, 102, 241)"
-                              stopOpacity="0.6"
+                              stopColor="var(--fc-group-b)"
+                              stopOpacity="0.55"
                             />
                           </linearGradient>
                         </defs>
@@ -380,7 +386,7 @@ export default function RecoveryProgressPage() {
                                     .filter((p): p is string => p != null)
                                     .join(" ")}
                                   fill="none"
-                                  stroke="rgb(245, 158, 11)"
+                                  stroke="var(--fc-effort-hard)"
                                   strokeWidth="2"
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
@@ -401,8 +407,8 @@ export default function RecoveryProgressPage() {
                                       cx={x}
                                       cy={y}
                                       r="4"
-                                      fill="rgb(245, 158, 11)"
-                                      stroke="white"
+                                      fill="var(--fc-effort-hard)"
+                                      stroke="var(--fc-bg-deep)"
                                       strokeWidth="1.5"
                                     />
                                   );
@@ -421,9 +427,9 @@ export default function RecoveryProgressPage() {
               )}
             </div>
 
-            <div className="fc-card-shell backdrop-blur-[8px] p-4 mt-4">
+            <div className="fc-card-shell p-4 mt-4">
               <div className="mb-4 flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--fc-accent-cyan)] shadow-[0_10px_20px_color-mix(in_srgb,var(--fc-accent-cyan)_25%,transparent)]">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--fc-accent)] shadow-[0_10px_20px_color-mix(in_srgb,var(--fc-accent)_25%,transparent)]">
                   <BarChart3 className="h-6 w-6 text-white" />
                 </div>
                 <div>
@@ -445,17 +451,18 @@ export default function RecoveryProgressPage() {
                 <WellnessTrendChart wellnessStats={wellnessStats} />
               </div>
             ) : (
-              <div className="fc-card-shell backdrop-blur-[8px] p-4 mt-4">
+              <div className="fc-card-shell p-4 mt-4">
                 <EmptyState
                   variant="compact"
                   title="No wellness trend data"
                   description="Log daily check-ins to see mood, soreness, and sleep trends."
+                  actionLabel="Go to check-ins"
+                  actionHref="/client/check-ins"
                 />
               </div>
             )}
           </div>
         </ClientPageShell>
-      </AnimatedBackground>
     </ProtectedRoute>
   );
 }

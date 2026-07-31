@@ -149,17 +149,17 @@ export function WeeklyCheckInCard({
 
   const shellStyle: React.CSSProperties = isDoneThisPeriod
     ? {
-        background: "linear-gradient(135deg, var(--cs-good-soft, rgba(52,211,153,0.12)), var(--cs-card, #0e1f2e))",
-        borderColor: "var(--cs-good-dim, rgba(52,211,153,0.25))",
+        background: "transparent",
+        borderColor: "var(--cs-good-dim)",
       }
     : isDue
       ? {
-          background: "linear-gradient(135deg, var(--cs-warning-soft, rgba(245,194,66,0.12)), var(--cs-card, #0e1f2e))",
-          borderColor: "var(--cs-warning-dim, rgba(245,194,66,0.25))",
+          background: "transparent",
+          borderColor: "var(--cs-warning-dim)",
         }
       : {
-          background: "var(--cs-card, #0e1f2e)",
-          borderColor: "var(--cs-line, rgba(255,255,255,0.08))",
+          background: "transparent",
+          borderColor: "var(--cs-line)",
         };
 
   return (
@@ -181,15 +181,15 @@ export function WeeklyCheckInCard({
         <span
           className={cn(checkinSuiteStyles.fontMono, "text-[9.5px] font-semibold uppercase tracking-[0.16em]")}
           style={{
-            color: isDoneThisPeriod ? "var(--cs-good)" : isDue ? "var(--cs-warning)" : "var(--cs-cyan)",
+            color: isDoneThisPeriod ? "var(--cs-good)" : isDue ? "var(--cs-warning)" : "var(--fc-accent)",
           }}
         >
-          Scheduled check-in
+          Periodical check-in
         </span>
         {isDoneThisPeriod ? (
           <CheckinStatusPill variant="completed" label="Completed" />
         ) : isDue ? (
-          <CheckinStatusPill variant="due" label={isOverdue && overdueDays > 0 ? "Overdue" : "Due"} />
+          <CheckinStatusPill variant="due" label="Due" />
         ) : (
           <span
             className={cn(checkinSuiteStyles.fontMono, "shrink-0 rounded-[5px] border px-2 py-0.5 text-[8.5px] font-semibold uppercase tracking-[0.08em]")}
@@ -208,9 +208,9 @@ export function WeeklyCheckInCard({
         {isDoneThisPeriod && latestMeasurement?.measured_date ? (
           <>Completed {formatDate(latestMeasurement.measured_date)}</>
         ) : isDue ? (
-          <>Weekly review · 3 quick steps</>
+          <>Periodical check-in · quick steps</>
         ) : dueDateText ? (
-          <>Next review on {dueDateText}</>
+          <>Next check-in on {dueDateText}</>
         ) : (
           "No check-in data yet"
         )}
@@ -225,7 +225,7 @@ export function WeeklyCheckInCard({
           <button
             type="button"
             className={cn(checkinSuiteStyles.fontBody, "flex flex-1 items-center justify-between text-left text-[11px] font-medium py-1")}
-            style={{ color: "var(--cs-cyan)" }}
+            style={{ color: "var(--fc-accent)" }}
             onClick={(e) => {
               e.stopPropagation();
               setExpanded((v) => !v);
@@ -238,7 +238,7 @@ export function WeeklyCheckInCard({
           <button
             type="button"
             className={cn(checkinSuiteStyles.fontBody, "flex flex-1 items-center justify-between text-left text-[11px] font-medium py-1")}
-            style={{ color: "var(--cs-cyan)" }}
+            style={{ color: "var(--fc-accent)" }}
             onClick={(e) => {
               e.stopPropagation();
               window.location.href = "/client/check-ins/weekly";
@@ -251,7 +251,7 @@ export function WeeklyCheckInCard({
           <button
             type="button"
             className={cn(checkinSuiteStyles.fontBody, "flex flex-1 items-center justify-between text-left text-[11px] font-medium py-1")}
-            style={{ color: "var(--cs-cyan)" }}
+            style={{ color: "var(--fc-accent)" }}
             onClick={(e) => {
               e.stopPropagation();
               setExpanded((v) => !v);
@@ -263,9 +263,12 @@ export function WeeklyCheckInCard({
         )}
       </div>
 
-      {isDue && isOverdue && overdueDays > 0 && (
-        <p className={cn(checkinSuiteStyles.fontBody, "text-xs")} style={{ color: "var(--cs-warning)" }}>
-          Overdue by {overdueDays} day{overdueDays === 1 ? "" : "s"}
+      {isDue && (
+        <p className={cn(checkinSuiteStyles.fontMono, "text-[10.5px] tracking-[0.04em]")} style={{ color: "var(--cs-t3)" }}>
+          Body check due
+          {isOverdue && overdueDays > 0
+            ? ` · due ${overdueDays} day${overdueDays === 1 ? "" : "s"} ago`
+            : null}
         </p>
       )}
 
@@ -339,10 +342,10 @@ export function WeeklyCheckInCard({
                   e.stopPropagation();
                   window.location.href = "/client/check-ins/weekly";
                 }}
-                className="w-full rounded-xl py-2.5 text-sm font-semibold"
+                className={cn(checkinSuiteStyles.fontBody, "w-full rounded-xl py-2.5 text-sm font-semibold")}
                 style={{
-                  color: "var(--cs-lime-text)",
-                  background: "linear-gradient(135deg, var(--cs-lime), var(--cs-lime-2))",
+                  color: "var(--fc-ink)",
+                  background: "var(--fc-accent)",
                 }}
               >
                 Start this week&apos;s check-in

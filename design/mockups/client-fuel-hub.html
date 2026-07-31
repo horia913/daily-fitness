@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<title>Client — Fuel hub</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;}
+  :root{
+    --page:#0A0B0D; --well:#050608;
+    --line:rgba(255,255,255,.07); --line-2:rgba(255,255,255,.13);
+    --accent:#2E7BFF; --accent-glow:rgba(46,123,255,.30);
+    --good:#22E56A; --warn:#FFB020; --hot:#FF7A2F; --bad:#FF5A4D; --gold:#F5C242; --aqua:#22D3EE; --purple:#9D6BFF;
+    --text:#F0F2F5; --dim:#8B93A1; --subtle:#5C6470; --faint:#3D434D;
+    --f-d:'Archivo',sans-serif; --f-b:'Inter',sans-serif; --f-m:'JetBrains Mono',monospace;
+  }
+  body{background:#070809;color:var(--text);font-family:var(--f-b);-webkit-font-smoothing:antialiased;padding:22px;font-size:13px;
+       display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start;}
+  .d{font-family:var(--f-d);font-stretch:105%;}
+  svg{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;}
+  .lbl{font-family:var(--f-m);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:9px;font-weight:700;}
+  .phone{width:375px;background:var(--page);border:1px solid var(--line-2);border-radius:22px;padding:18px 16px 26px;}
+
+  .hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
+  .hd .eb{font-family:var(--f-m);font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--accent);font-weight:700;}
+  .hist{font-family:var(--f-m);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);font-weight:700;
+        border:1px solid var(--line-2);border-radius:999px;padding:7px 13px;display:flex;align-items:center;gap:6px;}
+  .hist svg{width:12px;height:12px;}
+  h1{font-family:var(--f-d);font-size:26px;font-weight:800;letter-spacing:-.025em;margin-bottom:16px;}
+
+  .card{border:1px solid var(--line);border-radius:13px;padding:15px 16px;margin-bottom:12px;position:relative;overflow:hidden;}
+  .card.rail::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:3px;background:var(--h);border-radius:0 3px 3px 0;}
+
+  /* day summary */
+  .ds{display:flex;align-items:center;gap:14px;}
+  .ring{width:62px;height:62px;border-radius:50%;flex-shrink:0;border:4px solid rgba(255,255,255,.07);
+        border-top-color:var(--good);border-right-color:var(--good);display:flex;flex-direction:column;align-items:center;justify-content:center;}
+  .ring .n{font-family:var(--f-d);font-size:17px;font-weight:900;line-height:1;}
+  .ring .l{font-family:var(--f-m);font-size:7px;letter-spacing:.11em;color:var(--faint);margin-top:2px;}
+  .ds .kc{flex:1;}
+  .ds .kc .pl{font-family:var(--f-m);font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);}
+  .ds .kc .v{display:flex;align-items:baseline;gap:6px;margin-top:6px;}
+  .ds .kc .v .a{font-family:var(--f-d);font-size:28px;font-weight:900;line-height:1;letter-spacing:-.03em;color:var(--good);}
+  .ds .kc .v .b{font-family:var(--f-m);font-size:12px;color:var(--dim);}
+  .macros{margin-top:14px;display:flex;flex-direction:column;gap:9px;}
+  .mr{display:flex;align-items:center;gap:10px;}
+  .mr .k{font-family:var(--f-m);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);width:52px;flex-shrink:0;}
+  .mr .tr{flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,.05);overflow:hidden;position:relative;}
+  .mr .tr i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;}
+  .mr .n{font-family:var(--f-m);font-size:10.5px;color:var(--dim);width:66px;text-align:right;flex-shrink:0;}
+  .mr .n b{color:var(--text);}
+  .on i{background:var(--good);box-shadow:0 0 10px -3px var(--good);}
+  .near i{background:var(--warn);box-shadow:0 0 10px -3px var(--warn);}
+  .off i{background:var(--hot);box-shadow:0 0 10px -3px var(--hot);}
+
+  /* water — single home */
+  .wh{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:11px;}
+  .wh .t{font-size:13.5px;font-weight:700;display:flex;align-items:center;gap:8px;}
+  .wh .t svg{width:15px;height:15px;color:var(--aqua);}
+  .wh .v{font-family:var(--f-m);font-size:11px;color:var(--dim);}
+  .wh .v b{font-family:var(--f-d);font-size:15px;font-weight:800;color:var(--aqua);}
+  .drops{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;}
+  .dp{aspect-ratio:1;border-radius:9px;border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;color:var(--faint);}
+  .dp svg{width:13px;height:13px;}
+  .dp.on{background:color-mix(in srgb,var(--aqua) 18%,transparent);border-color:color-mix(in srgb,var(--aqua) 45%,transparent);color:var(--aqua);}
+
+  .eb2{font-family:var(--f-m);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--subtle);margin:18px 0 10px;font-weight:700;}
+
+  /* meal rows — compact */
+  .meal{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin-bottom:9px;position:relative;overflow:hidden;}
+  .meal::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:3px;background:var(--h);border-radius:0 3px 3px 0;}
+  .meal.done{background:linear-gradient(100deg,color-mix(in srgb,var(--good) 11%,transparent),color-mix(in srgb,var(--good) 3%,transparent) 40%,transparent 72%);}
+  .meal.done::before{background:var(--good);}
+  .mi{width:32px;height:32px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+      background:color-mix(in srgb,var(--h) 20%,transparent);color:var(--h);}
+  .mi svg{width:16px;height:16px;}
+  .mb{flex:1;min-width:0;}
+  .mb .n{font-size:13.5px;font-weight:700;}
+  .mb .o{font-size:11.5px;color:var(--dim);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .mb .mc{font-family:var(--f-m);font-size:9.5px;color:var(--faint);margin-top:5px;}
+  .mb .mc b{color:var(--dim);}
+  .tick{width:30px;height:30px;border-radius:9px;border:1.5px solid var(--line-2);flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--faint);}
+  .tick.on{background:var(--good);border-color:var(--good);color:#08120A;}
+  .tick svg{width:15px;height:15px;}
+
+  .banner{font-family:var(--f-m);font-size:9.5px;color:var(--subtle);border:1px solid var(--line);border-radius:10px;
+          padding:10px 12px;display:flex;gap:9px;align-items:center;margin-top:4px;}
+  .banner svg{width:13px;height:13px;color:var(--aqua);flex-shrink:0;}
+
+  .lnk{display:flex;align-items:center;gap:11px;border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin-top:9px;position:relative;overflow:hidden;}
+  .lnk::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:3px;background:var(--h);border-radius:0 3px 3px 0;}
+  .lnk .ic{width:28px;height:28px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+           background:color-mix(in srgb,var(--h) 20%,transparent);color:var(--h);}
+  .lnk .ic svg{width:14px;height:14px;}
+  .lnk .b{flex:1;}
+  .lnk .b .n{font-size:13px;font-weight:700;}
+  .lnk .b .s{font-family:var(--f-m);font-size:9.5px;color:var(--faint);margin-top:3px;}
+  .lnk .v{font-family:var(--f-d);font-size:15px;font-weight:800;color:var(--h);}
+  .cv{color:var(--faint);}
+
+  .note{width:430px;font-size:12px;line-height:1.85;color:var(--subtle);border-left:2px solid var(--accent);padding-left:14px;}
+  .note b{color:var(--text);} .note code{font-family:var(--f-m);font-size:11px;color:var(--aqua);}
+</style></head>
+<body>
+
+<div>
+  <div class="lbl">Fuel hub · 375px</div>
+  <div class="phone">
+
+    <div class="hd">
+      <span class="eb">● Today · Tue 28 Jul</span>
+      <span class="hist"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/></svg>History</span>
+    </div>
+    <h1 class="d">Fuel</h1>
+
+    <!-- DAY SUMMARY -->
+    <div class="card rail" style="--h:var(--good)">
+      <div class="ds">
+        <span class="ring"><span class="n d">2/4</span><span class="l">MEALS</span></span>
+        <span class="kc">
+          <div class="pl">generated plan 1</div>
+          <div class="v"><span class="a d">1,145</span><span class="b">/ 2,000 kcal</span></div>
+        </span>
+      </div>
+      <div class="macros">
+        <div class="mr on"><span class="k">Protein</span><span class="tr"><i style="width:43%"></i></span><span class="n"><b>65</b> / 150 g</span></div>
+        <div class="mr near"><span class="k">Carbs</span><span class="tr"><i style="width:56%"></i></span><span class="n"><b>125</b> / 224 g</span></div>
+        <div class="mr on"><span class="k">Fat</span><span class="tr"><i style="width:73%"></i></span><span class="n"><b>41</b> / 56 g</span></div>
+      </div>
+    </div>
+
+    <!-- WATER — one home only -->
+    <div class="card rail" style="--h:var(--aqua)">
+      <div class="wh">
+        <span class="t"><svg viewBox="0 0 24 24"><path d="M12 3c3 3.5 6 6.5 6 10a6 6 0 0 1-12 0c0-3.5 3-6.5 6-10z"/></svg>Water</span>
+        <span class="v"><b>1.5</b> / 3.0 L</span>
+      </div>
+      <div class="drops">
+        <span class="dp on"><svg viewBox="0 0 24 24"><path d="M12 3c3 3.5 6 6.5 6 10a6 6 0 0 1-12 0c0-3.5 3-6.5 6-10z"/></svg></span>
+        <span class="dp on"><svg viewBox="0 0 24 24"><path d="M12 3c3 3.5 6 6.5 6 10a6 6 0 0 1-12 0c0-3.5 3-6.5 6-10z"/></svg></span>
+        <span class="dp on"><svg viewBox="0 0 24 24"><path d="M12 3c3 3.5 6 6.5 6 10a6 6 0 0 1-12 0c0-3.5 3-6.5 6-10z"/></svg></span>
+        <span class="dp on"><svg viewBox="0 0 24 24"><path d="M12 3c3 3.5 6 6.5 6 10a6 6 0 0 1-12 0c0-3.5 3-6.5 6-10z"/></svg></span>
+        <span class="dp"><svg viewBox="0 0 24 24"><path d="M12 3c3 3.5 6 6.5 6 10a6 6 0 0 1-12 0c0-3.5 3-6.5 6-10z"/></svg></span>
+        <span class="dp"><svg viewBox="0 0 24 24"><path d="M12 3c3 3.5 6 6.5 6 10a6 6 0 0 1-12 0c0-3.5 3-6.5 6-10z"/></svg></span>
+        <span class="dp"><svg viewBox="0 0 24 24"><path d="M12 3c3 3.5 6 6.5 6 10a6 6 0 0 1-12 0c0-3.5 3-6.5 6-10z"/></svg></span>
+        <span class="dp"><svg viewBox="0 0 24 24"><path d="M12 3c3 3.5 6 6.5 6 10a6 6 0 0 1-12 0c0-3.5 3-6.5 6-10z"/></svg></span>
+      </div>
+    </div>
+
+    <!-- MEALS -->
+    <div class="eb2">Today's meals</div>
+
+    <div class="meal done" style="--h:var(--gold)">
+      <span class="mi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg></span>
+      <span class="mb"><div class="n">Breakfast</div><div class="o">Greek Yogurt + Granola + Fruit</div>
+        <div class="mc"><b>510</b> kcal · 26 P · 45 C · 28 F</div></span>
+      <span class="tick on"><svg viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></svg></span>
+    </div>
+
+    <div class="meal done" style="--h:var(--hot)">
+      <span class="mi"><svg viewBox="0 0 24 24"><path d="M4 4v7a4 4 0 0 0 8 0V4M8 11v9M17 4c-1.5 2-2 4-2 6s.5 3 2 3 2-1 2-3-.5-4-2-6zM17 13v7"/></svg></span>
+      <span class="mb"><div class="n">Lunch</div><div class="o">Protein Salad Bowl</div>
+        <div class="mc"><b>635</b> kcal · 34 P · 100 C · 13 F</div></span>
+      <span class="tick on"><svg viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></svg></span>
+    </div>
+
+    <div class="meal" style="--h:var(--purple)">
+      <span class="mi"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-9.5-7.9A6.5 6.5 0 0 0 20 12z"/></svg></span>
+      <span class="mb"><div class="n">Dinner</div><div class="o">Chicken, Rice & Greens</div>
+        <div class="mc"><b>727</b> kcal · 39 P · 76 C · 32 F</div></span>
+      <span class="tick"><svg viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></svg></span>
+    </div>
+
+    <div class="meal" style="--h:var(--aqua)">
+      <span class="mi"><svg viewBox="0 0 24 24"><path d="M6 3h12l-1 7a5 5 0 0 1-10 0zM12 17v4M8 21h8"/></svg></span>
+      <span class="mb"><div class="n">Snack</div><div class="o">Whey + Banana</div>
+        <div class="mc"><b>230</b> kcal · 26 P · 28 C · 2 F</div></span>
+      <span class="tick"><svg viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></svg></span>
+    </div>
+
+    <div class="banner"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>All portions are for raw / uncooked ingredients</div>
+
+    <!-- links out -->
+    <div class="eb2">More</div>
+    <div class="lnk" style="--h:var(--accent)">
+      <span class="ic"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8M21 7h-5V2"/></svg></span>
+      <span class="b"><div class="n">Nutrition history</div><div class="s">Adherence, trends & macro split</div></span>
+      <span class="cv"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M9 5l7 7-7 7"/></svg></span>
+    </div>
+    <div class="lnk" style="--h:var(--good)">
+      <span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg></span>
+      <span class="b"><div class="n">Nutrition goals</div><div class="s">50% adherence this week</div></span>
+      <span class="v d">2</span>
+      <span class="cv"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M9 5l7 7-7 7"/></svg></span>
+    </div>
+
+  </div>
+</div>
+
+<div class="note">
+  <b>Meals become compact rows.</b> Each card today is a full detail view — options carousel, 4–5 ingredients with raw grams, a macro row, Add photo, Mark complete — so four meals is an endless scroll. Now: icon · meal · selected option · <b>kcal + macros on one line</b> · a tick to complete. <b>Tap the row for detail</b>, where the ingredients, options carousel and photo already live.<br><br>
+  <b>Completing is a tick, not a full-width button.</b> It's the most frequent action and needs to be one tap from the list — and per the colour law, marking a record done is <b>green</b>, not blue. (Blue = go forward; green = commit a unit of work, like "Log set". Flag if you disagree — currently it's blue.)<br><br>
+  <b>Water has one home.</b> Today it's tracked twice — the droplet strip (<code>1,500 / 3,000 ML</code>) <i>and</i> "Water Intake 1500 / 3 liters" under Goals, in different units. Keep the droplets, drop the goal duplicate, use one unit.<br><br>
+  <b>Macros aren't coloured by identity.</b> P/C/F as red/green/yellow was retired in v4 §2.9 — bar colour should mean <b>variance from target</b> (on/near/off), which is what the summary card now does. Per-meal macros are plain mono.<br><br>
+  <b>Empty sections don't render.</b> "Nutrition trends · Start logging meals to see trends" is a collapsed empty block taking space; it should appear once there's data.<br><br>
+  <b>Goals link out</b> rather than being a bolted-on section — the adherence figure comes with it.<br><br>
+  <b>Double fetch:</b> <code>get_client_nutrition_page</code> POSTs twice (one <code>(REPEAT)</code>) and <code>client_meal_overrides</code> GETs twice — <b>same root cause as the progress hub and the log detail</b>. Fix once, apply to all three.
+</div>
+
+</body></html>

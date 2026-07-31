@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Log field options — 375px</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;}
+  :root{
+    --bg:#0A0B0D; --hairline:rgba(255,255,255,.07); --hairline-2:rgba(255,255,255,.13);
+    --good:#22E56A; --warn:#FFB020; --hue:#2E7BFF;
+    --text:#EEF1F5; --dim:#98A2B3; --subtle:#5C6470;
+    --fb-sans:ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    --fb-mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+    --f-display:'Archivo',var(--fb-sans); --f-body:'Inter',var(--fb-sans); --f-mono:'JetBrains Mono',var(--fb-mono);
+  }
+  body{background:#07080A;color:var(--text);font-family:var(--f-body);-webkit-font-smoothing:antialiased;padding:26px 20px 60px;display:flex;gap:34px;flex-wrap:wrap;justify-content:center;align-items:flex-start;}
+  .disp{font-family:var(--f-display);font-stretch:125%;}
+  .col{width:375px;}
+  .ruler{font-family:var(--f-mono);font-size:9px;color:var(--subtle);text-align:center;margin-bottom:6px;}
+  .cap{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--subtle);margin-bottom:4px;text-align:center;}
+  .cap b{color:var(--text);}
+  .sub{font-size:11px;color:var(--subtle);text-align:center;margin-bottom:11px;line-height:1.45;}
+  .rec{color:var(--good);font-weight:700;}
+
+  .phone{width:375px;background:var(--bg);border-radius:24px;border:1px solid var(--hairline-2);overflow:hidden;}
+  .live{position:relative;margin:10px;border-radius:15px;overflow:hidden;border:1px solid var(--hairline-2);}
+  .live::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--hue);}
+  .lhead{display:flex;align-items:center;justify-content:space-between;padding:10px 12px 9px 16px;border-bottom:1px solid var(--hairline);}
+  .lhead .s{font-family:var(--f-display);font-stretch:125%;font-size:14px;font-weight:800;}
+  .lhead .r{font-family:var(--f-mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--hue);font-weight:700;}
+  .exrow{padding:11px 16px 0;font-size:16px;font-weight:700;font-family:var(--f-display);font-stretch:125%;}
+  .primary{display:grid;grid-template-columns:3fr 2fr;gap:10px;padding:9px 16px 10px;border-bottom:1px solid var(--hairline);margin-top:8px;}
+  .plbl{font-family:var(--f-mono);font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:var(--subtle);margin-bottom:4px;}
+  .pval{display:flex;align-items:baseline;gap:5px;}
+  .pval .big{font-family:var(--f-display);font-stretch:125%;font-size:26px;font-weight:900;line-height:1;}
+  .pval .x{font-family:var(--f-mono);font-size:13px;color:var(--subtle);}
+  .pval .u{font-family:var(--f-mono);font-size:11px;color:var(--dim);align-self:flex-end;padding-bottom:1px;}
+  .eword{font-family:var(--f-display);font-stretch:125%;font-size:23px;font-weight:900;line-height:1;color:var(--warn);}
+  .erpe{font-family:var(--f-mono);font-size:9px;color:var(--dim);}
+
+  /* ============ OPTION A · horizontal steppers, side by side ============ */
+  .logA{display:flex;gap:6px;padding:11px 16px 12px;}
+  .fA{flex:1;min-width:0;background:#050608;border:1px solid rgba(255,255,255,.16);border-radius:11px;padding:6px 7px 7px;}
+  .fA .fl{font-family:var(--f-mono);font-size:7.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle);text-align:center;}
+  .fA .row{display:flex;align-items:center;justify-content:space-between;gap:4px;margin-top:4px;}
+  .fA button{width:30px;height:30px;flex-shrink:0;border-radius:8px;border:1px solid var(--hairline-2);background:rgba(255,255,255,.04);color:var(--dim);font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;}
+  .fA .v{font-family:var(--f-mono);font-size:19px;font-weight:700;flex:1;text-align:center;min-width:0;}
+  .btnA{width:52px;flex-shrink:0;border-radius:11px;background:var(--good);color:#04240F;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;}
+
+  /* ============ OPTION B · full-width stacked rows ============ */
+  .logB{padding:11px 16px 12px;display:flex;flex-direction:column;gap:7px;}
+  .fB{display:flex;align-items:center;gap:8px;background:#050608;border:1px solid rgba(255,255,255,.16);border-radius:11px;padding:6px 8px;}
+  .fB .fl{font-family:var(--f-mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle);width:52px;flex-shrink:0;}
+  .fB .v{font-family:var(--f-mono);font-size:20px;font-weight:700;flex:1;text-align:center;}
+  .fB button{width:34px;height:32px;flex-shrink:0;border-radius:8px;border:1px solid var(--hairline-2);background:rgba(255,255,255,.04);color:var(--dim);font-size:17px;line-height:1;display:flex;align-items:center;justify-content:center;}
+  .btnB{height:44px;border-radius:11px;background:var(--good);color:#04240F;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;margin-top:1px;}
+
+  .srow{display:flex;align-items:center;gap:10px;padding:8px 16px 8px 20px;border-top:1px solid var(--hairline);}
+  .tick{width:15px;height:15px;border-radius:50%;border:1.5px solid var(--hairline-2);flex-shrink:0;}
+  .sn{font-family:var(--f-mono);font-size:10px;color:var(--dim);width:40px;flex-shrink:0;}
+  .sx{flex:1;font-family:var(--f-mono);font-size:11px;color:var(--subtle);}
+  .prefill{padding:9px 16px 12px 20px;font-family:var(--f-mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);}
+
+  /* last session card — v6 */
+  .lastcard{margin:0 10px 12px;border:1px solid var(--hairline);border-radius:14px;overflow:hidden;}
+  .lchead{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:1px solid var(--hairline);}
+  .lchead .t{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle);font-weight:700;}
+  .lchead .d{font-family:var(--f-mono);font-size:9.5px;color:var(--subtle);}
+  .lrow{display:flex;align-items:center;gap:10px;padding:7px 14px 7px 16px;border-bottom:1px solid var(--hairline);}
+  .lrow:last-child{border-bottom:none;}
+  .lrow .n{font-family:var(--f-mono);font-size:10px;color:var(--subtle);width:14px;flex-shrink:0;}
+  .lrow .val{font-family:var(--f-mono);font-size:12px;color:var(--text);flex:1;}
+  .lrow .eff{font-family:var(--f-display);font-stretch:125%;font-size:12px;font-weight:900;color:var(--warn);flex-shrink:0;}
+  .lrow .eff.na{color:var(--subtle);font-family:var(--f-mono);font-weight:400;}
+
+  .note{width:375px;font-size:11.5px;line-height:1.65;color:var(--subtle);border-left:2px solid var(--good);padding-left:12px;}
+  .note b{color:var(--text);}
+</style></head>
+<body>
+
+<!-- ============== OPTION A ============== -->
+<div class="col">
+  <div class="ruler">◀ 375px ▶</div>
+  <div class="cap"><b>A · side by side, − value +</b></div>
+  <div class="sub">Steppers go horizontal inside each field. Same height as now, far less cramped. <span class="rec">My pick.</span></div>
+  <div class="phone">
+    <div class="live">
+      <div class="lhead"><span class="s disp">Set 1 of 3</span><span class="r">● Logging now</span></div>
+      <div class="exrow">Leg Press Wide Stance</div>
+      <div class="primary">
+        <div><div class="plbl">Target</div><div class="pval"><span class="big">6</span><span class="u">reps</span></div></div>
+        <div><div class="plbl">Effort</div><div class="pval"><span class="eword disp">Max</span><span class="erpe">RPE 10</span></div></div>
+      </div>
+      <div class="logA">
+        <div class="fA"><div class="fl">Weight kg</div><div class="row"><button>−</button><span class="v">7.5</span><button>+</button></div></div>
+        <div class="fA"><div class="fl">Reps</div><div class="row"><button>−</button><span class="v">6</span><button>+</button></div></div>
+        <div class="btnA">✓</div>
+      </div>
+      <div class="srow"><span class="tick"></span><span class="sn">Set 2</span><span class="sx">6 reps · 7.5 kg</span></div>
+      <div class="srow"><span class="tick"></span><span class="sn">Set 3</span><span class="sx">6 reps · 7.5 kg</span></div>
+      <div class="prefill">↳ prefill remaining targets</div>
+    </div>
+    <div class="lastcard">
+      <div class="lchead"><span class="t">Last session</span><span class="d">Jul 17 · 3 sets</span></div>
+      <div class="lrow"><span class="n">1</span><span class="val">6 × 7.5 kg</span><span class="eff na">—</span></div>
+      <div class="lrow"><span class="n">2</span><span class="val">6 × 7.5 kg</span><span class="eff">Hard</span></div>
+      <div class="lrow"><span class="n">3</span><span class="val">5 × 7.5 kg</span><span class="eff">Max</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============== OPTION B ============== -->
+<div class="col">
+  <div class="ruler">◀ 375px ▶</div>
+  <div class="cap"><b>B · stacked full-width</b></div>
+  <div class="sub">Your idea — each field its own wide row. Biggest targets, but ~40px taller.</div>
+  <div class="phone">
+    <div class="live">
+      <div class="lhead"><span class="s disp">Set 1 of 3</span><span class="r">● Logging now</span></div>
+      <div class="exrow">Leg Press Wide Stance</div>
+      <div class="primary">
+        <div><div class="plbl">Target</div><div class="pval"><span class="big">6</span><span class="u">reps</span></div></div>
+        <div><div class="plbl">Effort</div><div class="pval"><span class="eword disp">Max</span><span class="erpe">RPE 10</span></div></div>
+      </div>
+      <div class="logB">
+        <div class="fB"><span class="fl">Weight</span><button>−</button><span class="v">7.5</span><button>+</button></div>
+        <div class="fB"><span class="fl">Reps</span><button>−</button><span class="v">6</span><button>+</button></div>
+        <div class="btnB">✓ &nbsp;Log set</div>
+      </div>
+      <div class="srow"><span class="tick"></span><span class="sn">Set 2</span><span class="sx">6 reps · 7.5 kg</span></div>
+      <div class="srow"><span class="tick"></span><span class="sn">Set 3</span><span class="sx">6 reps · 7.5 kg</span></div>
+      <div class="prefill">↳ prefill remaining targets</div>
+    </div>
+    <div class="lastcard">
+      <div class="lchead"><span class="t">Last session</span><span class="d">Jul 17 · 3 sets</span></div>
+      <div class="lrow"><span class="n">1</span><span class="val">6 × 7.5 kg</span><span class="eff na">—</span></div>
+      <div class="lrow"><span class="n">2</span><span class="val">6 × 7.5 kg</span><span class="eff">Hard</span></div>
+      <div class="lrow"><span class="n">3</span><span class="val">5 × 7.5 kg</span><span class="eff">Max</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="note">
+  <b>Both fix the squeeze</b> — the actual problem was the vertical stepper stack in a cramped right column, not the side-by-side arrangement.<br><br>
+  <b>A</b> keeps the current height and gives each stepper a 30px square target — enough for a thumb, and the row still fits 375 with the ✓.<br>
+  <b>B</b> (yours) gives the biggest targets and a labelled "Log set" button, but costs ~40px of height on a card that's already tall when a coach loads technique + note + load %.<br><br>
+  <b>Last session card is fixed in both</b> — it was still old-skin: it now uses the v6 hairline card, a real date, and the <b>effort word</b> per set (the RPE translation) where the dash used to be.
+</div>
+
+</body></html>

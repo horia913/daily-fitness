@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -49,12 +49,12 @@ function formatTargetRow(h: ClientHabitWithTemplate): string {
     const field = String(h.template.source_config?.field ?? '')
     if (field === 'sleep_hours' && typeof t.hours === 'number') return `Target: ${t.hours}h sleep / night`
     if (field === 'steps' && typeof t.steps === 'number') return `Target: ${Math.round(Number(t.steps)).toLocaleString()} steps / day`
-    if (field === 'sleep_quality' && typeof t.quality === 'number') return `Target: sleep quality ≥ ${t.quality} / 5`
-    if (field === 'stress_level' && typeof t.max_stress === 'number') return `Target: stress ≤ ${t.max_stress} / 5`
+    if (field === 'sleep_quality' && typeof t.quality === 'number') return `Target: sleep quality â‰¥ ${t.quality} / 5`
+    if (field === 'stress_level' && typeof t.max_stress === 'number') return `Target: stress â‰¤ ${t.max_stress} / 5`
   }
   if (st === 'workout_logged') return 'Target: 1 workout / day'
   const keys = Object.keys(t).filter((k) => t[k] != null && t[k] !== '')
-  if (keys.length === 0) return 'Target: —'
+  if (keys.length === 0) return 'Target: â€”'
   return `Target: ${keys.map((k) => `${k}: ${String(t[k])}`).join(', ')}`
 }
 
@@ -231,7 +231,7 @@ export default function ClientHabitsView({
         {[1, 2, 3].map((i) => (
           <div
             key={i}
-            className="h-36 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl animate-pulse"
+            className="h-36 bg-transparent border border-[color:var(--fc-glass-border)] rounded-2xl animate-pulse"
           />
         ))}
       </div>
@@ -249,7 +249,7 @@ export default function ClientHabitsView({
       )
     }
     return (
-      <div className="fc-card-shell p-8 text-center rounded-2xl border border-[color:var(--fc-glass-border)]">
+      <div className="rounded-[18px] border border-[color:rgba(255,255,255,0.08)] bg-transparent p-8 text-center">
         <p className="text-sm fc-text-dim">
           {displayName} hasn&apos;t set any habits yet.
         </p>
@@ -264,7 +264,7 @@ export default function ClientHabitsView({
           <div>
             <h2 className={sec.sectionTitle}>Habits</h2>
             <p className="text-sm text-[color:var(--fc-text-subtle)] mt-1">
-              {displayName} · {habits.length} active habit{habits.length === 1 ? '' : 's'}
+              {displayName} Â· {habits.length} active habit{habits.length === 1 ? '' : 's'}
             </p>
           </div>
           <div className={sec.rangeRow}>
@@ -330,7 +330,7 @@ export default function ClientHabitsView({
                     {windowDays === 30 ? (
                       <>
                         {' '}
-                        · Best streak: <b>{streak}</b>d
+                        Â· Best streak: <b>{streak}</b>d
                       </>
                     ) : null}
                   </>
@@ -350,10 +350,10 @@ export default function ClientHabitsView({
         <div>
           <h2 className="text-lg font-semibold fc-text-primary">Habits</h2>
           <p className="text-sm fc-text-dim mt-1">
-            {displayName} · {habits.length} active habit{habits.length === 1 ? '' : 's'}
+            {displayName} Â· {habits.length} active habit{habits.length === 1 ? '' : 's'}
           </p>
         </div>
-        <div className="flex rounded-xl border border-[color:var(--fc-glass-border)] p-0.5 bg-[color:var(--fc-glass-soft)]">
+        <div className="flex rounded-xl border border-[color:var(--fc-glass-border)] p-0.5 bg-[color:var(--bg-transparent)]">
           {([7, 30] as const).map((d) => (
             <button
               key={d}
@@ -362,7 +362,7 @@ export default function ClientHabitsView({
               className={cn(
                 'px-3 py-1.5 text-xs font-medium rounded-lg transition-colors',
                 windowDays === d
-                  ? 'bg-[color:var(--fc-accent-cyan)]/20 text-[color:var(--fc-accent-cyan)]'
+                  ? 'bg-[color:var(--fc-accent)]/20 text-[color:var(--fc-accent)]'
                   : 'fc-text-dim hover:fc-text-primary'
               )}
             >
@@ -401,7 +401,7 @@ export default function ClientHabitsView({
           return (
             <article
               key={habit.id}
-              className="rounded-2xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4 space-y-3"
+              className="rounded-2xl border border-[color:var(--fc-glass-border)] bg-transparent p-4 space-y-3"
             >
               <div className="flex items-start gap-3">
                 <div className="fc-icon-tile fc-icon-habits shrink-0">
@@ -439,7 +439,7 @@ export default function ClientHabitsView({
                         done
                           ? 'bg-[color:var(--fc-domain-habits)] border-transparent'
                           : 'bg-transparent border-[color:var(--fc-glass-border)]',
-                        isToday && 'ring-2 ring-cyan-500/60 ring-offset-1 ring-offset-[color:var(--fc-surface)]'
+                        isToday && 'ring-2 ring-[color-mix(in_srgb,var(--fc-group-c)_60%,transparent)] ring-offset-1 ring-offset-[color:var(--fc-surface)]'
                       )}
                     />
                   )
@@ -449,7 +449,7 @@ export default function ClientHabitsView({
               <div className="text-xs fc-text-subtle space-y-1">
                 <p>
                   Completed: {completedCount}/{total} days ({pct}%)
-                  {streak > 0 ? ` · Current streak: ${streak} day${streak === 1 ? '' : 's'}` : null}
+                  {streak > 0 ? ` Â· Current streak: ${streak} day${streak === 1 ? '' : 's'}` : null}
                 </p>
                 <p>
                   Last logged:{' '}

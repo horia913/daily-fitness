@@ -140,14 +140,14 @@ export function LogMeasurementModal({
     ? "block text-xs uppercase tracking-wider text-gray-400 mb-1"
     : "block text-sm font-medium mb-2 fc-text-primary";
   const inputClass = compactForm
-    ? "w-full h-11 px-3 rounded-lg text-sm text-white bg-white/[0.04] border border-white/10 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500/40"
-    : "w-full px-4 py-4 rounded-xl text-lg font-medium fc-glass-soft fc-text-primary border-2 border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)] focus:border-[color:var(--fc-accent-cyan)]";
+    ? "w-full h-11 px-3 rounded-lg text-sm text-white bg-white/[0.04] border border-white/10 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--fc-group-c)_40%,transparent)] focus:border-[color-mix(in_srgb,var(--fc-group-c)_40%,transparent)]"
+    : "w-full px-4 py-4 rounded-xl text-lg font-medium fc-glass-soft fc-text-primary border-2 border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent)] focus:border-[color:var(--fc-accent)]";
   const inputClassSecondary = compactForm
-    ? "w-full h-11 px-3 rounded-lg text-sm text-white bg-white/[0.04] border border-white/10 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500/40"
-    : "w-full px-4 py-3 rounded-xl text-base fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]";
+    ? "w-full h-11 px-3 rounded-lg text-sm text-white bg-white/[0.04] border border-white/10 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--fc-group-c)_40%,transparent)] focus:border-[color-mix(in_srgb,var(--fc-group-c)_40%,transparent)]"
+    : "w-full px-4 py-3 rounded-xl text-base fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent)]";
   const inputClassGrid = compactForm
-    ? "w-full h-11 px-3 rounded-lg text-sm text-white bg-white/[0.04] border border-white/10 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500/40"
-    : "w-full px-3 py-2 rounded-lg text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent-cyan)]";
+    ? "w-full h-11 px-3 rounded-lg text-sm text-white bg-white/[0.04] border border-white/10 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--fc-group-c)_40%,transparent)] focus:border-[color-mix(in_srgb,var(--fc-group-c)_40%,transparent)]"
+    : "w-full px-3 py-2 rounded-lg text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent)]";
   const gridLabelClass = compactForm
     ? "block text-xs uppercase tracking-wider text-gray-400 mb-1"
     : "block text-xs font-medium mb-1.5 fc-text-subtle";
@@ -395,8 +395,8 @@ export function LogMeasurementModal({
                           onChange={(e) => setMeasurementMethod(e.target.value)}
                           className={
                             compactForm
-                              ? "w-full h-11 px-3 rounded-lg text-sm text-white bg-white/[0.04] border border-white/10 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                              : "w-full px-3 py-2 rounded-lg text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent-cyan)] bg-[color:var(--fc-glass-soft)]"
+                              ? "w-full h-11 px-3 rounded-lg text-sm text-white bg-white/[0.04] border border-white/10 focus:outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--fc-group-c)_40%,transparent)]"
+                              : "w-full px-3 py-2 rounded-lg text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent)] bg-[color:var(--fc-glass-soft)]"
                           }
                         >
                           <option value="">Select method</option>
@@ -416,8 +416,8 @@ export function LogMeasurementModal({
                           rows={3}
                           className={
                             compactForm
-                              ? "w-full min-h-[5.5rem] px-3 py-2 rounded-lg text-sm text-white bg-white/[0.04] border border-white/10 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 resize-none"
-                              : "w-full px-3 py-2 rounded-lg text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent-cyan)] resize-none"
+                              ? "w-full min-h-[5.5rem] px-3 py-2 rounded-lg text-sm text-white bg-white/[0.04] border border-white/10 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--fc-group-c)_40%,transparent)] resize-none"
+                              : "w-full px-3 py-2 rounded-lg text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent)] resize-none"
                           }
                         />
                       </div>
@@ -448,7 +448,7 @@ export function LogMeasurementModal({
                 type="button"
                 onClick={handleSubmit}
                 disabled={saving}
-                className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-500 px-4 text-sm font-semibold text-white shadow-lg shadow-cyan-500/25 ring-1 ring-cyan-400/30 ring-inset transition-all active:scale-[0.98] disabled:opacity-50"
+                className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[color-mix(in_srgb,var(--fc-group-c)_75%,black)] to-[color:var(--fc-group-c)] px-4 text-sm font-semibold text-white shadow-lg shadow-[0_0_24px_color-mix(in_srgb,var(--fc-group-c)_25%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--fc-group-c)_30%,transparent)] ring-inset transition-all active:scale-[0.98] disabled:opacity-50"
               >
                 {saving ? (
                   <>

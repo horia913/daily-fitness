@@ -6,6 +6,7 @@
  */
 
 import { supabase } from "./supabase";
+import { toLocalDateString } from "./clientActivityService";
 
 export interface DailyWellnessLog {
   id: string;
@@ -43,9 +44,11 @@ export function dbToUiScale(dbValue: number | null | undefined): number | null {
 }
 
 /**
- * Create or update today's wellness log.
- * Uses upsert on (client_id, log_date) = (clientId, today).
+ * Create or update today's wellness log (local calendar day).
+ * Uses upsert on (client_id, log_date).
  * Merges with existing data to preserve fields that aren't being updated.
+ * Near midnight: if a UTC-keyed row exists for "UTC today" and local today differs,
+ * re-key that row to the local date so we don't orphan or duplicate.
  */
 export async function upsertDailyLog(
   clientId: string,
@@ -58,21 +61,46 @@ export async function upsertDailyLog(
     notes?: string;
   }
 ): Promise<DailyWellnessLog | null> {
-  const today = new Date().toISOString().split("T")[0];
+  const todayLocal = toLocalDateString(new Date());
+  const todayUtc = new Date().toISOString().split("T")[0];
   try {
-    // Fetch existing row first to merge data
-    const { data: existing } = await supabase
+    // Fetch existing row for local today
+    let { data: existing } = await supabase
       .from("daily_wellness_logs")
       .select("*")
       .eq("client_id", clientId)
-      .eq("log_date", today)
+      .eq("log_date", todayLocal)
       .maybeSingle();
+
+    // Compat: UTC-keyed "today" row from the old write path — adopt it as local today
+    if (!existing && todayUtc !== todayLocal) {
+      const { data: utcRow } = await supabase
+        .from("daily_wellness_logs")
+        .select("*")
+        .eq("client_id", clientId)
+        .eq("log_date", todayUtc)
+        .maybeSingle();
+      if (utcRow) {
+        const { data: moved, error: moveErr } = await supabase
+          .from("daily_wellness_logs")
+          .update({ log_date: todayLocal })
+          .eq("id", (utcRow as DailyWellnessLog).id)
+          .select()
+          .maybeSingle();
+        if (moveErr) {
+          // Unique conflict if both somehow exist — fall through with local null
+          console.error("wellnessService.upsertDailyLog re-key error:", moveErr);
+        } else {
+          existing = moved;
+        }
+      }
+    }
 
     // Merge: spread existing data, overlay new data
     // Note: daily_wellness_logs has no updated_at column; do not send it.
     const row = {
       client_id: clientId,
-      log_date: today,
+      log_date: todayLocal,
       ...(existing || {}),
       ...(data.sleep_hours !== undefined ? { sleep_hours: data.sleep_hours } : {}),
       ...(data.sleep_quality !== undefined ? { sleep_quality: data.sleep_quality } : {}),
@@ -81,6 +109,11 @@ export async function upsertDailyLog(
       ...(data.steps !== undefined ? { steps: data.steps } : {}),
       ...(data.notes !== undefined ? { notes: data.notes?.trim() || null } : {}),
     };
+    // Ensure log_date stays local after spread of existing
+    row.log_date = todayLocal;
+    if ((row as { id?: string }).id && existing) {
+      // keep id from existing for upsert conflict path
+    }
 
     const { data: result, error } = await supabase
       .from("daily_wellness_logs")
@@ -93,7 +126,17 @@ export async function upsertDailyLog(
       console.error("wellnessService.upsertDailyLog error:", error);
       return null;
     }
-    return result as DailyWellnessLog;
+    const log = result as DailyWellnessLog;
+    try {
+      const { emitInAppNotification } = await import("@/lib/inAppNotificationEvents");
+      void emitInAppNotification({
+        event: "coach_checkin_logged",
+        logDate: log.log_date,
+      });
+    } catch {
+      /* non-blocking */
+    }
+    return log;
   } catch (e) {
     console.error("wellnessService.upsertDailyLog exception:", e);
     return null;
@@ -101,23 +144,41 @@ export async function upsertDailyLog(
 }
 
 /**
- * Get today's log for the client (to check if already filled).
+ * Get today's log for the client (local calendar day).
+ * Also accepts a UTC-keyed row when local ≠ UTC so pre-fix logs still resolve.
  */
 export async function getTodayLog(
   clientId: string
 ): Promise<DailyWellnessLog | null> {
-  const today = new Date().toISOString().split("T")[0];
+  const todayLocal = toLocalDateString(new Date());
+  const todayUtc = new Date().toISOString().split("T")[0];
+
   const { data, error } = await supabase
     .from("daily_wellness_logs")
     .select("*")
     .eq("client_id", clientId)
-    .eq("log_date", today)
+    .eq("log_date", todayLocal)
     .maybeSingle();
   if (error) {
     console.error("wellnessService.getTodayLog error:", error);
     return null;
   }
-  return data as DailyWellnessLog | null;
+  if (data) return data as DailyWellnessLog;
+
+  if (todayUtc !== todayLocal) {
+    const { data: utcData, error: utcErr } = await supabase
+      .from("daily_wellness_logs")
+      .select("*")
+      .eq("client_id", clientId)
+      .eq("log_date", todayUtc)
+      .maybeSingle();
+    if (utcErr) {
+      console.error("wellnessService.getTodayLog utc fallback error:", utcErr);
+      return null;
+    }
+    return (utcData as DailyWellnessLog | null) ?? null;
+  }
+  return null;
 }
 
 /**
@@ -143,11 +204,11 @@ export async function getLogRange(
 }
 
 /**
- * Get check-in streak: consecutive days with a complete wellness log, counting back from today.
+ * Get check-in streak: consecutive days with a complete wellness log, counting back from local today.
  * A day counts toward the streak if sleep_hours, sleep_quality, stress_level, and soreness_level are all non-null.
  */
 export async function getCheckinStreak(clientId: string): Promise<number> {
-  const today = new Date().toISOString().split("T")[0];
+  const today = toLocalDateString(new Date());
   const { data, error } = await supabase
     .from("daily_wellness_logs")
     .select("*") // Use select("*") to handle missing columns gracefully
@@ -171,13 +232,13 @@ export async function getCheckinStreak(clientId: string): Promise<number> {
   );
   
   let streak = 0;
-  const d = new Date(today + "T12:00:00Z");
+  // Walk backward using local calendar days (noon local avoids DST edge cases)
   for (let i = 0; i < 365; i++) {
-    const s = d.toISOString().split("T")[0];
-    if (s > today) break;
+    const d = new Date(today + "T12:00:00");
+    d.setDate(d.getDate() - i);
+    const s = toLocalDateString(d);
     if (!completeDates.has(s)) break;
     streak++;
-    d.setUTCDate(d.getUTCDate() - 1);
   }
   return streak;
 }

@@ -3,7 +3,10 @@
 import React, { useState } from "react";
 import { ChevronDown, ChevronRight, ChevronUp } from "lucide-react";
 
-export type ScoreBreakdownLabel = "Training" | "Recovery" | "Nutrition" | "Extras";
+export type ScoreBreakdownLabel =
+  | "Adherence"
+  | "Execution"
+  | "Training";
 
 export type ScoreBreakdownComponent = {
   label: ScoreBreakdownLabel;
@@ -12,6 +15,8 @@ export type ScoreBreakdownComponent = {
   hint?: string;
   /** Sub-rows when expanded (e.g. completion % / execution %). */
   subRows?: { label: string; value: number | null; hint?: string }[];
+  /** When true, row is styled as contextual (not part of composite score). */
+  wellnessContext?: boolean;
 };
 
 export interface ScoreBreakdownProps {
@@ -29,27 +34,26 @@ function safeBarWidth(v: number | null) {
 
 function TrendLine({ delta }: { delta: number }) {
   if (delta === 0) {
-    return <span className="text-[10px] fc-text-dim">Flat vs last week</span>;
+    return <span className="text-[10px] fc-text-dim">Flat vs prior window</span>;
   }
   if (delta > 0) {
     return (
       <span className="text-[10px]" style={{ color: "var(--fc-status-success)" }}>
-        ↑ +{delta} from last week
+        ↑ +{delta} vs prior window
       </span>
     );
   }
   return (
     <span className="text-[10px]" style={{ color: "var(--fc-status-warning)" }}>
-      ↓ {Math.abs(delta)} from last week
+      ↓ {Math.abs(delta)} vs prior window
     </span>
   );
 }
 
 const LABEL_COLORS: Record<ScoreBreakdownLabel, string> = {
+  Adherence: "var(--fc-domain-workouts)",
+  Execution: "var(--fc-accent)",
   Training: "var(--fc-domain-workouts)",
-  Recovery: "var(--fc-accent-cyan)",
-  Nutrition: "var(--fc-domain-meals)",
-  Extras: "#8B5CF6",
 };
 
 function CoachDelta({ delta }: { delta: number | undefined }) {
@@ -125,29 +129,25 @@ export function ScoreBreakdown({
             const key = item.label;
             const color = LABEL_COLORS[item.label];
             const unavailable = item.value === null;
-            const nutritionOff = item.label === "Nutrition" && item.value === 0 && item.hint === "off";
-            const barW = nutritionOff ? 0 : safeBarWidth(item.value);
+            const barW = safeBarWidth(item.value);
             const displayPct =
-              unavailable || nutritionOff
-                ? nutritionOff
-                  ? "Off"
-                  : "—"
-                : `${Math.round(item.value ?? 0)}%`;
+              unavailable ? "—" : `${Math.round(item.value ?? 0)}%`;
 
             const barFill = unavailable
               ? "var(--fc-surface-sunken)"
-              : nutritionOff
-                ? "color-mix(in srgb, var(--fc-domain-meals) 35%, var(--fc-surface-sunken))"
-                : color;
+              : color;
 
             return (
-              <div key={key} className="space-y-2 py-3.5 first:pt-2 last:pb-1">
+              <div
+                key={key}
+                className={`space-y-2 py-3.5 first:pt-2 last:pb-1 ${item.wellnessContext ? "opacity-80" : ""}`}
+              >
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-medium fc-text-primary">{item.label}</span>
                   <div className="flex items-center gap-2 shrink-0">
                     <span
                       className={`text-lg font-bold tabular-nums ${unavailable ? "fc-text-dim" : ""}`}
-                      style={{ color: unavailable || nutritionOff ? undefined : color }}
+                      style={{ color: unavailable ? undefined : color }}
                     >
                       {displayPct}
                     </span>

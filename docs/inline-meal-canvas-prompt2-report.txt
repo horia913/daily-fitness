@@ -1,0 +1,108 @@
+# INLINE MEAL CANVAS — PROMPT 2 REPORT
+**Date:** 2026-07-04
+
+---
+
+## 1. Files changed
+
+### Created
+- `src/lib/mealPlans/foodCatalogForm.ts` — shared P2 field set, validation, `createFoodFromCatalogForm`
+- `src/lib/mealPlans/mealFoodRecentsStorage.ts` — localStorage recent food ids
+- `src/lib/mealPlans/isTypingInField.ts` — keyboard guard (input/textarea/contenteditable)
+- `src/components/meal-display/InlineCreateFoodForm.tsx` — slim inline create-food form
+
+### Modified
+- `src/app/coach/nutrition/meal-plans/[id]/page.tsx` — `data-7xl` width, keyboard shortcuts
+- `src/lib/mealPlanService.ts` — `getFoodsByIds(ids)`
+- `src/components/meal-display/InlineFoodSearch.tsx` — recents, create footer, create form, forwardRef
+- `src/components/meal-display/MealListEditor.tsx` — forwardRef `openFoodSearch`, planFoodIds
+- `src/components/meal-display/CoachPlanBuilderView.tsx` — `mealListEditorRef` passthrough
+- `src/components/meal-display/mealDisplay.module.css` — create form, recents group, search footer styles
+- `src/components/meal-display/index.ts` — new exports
+- `src/components/coach/nutrition/CoachFoodDatabasePanel.tsx` — imports shared `foodCatalogForm` (same contract)
+
+---
+
+## 2. Full-width fix
+
+**What was clamping it:** The builder page wrapped content in `CoachPageShell widthVariant="default-5xl"`, which applies `max-w-5xl` (64rem). Coach Home (`/coach/page.tsx`) and the nutrition workspace (`/coach/nutrition/page.tsx`) both use `widthVariant="data-7xl"` (`max-w-7xl` / 80rem) for open data-dense tables.
+
+**Fix:** Changed all builder `CoachPageShell` instances on `meal-plans/[id]/page.tsx` from `default-5xl` → `data-7xl`. **Page-level only** — `CoachPageShell.tsx` unchanged.
+
+**Matches:** Nutrition workspace + Coach Home (`data-7xl`).
+
+**Regression:** No shared-shell change; other routes using `default-5xl` unchanged. P4 `<1024px` macro 2×2 + legend and header stack unchanged (CSS media queries untouched).
+
+---
+
+## 3. Create custom food
+
+**Reuses P2 contract:** `EMPTY_FOOD_CATALOG_FORM` / `FOOD_CATEGORIES` / `validateFoodCatalogForm` / `createFoodFromCatalogForm` — same fields as P2 `CoachFoodDatabasePanel` (name, brand, serving size/unit, calories, protein, carbs, fat, fiber, category). P2 panel now imports the same module.
+
+**Catalog write vs draft:**
+- `createFoodFromCatalogForm` → `MealPlanService.createFood(...)` writes to global `foods` **immediately** (catalog data).
+- On success → `onSelect(food)` → P1 `onAddFood` / `addFoodToDraft` adds a **temp food row** to `workingCopy` (persists on tree **Save**).
+- No deferral into `commitMealPlanTree`.
+
+**Auto-add:** New food appears as a food row in the open option with default `quantity = serving_size`, `unit = serving_unit`.
+
+**Where:** Food search dropdown footer `＋ Create "<query>"` / `＋ Create custom food` → expands `InlineCreateFoodForm` on canvas (not a modal).
+
+---
+
+## 4. Recents (quick-pick)
+
+**Storage key:** `dailyfitness:meal-builder-food-recents`
+
+**Mechanism:**
+- Last **12** distinct `food_id`s, most-recent-first, deduped on each add (`recordRecentFoodId` on select/create).
+- Persisted in `localStorage` across sessions (same pattern as P1 draft storage).
+
+**Resolution:** `MealPlanService.getFoodsByIds(ids)` — single batch `foods` query with `.in('id', ids)`, ordered by recents list; missing/inactive foods silently omitted.
+
+**Empty search UI:** When query length < 2, dropdown shows:
+1. **Recent** group (required)
+2. **In this plan** group (nice-to-have) — food ids from current `workingCopy`, excluding ids already in Recent
+
+---
+
+## 5. Keyboard shortcuts
+
+**Guard:** `isTypingInField` — blocks when target is `HTMLInputElement`, `HTMLTextAreaElement`, or `contentEditable` (station checks input/textarea; contenteditable added per spec).
+
+| Key | Action | Station analogue |
+|-----|--------|------------------|
+| **M** | Add meal in place (same as ＋ Add meal ghost row) | **N** = add exercise (station); **M** = add **m**eal |
+| **F** | Open/focus food search on expanded meal's first option | — |
+
+Shortcuts disabled on legacy read-only plans (`isLegacyPlan`).
+
+**F behavior:** Requires a meal expanded (`openMealId`); opens food search on first option and focuses input via `MealListEditorHandle.openFoodSearch()`.
+
+---
+
+## 6. Design conformance (new UI only)
+
+| Element | Token(s) | Design-law |
+|--------|----------|------------|
+| Inline create-food form | `--fc-hairline`, `--f-mono`, `--fc-text-dim/subtle/primary`, `--inlineInput` underline | Borderless/underline; no glow |
+| Create footer link | `--fc-accent`, `--f-mono` | Ghost accent link |
+| Recent / In-plan group labels | `--f-mono`, `--fc-text-subtle` | Mono micro uppercase |
+| Save food button (inline form) | `--fc-accent` text link | Ghost, no glow |
+| Recents dropdown | `--fc-surface-card`, `--fc-glass-border`, `--fc-hairline` | Surface list, no glow |
+
+**Save is still the only glow** — `.saveBtnDirty` only; create form and new controls use accent text/links only.
+
+**P4/P1 read-state grammar:** Unchanged when meals collapsed; expanded editing affordances from P1 preserved.
+
+---
+
+## 7. tsc result
+
+`npx tsc --noEmit` → **exit 0** (clean)
+
+---
+
+## DEFER (unchanged)
+- Orphan file deletion (P-3)
+- Drag-to-reorder (parked)

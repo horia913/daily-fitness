@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import {
@@ -50,7 +50,7 @@ export default function ClientProgressPhotosSection({ clientId }: ClientProgress
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="animate-pulse h-64 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl" />
+        <div className="animate-pulse h-64 bg-transparent border border-[color:var(--fc-glass-border)] rounded-2xl" />
       </div>
     );
   }
@@ -131,7 +131,7 @@ export default function ClientProgressPhotosSection({ clientId }: ClientProgress
                 </span>
                 <span className="fc-text-subtle">
                   {entry.types.join(", ")}
-                  {entry.weight_kg != null && ` · ${entry.weight_kg} kg`}
+                  {entry.weight_kg != null && ` Â· ${entry.weight_kg} kg`}
                 </span>
               </div>
             ))}

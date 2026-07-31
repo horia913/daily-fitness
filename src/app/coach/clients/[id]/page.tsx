@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
-import React, { useMemo } from "react";
+import React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
-import { usePageData } from "@/hooks/usePageData";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { Button } from "@/components/ui/button";
 import CoachClientDailyReview, {
@@ -34,6 +34,7 @@ type ClientOverviewData = {
   program: ProgramCardJson;
   nutrition: NutritionCardJson;
   weeklyReview: WeeklyReviewJson;
+  standingNote: string | null;
 };
 
 export default function ClientDetailPage() {
@@ -41,8 +42,9 @@ export default function ClientDetailPage() {
   const { user } = useAuth();
   const clientId = params.id as string;
 
-  const fetchSummary = useMemo(
-    () => async (): Promise<ClientOverviewData | null> => {
+  const summaryQuery = useQuery({
+    queryKey: ["coach-client", clientId, "summary"],
+    queryFn: async (): Promise<ClientOverviewData | null> => {
       const res = await fetchApi(`/api/coach/clients/${clientId}/summary`);
       if (res.status === 403 || res.status === 404) {
         return null;
@@ -80,15 +82,20 @@ export default function ClientDetailPage() {
             }
           : null,
         weeklyReview: json.weeklyReview ?? null,
+        standingNote:
+          typeof json.standingNote === "string" ? json.standingNote : null,
       };
     },
-    [clientId],
-  );
+    enabled: !!clientId && !!user?.id,
+  });
 
-  const { data: client, loading, error, refetch } = usePageData(fetchSummary, [
-    clientId,
-    user?.id,
-  ]);
+  const client = summaryQuery.data ?? null;
+  const loading = summaryQuery.isLoading;
+  const error = summaryQuery.isError
+    ? summaryQuery.error instanceof Error
+      ? summaryQuery.error.message
+      : "Failed to load client"
+    : null;
 
   if (loading) {
     return <PageSkeleton variant="list" />;
@@ -97,9 +104,13 @@ export default function ClientDetailPage() {
   if (error) {
     return (
       <div className="flex min-h-[40vh] flex-col items-center justify-center px-4 py-10 text-center">
-        <div className="fc-glass-soft max-w-md w-full space-y-3 rounded-xl border border-[color:var(--fc-glass-border)] p-6">
+        <div className="bg-transparent max-w-md w-full space-y-3 rounded-xl border border-[color:var(--fc-glass-border)] p-6">
           <p className="text-sm fc-text-dim">{error}</p>
-          <Button type="button" className="fc-btn fc-btn-primary" onClick={() => void refetch()}>
+          <Button
+            type="button"
+            className="fc-btn fc-btn-primary"
+            onClick={() => void summaryQuery.refetch()}
+          >
             Retry
           </Button>
         </div>
@@ -110,7 +121,7 @@ export default function ClientDetailPage() {
   if (!client) {
     return (
       <div className="flex min-h-[40vh] flex-col items-center justify-center px-4 py-10 text-center">
-        <div className="fc-glass-soft max-w-md w-full space-y-4 rounded-xl border border-[color:var(--fc-glass-border)] p-6">
+        <div className="bg-transparent max-w-md w-full space-y-4 rounded-xl border border-[color:var(--fc-glass-border)] p-6">
           <p className="text-sm font-semibold fc-text-primary">Client not found</p>
           <p className="text-xs fc-text-dim">
             This client may not exist or you may not have access.
@@ -140,6 +151,7 @@ export default function ClientDetailPage() {
       program={client.program}
       nutrition={client.nutrition}
       weeklyReview={client.weeklyReview}
+      standingNote={client.standingNote}
     />
   );
 }

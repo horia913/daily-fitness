@@ -3,9 +3,9 @@
 .shell {
   position: relative;
   overflow: hidden;
-  border-radius: 22px;
-  border: 1px solid var(--fc-surface-card-border);
-  background: var(--fc-surface-card);
+  border-radius: 16px;
+  border: 1px solid var(--fc-glass-border);
+  background: transparent;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -13,7 +13,7 @@
 
 .divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--fc-hairline);
   width: 100%;
 }
 
@@ -22,6 +22,41 @@
   align-items: flex-start;
   gap: 12px;
   padding: 14px 16px 12px;
+}
+
+.headRowButton {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  padding: 14px 16px 12px;
+}
+
+.headRowButton:disabled {
+  cursor: default;
+}
+
+.headActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.headChevron {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--fc-text-subtle);
+  transition: transform 0.15s ease;
+}
+
+.headChevronOpen {
+  transform: rotate(180deg);
 }
 
 .mealIconWrap {
@@ -48,14 +83,16 @@
 }
 
 .mealMeta {
+  font-family: var(--f-mono, "JetBrains Mono", ui-monospace);
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.42);
+  color: var(--fc-text-subtle);
   margin: 0;
   line-height: 1.35;
 }
 
 .statusPill {
   flex-shrink: 0;
+  font-family: var(--f-mono, "JetBrains Mono", ui-monospace);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -63,14 +100,14 @@
   padding: 4px 9px;
   border-radius: 999px;
   border: 1px solid var(--fc-glass-border);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.42);
+  background: transparent;
+  color: var(--fc-text-subtle);
 }
 
 .statusPillLogged {
-  background: rgba(197, 255, 74, 0.1);
-  border-color: rgba(197, 255, 74, 0.25);
-  color: var(--fc-accent-lime);
+  background: transparent;
+  border-color: color-mix(in srgb, var(--fc-status-success) 45%, transparent);
+  color: var(--fc-status-success);
 }
 
 .carousel {
@@ -108,13 +145,13 @@
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--fc-glass-border);
   transition: background 0.15s ease, box-shadow 0.15s ease;
 }
 
 .dotActive {
-  background: var(--fc-accent-cyan);
-  box-shadow: 0 0 8px rgba(79, 227, 232, 0.45);
+  background: var(--fc-accent);
+  box-shadow: none;
 }
 
 .ingredients {
@@ -143,18 +180,19 @@
 }
 
 .ingQty {
-  font-family: var(--f-display, var(--font-display, var(--font-number, ui-sans-serif)));
-  font-size: 14px;
+  font-family: var(--f-mono, "JetBrains Mono", ui-monospace);
+  font-size: 13px;
   font-weight: 700;
   color: var(--fc-text-dim);
   flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .ingQtyUnit {
-  font-family: var(--font-sans, ui-sans-serif);
+  font-family: var(--f-mono, "JetBrains Mono", ui-monospace);
   font-size: 10px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.42);
+  color: var(--fc-text-subtle);
   margin-left: 2px;
 }
 
@@ -164,7 +202,7 @@
   align-items: baseline;
   gap: 10px 14px;
   padding: 12px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--fc-hairline);
 }
 
 .stat {
@@ -174,25 +212,26 @@
 }
 
 .statVal {
-  font-family: var(--f-display, var(--font-display, var(--font-number, ui-sans-serif)));
+  font-family: var(--f-display, "Archivo Expanded", "Archivo", ui-sans-serif);
   font-size: 15px;
   font-weight: 700;
   line-height: 1;
 }
 
 .statLbl {
+  font-family: var(--f-mono, "JetBrains Mono", ui-monospace);
   font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.42);
+  color: var(--fc-text-subtle);
 }
 
 .dotSep {
   width: 3px;
   height: 3px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--fc-glass-border);
   align-self: center;
   margin-top: 8px;
 }
@@ -212,19 +251,21 @@
   gap: 8px;
   padding: 10px;
   border-radius: 12px;
-  border: 1px dashed rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.025);
-  font-size: 11.5px;
+  border: 1px dashed var(--fc-glass-border);
+  background: transparent;
+  font-family: var(--f-mono, "JetBrains Mono", ui-monospace);
+  font-size: 11px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.42);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fc-text-subtle);
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition: border-color 0.15s ease, color 0.15s ease;
 }
 
 .photoDashed:hover {
-  border-color: rgba(79, 227, 232, 0.35);
-  background: rgba(79, 227, 232, 0.06);
-  color: var(--fc-accent-cyan);
+  border-color: color-mix(in srgb, var(--fc-accent) 45%, transparent);
+  color: var(--fc-accent);
 }
 
 .photoThumbWrap {
@@ -248,7 +289,8 @@
   justify-content: space-between;
   gap: 8px;
   padding: 8px 10px;
-  background: rgba(0, 0, 0, 0.35);
+  border-top: 1px solid var(--fc-hairline);
+  background: transparent;
 }
 
 .loggedPhotoHero {

@@ -1,0 +1,178 @@
+# DESIGN SYSTEM — Collection Card (Element 16)
+**Date:** 2026-07-05  
+**Spec:** design/mockups/element-16-collection-card.html  
+**Applied reference:** design/mockups/coach-03-programs.html
+
+---
+
+## 1. Files created / modified
+
+| Path | Action |
+|------|--------|
+| `src/styles/ui-system.css` | Modified — added phase-intensity + collection-card surface tokens (`:root` + dark theme block) |
+| `src/components/ui/CollectionCard.tsx` | **Created** — reusable collection card + meta/stat/action helpers |
+| `src/components/ui/collectionCard.module.css` | **Created** — Element 16 styles (CSS module) |
+| `src/app/dev/ui-gallery/page.tsx` | Modified — added "Element 16 — Collection Card" gallery section |
+
+**Not modified:** Programs, Plans, Clients, or nutrition pages.
+
+---
+
+## 2. Tokens in design-system stylesheet
+
+**File:** `src/styles/ui-system.css` (confirmed — app design-system stylesheet)
+
+### Phase-intensity scale (`--phase-*`)
+
+Added in both `:root` (light) and dark-theme blocks after `--fc-rarity-legendary`:
+
+| Token | Value | Aliases |
+|-------|-------|---------|
+| `--phase-light` | `var(--fc-status-success)` | #22E56A — light / base |
+| `--phase-mod` | `var(--fc-status-warning)` | #FFB020 — moderate / build |
+| `--phase-hard` | `var(--fc-status-error)` | #FF5A4D — hard / peak |
+| `--phase-deload` | `var(--fc-group-c)` | #22D3EE — deload / recovery |
+
+Semantic equivalents already existed; `--phase-*` names expose intensity meaning explicitly.
+
+### Collection-card surface tokens (new)
+
+| Token | Value | Notes |
+|-------|-------|-------|
+| `--fc-collection-card` | `#0B0C0F` | Card surface (spec `#0B0C0F`; not covered by `--fc-surface-card` #1B1E24) |
+| `--fc-collection-card-raised` | `#101318` | Hover lift (spec `--raised`) |
+| `--fc-collection-card-border` | `rgba(255, 255, 255, 0.09)` | Card hairline border |
+
+### Reused existing tokens (no new hex in component)
+
+| Role | Token |
+|------|-------|
+| Item hue (rail + glow) | `--fc-group-a` … `--fc-group-d` via `COLLECTION_HUES` |
+| Default hue fallback | `--fc-accent` |
+| Hairlines / borders | `--fc-hairline`, `--fc-glass-border-strong` |
+| Text | `--fc-text-primary`, `--fc-text-dim`, `--fc-text-subtle` |
+| Status active green | `--phase-light` |
+| Danger hover | `--phase-hard` |
+| Avatar initials on hue | `--fc-bg-deep` |
+| Typography | `--f-display`, `--f-mono` (from `globals.css`) |
+| Radius | `--fc-radius-md` (16px) |
+
+---
+
+## 3. Component API, location, CSS convention
+
+**Location:** `src/components/ui/CollectionCard.tsx` + `src/components/ui/collectionCard.module.css`
+
+**Convention:** Co-located CSS module (same pattern as `coachNutritionWorkspace.module.css`, coach station modules). UI primitives in `components/ui/` use global `fc-*` classes when token-only; new governed element uses a module because Element 16 has a large, self-contained ruleset matching the mockup HTML/CSS — mirrors coach workspace components rather than polluting `ui-system.css` with 200+ lines of card anatomy.
+
+### Exports
+
+| Export | Role |
+|--------|------|
+| `CollectionCard` | Main card shell |
+| `CollectionCardStack` | 12px vertical gap wrapper (`.stack`) |
+| `CollectionCardMetaChip` | Level chip in meta line |
+| `CollectionCardMetaSep` | `·` separator |
+| `CollectionCardMetaValue` | Emphasized mono value |
+| `CollectionCardMetaText` | Plain meta span |
+| `CollectionCardAssignedStat` | Programs-style right stat (count + optional avatars) |
+| `CollectionCardIconAction` | Ghost icon button (default / danger) |
+| `COLLECTION_HUES` | `{ a, b, c, d }` → `var(--fc-group-*)` |
+
+### `CollectionCard` props
+
+| Prop | Type | Required | Notes |
+|------|------|----------|-------|
+| `hue` | `string` | yes | CSS color for `--collection-hue` (rail + glow + stat accent) |
+| `name` | `string` | yes | Archivo title |
+| `status` | `'active' \| 'inactive'` | yes | Dims card, gray rail, suppresses glow when inactive |
+| `statusLabel` | `string` | no | Default "Active" / "Inactive" |
+| `meta` | `ReactNode` | yes | Meta line slot |
+| `structure` | `CollectionCardStructureSegment[]` | no | Phase strip — omit for Clients etc. |
+| `rightStat` | `ReactNode` | no | Score ring, assigned count, etc. |
+| `actions` | `ReactNode` | no | Icon button row |
+| `className` | `string` | no | |
+| `onClick` | `() => void` | no | Makes root a `<button>` |
+
+### `CollectionCardStructureSegment`
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `label` | `string` | Phase name under bar |
+| `duration` | `string` | e.g. "4 weeks" |
+| `flex` | `number` | Segment width proportion |
+| `phase` | `'light' \| 'moderate' \| 'hard' \| 'deload'` | Maps to `--phase-*` via CSS class |
+
+---
+
+## 4. Diff table vs `element-16-collection-card.html` CSS
+
+| Spec rule | Mockup | Implementation | Match |
+|-----------|--------|----------------|-------|
+| Card surface | `#0B0C0F` | `var(--fc-collection-card)` | ✓ |
+| Border | `1px rgba(255,255,255,.09)` | `var(--fc-collection-card-border)` | ✓ |
+| Radius | `16px` | `var(--fc-radius-md)` | ✓ |
+| Padding | `20px 22px 18px 26px` | same | ✓ |
+| Gap (card inner) | `20px` | `20px` | ✓ |
+| Stack gap | `12px` | `CollectionCardStack` `12px` | ✓ |
+| Left rail | `3px`, item hue | `::before`, `var(--collection-hue)` | ✓ |
+| Right glow | `46%` width, radial 32% hue | `::after`, `color-mix` 32% | ✓ |
+| Hover | `#101318`, brighter border | `--fc-collection-card-raised`, `--fc-glass-border-strong` | ✓ |
+| Inactive | `opacity .58`, gray rail, glow `.4` | `.inactive` class | ✓ |
+| Title | Archivo 19px 700 | `.name` | ✓ |
+| Status pill | 9.5px mono, dot, active/off colors | `.statusActive` / `.statusInactive` | ✓ |
+| Meta | 11px mono, chip, sep, value | meta helpers | ✓ |
+| Level chip | 10px uppercase, hairline border | `.metaChip` | ✓ |
+| Structure bar | 8px height, 3px gap, 2px radius | `.segs` / `.seg` | ✓ |
+| Phase colors | `--phase-*` | CSS classes → token vars | ✓ |
+| Segment labels | 11px name + 9.5px mono duration | `.slabName` / `.slabDuration` | ✓ |
+| Assigned stat | 19px mono count, 9px label | `.acountN` / `.acountL` | ✓ |
+| Zero stat | count `var(--subtle)` | `.acountZero` | ✓ |
+| Avatars | 26px, -8px overlap, 2px card border | `.avatar` | ✓ |
+| Icon buttons | 32×32, 9px radius, danger red hover | `.iconBtn` / `.iconBtnDanger` | ✓ |
+| Responsive | stack `<1024px`, side below | `@media (max-width: 1023px)` | ✓ |
+| Score ring | `.ring` 46×46 SVG | **Not built** — rightStat is open slot; Clients build passes custom node | intentional |
+| `--hue` inline | `style="--hue:var(--hueA)"` | `style={{ '--collection-hue': hue }}` | ✓ (renamed to avoid collision) |
+| Status off label | "Inactive" | default when `status="inactive"` | ✓ |
+| Clients "On track" status | custom label | `statusLabel` prop | ✓ |
+
+**Intentional omissions (spec slots, not fixed CSS):** score ring component (gallery uses assigned-stat only); message icon variant for Clients — consumers pass via `actions` slot.
+
+---
+
+## 5. Gallery section + three examples
+
+**Section:** `Element 16 — Collection Card` in `src/app/dev/ui-gallery/page.tsx` (after Element 15).
+
+| Example | Demonstrates |
+|---------|--------------|
+| **Hypertrophy Base** (active) | Full phase strip: Foundation (light) → Hypertrophy (moderate) → Peak (hard) → Deload; 8 clients + 3 avatars; all four actions |
+| **Peaking Block** (active) | No structure strip; **zero-stat** (`count={0}`, muted number, no avatars) |
+| **Old Cut Program** (inactive) | Dimmed card, gray rail, suppressed glow, inactive status pill, zero clients |
+
+View at: `/dev/ui-gallery` → scroll to "Element 16 — Collection Card".
+
+---
+
+## 6. Not wired into real pages
+
+Confirmed — no changes to:
+- `/coach/programs` or `ProgramsDashboardContent`
+- Nutrition workspace / meal plans panels
+- Clients list or any production roster page
+
+`ProgramCard` remains in gallery section 2 as legacy reference only.
+
+---
+
+## 7. TypeScript
+
+```
+npx tsc --noEmit → exit 0
+```
+
+---
+
+## Phase-mapping note (deferred)
+
+Gallery hardcodes `phase` per structure segment. Mapping real `training_blocks` to phase levels is for the **Programs Phase B build**, not this prompt.

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -6,7 +6,6 @@ import {
   User,
   HeartHandshake,
   ImageIcon,
-  ClipboardCheck,
   Target,
   Star,
   MessageSquare,
@@ -41,7 +40,6 @@ const PROGRESS_TABS: SubTabDef<ProgressHubSectionId>[] = [
   { id: "body", label: "Body", icon: User },
   { id: "wellness", label: "Wellness", icon: HeartHandshake },
   { id: "photos", label: "Photos", icon: ImageIcon },
-  { id: "fms", label: "FMS", icon: ClipboardCheck },
   { id: "goals", label: "Goals", icon: Target },
   { id: "habits", label: "Habits", icon: Star },
 ];
@@ -51,7 +49,7 @@ export default function CoachCheckInsShell({ clientId }: { clientId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { addToast } = useToast();
-  const { clientName, email, firstName, lastName } = useCoachClient();
+  const { clientName, email, phone, firstName, lastName } = useCoachClient();
 
   const coachId = user?.id ?? "";
   const [loading, setLoading] = useState(true);
@@ -171,14 +169,14 @@ export default function CoachCheckInsShell({ clientId }: { clientId: string }) {
     const c = Math.round(
       trendSlice.reduce((s, d) => s + (d.checkins ?? 0), 0) / trendSlice.length
     );
-    return `Last 8 weeks · workouts ${w}% · check-ins ${c}% avg`;
+    return `Last 8 weeks Â· workouts ${w}% Â· check-ins ${c}% avg`;
   }, [trendSlice]);
 
   if (loading) {
     return (
       <div className="space-y-3 animate-pulse">
-        <div className="h-32 rounded-[20px] bg-[color:var(--fc-glass-soft)] border border-[color:var(--fc-glass-border)]" />
-        <div className="h-24 rounded-[18px] bg-[color:var(--fc-glass-soft)] border border-[color:var(--fc-glass-border)]" />
+        <div className="h-32 rounded-[20px] bg-[color:var(--bg-transparent)] border border-[color:var(--fc-glass-border)]" />
+        <div className="h-24 rounded-[18px] bg-[color:var(--bg-transparent)] border border-[color:var(--fc-glass-border)]" />
       </div>
     );
   }
@@ -203,7 +201,7 @@ export default function CoachCheckInsShell({ clientId }: { clientId: string }) {
           accent="purple"
           eyebrow="Check-ins & assessments"
           title={`${displayName}'s adherence`}
-          subtitle="Body, wellness, photos, FMS, goals & habits"
+          subtitle="Body, wellness, photos, goals & habits"
           stats={[
             { num: checkPct, numSuffix: "%", label: "Check-ins", tone: checkTone },
             { num: row.streak, numSuffix: "d", label: "Streak", tone: "default" },
@@ -235,7 +233,7 @@ export default function CoachCheckInsShell({ clientId }: { clientId: string }) {
         trainedToday={trainedToday}
         attentionLevel={attentionLevel}
         attentionDetail={row.alerts > 0 ? `${row.alerts} quiet days this week` : null}
-        phone={null}
+        phone={phone}
         onMessage={openMessage}
       />
 

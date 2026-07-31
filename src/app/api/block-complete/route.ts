@@ -133,16 +133,34 @@ export async function POST(req: NextRequest) {
       if (existingLog) {
         workoutLogId = existingLog.id
       } else {
+        // Program Spine Rebuild (step 4): stamp the instance schedule row id on
+        // the workout_log created here. Resolved via the workout_assignment
+        // bridge; null for standalone workouts.
+        const { resolveProgramDayAssignmentIdByWorkoutAssignment } = await import('@/lib/resolveInstanceScheduleRow')
+        const programDayAssignmentId = await resolveProgramDayAssignmentIdByWorkoutAssignment(
+          supabaseAdmin,
+          assignmentId
+        )
+
+        const newLogPayload: {
+          client_id: string
+          workout_assignment_id: string
+          started_at: string
+          completed_at: null
+          program_day_assignment_id?: string
+        } = {
+          client_id: userId,
+          workout_assignment_id: assignmentId,
+          started_at: new Date().toISOString(),
+          completed_at: null,
+        }
+        if (programDayAssignmentId) {
+          newLogPayload.program_day_assignment_id = programDayAssignmentId
+        }
+
         const { data: newLog, error: createError } = await supabaseAdmin
           .from('workout_logs')
-          .insert([
-            {
-              client_id: userId,
-              workout_assignment_id: assignmentId,
-              started_at: new Date().toISOString(),
-              completed_at: null,
-            },
-          ])
+          .insert([newLogPayload])
           .select('id')
           .single()
 
@@ -159,25 +177,128 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Upsert set entry completion (one row per workout_log + set entry)
-    const { error: upsertError } = await supabaseAdmin
-      .from('workout_set_entry_completions')
-      .upsert(
-        {
-          workout_log_id: workoutLogId,
-          workout_set_entry_id: setEntryId,
-          completed_at: new Date().toISOString(),
-          completion_type: 'block_complete',
-        },
-        {
-          onConflict: 'workout_log_id,workout_set_entry_id',
-          ignoreDuplicates: false,
-        }
-      )
+    // Instance workouts key blocks by program_instance_set_entries.id; master
+    // templates use workout_set_entries.id (FK on workout_set_entry_id).
+    const { data: instanceEntry, error: instanceLookupError } = await supabaseAdmin
+      .from('program_instance_set_entries')
+      .select('id')
+      .eq('id', setEntryId)
+      .maybeSingle()
 
-    if (upsertError) {
-      console.error('block-complete: upsert error', upsertError)
-      return createErrorResponse('Failed to save block completion', upsertError.message, undefined, 400)
+    if (instanceLookupError) {
+      console.error('block-complete: instance set entry lookup error', instanceLookupError)
+      return createErrorResponse(
+        'Failed to resolve set entry',
+        instanceLookupError.message,
+        undefined,
+        400
+      )
+    }
+
+    const completedAt = new Date().toISOString()
+
+    if (instanceEntry) {
+      // Instance blocks use a partial unique index (WHERE program_instance_set_entry_id
+      // IS NOT NULL). Supabase JS upsert cannot target partial indexes, so use
+      // check-then-write; the index still guards concurrent double-taps (23505).
+      const { data: existingCompletion, error: selectError } = await supabaseAdmin
+        .from('workout_set_entry_completions')
+        .select('id')
+        .eq('workout_log_id', workoutLogId)
+        .eq('program_instance_set_entry_id', setEntryId)
+        .maybeSingle()
+
+      if (selectError) {
+        console.error('block-complete: instance completion lookup error', selectError)
+        return createErrorResponse(
+          'Failed to save block completion',
+          selectError.message,
+          undefined,
+          400
+        )
+      }
+
+      if (existingCompletion) {
+        const { error: updateError } = await supabaseAdmin
+          .from('workout_set_entry_completions')
+          .update({
+            completed_at: completedAt,
+            completion_type: 'block_complete',
+          })
+          .eq('id', existingCompletion.id)
+
+        if (updateError) {
+          console.error('block-complete: instance completion update error', updateError)
+          return createErrorResponse(
+            'Failed to save block completion',
+            updateError.message,
+            undefined,
+            400
+          )
+        }
+      } else {
+        const { error: insertError } = await supabaseAdmin
+          .from('workout_set_entry_completions')
+          .insert({
+            workout_log_id: workoutLogId,
+            program_instance_set_entry_id: setEntryId,
+            workout_set_entry_id: null,
+            completed_at: completedAt,
+            completion_type: 'block_complete',
+          })
+
+        if (insertError) {
+          if (insertError.code === '23505') {
+            // Concurrent double-tap: partial unique index won the race — idempotent success.
+            const { error: raceUpdateError } = await supabaseAdmin
+              .from('workout_set_entry_completions')
+              .update({
+                completed_at: completedAt,
+                completion_type: 'block_complete',
+              })
+              .eq('workout_log_id', workoutLogId)
+              .eq('program_instance_set_entry_id', setEntryId)
+
+            if (raceUpdateError) {
+              console.error('block-complete: instance completion race update error', raceUpdateError)
+              return createErrorResponse(
+                'Failed to save block completion',
+                raceUpdateError.message,
+                undefined,
+                400
+              )
+            }
+          } else {
+            console.error('block-complete: instance completion insert error', insertError)
+            return createErrorResponse(
+              'Failed to save block completion',
+              insertError.message,
+              undefined,
+              400
+            )
+          }
+        }
+      }
+    } else {
+      const { error: upsertError } = await supabaseAdmin
+        .from('workout_set_entry_completions')
+        .upsert(
+          {
+            workout_log_id: workoutLogId,
+            workout_set_entry_id: setEntryId,
+            completed_at: completedAt,
+            completion_type: 'block_complete',
+          },
+          {
+            onConflict: 'workout_log_id,workout_set_entry_id',
+            ignoreDuplicates: false,
+          }
+        )
+
+      if (upsertError) {
+        console.error('block-complete: upsert error', upsertError)
+        return createErrorResponse('Failed to save block completion', upsertError.message, undefined, 400)
+      }
     }
 
     return NextResponse.json({ workout_log_id: workoutLogId })

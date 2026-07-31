@@ -29,9 +29,9 @@
 }
 
 .tileOn {
-  background: var(--cyan-soft);
-  border-color: var(--cyan-dim);
-  color: var(--cyan);
+  background: var(--fc-accent-dim);
+  border-color: var(--fc-accent-glow);
+  color: var(--fc-accent);
 }
 
 .cb {
@@ -42,16 +42,16 @@
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
 }
 
 .cbOn {
-  background: var(--cyan);
-  border-color: var(--cyan);
+  background: var(--fc-accent);
+  border-color: var(--fc-accent);
 }
 
 .cbIcon {
-  color: #0a1a26;
+  color: var(--fc-ink);
 }
 
 .tileLabel {

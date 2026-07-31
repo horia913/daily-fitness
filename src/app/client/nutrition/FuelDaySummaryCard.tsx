@@ -1,10 +1,10 @@
 "use client";
 
+import { macroVarianceBand } from "@/lib/macroVariance";
 import styles from "./fuelPage.module.css";
 
 export interface FuelDaySummaryCardProps {
   planName: string;
-  dateLabel: string;
   loggedMeals: number;
   totalMeals: number;
   caloriesConsumed: number;
@@ -14,12 +14,14 @@ export interface FuelDaySummaryCardProps {
   fat: { consumed: number; goal: number };
 }
 
-const R = 26;
-const CIRC = 2 * Math.PI * R;
+const VARIANCE_FILL = {
+  on: styles.macroFillOn,
+  near: styles.macroFillNear,
+  off: styles.macroFillOff,
+} as const;
 
 export function FuelDaySummaryCard({
   planName,
-  dateLabel,
   loggedMeals,
   totalMeals,
   caloriesConsumed,
@@ -28,79 +30,51 @@ export function FuelDaySummaryCard({
   carbs,
   fat,
 }: FuelDaySummaryCardProps) {
-  const ringPct =
-    totalMeals > 0 ? Math.min(1, loggedMeals / totalMeals) : 0;
-  const dash = ringPct * CIRC;
-
-  const pct = (cur: number, goal: number) =>
-    goal > 0 ? Math.min(100, (cur / goal) * 100) : 0;
-
   const goalKcal = caloriesGoal > 0 ? caloriesGoal : null;
+  const kcalBand = macroVarianceBand(caloriesConsumed, caloriesGoal);
 
   return (
-    <section className={styles.daySummary} aria-label="Daily meal plan summary">
-      <div className={styles.daySummaryInner}>
-        <div className={styles.dayHead}>
-          <div className={styles.dayHeadLeft}>
-            <div className={styles.eyebrowMealPlan}>Meal plan</div>
-            <h2 className={styles.planName}>{planName}</h2>
-            <p className={styles.planDate}>{dateLabel}</p>
-          </div>
-          <div className={styles.ringWrap} aria-hidden>
-            <svg className={styles.ringSvg} viewBox="0 0 64 64">
-              <circle className={styles.ringBg} cx="32" cy="32" r={R} />
-              <circle
-                className={styles.ringFg}
-                cx="32"
-                cy="32"
-                r={R}
-                strokeDasharray={`${dash} ${CIRC}`}
-              />
-            </svg>
-            <div className={styles.ringCenter}>
-              <div className={styles.ringNums}>
-                {loggedMeals}
-                <span>/{totalMeals || "—"}</span>
-              </div>
-              <div className={styles.ringMealsLabel}>Meals</div>
-            </div>
-          </div>
-        </div>
-
-        <div className={styles.calorieLine}>
-          <span className={styles.calCurrent}>
-            {Math.round(caloriesConsumed)}
+    <section
+      className={styles.daySummary}
+      style={{ ["--h" as string]: "var(--fc-status-success)" }}
+      aria-label="Daily meal plan summary"
+    >
+      <div className={styles.dsRow}>
+        <div className={styles.ring} aria-hidden>
+          <span className={styles.ringN}>
+            {loggedMeals}/{totalMeals || "—"}
           </span>
-          <span className={styles.calSep}>/</span>
-          <span className={styles.calTarget}>
-            {goalKcal != null ? Math.round(goalKcal) : "—"}
-          </span>
-          <span className={styles.calUnit}>kcal</span>
+          <span className={styles.ringL}>MEALS</span>
         </div>
+        <div className={styles.kcBlock}>
+          <div className={styles.planLabel}>{planName}</div>
+          <div className={styles.kcalRow}>
+            <span
+              className={styles.kcalA}
+              data-band={kcalBand}
+            >
+              {Math.round(caloriesConsumed).toLocaleString()}
+            </span>
+            <span className={styles.kcalB}>
+              / {goalKcal != null ? Math.round(goalKcal).toLocaleString() : "—"}{" "}
+              kcal
+            </span>
+          </div>
+        </div>
+      </div>
 
-        <div className={styles.macroGrid}>
-          <MacroBar
-            label="Protein"
-            consumed={protein.consumed}
-            goal={protein.goal}
-            pct={pct(protein.consumed, protein.goal)}
-            fillClass={styles.macroFillProtein}
-          />
-          <MacroBar
-            label="Carbs"
-            consumed={carbs.consumed}
-            goal={carbs.goal}
-            pct={pct(carbs.consumed, carbs.goal)}
-            fillClass={styles.macroFillCarbs}
-          />
-          <MacroBar
-            label="Fat"
-            consumed={fat.consumed}
-            goal={fat.goal}
-            pct={pct(fat.consumed, fat.goal)}
-            fillClass={styles.macroFillFat}
-          />
-        </div>
+      <div className={styles.macroGrid}>
+        <MacroBar
+          label="Protein"
+          consumed={protein.consumed}
+          goal={protein.goal}
+        />
+        <MacroBar
+          label="Carbs"
+          consumed={carbs.consumed}
+          goal={carbs.goal}
+        />
+        <MacroBar label="Fat" consumed={fat.consumed} goal={fat.goal} />
       </div>
     </section>
   );
@@ -110,28 +84,27 @@ function MacroBar({
   label,
   consumed,
   goal,
-  pct,
-  fillClass,
 }: {
   label: string;
   consumed: number;
   goal: number;
-  pct: number;
-  fillClass: string;
 }) {
+  const band = macroVarianceBand(consumed, goal);
+  const pct = goal > 0 ? Math.min(100, (consumed / goal) * 100) : 0;
   const g = goal > 0 ? goal : null;
   return (
-    <div className={styles.macroRow}>
+    <div className={styles.macroRow} data-band={band}>
       <span className={styles.macroLabel}>{label}</span>
       <div className={styles.macroTrack}>
-        <div className={fillClass} style={{ width: `${pct}%` }} />
+        <i
+          className={VARIANCE_FILL[band]}
+          style={{ width: `${pct}%` }}
+          aria-hidden
+        />
       </div>
       <div className={styles.macroValue}>
-        <span>{Math.round(consumed)}</span>
-        {g != null ? (
-          <span style={{ color: "rgba(255,255,255,0.42)" }}> / {g}</span>
-        ) : null}
-        <span className={styles.macroValueUnit}> g</span>
+        <b>{Math.round(consumed)}</b>
+        {g != null ? ` / ${Math.round(g)} g` : " g"}
       </div>
     </div>
   );

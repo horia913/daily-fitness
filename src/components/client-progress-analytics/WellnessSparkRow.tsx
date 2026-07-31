@@ -25,7 +25,7 @@ function tierForValue(
 function colorVar(metric: Metric): string {
   if (metric === "sleep") return "var(--purple)";
   if (metric === "stress") return "var(--warning)";
-  return "var(--cyan)";
+  return "var(--fc-accent)";
 }
 
 function trendForMetric(
@@ -143,7 +143,7 @@ export function WellnessSparkRow({
               className="font-bold text-[13px] text-[var(--t1)]"
               style={{
                 fontFamily:
-                  '"Big Shoulders Display", var(--font-geist-sans, Geist), sans-serif',
+                  'var(--f-display), var(--font-geist-sans, Geist), sans-serif',
               }}
             >
               {avgDisplay}

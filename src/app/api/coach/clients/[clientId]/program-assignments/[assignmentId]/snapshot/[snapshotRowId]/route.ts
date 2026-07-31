@@ -1,8 +1,8 @@
 /**
  * PATCH /api/coach/clients/[clientId]/program-assignments/[assignmentId]/snapshot/[snapshotRowId]
  *
- * Updates a single program_day_assignments row for the coach's client assignment.
- * Does not modify master program_schedule or workout_logs.
+ * Updates a single program_day_assignments row — instance schedule only.
+ * Never reads or writes master program_schedule / workout_templates for assignment.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -20,12 +20,12 @@ type RouteCtx = {
 }
 
 type PatchBody = {
-  workout_template_id?: string | null
-  is_customized?: boolean
+  /** Assign an existing instance workout to this day. */
+  program_instance_workout_id?: string | null
+  /** Clone a coach library template into a new instance workout and assign it. */
+  library_template_id?: string | null
   day_type?: 'workout' | 'rest' | 'assessment'
   name?: string | null
-  reset_to_template?: boolean
-  /** When not resetting to master, optional day flag for this snapshot row. */
   is_optional?: boolean
 }
 
@@ -83,107 +83,92 @@ export async function PATCH(request: NextRequest, ctx: RouteCtx) {
       return NextResponse.json({ error: 'Snapshot row not found' }, { status: 404 })
     }
 
-    const dayNum = Number(row.day_number) || 1
-    const weekNum = Math.max(1, Math.ceil(dayNum / 7))
+    const weekNum = Number(row.week_number) || Math.max(1, Math.ceil((Number(row.day_number) || 1) / 7))
     const programDayRaw = row.program_day
     const programDay =
       typeof programDayRaw === 'number' && programDayRaw >= 1 && programDayRaw <= 7
         ? programDayRaw
-        : Math.max(1, Math.min(7, dayNum - (weekNum - 1) * 7))
+        : Math.max(1, Math.min(7, (Number(row.day_number) || 1) - (weekNum - 1) * 7))
 
-    let workout_template_id: string | null
-    let is_customized: boolean
+    let program_instance_workout_id: string | null =
+      (row.program_instance_workout_id as string | null) ?? null
     let day_type: string
     let name: string
     let is_optional: boolean
 
-    if (body.reset_to_template) {
-      const { data: ps, error: psErr } = await supabaseAdmin
-        .from('program_schedule')
-        .select('template_id, is_optional')
-        .eq('program_id', assignment.program_id)
-        .eq('week_number', weekNum)
-        .eq('day_number', programDay)
+    const wantsRest =
+      body.day_type === 'rest' ||
+      body.program_instance_workout_id === null ||
+      body.program_instance_workout_id === ''
+
+    if (wantsRest) {
+      program_instance_workout_id = null
+      day_type = 'rest'
+      is_optional = body.is_optional ?? false
+      name =
+        typeof body.name === 'string' && body.name.trim().length > 0
+          ? body.name.trim()
+          : `Rest Day ${weekNum}-${programDay}`
+    } else if (typeof body.library_template_id === 'string' && body.library_template_id.length > 0) {
+      const { data: clonedId, error: cloneErr } = await supabaseAuth.rpc(
+        'clone_template_to_instance_workout',
+        {
+          p_assignment_id: assignmentId,
+          p_source_template_id: body.library_template_id,
+        },
+      )
+      if (cloneErr) {
+        console.error('[snapshot PATCH] clone:', cloneErr)
+        return NextResponse.json({ error: cloneErr.message || 'Clone failed' }, { status: 400 })
+      }
+      program_instance_workout_id = clonedId as string
+
+      const { data: piw } = await supabaseAdmin
+        .from('program_instance_workouts')
+        .select('name, estimated_duration')
+        .eq('id', program_instance_workout_id)
         .maybeSingle()
 
-      if (psErr) {
-        console.error('[snapshot PATCH] program_schedule:', psErr)
-        return NextResponse.json({ error: 'Failed to load master slot' }, { status: 500 })
+      day_type = body.day_type === 'assessment' ? 'assessment' : 'workout'
+      is_optional = body.is_optional ?? false
+      name =
+        typeof body.name === 'string' && body.name.trim().length > 0
+          ? body.name.trim()
+          : ((piw?.name as string) || `Workout Day ${weekNum}-${programDay}`)
+    } else if (
+      typeof body.program_instance_workout_id === 'string' &&
+      body.program_instance_workout_id.length > 0
+    ) {
+      const iid = body.program_instance_workout_id
+      const { data: piw, error: piwErr } = await supabaseAdmin
+        .from('program_instance_workouts')
+        .select('id, name, program_assignment_id')
+        .eq('id', iid)
+        .maybeSingle()
+
+      if (piwErr || !piw || piw.program_assignment_id !== assignmentId) {
+        return NextResponse.json({ error: 'Instance workout not found for this assignment' }, { status: 404 })
       }
 
-      workout_template_id = ps?.template_id ?? null
-      is_optional = Boolean((ps as { is_optional?: boolean | null })?.is_optional)
-      is_customized = false
-      day_type = workout_template_id ? 'workout' : 'rest'
-      const defaultName =
-        day_type === 'workout'
-          ? `Workout Day ${weekNum}-${programDay}`
-          : `Rest Day ${weekNum}-${programDay}`
-
-      if (workout_template_id) {
-        const { data: tmpl } = await supabaseAdmin
-          .from('workout_templates')
-          .select('name')
-          .eq('id', workout_template_id)
-          .maybeSingle()
-        name = (tmpl?.name as string) || defaultName
-      } else {
-        name = defaultName
-      }
+      program_instance_workout_id = iid
+      day_type = body.day_type === 'assessment' ? 'assessment' : 'workout'
+      is_optional = body.is_optional ?? false
+      name =
+        typeof body.name === 'string' && body.name.trim().length > 0
+          ? body.name.trim()
+          : ((piw.name as string) || `Workout Day ${weekNum}-${programDay}`)
     } else {
-      const wantsRest =
-        body.day_type === 'rest' ||
-        body.workout_template_id === null ||
-        body.workout_template_id === ''
-
-      if (wantsRest) {
-        workout_template_id = null
-        day_type = 'rest'
-        is_optional = false
-        is_customized = body.is_customized !== undefined ? Boolean(body.is_customized) : true
-        name =
-          typeof body.name === 'string' && body.name.trim().length > 0
-            ? body.name.trim()
-            : `Rest Day ${weekNum}-${programDay}`
-      } else {
-        const tid = body.workout_template_id
-        if (typeof tid !== 'string' || tid.length === 0) {
-          return NextResponse.json(
-            { error: 'Provide workout_template_id, set rest, or reset_to_template' },
-            { status: 400 }
-          )
-        }
-
-        const { data: tmpl, error: tmplErr } = await supabaseAdmin
-          .from('workout_templates')
-          .select('id, name, coach_id')
-          .eq('id', tid)
-          .maybeSingle()
-
-        if (tmplErr || !tmpl) {
-          return NextResponse.json({ error: 'Template not found' }, { status: 404 })
-        }
-
-        if (tmpl.coach_id !== user.id) {
-          return createForbiddenResponse('You can only assign templates you own')
-        }
-
-        workout_template_id = tid
-        is_customized = body.is_customized !== undefined ? Boolean(body.is_customized) : true
-        day_type = body.day_type === 'assessment' ? 'assessment' : 'workout'
-        is_optional = body.is_optional ?? false
-        name =
-          typeof body.name === 'string' && body.name.trim().length > 0
-            ? body.name.trim()
-            : ((tmpl.name as string) || `Workout Day ${weekNum}-${programDay}`)
-      }
+      return NextResponse.json(
+        { error: 'Provide program_instance_workout_id, library_template_id, or set rest' },
+        { status: 400 },
+      )
     }
 
     const { data: updated, error: updateError } = await supabaseAdmin
       .from('program_day_assignments')
       .update({
-        workout_template_id,
-        is_customized,
+        program_instance_workout_id,
+        workout_template_id: null,
         day_type,
         name,
         is_optional,

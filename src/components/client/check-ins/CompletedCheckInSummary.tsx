@@ -27,7 +27,7 @@ export function CompletedCheckInSummary({ log, logDate, onEdit }: CompletedCheck
         <span className="text-lg" aria-hidden>
           ✅
         </span>
-        <h2 className="text-lg font-bold fc-text-primary leading-tight">Today&apos;s Check-in Complete</h2>
+        <h2 className="text-lg font-bold fc-text-primary leading-tight">Daily check-in complete</h2>
       </div>
       <p className="text-sm fc-text-dim mb-4">{formatDateLong(logDate)}</p>
 
@@ -73,7 +73,7 @@ export function CompletedCheckInSummary({ log, logDate, onEdit }: CompletedCheck
         onClick={onEdit}
         className="w-full min-h-[48px] py-3 rounded-xl text-sm font-semibold fc-btn fc-btn-secondary fc-press"
       >
-        Edit Check-in
+        Edit daily check-in
       </button>
     </div>
   );

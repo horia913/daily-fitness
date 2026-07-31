@@ -1,4 +1,4 @@
-/* Fuel / nutrition daily view — nutrition-v1 */
+/* Fuel / nutrition daily view — v6 flat chrome */
 
 .topbar {
   display: flex;
@@ -16,11 +16,7 @@
   padding: 0;
   flex-shrink: 0;
   cursor: pointer;
-  background: linear-gradient(
-    135deg,
-    var(--fc-surface-elevated),
-    var(--fc-surface-card)
-  );
+  background: transparent;
 }
 
 .avatarBtn img {
@@ -36,6 +32,11 @@
   justify-content: space-between;
   gap: 12px 16px;
   margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--fc-glass-border);
+  border-left: 3px solid var(--fc-accent);
+  padding-left: 14px;
+  margin-left: -4px;
 }
 
 .headerLeft {
@@ -48,20 +49,13 @@
 }
 
 .fuelTitle {
-  font-family: var(--f-headline, var(--font-sans, ui-sans-serif));
+  font-family: var(--f-headline, "Archivo", ui-sans-serif);
   font-weight: 700;
   font-size: 32px;
   line-height: 1;
   letter-spacing: -0.025em;
   margin: 0;
-  background: linear-gradient(
-    135deg,
-    var(--fc-accent-cyan),
-    var(--fc-accent-lime)
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--fc-text-primary);
 }
 
 .headerActions {
@@ -78,17 +72,20 @@
   gap: 6px;
   padding: 8px 12px;
   border-radius: 999px;
-  font-size: 12px;
+  font-family: var(--f-mono, "JetBrains Mono", ui-monospace);
+  font-size: 11px;
   font-weight: 600;
-  border: 1px solid rgba(79, 227, 232, 0.25);
-  background: rgba(79, 227, 232, 0.1);
-  color: var(--fc-accent-cyan);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid color-mix(in srgb, var(--fc-accent) 35%, transparent);
+  background: transparent;
+  color: var(--fc-accent);
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: border-color 0.15s ease, color 0.15s ease;
 }
 
 .pillAddFood:hover {
-  background: rgba(79, 227, 232, 0.16);
+  border-color: var(--fc-accent);
 }
 
 .pillHistory {
@@ -97,43 +94,31 @@
   gap: 6px;
   padding: 8px 12px;
   border-radius: 999px;
-  font-size: 12px;
+  font-family: var(--f-mono, "JetBrains Mono", ui-monospace);
+  font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   border: 1px solid var(--fc-glass-border);
-  background: rgba(255, 255, 255, 0.04);
+  background: transparent;
   color: var(--fc-text-dim);
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: border-color 0.15s ease, color 0.15s ease;
 }
 
 .pillHistory:hover {
   color: var(--fc-text-primary);
-  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--fc-glass-border-strong);
 }
 
 .goalPrompt {
   position: relative;
   border-radius: 14px;
   border: 1px solid var(--fc-glass-border);
-  background: var(--fc-surface-card);
+  background: transparent;
   padding: 12px 14px;
   margin-bottom: 16px;
   overflow: hidden;
-}
-
-.goalPrompt::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 45%;
-  height: 70%;
-  pointer-events: none;
-  background: radial-gradient(
-    circle at 100% 0%,
-    rgba(245, 194, 66, 0.12),
-    transparent 65%
-  );
 }
 
 .goalPromptInner {
@@ -151,20 +136,23 @@
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  background: rgba(245, 194, 66, 0.12);
+  border: 1px solid color-mix(in srgb, var(--fc-accent-gold) 30%, transparent);
+  background: transparent;
   color: var(--fc-accent-gold);
 }
 
 .goalPromptTitle {
-  font-size: 12px;
+  font-family: var(--f-headline, "Archivo", ui-sans-serif);
+  font-size: 13px;
   font-weight: 600;
   color: var(--fc-text-primary);
   margin: 0 0 2px;
 }
 
 .goalPromptSub {
-  font-size: 11.5px;
-  color: rgba(255, 255, 255, 0.42);
+  font-family: var(--font-body, "Inter", ui-sans-serif);
+  font-size: 12px;
+  color: var(--fc-text-subtle);
   margin: 0;
   line-height: 1.35;
 }
@@ -172,9 +160,12 @@
 .goalPromptCta {
   margin-left: auto;
   flex-shrink: 0;
-  font-size: 12px;
+  font-family: var(--f-mono, "JetBrains Mono", ui-monospace);
+  font-size: 11px;
   font-weight: 600;
-  color: var(--fc-accent-lime);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fc-accent);
   background: none;
   border: none;
   cursor: pointer;
@@ -188,20 +179,398 @@
 .footerNote {
   text-align: center;
   color: var(--fc-text-quaternary, rgba(255, 255, 255, 0.26));
-  font-size: 10.5px;
+  font-family: var(--f-mono, "JetBrains Mono", ui-monospace);
+  font-size: 10px;
+  letter-spacing: 0.04em;
   margin: 14px 0;
 }
 
 .mealsStack {
   display: flex;
   flex-direction: column;
+  gap: 14px;
+}
+
+.sectionEyebrow {
+  font-family: var(--f-mono, "JetBrains Mono", ui-monospace);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fc-text-subtle);
+  margin: 18px 0 10px;
+  font-weight: 700;
+}
+
+/* Compact meal rows */
+.mealRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--fc-glass-border);
+  border-radius: 12px;
+  padding: 11px 12px 11px 14px;
+  position: relative;
+  overflow: hidden;
+  background: transparent;
+}
+
+.mealRowHeader {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mealRow::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  background: var(--h, var(--fc-accent));
+  border-radius: 0 3px 3px 0;
+}
+
+.mealRowDone {
+  background: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--fc-status-success) 11%, transparent),
+    color-mix(in srgb, var(--fc-status-success) 3%, transparent) 40%,
+    transparent 72%
+  );
+}
+
+.mealRowDone::before {
+  background: var(--fc-status-success);
+}
+
+.mealRowMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
   gap: 12px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.mealIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--h, var(--fc-accent)) 20%, transparent);
+  color: var(--h, var(--fc-accent));
+}
+
+.mealBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mealName {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--fc-text-primary);
+  line-height: 1.2;
+}
+
+.mealOption {
+  font-size: 11.5px;
+  color: var(--fc-text-dim);
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mealMacros {
+  font-family: var(--f-mono, "JetBrains Mono", ui-monospace);
+  font-size: 9.5px;
+  color: var(--fc-text-subtle);
+  margin-top: 5px;
+}
+
+.mealMacros b {
+  color: var(--fc-text-dim);
+  font-weight: 700;
+}
+
+.mealTick {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1.5px solid var(--fc-glass-border-strong, var(--fc-glass-border));
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fc-text-subtle);
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.mealTick:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.mealTickOn {
+  background: var(--fc-status-success);
+  border-color: var(--fc-status-success);
+  color: #08120a;
+}
+
+.mealChevron {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid var(--fc-glass-border);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fc-text-subtle);
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.mealChevronOpen {
+  transform: rotate(180deg);
+}
+
+.mealExpand {
+  width: 100%;
+  margin-top: 11px;
+  border-top: 1px solid var(--fc-glass-border);
+  padding-top: 11px;
+}
+
+.mealOptionRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.optionNavBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid var(--fc-glass-border);
+  background: transparent;
+  color: var(--fc-text-dim);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.optionNavBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.optionCenter {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
+.optionName {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--fc-text-primary);
+}
+
+.optionDots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.optionDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--fc-glass-border);
+}
+
+.optionDotOn {
+  background: var(--fc-accent);
+}
+
+.mealIngredients {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.mealIngredientRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mealIngredientName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fc-text-primary);
+  font-size: 12px;
+}
+
+.mealIngredientQty {
+  flex-shrink: 0;
+  color: var(--fc-text-dim);
+  font-family: var(--f-mono, "JetBrains Mono", ui-monospace);
+  font-size: 11px;
+}
+
+.mealMacroBreakdown {
+  margin-top: 10px;
+  font-family: var(--f-mono, "JetBrains Mono", ui-monospace);
+  font-size: 10px;
+  color: var(--fc-text-dim);
+}
+
+.mealExpandActions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+}
+
+.mealPhotoBtn {
+  width: 100%;
+  min-height: 36px;
+  border-radius: 10px;
+  border: 1px dashed var(--fc-glass-border-strong, var(--fc-glass-border));
+  background: transparent;
+  color: var(--fc-text-dim);
+  font-size: 11px;
+  font-family: var(--f-mono, "JetBrains Mono", ui-monospace);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  cursor: pointer;
+}
+
+.mealPhotoBtn:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.portionBanner {
+  font-family: var(--f-mono, "JetBrains Mono", ui-monospace);
+  font-size: 9.5px;
+  color: var(--fc-text-subtle);
+  border: 1px solid var(--fc-glass-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.linkRow {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  border: 1px solid var(--fc-glass-border);
+  border-radius: 12px;
+  padding: 13px 14px;
+  margin-top: 9px;
+  position: relative;
+  overflow: hidden;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.linkRow::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  background: var(--h, var(--fc-accent));
+  border-radius: 0 3px 3px 0;
+}
+
+.linkIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--h, var(--fc-accent)) 20%, transparent);
+  color: var(--h, var(--fc-accent));
+}
+
+.linkBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.linkName {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fc-text-primary);
+}
+
+.linkSub {
+  font-family: var(--f-mono, "JetBrains Mono", ui-monospace);
+  font-size: 9.5px;
+  color: var(--fc-text-subtle);
+  margin-top: 3px;
+}
+
+.linkVal {
+  font-family: var(--f-headline, "Archivo", ui-sans-serif);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--h, var(--fc-accent));
+  flex-shrink: 0;
+}
+
+.linkChevron {
+  color: var(--fc-text-subtle);
+  flex-shrink: 0;
 }
 
 .trendsCard {
-  border-radius: 18px;
-  border: 1px solid var(--fc-surface-card-border);
-  background: var(--fc-surface-card);
+  border-radius: 16px;
+  border: 1px solid var(--fc-glass-border);
+  background: transparent;
   padding: 0;
   overflow: hidden;
 }
@@ -229,7 +598,7 @@
 }
 
 .trendsTitle {
-  font-family: var(--f-headline, var(--font-sans, ui-sans-serif));
+  font-family: var(--f-headline, "Archivo", ui-sans-serif);
   font-weight: 600;
   font-size: 14px;
   color: var(--fc-text-primary);
@@ -237,7 +606,7 @@
 
 .trendsBody {
   padding: 0 16px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--fc-hairline);
 }
 
 .trendsEmpty {
@@ -246,6 +615,7 @@
 }
 
 .trendsEmptyPrimary {
+  font-family: var(--font-body, "Inter", ui-sans-serif);
   font-size: 12px;
   font-weight: 500;
   color: var(--fc-text-dim);
@@ -253,282 +623,217 @@
 }
 
 .trendsEmptySecondary {
+  font-family: var(--f-mono, "JetBrains Mono", ui-monospace);
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.42);
+  color: var(--fc-text-subtle);
   margin: 0;
 }
 
-/* Day summary card */
+/* Day summary — rail + variance macro bars */
 .daySummary {
   position: relative;
-  border-radius: 22px;
-  border: 1px solid var(--fc-surface-card-border);
-  background: var(--fc-surface-card);
-  padding: 18px;
-  margin-bottom: 16px;
+  border-radius: 13px;
+  border: 1px solid var(--fc-glass-border);
+  background: transparent;
+  padding: 15px 16px;
+  margin-bottom: 12px;
   overflow: hidden;
 }
 
 .daySummary::before {
   content: "";
   position: absolute;
-  top: 0;
   left: 0;
-  width: 55%;
-  height: 55%;
-  pointer-events: none;
-  background: radial-gradient(
-    circle at 0% 0%,
-    rgba(197, 255, 74, 0.08),
-    transparent 58%
-  );
+  top: 14px;
+  bottom: 14px;
+  width: 3px;
+  background: var(--h, var(--fc-status-success));
+  border-radius: 0 3px 3px 0;
 }
 
-.daySummary::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 42%;
-  height: 48%;
-  pointer-events: none;
-  opacity: 0.12;
-  background: repeating-linear-gradient(
-    -28deg,
-    rgba(255, 255, 255, 0.05) 0 2px,
-    transparent 2px 5px
-  );
-  border-radius: 0 22px 0 0;
-}
-
-.daySummaryInner {
-  position: relative;
-  z-index: 1;
-}
-
-.dayHead {
+.dsRow {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
+  align-items: center;
+  gap: 14px;
 }
 
-.dayHeadLeft {
-  flex: 1;
-  min-width: 0;
-}
-
-.eyebrowMealPlan {
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.42);
-  margin-bottom: 6px;
-}
-
-.planName {
-  font-family: var(--f-headline, var(--font-sans, ui-sans-serif));
-  font-weight: 600;
-  font-size: 18px;
-  color: var(--fc-text-primary);
-  margin: 0 0 4px;
-  line-height: 1.2;
-}
-
-.planDate {
-  font-size: 12px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.42);
-  margin: 0;
-}
-
-.ringWrap {
-  width: 64px;
-  height: 64px;
+.ring {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
   flex-shrink: 0;
-  position: relative;
-}
-
-.ringSvg {
-  width: 64px;
-  height: 64px;
-  transform: rotate(-90deg);
-}
-
-.ringBg {
-  fill: none;
-  stroke: rgba(255, 255, 255, 0.08);
-  stroke-width: 4;
-}
-
-.ringFg {
-  fill: none;
-  stroke: var(--fc-accent-lime);
-  stroke-width: 4;
-  stroke-linecap: round;
-  filter: drop-shadow(0 0 6px rgba(197, 255, 74, 0.35));
-}
-
-.ringCenter {
-  position: absolute;
-  inset: 0;
+  border: 4px solid rgba(255, 255, 255, 0.07);
+  border-top-color: var(--fc-status-success);
+  border-right-color: var(--fc-status-success);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  pointer-events: none;
 }
 
-.ringNums {
-  font-family: var(--f-display, var(--font-display, var(--font-number, ui-sans-serif)));
-  font-weight: 700;
-  font-size: 22px;
+.ringN {
+  font-family: var(--f-headline, "Archivo", ui-sans-serif);
+  font-size: 17px;
+  font-weight: 900;
   line-height: 1;
   color: var(--fc-text-primary);
 }
 
-.ringNums span {
-  font-size: 14px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.26);
-}
-
-.ringMealsLabel {
-  font-size: 7.5px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.42);
+.ringL {
+  font-family: var(--f-mono, "JetBrains Mono", ui-monospace);
+  font-size: 7px;
+  letter-spacing: 0.11em;
+  color: var(--fc-text-subtle);
   margin-top: 2px;
 }
 
-.calorieLine {
+.kcBlock {
+  flex: 1;
+  min-width: 0;
+}
+
+.planLabel {
+  font-family: var(--f-mono, "JetBrains Mono", ui-monospace);
+  font-size: 9px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--fc-text-subtle);
+}
+
+.kcalRow {
   display: flex;
   align-items: baseline;
+  gap: 6px;
+  margin-top: 6px;
   flex-wrap: wrap;
-  gap: 6px 10px;
-  margin-bottom: 16px;
 }
 
-.calCurrent {
-  font-family: var(--f-display, var(--font-display, var(--font-number, ui-sans-serif)));
-  font-size: 32px;
-  font-weight: 700;
-  color: var(--fc-accent-lime);
+.kcalA {
+  font-family: var(--f-headline, "Archivo", ui-sans-serif);
+  font-size: 28px;
+  font-weight: 900;
   line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--fc-status-success);
 }
 
-.calSep {
-  font-size: 18px;
-  color: rgba(255, 255, 255, 0.26);
+.kcalA[data-band="near"] {
+  color: var(--fc-macro-near-target, var(--fc-status-warning));
 }
 
-.calTarget {
-  font-family: var(--f-display, var(--font-display, var(--font-number, ui-sans-serif)));
-  font-size: 22px;
-  font-weight: 700;
+.kcalA[data-band="off"] {
+  color: var(--fc-effort-hard, var(--fc-macro-off-target));
+}
+
+.kcalB {
+  font-family: var(--f-mono, "JetBrains Mono", ui-monospace);
+  font-size: 12px;
   color: var(--fc-text-dim);
 }
 
-.calUnit {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.42);
-  margin-left: 4px;
-}
-
 .macroGrid {
+  margin-top: 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 9px;
 }
 
 .macroRow {
-  display: grid;
-  grid-template-columns: 60px 1fr auto;
+  display: flex;
   align-items: center;
   gap: 10px;
 }
 
 .macroLabel {
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
+  font-family: var(--f-mono, "JetBrains Mono", ui-monospace);
+  font-size: 9px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.42);
+  color: var(--fc-text-subtle);
+  width: 52px;
+  flex-shrink: 0;
+  font-weight: 700;
 }
 
 .macroTrack {
+  flex: 1;
   height: 6px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.05);
   overflow: hidden;
+  position: relative;
 }
 
-.macroFillProtein {
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    var(--fc-macro-protein),
-    var(--fc-macro-protein-mid)
-  );
+.macroFillOn,
+.macroFillNear,
+.macroFillOff {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 3px;
+  display: block;
 }
 
-.macroFillCarbs {
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    var(--fc-macro-carbs),
-    var(--fc-macro-carbs-mid)
-  );
+.macroFillOn {
+  background: var(--fc-macro-on-target, var(--fc-status-success));
+  box-shadow: 0 0 10px -3px var(--fc-macro-on-target, var(--fc-status-success));
 }
 
-.macroFillFat {
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    var(--fc-macro-fat),
-    var(--fc-macro-fat-mid)
-  );
+.macroFillNear {
+  background: var(--fc-macro-near-target, var(--fc-status-warning));
+  box-shadow: 0 0 10px -3px var(--fc-macro-near-target, var(--fc-status-warning));
+}
+
+.macroFillOff {
+  background: var(--fc-effort-hard, var(--fc-macro-off-target));
+  box-shadow: 0 0 10px -3px var(--fc-effort-hard, var(--fc-macro-off-target));
 }
 
 .macroValue {
-  font-family: var(--f-display, var(--font-display, var(--font-number, ui-sans-serif)));
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--fc-text-primary);
+  font-family: var(--f-mono, "JetBrains Mono", ui-monospace);
+  font-size: 10.5px;
+  color: var(--fc-text-dim);
+  width: 72px;
+  text-align: right;
+  flex-shrink: 0;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
-.macroValueUnit {
-  font-family: var(--font-sans, ui-sans-serif);
-  font-size: 9.5px;
+.macroValue b {
+  color: var(--fc-text-primary);
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.42);
 }
 
-/* Water card v6 chrome */
+/* Water — aqua rail + droplet tiles (single home) */
 .waterCard {
-  border-radius: 18px;
-  border: 1px solid var(--fc-surface-card-border);
-  background: var(--fc-surface-card);
-  padding: 14px 16px;
-  margin-bottom: 16px;
+  position: relative;
+  border-radius: 13px;
+  border: 1px solid var(--fc-glass-border);
+  background: transparent;
+  padding: 15px 16px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.waterCard::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 3px;
+  background: var(--fc-group-c, #22d3ee);
+  border-radius: 0 3px 3px 0;
 }
 
 .waterHead {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 11px;
 }
 
 .waterHeadLeft {
@@ -539,71 +844,69 @@
 }
 
 .waterLabel {
-  font-family: var(--f-headline, var(--font-sans, ui-sans-serif));
-  font-weight: 600;
-  font-size: 15px;
-  color: var(--fc-text-primary);
-}
-
-.waterVal {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 2px 6px;
-  justify-content: flex-end;
-  font-variant-numeric: tabular-nums;
-}
-
-.waterCurrent {
-  font-family: var(--f-display, var(--font-display, var(--font-number, ui-sans-serif)));
-  font-size: 16px;
+  font-size: 13.5px;
   font-weight: 700;
-  color: var(--fc-accent-cyan);
-}
-
-.waterSep {
-  color: rgba(255, 255, 255, 0.42);
-  font-size: 14px;
-}
-
-.waterTarget {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.42);
-}
-
-.waterUnit {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.42);
-}
-
-.dropletRow {
-  display: flex;
-  flex-wrap: wrap;
+  color: var(--fc-text-primary);
+  display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 
+.waterVal {
+  font-family: var(--f-mono, "JetBrains Mono", ui-monospace);
+  font-size: 11px;
+  color: var(--fc-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.waterCurrent {
+  font-family: var(--f-headline, "Archivo", ui-sans-serif);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--fc-group-c, #22d3ee);
+}
+
+.waterSep {
+  margin: 0 2px;
+}
+
+.waterTarget {
+  color: var(--fc-text-dim);
+}
+
+.waterUnit {
+  margin-left: 2px;
+}
+
+.dropletRow {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+}
+
 .dropletBtn {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
+  aspect-ratio: 1;
+  border-radius: 9px;
   display: grid;
   place-items: center;
-  border: 1px solid transparent;
+  border: 1px solid var(--fc-glass-border-strong, var(--fc-glass-border));
+  background: transparent;
+  color: var(--fc-text-subtle);
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+  padding: 0;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease,
+    transform 0.12s ease;
 }
 
 .dropletBtnActive {
-  background: rgba(79, 227, 232, 0.1);
-  border-color: rgba(79, 227, 232, 0.2);
-  color: var(--fc-accent-cyan);
+  background: color-mix(in srgb, var(--fc-group-c, #22d3ee) 18%, transparent);
+  border-color: color-mix(in srgb, var(--fc-group-c, #22d3ee) 45%, transparent);
+  color: var(--fc-group-c, #22d3ee);
 }
 
 .dropletBtnInactive {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: var(--fc-surface-card-border);
-  color: rgba(255, 255, 255, 0.35);
+  border-color: var(--fc-glass-border-strong, var(--fc-glass-border));
+  color: var(--fc-text-subtle);
 }
 
 .dropletBtn:active {
@@ -611,25 +914,23 @@
 }
 
 .waterAddBtn {
-  height: 38px;
-  min-width: 72px;
-  padding: 0 12px;
-  border-radius: 12px;
-  border: 1px dashed rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.42);
-  font-size: 13px;
+  grid-column: 1 / -1;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px dashed var(--fc-glass-border);
+  background: transparent;
+  color: var(--fc-text-subtle);
+  font-family: var(--f-mono, "JetBrains Mono", ui-monospace);
+  font-size: 11px;
   font-weight: 600;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 
 .waterAddBtn:hover {
-  border-color: rgba(79, 227, 232, 0.35);
-  background: rgba(79, 227, 232, 0.06);
-  color: var(--fc-accent-cyan);
+  border-color: color-mix(in srgb, var(--fc-group-c, #22d3ee) 45%, transparent);
+  color: var(--fc-group-c, #22d3ee);
 }

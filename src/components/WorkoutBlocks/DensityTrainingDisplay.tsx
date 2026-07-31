@@ -191,7 +191,8 @@ export function DensityTrainingDisplay({ block, index }: BlockVariantProps) {
     for_time: "Finish all prescribed work as quickly as possible.",
   };
 
-  const blockTitle = block.blockName || block.displayType || "Training Block";
+  const blockTitle =
+    block.blockName || block.displayType || block.blockType || "Set";
   const blockDescription =
     descriptionMap[normalizedType] ??
     "Follow the prescribed tempo and rest guidance for this interval.";
@@ -201,7 +202,7 @@ export function DensityTrainingDisplay({ block, index }: BlockVariantProps) {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide dark:text-slate-400">
-            Block {index + 1}
+            Set {index + 1}
           </p>
           <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-2">
             {blockTitle}

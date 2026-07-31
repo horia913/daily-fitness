@@ -2,56 +2,94 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Pencil,
-  Target,
-  Repeat2,
-  Timer,
-  Gauge,
-  Flame,
-} from "lucide-react";
+import { ChevronLeft, Pencil } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
-import {
-  BaseBlockExecutorLayout,
-  formatRestSeconds,
-} from "../BaseBlockExecutor";
-import type { PrescriptionItem } from "../ui/PrescriptionCard";
-import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
-import { LogSetButton } from "../ui/LogSetButton";
 import { parseRepsTarget } from "@/lib/workout/parseRepsTarget";
-import { LargeInput } from "../ui/LargeInput";
-import logPairStyles from "../ui/logWeightRepsPair.module.css";
-import { BaseBlockExecutorProps } from "../types";
-import { LoggedSet } from "@/types/workoutBlocks";
+import { BaseSetEntryExecutorProps } from "../types";
+import { useWorkoutExecutionChrome } from "../WorkoutExecutionChromeContext";
+import { NavigationControls } from "../ui/NavigationControls";
+import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
+import { LastSessionSetsSection } from "../ui/LastSessionSetsSection";
+import { ProgressionNudge } from "../ui/ProgressionNudge";
+import { LoggedSet } from "@/types/workoutSetEntries";
 import { LoggedSetsList, type LoggedSetRow } from "../ui/LoggedSetsList";
 import { useUpdateSetRpe } from "../hooks/useUpdateSetRpe";
-import { appendTargetEffortItem } from "../appendTargetEffortItem";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import {
   getWeightDefaultAndSuggestion,
   getCoachSuggestedWeight,
 } from "@/lib/weightDefaultService";
-import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
-import { ProgressionNudge } from "../ui/ProgressionNudge";
 import { fetchApi } from "@/lib/apiClient";
 import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
 import { parseWeightKgInput } from "@/lib/parseWeightKgInput";
+import { useSetRowsState } from "../hooks/useSetRowsState";
+import { SetUnitRow } from "../ui/set-rows/SetUnitRow";
+import setUnitStyles from "../ui/set-rows/setUnitRow.module.css";
+import { resolveSetRowWeightDefault } from "../ui/set-rows/resolveSetRowWeightDefault";
+import { resolveSetPrescriptionTargets } from "../ui/set-rows/resolveSetPrescriptionTargets";
+import { LoggedEffortInline } from "../ui/LoggedEffortInline";
+import { useLiveRestTimer } from "../LiveRestTimerContext";
+import { formatGroupedExerciseBadge } from "../groupLetterBadges";
+import {
+  LiveCard,
+  LiveCardGroupedExercise,
+  LiveCardGlue,
+  LiveCardLog,
+  LiveCardLogField,
+  LiveCardLogButton,
+  effortFromPrescribedRir,
+  formatLiveRest,
+  resolveRestSeconds,
+  formatLiveLast,
+  groupIndexToHue,
+  type LiveCardTarget,
+} from "../live-card";
+
+function targetsToLiveCardTarget(
+  targets: ReturnType<typeof resolveSetPrescriptionTargets>,
+): LiveCardTarget {
+  if (targets.weight_kg != null) {
+    return {
+      kind: "reps_weight",
+      reps: targets.reps ?? "—",
+      weight: targets.weight_kg,
+    };
+  }
+  return {
+    kind: "reps_only",
+    reps: targets.reps ?? "—",
+    unit: "reps",
+  };
+}
+
+function groupExerciseBadge(
+  groupIndex: number,
+  exerciseOrder: number | undefined,
+  index: number,
+): string {
+  return formatGroupedExerciseBadge(groupIndex, exerciseOrder, index);
+}
+
+interface GiantSetRow {
+  setNumber: number;
+  weights: string[];
+  reps: string[];
+  done: boolean;
+}
 
 export function GiantSetExecutor({
-  block,
-  onBlockComplete,
-  onNextBlock,
+  liveSetEntry,
+  onSetEntryComplete,
+  onNextSetEntry,
   e1rmMap = {},
   onE1rmUpdate,
   lastPerformedWeightByExerciseId = {},
   lastSessionWeightByExerciseId = {},
   sessionId,
   assignmentId,
-  allBlocks = [],
-  currentBlockIndex = 0,
-  onBlockChange,
+  allSetEntries = [],
+  currentSetEntryIndex = 0,
+  onSetEntryChange,
   currentExerciseIndex = 0,
   onExerciseIndexChange,
   logSetToDatabase,
@@ -70,11 +108,11 @@ export function GiantSetExecutor({
   onSetLogUpsert,
   onSetEditSaved,
   loggedSets,
-}: BaseBlockExecutorProps) {
+}: BaseSetEntryExecutorProps) {
   const { addToast } = useToast();
-  const exercises = block.block.exercises || [];
-  const totalSets = block.block.total_sets || 1;
-  const completedSets = block.completedSets || 0;
+  const exercises = liveSetEntry.setEntry.exercises || [];
+  const totalSets = liveSetEntry.setEntry.total_sets || 1;
+  const completedSets = liveSetEntry.completedSets || 0;
   const currentSetNumber = completedSets + 1;
 
   /** Parent-owned logged sets; single source of truth. Persists across block navigation. */
@@ -83,6 +121,8 @@ export function GiantSetExecutor({
   const [weights, setWeights] = useState<string[]>([]);
   const [reps, setReps] = useState<string[]>([]);
   const [isLoggingSet, setIsLoggingSet] = useState(false);
+  /** Tap-to-jump: override first-incomplete when client picks an upcoming round */
+  const [jumpRowIndex, setJumpRowIndex] = useState<number | null>(null);
   useLoggingReset(isLoggingSet, setIsLoggingSet);
   const [weightsPristine, setWeightsPristine] = useState<boolean[]>([]);
   const [viewingSetIndex, setViewingSetIndex] = useState(0);
@@ -115,11 +155,11 @@ export function GiantSetExecutor({
       const tempId = tempEntries[0].id;
       tempEntries.forEach((oldEntry) => {
         const newEntry = { ...oldEntry, id: set_log_id };
-        onSetLogUpsert?.(block.block.id, newEntry, { replaceId: tempId });
+        onSetLogUpsert?.(liveSetEntry.setEntry.id, newEntry, { replaceId: tempId });
       });
     });
     return () => {};
-  }, [registerSetLogIdResolved, onSetLogUpsert, block.block.id]);
+  }, [registerSetLogIdResolved, onSetLogUpsert, liveSetEntry.setEntry.id]);
   useEffect(() => {
     if (viewingSetIndex > loggedSetsList.length)
       setViewingSetIndex(loggedSetsList.length);
@@ -220,7 +260,7 @@ export function GiantSetExecutor({
     if (exercises.length === 0) return;
     const nextReps = exercises.map((ex) => {
       const { numericDefault } = parseRepsTarget(
-        ex.reps ?? block.block.reps_per_set ?? null,
+        ex.reps ?? liveSetEntry.setEntry.reps_per_set ?? null,
       );
       return numericDefault > 0 ? String(numericDefault) : "";
     });
@@ -231,52 +271,75 @@ export function GiantSetExecutor({
     completedSets,
     exercises.length,
     exerciseRepSig,
-    block.block.reps_per_set,
+    liveSetEntry.setEntry.reps_per_set,
   ]);
 
   const titleExercise =
     exercises[currentExerciseIndex ?? 0] ?? exercises[0];
-  const exerciseTitleName =
-    titleExercise?.exercise?.name ?? "Exercise";
 
-  const prescriptionItems: PrescriptionItem[] = [
-    { icon: Target, label: "Rounds", value: totalSets },
-    {
-      icon: Timer,
-      label: "Rest between",
-      value: formatRestSeconds(block.block.rest_seconds || 90),
-      unit: "s",
-    },
-  ];
-  exercises.forEach((ex, idx) => {
-    const name = ex.exercise?.name || `Exercise ${idx + 1}`;
-    if (ex.reps) {
-      prescriptionItems.push({
-        icon: Repeat2,
-        label: `${idx + 1}. ${name}`,
-        value: ex.reps,
-      });
-    }
-    if (ex.tempo) {
-      prescriptionItems.push({
-        icon: Gauge,
-        label: `Tempo (${idx + 1})`,
-        value: ex.tempo,
-      });
-    }
-    appendTargetEffortItem(
-      prescriptionItems,
-      (ex as { rir?: unknown }).rir,
-      Flame,
-      `Target effort (${idx + 1})`,
-    );
-  });
+  const restSec = resolveRestSeconds(liveSetEntry.setEntry.rest_seconds);
 
-  const instructions = block.block.set_notes || undefined;
+  const instructions = liveSetEntry.setEntry.set_notes || undefined;
 
   const roundNumbersLogged = [
     ...new Set(loggedSetsList.map((s) => s.set_number)),
   ].sort((a, b) => a - b);
+  const exerciseWeightMeta = exercises.map((exercise, exIdx) => {
+    const coachSuggested = getCoachSuggestedWeight(
+      exercise.load_percentage,
+      exercise.exercise_id ? (e1rmMap[exercise.exercise_id] ?? null) : null,
+    );
+    const result = results[exIdx];
+    return {
+      lastSessionSetDetails:
+        exercise.exercise_id && previousPerformanceMap
+          ? (previousPerformanceMap.get(exercise.exercise_id)?.lastWorkout
+              ?.setDetails ?? null)
+          : null,
+      defaultWeight: result?.default_weight ?? null,
+      suggestedWeight:
+        coachSuggested != null && coachSuggested > 0
+          ? coachSuggested
+          : (result?.suggested_weight ?? null),
+    };
+  });
+
+  const rowsState = useSetRowsState<GiantSetRow>({
+    rowCount: totalSets,
+    // Structural only — sticky/suggested weight must NOT be in resetKey (wipes done flags).
+    resetKey: `${liveSetEntry.setEntry.id}:${exercises.map((e) => e.exercise_id).join(",")}`,
+    loggedCount: roundNumbersLogged.length,
+    createDefaultRow: (index, previous) => ({
+      setNumber: index + 1,
+      weights: exercises.map((exercise, exIdx) => {
+        const targets = resolveSetPrescriptionTargets(
+          exercise,
+          index + 1,
+          liveSetEntry.setEntry.reps_per_set,
+        );
+        return resolveSetRowWeightDefault({
+          setNumber: index + 1,
+          previousRowWeight: index > 0 ? previous?.weights?.[exIdx] : undefined,
+          lastSessionSetDetails: exerciseWeightMeta[exIdx]?.lastSessionSetDetails,
+          defaultWeight: exerciseWeightMeta[exIdx]?.defaultWeight ?? null,
+          suggestedWeight: exerciseWeightMeta[exIdx]?.suggestedWeight ?? null,
+          prescribedWeightKg: targets.weight_kg,
+        });
+      }),
+      reps: exercises.map((exercise, exIdx) => {
+        const targets = resolveSetPrescriptionTargets(
+          exercise,
+          index + 1,
+          liveSetEntry.setEntry.reps_per_set,
+        );
+        const { numericDefault } = parseRepsTarget(targets.reps);
+        if (numericDefault > 0) return String(numericDefault);
+        return previous?.reps?.[exIdx] ?? "";
+      }),
+      done: false,
+    }),
+  });
+
   const maxViewableRound =
     roundNumbersLogged.length === 0 ? 0 : Math.max(...roundNumbersLogged);
 
@@ -303,7 +366,7 @@ export function GiantSetExecutor({
     if (giantSetExercises.length === 0) return;
     setIsSavingEdit(true);
     try {
-      const payload = buildSetEditPatchPayload(block.block.set_type, {
+      const payload = buildSetEditPatchPayload(liveSetEntry.setEntry.set_type, {
         round_number: viewingSetIndex,
         giant_set_exercises: giantSetExercises,
       });
@@ -323,7 +386,7 @@ export function GiantSetExecutor({
           return { ...s, weight_kg: w, reps_completed: r };
         });
         const toUpsert = next.filter((s) => s.set_number === viewingSetIndex);
-        toUpsert.forEach((e) => onSetEditSaved?.(block.block.id, e));
+        toUpsert.forEach((e) => onSetEditSaved?.(liveSetEntry.setEntry.id, e));
         addToast({
           title: "Round updated",
           variant: "success",
@@ -382,7 +445,7 @@ export function GiantSetExecutor({
       if (process.env.NODE_ENV !== "production") {
         console.log("[SAVE EDITS guard]", {
           executor: "GiantSetExecutor",
-          blockTypeFromUI: block.block.set_type,
+          blockTypeFromUI: liveSetEntry.setEntry.set_type,
           editingSetId,
           isSavingEdit,
           timestamp: Date.now(),
@@ -412,7 +475,7 @@ export function GiantSetExecutor({
     if (giantSetExercises.length === 0) return;
     setIsSavingEdit(true);
     try {
-      const payload = buildSetEditPatchPayload(block.block.set_type, {
+      const payload = buildSetEditPatchPayload(liveSetEntry.setEntry.set_type, {
         round_number: editDraft.round_number,
         giant_set_exercises: giantSetExercises,
       });
@@ -420,7 +483,7 @@ export function GiantSetExecutor({
         console.log("[SAVE EDITS]", {
           executor: "GiantSetExecutor",
           setId: editingSetId,
-          blockTypeFromUI: block.block.set_type,
+          blockTypeFromUI: liveSetEntry.setEntry.set_type,
           payloadKeys: Object.keys(payload),
         });
       }
@@ -441,7 +504,7 @@ export function GiantSetExecutor({
         const toUpsert = next.filter(
           (s) => s.set_number === editDraft.round_number,
         );
-        toUpsert.forEach((e) => onSetEditSaved?.(block.block.id, e));
+        toUpsert.forEach((e) => onSetEditSaved?.(liveSetEntry.setEntry.id, e));
         setEditingSetId(null);
         setEditDraft(null);
         addToast({
@@ -467,12 +530,14 @@ export function GiantSetExecutor({
     }
   };
 
-  const handleLog = async () => {
+  const handleLogRound = async (rowIndex: number) => {
     if (exercises.length === 0 || isLoggingSet) return;
+    const row = rowsState.rows[rowIndex];
+    if (!row || row.done) return;
 
     const allValid = exercises.every((_, idx) => {
-      const weightStr = weights[idx];
-      const repsStr = reps[idx];
+      const weightStr = row.weights[idx];
+      const repsStr = row.reps[idx];
 
       // Check weight: must be entered (not empty or undefined), valid number, and >= 0
       // Allow "0" as a valid weight value
@@ -538,8 +603,8 @@ export function GiantSetExecutor({
       // Build giant_set_exercises array - only include valid exercises
       const giantSetExercises = exercises
         .map((exercise, idx) => {
-          const weightNum = parseWeightKgInput(weights[idx] || "0");
-          const repsNum = parseInt(reps[idx] || "0");
+          const weightNum = parseWeightKgInput(row.weights[idx] || "0");
+          const repsNum = parseInt(row.reps[idx] || "0", 10);
           if (!exercise?.exercise_id || isNaN(weightNum) || isNaN(repsNum)) {
             return null;
           }
@@ -555,8 +620,8 @@ export function GiantSetExecutor({
       // Log giant set as a single call
       const logData: any = {
         set_type: "giant_set",
-        round_number: completedSets + 1,
-        isLastSet: (completedSets + 1) >= totalSets,
+        round_number: row.setNumber,
+        isLastSet: rowsState.doneCount + 1 >= totalSets,
       };
 
       if (giantSetExercises.length > 0) {
@@ -567,23 +632,24 @@ export function GiantSetExecutor({
 
       const setLogId =
         (result as { set_log_id?: string }).set_log_id ?? `temp-${Date.now()}`;
-      const roundNumber = completedSets + 1;
+      const roundNumber = row.setNumber;
       const newEntries: LoggedSet[] = exercises.map(
         (exercise, idx) =>
           ({
             id: setLogId,
             exercise_id: exercise.exercise_id,
-            set_entry_id: block.block.id,
+            set_entry_id: liveSetEntry.setEntry.id,
             set_number: roundNumber,
-            weight_kg: parseWeightKgInput(weights[idx] || "0"),
-            reps_completed: parseInt(reps[idx] || "0"),
+            weight_kg: parseWeightKgInput(row.weights[idx] || "0"),
+            reps_completed: parseInt(row.reps[idx] || "0", 10),
             completed_at: new Date(),
           }) as LoggedSet,
       );
 
       if (result.success) {
-        newEntries.forEach((e) => onSetLogUpsert?.(block.block.id, e));
-        setViewingSetIndex(0);
+        newEntries.forEach((e) => onSetLogUpsert?.(liveSetEntry.setEntry.id, e));
+        rowsState.markDone(rowIndex, true);
+        setJumpRowIndex(null);
 
         addToast({
           title: "Giant Set Logged!",
@@ -592,11 +658,11 @@ export function GiantSetExecutor({
           duration: 2000,
         });
 
-        const newCompletedSets = completedSets + 1;
+        const newCompletedSets = rowsState.doneCount + 1;
         const updatedLoggedSets = [...loggedSetsList, ...newEntries];
         if (newCompletedSets < totalSets) {
-          const firstWeight = parseWeightKgInput(weights[0] || "0");
-          const firstReps = parseInt(reps[0] || "0", 10);
+          const firstWeight = parseWeightKgInput(row.weights[0] || "0");
+          const firstReps = parseInt(row.reps[0] || "0", 10);
           onLastSetLoggedForRest?.({
             weight: firstWeight,
             reps: firstReps,
@@ -608,7 +674,7 @@ export function GiantSetExecutor({
         onSetComplete?.(newCompletedSets);
 
         if (newCompletedSets >= totalSets) {
-          onBlockComplete(block.block.id, updatedLoggedSets);
+          onSetEntryComplete(liveSetEntry.setEntry.id, updatedLoggedSets);
         }
       } else {
         addToast({
@@ -623,8 +689,61 @@ export function GiantSetExecutor({
     }
   };
 
+  const firstIncompleteIndex = rowsState.rows.findIndex((r) => !r.done);
+  const activeRowIndex =
+    jumpRowIndex != null &&
+    jumpRowIndex >= 0 &&
+    rowsState.rows[jumpRowIndex] &&
+    !rowsState.rows[jumpRowIndex].done
+      ? jumpRowIndex
+      : firstIncompleteIndex;
+  const activeSetNumber = Math.min(
+    Math.max(
+      1,
+      (activeRowIndex >= 0 ? activeRowIndex : rowsState.doneCount - 1) + 1,
+    ),
+    totalSets,
+  );
+  const [confirmed, setConfirmed] = useState<boolean[]>(() =>
+    exercises.map(() => false),
+  );
+  useEffect(() => {
+    setConfirmed(exercises.map(() => false));
+  }, [activeRowIndex, liveSetEntry.setEntry.id, exercises.length]);
+
+  const confirmExercise = async (exIdx: number) => {
+    if (activeRowIndex < 0 || isLoggingSet) return;
+    const row = rowsState.rows[activeRowIndex];
+    if (!row || row.done) return;
+    const weightStr = row.weights[exIdx] ?? "";
+    const repsStr = row.reps[exIdx] ?? "";
+    const w = parseWeightKgInput(weightStr);
+    const r = parseInt(repsStr, 10);
+    if (
+      !weightStr.trim() ||
+      isNaN(w) ||
+      w < 0 ||
+      !repsStr.trim() ||
+      isNaN(r) ||
+      r <= 0
+    ) {
+      addToast({
+        title: "Invalid Input",
+        description: `Enter valid weight and reps for exercise ${exIdx + 1}`,
+        variant: "destructive",
+        duration: 3000,
+      });
+      return;
+    }
+    const next = confirmed.map((c, i) => (i === exIdx ? true : c));
+    setConfirmed(next);
+    if (next.every(Boolean)) {
+      await handleLogRound(activeRowIndex);
+    }
+  };
+
   const updateSetRpe = useUpdateSetRpe({
-    blockId: block.block.id,
+    setEntryId: liveSetEntry.setEntry.id,
     onSetLogUpsert,
   });
   const loggedSetRows: LoggedSetRow[] = roundNumbersLogged.map((roundNum) => {
@@ -663,307 +782,358 @@ export function GiantSetExecutor({
       <LoggedSetsList rows={loggedSetRows} label="Logged rounds" />
     ) : null;
 
-  const loggingInputs = (
-    <div className="space-y-4">
-      {allowSetEditDelete && totalSets > 0 && (
-        <div className="flex items-center justify-center gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="rounded-full"
-            onClick={() => setViewingSetIndex((i) => Math.max(0, i - 1))}
-            disabled={viewingSetIndex <= 0}
-            aria-label="Previous round"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </Button>
-          <span className="text-sm font-medium fc-text-primary min-w-[100px] text-center">
-            Round {displaySetNumber} of {totalSets}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="rounded-full"
-            onClick={() =>
-              setViewingSetIndex((i) => Math.min(maxViewableRound, i + 1))
-            }
-            disabled={viewingSetIndex >= maxViewableRound}
-            aria-label="Next round"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </Button>
-        </div>
-      )}
-      <div className="flex flex-col border-y border-white/5">
-      {exercises.map((exercise, idx) => {
-        const { displayHint: repsHintGiant } = parseRepsTarget(
-          exercise.reps ?? null,
+  const activeRow =
+    activeRowIndex >= 0 ? rowsState.rows[activeRowIndex] : null;
+
+  const nudgeWeight = (exIdx: number, delta: number) => {
+    if (activeRowIndex < 0) return;
+    rowsState.setRow(activeRowIndex, (current) => {
+      const nextWeights = [...current.weights];
+      const cur = parseWeightKgInput(nextWeights[exIdx] || "0");
+      const next = Math.max(0, (isNaN(cur) ? 0 : cur) + delta);
+      nextWeights[exIdx] = String(Math.round(next * 2) / 2);
+      return { ...current, weights: nextWeights };
+    });
+  };
+  const nudgeReps = (exIdx: number, delta: number) => {
+    if (activeRowIndex < 0) return;
+    rowsState.setRow(activeRowIndex, (current) => {
+      const nextReps = [...current.reps];
+      const cur = parseInt(nextReps[exIdx] || "0", 10);
+      const next = Math.max(0, (isNaN(cur) ? 0 : cur) + delta);
+      nextReps[exIdx] = String(next);
+      return { ...current, reps: nextReps };
+    });
+  };
+
+  const fillRemainingTargets = () => {
+    rowsState.fillRemaining((index, prev) => ({
+      weights: exercises.map((exercise, exIdx) => {
+        const targets = resolveSetPrescriptionTargets(
+          exercise,
+          index + 1,
+          liveSetEntry.setEntry.reps_per_set,
         );
-        return (
-        <div
-          key={exercise.id || idx}
-          className={`border-b border-white/5 py-4 ${idx === exercises.length - 1 ? "last:border-b-0" : ""}`}
-        >
-          <div className="mb-4 flex items-start justify-between gap-2">
-            <h4 className="min-w-0 flex-1 font-semibold fc-text-primary text-lg">
-              {idx + 1}. {exercise.exercise?.name || `Exercise ${idx + 1}`}
-              {exercise.exercise_letter && ` (${exercise.exercise_letter})`}
-            </h4>
-            <div className="shrink-0 pt-0.5">
-              <ExerciseActionButtons
-                exercise={exercise}
-                onVideoClick={onVideoClick}
-                onAlternativesClick={onAlternativesClick}
-              />
-            </div>
-          </div>
-          {exercise.exercise_id && (
-            <ProgressionNudge
-              suggestion={progressionSuggestionsMap?.get(exercise.exercise_id)}
-              previousPerformance={previousPerformanceMap?.get(exercise.exercise_id) ?? null}
-              previousSessionSetNumber={displaySetNumber}
-              onApplySuggestion={(w, r) => {
-                if (w != null) {
-                  setWeightsPristine((prev) => {
-                    const next = [...(prev.length ? prev : new Array(exercises.length).fill(true))];
-                    next[idx] = false;
-                    return next;
-                  });
-                  const newWeights = [...weights];
-                  newWeights[idx] = String(w);
-                  setWeights(newWeights);
-                }
-                if (r != null) {
-                  const newReps = [...reps];
-                  newReps[idx] = String(r);
-                  setReps(newReps);
-                }
-              }}
-            />
-          )}
-          <div className={`${logPairStyles.pair} ${logPairStyles.pairGapLg}`}>
-            <div className="space-y-2">
-              <LargeInput
-                label="Weight"
-                value={
-                  editDraft
-                    ? (editDraft.weights[idx] ?? "")
-                    : weights[idx] || ""
-                }
-                onChange={(value) => {
-                  if (editDraft) {
-                    setEditDraft((d) =>
-                      d
-                        ? {
-                            ...d,
-                            weights: d.weights.map((w, i) =>
-                              i === idx ? value : w,
-                            ),
-                          }
-                        : null,
-                    );
-                  } else {
-                    setWeightsPristine((prev) => {
-                      const next = [
-                        ...(prev.length
-                          ? prev
-                          : new Array(exercises.length).fill(true)),
-                      ];
-                      if (next[idx] !== false) next[idx] = false;
-                      return next;
-                    });
-                    const newWeights = [...weights];
-                    newWeights[idx] = value;
-                    setWeights(newWeights);
-                  }
-                }}
-                placeholder="0"
-                step="0.5"
-                unit="kg"
-                showStepper
-                stepAmount={2.5}
-                  />
-              {!editDraft &&
-                (() => {
-                  const coachSuggested = getCoachSuggestedWeight(
-                    exercise.load_percentage,
-                    exercise.exercise_id
-                      ? (e1rmMap[exercise.exercise_id] ?? null)
-                      : null,
-                  );
-                  return coachSuggested != null && coachSuggested > 0 ? (
-                    <ApplySuggestedWeightButton
-                      suggestedKg={coachSuggested}
-                      onApply={() => {
-                        setWeightsPristine((prev) => {
-                          const next = [
-                            ...(prev.length
-                              ? prev
-                              : new Array(exercises.length).fill(true)),
-                          ];
-                          next[idx] = false;
-                          return next;
-                        });
-                        const newWeights = [...weights];
-                        newWeights[idx] = String(coachSuggested);
-                        setWeights(newWeights);
-                      }}
-                    />
-                  ) : null;
-                })()}
-            </div>
-            <LargeInput
-              label="Reps"
-              hint={!editDraft ? repsHintGiant ?? undefined : undefined}
-              value={editDraft ? (editDraft.reps[idx] ?? "") : reps[idx] || ""}
-              onChange={(value) => {
-                if (editDraft) {
-                  setEditDraft((d) =>
-                    d
-                      ? {
-                          ...d,
-                          reps: d.reps.map((r, i) => (i === idx ? value : r)),
-                        }
-                      : null,
-                  );
-                } else {
-                  const newReps = [...reps];
-                  newReps[idx] = value;
-                  setReps(newReps);
-                }
-              }}
-              placeholder="0"
-              step="1"
-              showStepper
-              stepAmount={1}
-              />
-          </div>
-        </div>
+        return resolveSetRowWeightDefault({
+          setNumber: index + 1,
+          previousRowWeight: index > 0 ? prev?.weights?.[exIdx] : undefined,
+          lastSessionSetDetails:
+            exerciseWeightMeta[exIdx]?.lastSessionSetDetails,
+          defaultWeight: exerciseWeightMeta[exIdx]?.defaultWeight ?? null,
+          suggestedWeight: exerciseWeightMeta[exIdx]?.suggestedWeight ?? null,
+          prescribedWeightKg: targets.weight_kg,
+        });
+      }),
+      reps: exercises.map((exercise, exIdx) => {
+        const targets = resolveSetPrescriptionTargets(
+          exercise,
+          index + 1,
+          liveSetEntry.setEntry.reps_per_set,
         );
-      })}
-      </div>
-    </div>
-  );
+        const { numericDefault } = parseRepsTarget(targets.reps);
+        if (numericDefault > 0) return String(numericDefault);
+        return prev?.reps?.[exIdx] ?? "";
+      }),
+    }));
+  };
+
+  const formatGiantRoundSummary = (
+    row: (typeof rowsState.rows)[number],
+    opts: { done: boolean },
+  ) => {
+    if (opts.done) {
+      const forRound = loggedSetsList.filter(
+        (s) => Number(s.set_number) === row.setNumber,
+      );
+      return (
+        <>
+          {exercises.map((_, exIdx) => (
+            <span key={`done-sum-${exIdx}`}>
+              {exIdx > 0 ? " · " : null}
+              <span className={setUnitStyles.sxMuted}>
+                {formatGroupedExerciseBadge(
+                  currentSetEntryIndex,
+                  exercises[exIdx]?.exercise_order,
+                  exIdx,
+                )}
+              </span>{" "}
+              {row.reps[exIdx] || "—"}×
+              <span className={setUnitStyles.sxAccent}>
+                {row.weights[exIdx] || "—"}
+              </span>
+            </span>
+          ))}
+          <LoggedEffortInline rpe={forRound[0]?.rpe ?? null} />
+        </>
+      );
+    }
+    return (
+      <span className={setUnitStyles.sxMuted}>
+        {exercises
+          .map((exercise, exIdx) => {
+            const t = resolveSetPrescriptionTargets(
+              exercise,
+              row.setNumber,
+              liveSetEntry.setEntry.reps_per_set,
+            );
+            return `${formatGroupedExerciseBadge(currentSetEntryIndex, exercise.exercise_order, exIdx)} ${t.reps ?? "—"}×${t.weight_kg ?? "—"}`;
+          })
+          .join(" · ")}
+      </span>
+    );
+  };
 
   const isEditMode = !!editingSetId && !!editDraft;
-  const forViewedRound =
-    viewingSetIndex >= 1
-      ? loggedSetsList.filter((s) => s.set_number === viewingSetIndex)
-      : [];
-  const viewedSetEntry = forViewedRound[0] ?? null;
-
-  const logInputsReady =
-    !isLoggingSet &&
-    completedSets < totalSets &&
-    exercises.length > 0 &&
-    exercises.every((_, idx) => {
-      const ws = weights[idx];
-      const rs = reps[idx];
-      const w = parseWeightKgInput(String(ws ?? ""));
-      const r = parseInt(String(rs ?? ""), 10);
-      return (
-        String(ws ?? "").trim() !== "" &&
-        !isNaN(w) &&
-        w > 0 &&
-        String(rs ?? "").trim() !== "" &&
-        !isNaN(r) &&
-        r > 0
-      );
-    });
-
-  const logButton = (
-    <div className="space-y-2">
-      {allowSetEditDelete && isEditMode ? (
-        <div className="flex gap-2 w-full">
-          <Button
-            variant="outline"
-            onClick={handleCancelEdit}
-            className="flex-1 h-12 text-base font-semibold rounded-xl"
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSaveEdit}
-            disabled={
-              isSavingEdit ||
-              !editDraft ||
-              editDraft.weights.some(
-                (w, i) =>
-                  !w?.trim() ||
-                    isNaN(parseWeightKgInput(w)) ||
-                    parseWeightKgInput(w) < 0,
-              ) ||
-              editDraft.reps.some(
-                (r, i) =>
-                  !r?.trim() ||
-                  isNaN(parseInt(r, 10)) ||
-                  parseInt(r, 10) <= 0,
-              )
-            }
-            variant="fc-primary"
-            className="flex-1 h-12 text-base font-bold uppercase tracking-wider rounded-xl"
-          >
-            {isSavingEdit ? "Saving…" : "Save edits"}
-          </Button>
-        </div>
-      ) : allowSetEditDelete && viewedSetEntry ? (
-        <Button
-          onClick={() => handleEditSet(viewedSetEntry)}
-          variant="fc-primary"
-          className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl"
-        >
-          <Pencil className="w-5 h-5 mr-2" />
-          Edit this round
-        </Button>
-      ) : (
-        <LogSetButton
-          onClick={handleLog}
-          ready={logInputsReady}
-          loading={isLoggingSet}
-          label="Log giant set"
-        />
-      )}
-    </div>
-  );
+  const chrome = useWorkoutExecutionChrome();
+  const hideCompactBack = chrome?.hideCompactBack ?? false;
+  const totalSetEntries = allSetEntries.length || 1;
+  const canGoPrevious = currentSetEntryIndex > 0;
+  const canGoNext = currentSetEntryIndex < totalSetEntries - 1;
+  const firstExId = exercises[0]?.exercise_id;
+  const prevFirst =
+    firstExId && previousPerformanceMap
+      ? (previousPerformanceMap.get(firstExId) ?? null)
+      : null;
+  const lastWorkoutForLastWeek = prevFirst?.lastWorkout ?? null;
+  const glueRest = formatLiveRest(restSec) ?? "—";
+  const glueLabel =
+    exercises.length >= 3
+      ? `↓ \u00a0all ${exercises.length === 3 ? "three" : exercises.length} back to back · rest ${glueRest}`
+      : `↓ \u00a0back to back · rest ${glueRest}`;
+  const liveRest = useLiveRestTimer();
+  const isCardResting = Boolean(liveRest?.isResting);
 
   return (
-    <BaseBlockExecutorLayout
-      {...{
-        block,
-        onBlockComplete,
-        onNextBlock,
-        e1rmMap,
-        onE1rmUpdate,
-        sessionId,
-        assignmentId,
-        allBlocks,
-        currentBlockIndex,
-        onBlockChange,
-        currentExerciseIndex,
-        onExerciseIndexChange,
-        logSetToDatabase,
-        formatTime,
-        calculateSuggestedWeight,
-        onVideoClick,
-        onAlternativesClick,
-              onRestTimerClick,
-        onWorkoutBack,
-        previousPerformanceMap,
-      }}
-      exerciseName={exerciseTitleName}
-      prescriptionItems={prescriptionItems}
-      currentExercise={titleExercise}
-      instructions={instructions}
-      currentSet={displaySetNumber}
-      totalSets={totalSets}
-      progressLabel="Round"
-      loggingInputs={loggingInputs}
-      logButton={logButton}
-      aboveStickyContent={aboveStickyContent}
-      showNavigation={true}
-      showRestTimer={!!block.block.rest_seconds}
-    />
+    <>
+      <div className="flex flex-col border-b border-white/5">
+        <div className="flex flex-col gap-3 px-0 pb-2 pt-1 sm:px-1">
+          {onWorkoutBack && !hideCompactBack ? (
+            <button
+              type="button"
+              onClick={onWorkoutBack}
+              className="-ml-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/10 hover:text-white active:scale-95"
+              aria-label="Back"
+            >
+              <ChevronLeft className="h-5 w-5" aria-hidden />
+            </button>
+          ) : null}
+
+          <LiveCard
+            hue={groupIndexToHue(currentSetEntryIndex)}
+            heading={`Set ${activeSetNumber} of ${totalSets}`}
+            status={
+              rowsState.doneCount >= totalSets ? "complete" : "logging"
+            }
+            restGlue="none"
+          >
+            <div className="flex items-start justify-end gap-2 px-[18px] pt-1">
+              {titleExercise ? (
+                <ExerciseActionButtons
+                  exercise={titleExercise}
+                  onVideoClick={onVideoClick}
+                  onAlternativesClick={onAlternativesClick}
+                />
+              ) : null}
+            </div>
+
+            {rowsState.rows
+              .filter((row) => row.done)
+              .map((row) => (
+                <SetUnitRow
+                  key={`done-${row.setNumber}`}
+                  label={`Set ${row.setNumber}`}
+                  done
+                  summary={formatGiantRoundSummary(row, { done: true })}
+                />
+              ))}
+
+            {activeRow && activeRowIndex >= 0
+              ? exercises.map((exercise, exIdx) => {
+                  const targets = resolveSetPrescriptionTargets(
+                    exercise,
+                    activeSetNumber,
+                    liveSetEntry.setEntry.reps_per_set,
+                  );
+                  const isLogged = confirmed[exIdx] === true;
+                  const loggedValue =
+                    formatLiveLast(
+                      activeRow.reps[exIdx],
+                      activeRow.weights[exIdx],
+                    ) ?? undefined;
+                  const lastDetail =
+                    exercise.exercise_id && previousPerformanceMap
+                      ? previousPerformanceMap
+                          .get(exercise.exercise_id)
+                          ?.lastWorkout?.setDetails?.find(
+                            (s) => Number(s.set_number) === activeSetNumber,
+                          )
+                      : null;
+                  const lastHint = formatLiveLast(
+                    lastDetail?.reps_completed ?? null,
+                    lastDetail?.weight_kg ?? null,
+                  );
+                  const tempoHint =
+                    targets.tempo && String(targets.tempo).trim()
+                      ? `Tempo ${String(targets.tempo).trim()}`
+                      : null;
+                  const hint = [tempoHint, lastHint ? `Last ${lastHint}` : null]
+                    .filter(Boolean)
+                    .join(" · ");
+                  return (
+                    <LiveCardGroupedExercise
+                      key={exercise.exercise_id ?? exIdx}
+                      badge={groupExerciseBadge(
+                        currentSetEntryIndex,
+                        exercise.exercise_order,
+                        exIdx,
+                      )}
+                      name={
+                        exercise.exercise?.name || `Exercise ${exIdx + 1}`
+                      }
+                      target={targetsToLiveCardTarget(targets)}
+                      effort={effortFromPrescribedRir(targets.rir)}
+                      loadPct={exercise.load_percentage}
+                      note={exercise.notes}
+                      hint={hint || null}
+                      logged={isLogged}
+                      loggedValue={loggedValue}
+                      logSlot={
+                        !isLogged ? (
+                          <>
+                            <LiveCardLogField
+                              label="Weight"
+                              value={activeRow.weights[exIdx] ?? ""}
+                              onChange={(value) =>
+                                rowsState.setRow(activeRowIndex, (c) => {
+                                  const nextWeights = [...c.weights];
+                                  nextWeights[exIdx] = value;
+                                  return { ...c, weights: nextWeights };
+                                })
+                              }
+                              onIncrement={() => nudgeWeight(exIdx, 2.5)}
+                              onDecrement={() => nudgeWeight(exIdx, -2.5)}
+                            />
+                            <LiveCardLogField
+                              label="Reps"
+                              value={activeRow.reps[exIdx] ?? ""}
+                              onChange={(value) =>
+                                rowsState.setRow(activeRowIndex, (c) => {
+                                  const nextReps = [...c.reps];
+                                  nextReps[exIdx] = value;
+                                  return { ...c, reps: nextReps };
+                                })
+                              }
+                              onIncrement={() => nudgeReps(exIdx, 1)}
+                              onDecrement={() => nudgeReps(exIdx, -1)}
+                            />
+                            <LiveCardLogButton
+                              variant="compact"
+                              disabled={isLoggingSet}
+                              onClick={() => void confirmExercise(exIdx)}
+                            />
+                          </>
+                        ) : undefined
+                      }
+                    />
+                  );
+                })
+              : null}
+
+            <LiveCardGlue
+              resting={isCardResting}
+              timer={isCardResting ? liveRest?.countdownLabel : undefined}
+            >
+              {isCardResting
+                ? `↺ resting — Set ${liveRest?.nextSetNumber ?? "—"} next`
+                : glueLabel}
+            </LiveCardGlue>
+
+            {rowsState.rows
+              .filter((row) => !row.done && row.setNumber !== activeRow?.setNumber)
+              .map((row) => (
+                <SetUnitRow
+                  key={`upcoming-${row.setNumber}`}
+                  label={`Set ${row.setNumber}`}
+                  summary={formatGiantRoundSummary(row, { done: false })}
+                  onSelect={() =>
+                    setJumpRowIndex(
+                      rowsState.rows.findIndex((r) => r.setNumber === row.setNumber),
+                    )
+                  }
+                />
+              ))}
+
+            {rowsState.doneCount < totalSets ? (
+              <button
+                type="button"
+                onClick={fillRemainingTargets}
+                className="mx-[18px] mb-2 self-start text-[10px] font-semibold uppercase tracking-wide text-[color:var(--fc-text-subtle)] hover:text-[color:var(--fc-accent)]"
+              >
+                Prefill remaining targets
+              </button>
+            ) : null}
+
+            {isEditMode ? (
+              <LiveCardLog>
+                <div className="mt-3 flex gap-2 w-full">
+                  <Button
+                    variant="outline"
+                    onClick={handleCancelEdit}
+                    className="flex-1 h-12 text-base font-semibold rounded-xl"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSaveEdit}
+                    disabled={isSavingEdit || !editDraft}
+                    variant="fc-primary"
+                    className="flex-1 h-12 text-base font-bold uppercase tracking-wider rounded-xl"
+                  >
+                    {isSavingEdit ? "Saving…" : "Save edits"}
+                  </Button>
+                </div>
+              </LiveCardLog>
+            ) : null}
+          </LiveCard>
+
+          {prevFirst?.lastWorkout != null ||
+          (firstExId &&
+            progressionSuggestionsMap?.get(firstExId)) ? (
+            <div className="mx-4">
+              <ProgressionNudge
+                suggestion={
+                  firstExId
+                    ? (progressionSuggestionsMap?.get(firstExId) ?? null)
+                    : null
+                }
+                previousPerformance={prevFirst}
+                previousSessionSetNumber={activeSetNumber}
+                showPreviousSession={false}
+              />
+            </div>
+          ) : null}
+
+          {aboveStickyContent}
+
+          <NavigationControls
+            currentBlock={currentSetEntryIndex + 1}
+            totalBlocks={totalSetEntries}
+            onPrevious={() => {
+              if (onSetEntryChange && canGoPrevious) {
+                onSetEntryChange(currentSetEntryIndex - 1);
+              }
+            }}
+            onNext={() => {
+              if (onSetEntryChange && canGoNext) {
+                onSetEntryChange(currentSetEntryIndex + 1);
+              }
+            }}
+            canGoPrevious={canGoPrevious}
+            canGoNext={canGoNext}
+          />
+        </div>
+        <LastSessionSetsSection lastWorkout={lastWorkoutForLastWeek} />
+      </div>
+    </>
   );
 }

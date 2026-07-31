@@ -1,0 +1,123 @@
+================================================================================
+WAVE 4 STEP 1 — CODE CLEANUP REPORT (pre-drop)
+================================================================================
+Generated: 2026-07-12
+Scope: src/ only — no SQL, migrations, RPC changes, git
+
+================================================================================
+1. FILES DELETED
+================================================================================
+Booking / clipcards (§1):
+  src/lib/schedulingService.ts
+  src/components/coach/client-views/CoachClientSubscriptionSection.tsx
+
+Compliance retire (§2):
+  src/components/coach/ComplianceSnapshot.tsx
+
+Phantom dead code (§5):
+  src/components/BulkAssignment.tsx
+  src/lib/bulkAssignment.ts
+  src/components/HabitManager.tsx
+  src/components/HabitTracker.tsx          (phantom — NOT client/HabitTracker.tsx)
+  src/components/ExerciseSetForm.tsx
+  src/lib/workoutGroupService.ts
+  src/components/GreetingSettings.tsx
+  src/hooks/useGreetingPreferences.ts
+
+================================================================================
+2. FILES MODIFIED (by section)
+================================================================================
+§1 Booking / clipcards:
+  src/components/coach/client-views/CoachProfileShell.tsx
+    — removed subscription tab, clipcards hero query, CoachClientSubscriptionSection mount
+  src/lib/coachDashboardService.ts
+    — removed clipcards batch query; subscriptionEndDate/ExpiringSoon always null/false
+  src/app/client/profile/page.tsx
+    — removed clipcards subscription line fetch + UI
+  src/components/coach/ClientDetailModal.tsx
+    — removed subscription function card
+
+§3 Dead daily-workout service methods:
+  src/lib/workoutTemplateService.ts
+    — removed completeWorkout (RPC complete_workout)
+    — removed generateDailyWorkout (RPC generate_daily_workout)
+    — removed clearWorkoutCache (.from daily_workout_cache)
+    — kept getDailyWorkout (fallback via getNextDueWorkout; no dead RPC)
+
+§4 meal_plan_items legacy (decision B=a):
+  src/lib/mealPlanService.ts — removed MealItem/Meal types, getMealItems*, getMeals, calculateMealTotals
+  src/components/meal-display/loadPlanBuilderMeals.ts — no legacy branch
+  src/lib/mealPlans/loadMealPlanDraftBaseline.ts — returns MealPlanDraftState only
+  src/contexts/MealPlanDraftContext.tsx — removed legacyItems/isLegacyPlan
+  src/components/meal-display/CoachPlanBuilderView.tsx — removed LEGACY FORMAT UI; plain empty state
+  src/app/coach/nutrition/meal-plans/[id]/page.tsx — dropped legacy props/guards
+  src/components/meal-display/types.ts — removed LegacyPlanItemRow
+  src/components/meal-display/index.ts — updated exports
+  src/app/client/nutrition/meals/[id]/page.tsx
+    — loadCompositeMealByType resolves composite IDs via meals tree (not meal_plan_items)
+
+================================================================================
+3. FINAL ZERO-HIT SWEEP (src/)
+================================================================================
+.from('booked_sessions')     — 0
+.from('coach_time_slots')     — 0
+.from('coach_availability')   — 0
+.from('clipcards')            — 0
+.from('clip_cards')           — 0
+.from('sessions')              — 0
+meal_plan_items                — 0
+book_session / cancel_session / complete_session / add_session_feedback /
+  get_available_time_slots / extend_clipcard_validity — 0
+daily_workout_cache / generate_daily_workout / get_daily_workout — 0
+
+Residual comments only (not queries):
+  src/lib/validation/validators.ts:283 — comment mentions clipcards schema
+  src/lib/coachDashboardService.ts:904-906 — JSDoc notes retirement
+
+================================================================================
+4. PART 4 PHANTOM PATH OUTCOMES
+================================================================================
+DELETED (dead code, zero imports verified):
+  bulk_assignments / bulk_assignment_items — BulkAssignment.tsx + bulkAssignment.ts
+  user_habits / habit_entries — HabitManager.tsx + HabitTracker.tsx (components/)
+  workout_exercise_groups / workout_template_exercises — workoutGroupService.ts + ExerciseSetForm.tsx
+  user_preferences — GreetingSettings.tsx + useGreetingPreferences.ts
+
+SKIPPED — broken feature, separate decision (NOT fixed per instructions):
+  programs — src/lib/programWeekStateBuilder.ts:119,240
+    (.from('programs') should be workout_programs; LIVE via train API)
+
+WORKS — no change:
+  current_champions — src/lib/leaderboardService.ts:142 (live VIEW)
+
+COMMENT ONLY — no change:
+  table — src/lib/perfUtils.ts:7 (example in comment)
+
+================================================================================
+5. SKIPPED (still referenced or out of scope)
+================================================================================
+  meal_items — deferred (decision C); meal_food_items migration path untouched
+  get_train_page_data / program_assignment_progress — deferred (decision D)
+  get_client_compliance_scores RPCs — SQL side; ComplianceSnapshot.tsx deleted only
+  get_client_dashboard sessions block — SQL side; not in this prompt
+  SubscriptionClipcardRowSchema / CoachAvailabilitySchema in validators.ts — unused exports kept
+  MealCardWithOptions legacyItems prop — display fallback for meal_food_items without options (not meal_plan_items)
+
+================================================================================
+6. tsc --noEmit
+================================================================================
+Exit code: 0 (no errors)
+
+================================================================================
+7. USER BROWSER CHECK (gates drop SQL)
+================================================================================
+  [ ] Coach profile — no subscription tab; no clipcard chrome; no console errors
+  [ ] Coach dashboard loads
+  [ ] Client profile — no subscription line under hero
+  [ ] Plan builder — normal plan opens; empty plan shows "No meals yet." + Add meal
+  [ ] Client nutrition meal page loads (composite IDs resolve via meals table)
+  [ ] Train page + start workout — regression (unchanged paths)
+
+================================================================================
+END
+================================================================================

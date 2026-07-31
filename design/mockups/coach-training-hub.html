@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<title>Coach — Training hub (desktop + mobile)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;}
+  :root{
+    --page:#0A0B0D; --well:#050608;
+    --line:rgba(255,255,255,.07); --line-2:rgba(255,255,255,.13);
+    --accent:#2E7BFF; --accent-glow:rgba(46,123,255,.30);
+    --good:#22E56A; --warn:#FFB020; --gold:#F5C242; --purple:#9D6BFF; --aqua:#22D3EE; --pink:#FF4D7D; --orange:#FF8A1F;
+    --text:#F0F2F5; --dim:#8B93A1; --subtle:#5C6470; --faint:#3D434D;
+    --f-d:'Archivo',sans-serif; --f-b:'Inter',sans-serif; --f-m:'JetBrains Mono',monospace;
+  }
+  body{background:#070809;color:var(--text);font-family:var(--f-b);-webkit-font-smoothing:antialiased;padding:24px;font-size:13px;}
+  .d{font-family:var(--f-d);font-stretch:105%;}
+  svg{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+
+  .lbl{font-family:var(--f-m);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:0 0 10px;font-weight:700;}
+  .frame{background:var(--page);border:1px solid var(--line-2);border-radius:18px;padding:26px 28px 34px;margin-bottom:30px;}
+
+  h1{font-family:var(--f-d);font-size:28px;font-weight:800;letter-spacing:-.025em;}
+  .sub{font-size:12.5px;color:var(--dim);margin-top:6px;margin-bottom:22px;}
+
+  /* ============ DESKTOP GRID ============ */
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;}
+  .tile{position:relative;border:1px solid var(--line);border-radius:14px;padding:17px 18px 15px 20px;overflow:hidden;cursor:pointer;
+        display:flex;flex-direction:column;min-height:150px;}
+  .tile::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--h);}
+  .tile{background:linear-gradient(100deg, color-mix(in srgb,var(--h) 14%,transparent) 0%, color-mix(in srgb,var(--h) 4%,transparent) 32%, transparent 70%);}
+  .tile:hover{border-color:color-mix(in srgb,var(--h) 40%,transparent);}
+  .th{display:flex;align-items:flex-start;gap:12px;}
+  .ic{width:34px;height:34px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+      background:color-mix(in srgb,var(--h) 20%,transparent);color:var(--h);}
+  .ic svg{width:18px;height:18px;}
+  .tt{flex:1;min-width:0;}
+  .tt .n{font-family:var(--f-d);font-size:16px;font-weight:800;letter-spacing:-.01em;}
+  .tt .ds{font-size:11.5px;color:var(--subtle);margin-top:4px;line-height:1.45;}
+  .chev{color:var(--faint);flex-shrink:0;}
+  .chev svg{width:15px;height:15px;}
+
+  .stat{margin-top:auto;padding-top:14px;display:flex;align-items:baseline;gap:9px;}
+  .stat .n{font-family:var(--f-d);font-size:26px;font-weight:900;line-height:1;color:var(--h);letter-spacing:-.03em;}
+  .stat .l{font-family:var(--f-m);font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);}
+  .stat .x{font-family:var(--f-m);font-size:9.5px;color:var(--subtle);margin-left:auto;}
+  .stat .x b{color:var(--h);font-weight:700;}
+
+  .org{margin-top:22px;}
+  .orgl{font-family:var(--f-m);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--subtle);margin-bottom:10px;}
+  .orgrow{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+  .orgi{display:flex;align-items:center;gap:11px;border:1px solid var(--line);border-radius:11px;padding:12px 15px;color:var(--dim);font-size:12.5px;}
+  .orgi svg{width:15px;height:15px;color:var(--accent);}
+  .orgi .sp{flex:1;}
+  .orgi .c{font-family:var(--f-m);font-size:10px;color:var(--faint);}
+
+  /* ============ MOBILE ============ */
+  .phone{width:390px;background:var(--page);border:1px solid var(--line-2);border-radius:22px;padding:20px 16px 28px;}
+  .phone h1{font-size:24px;}
+  .phone .sub{font-size:12px;margin-bottom:18px;}
+  .rows{display:flex;flex-direction:column;gap:9px;}
+  .row{position:relative;border:1px solid var(--line);border-radius:12px;padding:13px 14px 13px 17px;display:flex;align-items:center;gap:12px;overflow:hidden;}
+  .row::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--h);}
+  .row{background:linear-gradient(100deg, color-mix(in srgb,var(--h) 14%,transparent) 0%, color-mix(in srgb,var(--h) 4%,transparent) 34%, transparent 72%);}
+  .row .ic{width:30px;height:30px;border-radius:9px;}
+  .row .ic svg{width:16px;height:16px;}
+  .row .rt{flex:1;min-width:0;}
+  .row .rt .n{font-size:14px;font-weight:700;}
+  .row .rt .ds{font-size:11px;color:var(--subtle);margin-top:3px;line-height:1.4;}
+  .row .cnt{font-family:var(--f-m);font-size:11px;font-weight:700;color:var(--h);flex-shrink:0;}
+
+  .note{max-width:1180px;margin-top:8px;padding-left:14px;border-left:2px solid var(--accent);font-size:12px;line-height:1.85;color:var(--subtle);}
+  .note b{color:var(--text);}
+  .note code{font-family:var(--f-m);font-size:11px;color:var(--aqua);background:rgba(34,211,238,.08);padding:1px 5px;border-radius:4px;}
+</style></head>
+<body>
+
+<!-- ================= DESKTOP ================= -->
+<div class="lbl">Desktop · ≥1024px</div>
+<div class="frame">
+  <h1 class="d">Training</h1>
+  <div class="sub">Programs, workout templates, and your exercise library.</div>
+
+  <div class="grid">
+
+    <div class="tile" style="--h:var(--accent)">
+      <div class="th">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h5v18H6a2 2 0 0 1-2-2zM20 5a2 2 0 0 0-2-2h-5v18h5a2 2 0 0 0 2-2z"/></svg></span>
+        <span class="tt"><div class="n">Programs</div><div class="ds">Multi-week programs and weekly schedules</div></span>
+        <span class="chev"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></span>
+      </div>
+      <div class="stat"><span class="n d">7</span><span class="l">programs</span><span class="x"><b>3</b> assigned</span></div>
+    </div>
+
+    <div class="tile" style="--h:var(--purple)">
+      <div class="th">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5M3 17l9 5 9-5"/></svg></span>
+        <span class="tt"><div class="n">Workout templates</div><div class="ds">Single-session workouts for programs and assignments</div></span>
+        <span class="chev"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></span>
+      </div>
+      <div class="stat"><span class="n d">42</span><span class="l">templates</span><span class="x">last edited <b>2d</b></span></div>
+    </div>
+
+    <div class="tile" style="--h:var(--good)">
+      <div class="th">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg></span>
+        <span class="tt"><div class="n">Exercise library</div><div class="ds">Browse and manage exercises</div></span>
+        <span class="chev"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></span>
+      </div>
+      <div class="stat"><span class="n d">558</span><span class="l">exercises</span><span class="x"><b>164</b> untagged</span></div>
+    </div>
+
+    <div class="tile" style="--h:var(--pink)">
+      <div class="th">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M7 4h10v5a5 5 0 0 1-10 0zM12 14v3M9 21h6"/></svg></span>
+        <span class="tt"><div class="n">Challenges</div><div class="ds">Create and manage client challenges</div></span>
+        <span class="chev"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></span>
+      </div>
+      <div class="stat"><span class="n d">2</span><span class="l">running</span><span class="x"><b>9</b> participants</span></div>
+    </div>
+
+    <div class="tile" style="--h:var(--orange)">
+      <div class="th">
+        <span class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 8h8M8 12h8M8 16h4"/></svg></span>
+        <span class="tt"><div class="n">Gym console</div><div class="ds">Clipboard of programmed workouts for the floor</div></span>
+        <span class="chev"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></span>
+      </div>
+      <div class="stat"><span class="n d">4</span><span class="l">on the board</span><span class="x">today</span></div>
+    </div>
+
+    <div class="tile" style="--h:var(--aqua)">
+      <div class="th">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M9 3h6v4a3 3 0 0 1-6 0zM12 10v6M8 21h8"/></svg></span>
+        <span class="tt"><div class="n">Testing</div><div class="ds">Mobility, performance and body assessments</div></span>
+        <span class="chev"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></span>
+      </div>
+      <div class="stat"><span class="n d">6</span><span class="l">this month</span><span class="x">last <b>3d ago</b></span></div>
+    </div>
+
+  </div>
+
+  <div class="org">
+    <div class="orgl">Organisation</div>
+    <div class="orgrow">
+      <span class="orgi"><svg viewBox="0 0 24 24"><path d="M3 7h18M3 12h18M3 17h10"/></svg>Workout categories<span class="sp"></span><span class="c">8</span><svg viewBox="0 0 24 24" style="color:var(--faint)"><path d="M9 5l7 7-7 7"/></svg></span>
+      <span class="orgi"><svg viewBox="0 0 24 24"><path d="M20.6 13.4L12 22l-9-9V4h9z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg>Exercise categories<span class="sp"></span><span class="c">5</span><svg viewBox="0 0 24 24" style="color:var(--faint)"><path d="M9 5l7 7-7 7"/></svg></span>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MOBILE ================= -->
+<div class="lbl">Mobile · &lt;1024px</div>
+<div class="phone">
+  <h1 class="d">Training</h1>
+  <div class="sub">Programs, workout templates, and your exercise library.</div>
+  <div class="rows">
+    <div class="row" style="--h:var(--accent)">
+      <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h5v18H6a2 2 0 0 1-2-2zM20 5a2 2 0 0 0-2-2h-5v18h5a2 2 0 0 0 2-2z"/></svg></span>
+      <span class="rt"><div class="n">Programs</div><div class="ds">Multi-week programs and schedules</div></span>
+      <span class="cnt">7</span></div>
+    <div class="row" style="--h:var(--purple)">
+      <span class="ic"><svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5M3 17l9 5 9-5"/></svg></span>
+      <span class="rt"><div class="n">Workout templates</div><div class="ds">Single-session workouts</div></span>
+      <span class="cnt">42</span></div>
+    <div class="row" style="--h:var(--good)">
+      <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg></span>
+      <span class="rt"><div class="n">Exercise library</div><div class="ds">Browse and manage exercises</div></span>
+      <span class="cnt">558</span></div>
+    <div class="row" style="--h:var(--pink)">
+      <span class="ic"><svg viewBox="0 0 24 24"><path d="M7 4h10v5a5 5 0 0 1-10 0zM12 14v3M9 21h6"/></svg></span>
+      <span class="rt"><div class="n">Challenges</div><div class="ds">Create and manage challenges</div></span>
+      <span class="cnt">2</span></div>
+    <div class="row" style="--h:var(--orange)">
+      <span class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 8h8M8 12h8M8 16h4"/></svg></span>
+      <span class="rt"><div class="n">Gym console</div><div class="ds">Clipboard for the floor</div></span>
+      <span class="cnt">4</span></div>
+    <div class="row" style="--h:var(--aqua)">
+      <span class="ic"><svg viewBox="0 0 24 24"><path d="M9 3h6v4a3 3 0 0 1-6 0zM12 10v6M8 21h8"/></svg></span>
+      <span class="rt"><div class="n">Testing</div><div class="ds">Mobility and assessments</div></span>
+      <span class="cnt">6</span></div>
+  </div>
+  <div class="org">
+    <div class="orgl">Organisation</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <span class="orgi"><svg viewBox="0 0 24 24"><path d="M3 7h18M3 12h18M3 17h10"/></svg>Workout categories<span class="sp"></span><span class="c">8</span></span>
+      <span class="orgi"><svg viewBox="0 0 24 24"><path d="M20.6 13.4L12 22l-9-9V4h9z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg>Exercise categories<span class="sp"></span><span class="c">5</span></span>
+    </div>
+  </div>
+</div>
+
+<div class="note">
+  <b>Same component, two arrangements.</b> Identical hue, icon tile, rail and wash in both — only the layout and how much detail is shown changes.<br><br>
+  <b>Desktop (<code>≥1024px</code>):</b> <code>grid-template-columns: repeat(3, 1fr)</code>, gap 13px, tiles <code>min-height:150px</code>, flex-column with the stat pinned to the bottom (<code>margin-top:auto</code>). Description on its own line under the name. Organisation becomes a 2-across row.<br>
+  <b>Mobile (<code>&lt;1024px</code>):</b> <code>flex-direction: column</code>, gap 9px — the rows you already ship. Icon · name+description · count · chevron on one line, ~64px tall. Organisation stacks 1-per-row.<br><br>
+  <b>The real change is the counts.</b> Today this is a menu that tells you nothing. Each destination now carries its own number — <b>7 programs · 42 templates · 558 exercises · 2 running · 4 on the board · 6 tests this month</b> — plus one secondary fact on desktop where there's room ("3 assigned", "164 untagged", "9 participants"). A hub should tell you the state of what's behind each door.<br><br>
+  <b>Kept exactly:</b> per-destination hue, the coloured left rail, the gradient wash fading out by ~70%, the icon tile at 20% hue, chevrons, and the Organisation section.
+</div>
+
+</body></html>

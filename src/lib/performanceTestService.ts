@@ -1,415 +1,457 @@
 /**
- * Performance Test Service
- * Handles 1km run and step test tracking for monthly performance assessments
+ * Performance tests — catalog + results (coach-tested and client self-logged).
+ * Legacy `public.performance_tests` is unused.
  */
 
-import { supabase } from './supabase';
+import { supabase } from './supabase'
+import { resolveViewerCoachId } from './leaderboardService'
 
-export interface PerformanceTest {
-  id: string;
-  client_id: string;
-  tested_at: string; // YYYY-MM-DD
-  test_type: '1km_run' | 'step_test';
-  
-  // 1km run fields
-  time_seconds?: number | null;
-  
-  // Step test fields
-  heart_rate_pre?: number | null;
-  heart_rate_1min?: number | null;
-  heart_rate_2min?: number | null;
-  heart_rate_3min?: number | null;
-  recovery_score?: number | null;
-  
-  // Context
-  notes?: string | null;
-  conditions?: string | null;
-  perceived_effort?: number | null;
-  tested_by?: string | null;
-  created_at: string;
-  updated_at: string;
+export type PerformanceDirection = 'higher_better' | 'lower_better'
+export type PerformanceCategory =
+  | 'jump'
+  | 'sprint'
+  | 'carry'
+  | 'cardio'
+  | 'other'
+
+export interface PerformanceTestCatalogItem {
+  id: string
+  test_key: string
+  display_name: string
+  category: PerformanceCategory
+  result_unit: string
+  secondary_unit: string | null
+  secondary_label: string | null
+  direction: PerformanceDirection
+  description: string | null
+  sort_order: number
+  is_active: boolean
 }
 
-export type TestType = '1km_run' | 'step_test';
+export interface PerformanceTestResult {
+  id: string
+  client_id: string
+  test_id: string
+  tested_at: string
+  tested_by: string | null
+  result_value: number
+  secondary_value: number | null
+  details: Record<string, unknown> | null
+  conditions: string | null
+  perceived_effort: number | null
+  notes: string | null
+  created_at?: string
+  test?: PerformanceTestCatalogItem | null
+}
 
-// ============================================================================
-// CRUD Operations
-// ============================================================================
+export type PerformanceResultInput = {
+  client_id: string
+  test_id: string
+  tested_at: string
+  tested_by: string | null
+  result_value: number
+  secondary_value?: number | null
+  conditions?: string | null
+  perceived_effort?: number | null
+  notes?: string | null
+}
+
+export type RosterPerformanceRank =
+  | { kind: 'ranked'; rank: number; total: number }
+  | { kind: 'solo' }
+  | { kind: 'unavailable' }
+
+export interface PerformanceCategoryGroup {
+  category: PerformanceCategory
+  items: PerformanceTestCatalogItem[]
+}
+
+const CATALOG_SELECT =
+  'id, test_key, display_name, category, result_unit, secondary_unit, secondary_label, direction, description, sort_order, is_active'
+
+const RESULT_SELECT =
+  'id, client_id, test_id, tested_at, tested_by, result_value, secondary_value, details, conditions, perceived_effort, notes, created_at'
+
+const CATEGORY_ORDER: PerformanceCategory[] = [
+  'jump',
+  'sprint',
+  'carry',
+  'cardio',
+  'other',
+]
+
+export function formatCategoryLabel(category: string): string {
+  if (!category) return ''
+  return category.charAt(0).toUpperCase() + category.slice(1)
+}
 
 /**
- * Get all performance tests for a client
+ * tested_by = coach id → coach-tested
+ * tested_by null or = client_id → self-logged
  */
+export function isSelfLogged(
+  result: Pick<PerformanceTestResult, 'tested_by' | 'client_id'>,
+): boolean {
+  return result.tested_by == null || result.tested_by === result.client_id
+}
+
+export function isCoachTested(
+  result: Pick<PerformanceTestResult, 'tested_by' | 'client_id'>,
+): boolean {
+  return !isSelfLogged(result)
+}
+
+export function groupCatalogByCategory(
+  tests: PerformanceTestCatalogItem[],
+): PerformanceCategoryGroup[] {
+  const map = new Map<PerformanceCategory, PerformanceTestCatalogItem[]>()
+  for (const t of tests) {
+    const list = map.get(t.category) ?? []
+    list.push(t)
+    map.set(t.category, list)
+  }
+  return CATEGORY_ORDER.filter((c) => map.has(c)).map((category) => ({
+    category,
+    items: [...(map.get(category) ?? [])].sort(
+      (a, b) => a.sort_order - b.sort_order,
+    ),
+  }))
+}
+
+/** Format a result for display; times in seconds use MM:SS when ≥ 60. */
+export function formatResultValue(
+  value: number | null | undefined,
+  unit: string,
+): string {
+  if (value == null || !Number.isFinite(Number(value))) return '—'
+  const n = Number(value)
+  if (unit === 's') {
+    if (n >= 60) return formatRunTime(n)
+    // Keep one decimal for short sprints when not integer
+    return Number.isInteger(n) ? `${n}s` : `${n.toFixed(2)}s`
+  }
+  if (unit === 'cm') return `${n} cm`
+  if (unit === 'kg') return `${n} kg`
+  if (unit === 'm') return `${n} m`
+  if (unit === 'rsi') return String(n)
+  if (unit === 'score') return String(n)
+  return `${n} ${unit}`
+}
+
+export function formatRunTime(seconds: number): string {
+  const mins = Math.floor(seconds / 60)
+  const secs = Math.round(seconds % 60)
+  return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
+export function parseTimeOrNumber(input: string): number | null {
+  const trimmed = input.trim()
+  if (!trimmed) return null
+  if (trimmed.includes(':')) {
+    const parts = trimmed.split(':').map((p) => parseFloat(p))
+    if (parts.some((n) => Number.isNaN(n))) return null
+    if (parts.length === 2) return parts[0] * 60 + parts[1]
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
+    return null
+  }
+  const n = Number(trimmed)
+  return Number.isFinite(n) ? n : null
+}
+
+/**
+ * Positive = improvement (direction-aware).
+ * lower_better: a drop is improvement; higher_better: a rise is improvement.
+ */
+export function improvementPercent(
+  latest: number,
+  previous: number,
+  direction: PerformanceDirection,
+): number | null {
+  if (!Number.isFinite(latest) || !Number.isFinite(previous) || previous === 0) {
+    return null
+  }
+  if (direction === 'lower_better') {
+    return Math.round(((previous - latest) / Math.abs(previous)) * 1000) / 10
+  }
+  return Math.round(((latest - previous) / Math.abs(previous)) * 1000) / 10
+}
+
+export function isImprovement(
+  latest: number,
+  previous: number,
+  direction: PerformanceDirection,
+): boolean {
+  if (direction === 'lower_better') return latest < previous
+  return latest > previous
+}
+
+/** Sparkline bar height 0.25–1; taller = better per catalog direction. */
+export function sparkBarFraction(
+  value: number,
+  min: number,
+  max: number,
+  direction: PerformanceDirection,
+): number {
+  const range = max - min || 1
+  const normalized = (value - min) / range
+  const quality = direction === 'lower_better' ? 1 - normalized : normalized
+  return 0.25 + quality * 0.75
+}
+
+export function compareScores(
+  a: number,
+  b: number,
+  direction: PerformanceDirection,
+): number {
+  // Ascending sort: better first when used with rank (index 0 = best)
+  if (direction === 'lower_better') return a - b
+  return b - a
+}
+
+export async function fetchActivePerformanceCatalog(): Promise<
+  PerformanceTestCatalogItem[]
+> {
+  const { data, error } = await supabase
+    .from('performance_test_catalog')
+    .select(CATALOG_SELECT)
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true })
+
+  if (error) throw error
+  return (data ?? []) as PerformanceTestCatalogItem[]
+}
+
+function attachCatalog(
+  rows: PerformanceTestResult[],
+  catalogById: Map<string, PerformanceTestCatalogItem>,
+): PerformanceTestResult[] {
+  return rows.map((r) => ({
+    ...r,
+    test: catalogById.get(r.test_id) ?? null,
+  }))
+}
+
+export async function fetchClientPerformanceResults(
+  clientId: string,
+  opts?: { testId?: string; limit?: number },
+): Promise<PerformanceTestResult[]> {
+  let query = supabase
+    .from('performance_test_results')
+    .select(RESULT_SELECT)
+    .eq('client_id', clientId)
+    .order('tested_at', { ascending: false })
+
+  if (opts?.testId) query = query.eq('test_id', opts.testId)
+  if (opts?.limit) query = query.limit(opts.limit)
+
+  const { data, error } = await query
+  if (error) throw error
+
+  const rows = (data ?? []) as PerformanceTestResult[]
+  if (rows.length === 0) return []
+
+  const catalog = await fetchActivePerformanceCatalog()
+  // Also fetch any inactive tests referenced by history
+  const missingIds = [
+    ...new Set(
+      rows
+        .map((r) => r.test_id)
+        .filter((id) => !catalog.some((c) => c.id === id)),
+    ),
+  ]
+  let extra: PerformanceTestCatalogItem[] = []
+  if (missingIds.length > 0) {
+    const { data: extraRows } = await supabase
+      .from('performance_test_catalog')
+      .select(CATALOG_SELECT)
+      .in('id', missingIds)
+    extra = (extraRows ?? []) as PerformanceTestCatalogItem[]
+  }
+  const catalogById = new Map(
+    [...catalog, ...extra].map((c) => [c.id, c]),
+  )
+  return attachCatalog(rows, catalogById)
+}
+
+/** Alias for progress hub batching */
 export async function getClientPerformanceTests(
   clientId: string,
-  testType?: TestType,
-  limit?: number
-): Promise<PerformanceTest[]> {
-  try {
-    let query = supabase
-      .from('performance_tests')
-      .select('*')
-      .eq('client_id', clientId)
-      .order('tested_at', { ascending: false });
-
-    if (testType) {
-      query = query.eq('test_type', testType);
-    }
-
-    if (limit) {
-      query = query.limit(limit);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Error fetching performance tests:', error);
-      return [];
-    }
-
-    return data || [];
-  } catch (error) {
-    console.error('Error in getClientPerformanceTests:', error);
-    return [];
-  }
+): Promise<PerformanceTestResult[]> {
+  return fetchClientPerformanceResults(clientId)
 }
 
-/**
- * Get latest performance test for a client
- */
-export async function getLatestPerformanceTest(
-  clientId: string,
-  testType: TestType
-): Promise<PerformanceTest | null> {
-  try {
-    const { data, error } = await supabase
-      .from('performance_tests')
-      .select('*')
-      .eq('client_id', clientId)
-      .eq('test_type', testType)
-      .order('tested_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+export async function fetchPerformanceResult(
+  resultId: string,
+): Promise<PerformanceTestResult | null> {
+  const { data, error } = await supabase
+    .from('performance_test_results')
+    .select(RESULT_SELECT)
+    .eq('id', resultId)
+    .maybeSingle()
 
-    if (error) {
-      console.error('Error fetching latest test:', error);
-      return null;
-    }
+  if (error) throw error
+  if (!data) return null
 
-    return data;
-  } catch (error) {
-    console.error('Error in getLatestPerformanceTest:', error);
-    return null;
-  }
-}
-
-/**
- * Create a new performance test
- */
-export async function createPerformanceTest(
-  test: Omit<PerformanceTest, 'id' | 'created_at' | 'updated_at'>
-): Promise<PerformanceTest | null> {
-  try {
-    const { data, error } = await supabase
-      .from('performance_tests')
-      .insert([test])
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating performance test:', error);
-      return null;
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Error in createPerformanceTest:', error);
-    return null;
-  }
-}
-
-/**
- * Update an existing performance test
- */
-export async function updatePerformanceTest(
-  testId: string,
-  updates: Partial<Omit<PerformanceTest, 'id' | 'client_id' | 'created_at'>>
-): Promise<PerformanceTest | null> {
-  try {
-    const { data, error } = await supabase
-      .from('performance_tests')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', testId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error updating performance test:', error);
-      return null;
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Error in updatePerformanceTest:', error);
-    return null;
-  }
-}
-
-/**
- * Delete a performance test
- */
-export async function deletePerformanceTest(testId: string): Promise<boolean> {
-  try {
-    const { error } = await supabase
-      .from('performance_tests')
-      .delete()
-      .eq('id', testId);
-
-    if (error) {
-      console.error('Error deleting performance test:', error);
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Error in deletePerformanceTest:', error);
-    return false;
-  }
-}
-
-// ============================================================================
-// Analysis & Progress
-// ============================================================================
-
-/**
- * Get performance progress over time
- */
-export async function getPerformanceProgress(
-  clientId: string,
-  testType: TestType
-): Promise<{
-  latest: PerformanceTest | null;
-  previous: PerformanceTest | null;
-  improvement: number | null;
-  improvementPercentage: number | null;
-}> {
-  try {
-    const tests = await getClientPerformanceTests(clientId, testType, 2);
-
-    if (tests.length === 0) {
-      return {
-        latest: null,
-        previous: null,
-        improvement: null,
-        improvementPercentage: null
-      };
-    }
-
-    const latest = tests[0];
-    const previous = tests.length > 1 ? tests[1] : null;
-
-    if (!previous) {
-      return {
-        latest,
-        previous: null,
-        improvement: null,
-        improvementPercentage: null
-      };
-    }
-
-    let improvement: number | null = null;
-    let improvementPercentage: number | null = null;
-
-    if (testType === '1km_run' && latest.time_seconds && previous.time_seconds) {
-      // For run: lower time = better (negative improvement means faster)
-      improvement = latest.time_seconds - previous.time_seconds;
-      improvementPercentage = (improvement / previous.time_seconds) * 100;
-    } else if (testType === 'step_test' && latest.recovery_score && previous.recovery_score) {
-      // For step test: higher recovery score = better
-      improvement = latest.recovery_score - previous.recovery_score;
-      improvementPercentage = (improvement / previous.recovery_score) * 100;
-    }
-
-    return {
-      latest,
-      previous,
-      improvement,
-      improvementPercentage
-    };
-  } catch (error) {
-    console.error('Error in getPerformanceProgress:', error);
-    return {
-      latest: null,
-      previous: null,
-      improvement: null,
-      improvementPercentage: null
-    };
-  }
-}
-
-/**
- * Calculate step test recovery score
- * Based on heart rate recovery after stepping exercise
- */
-export function calculateRecoveryScore(
-  hrPre: number,
-  hr1min: number,
-  hr2min: number,
-  hr3min: number
-): number {
-  // Recovery score formula: higher is better
-  // Based on how quickly heart rate returns to pre-exercise level
-  const recovery1 = hrPre - hr1min;
-  const recovery2 = hrPre - hr2min;
-  const recovery3 = hrPre - hr3min;
-  
-  // Weighted average (3min recovery weighted more)
-  const score = (recovery1 * 0.2) + (recovery2 * 0.3) + (recovery3 * 0.5);
-  
-  return Math.round(score * 100) / 100;
-}
-
-/**
- * Check if client is due for performance test
- * (Should test monthly)
- */
-export async function isDueForPerformanceTest(
-  clientId: string,
-  testType: TestType
-): Promise<boolean> {
-  try {
-    const latest = await getLatestPerformanceTest(clientId, testType);
-
-    if (!latest) {
-      return true; // Never tested
-    }
-
-    const lastTested = new Date(latest.tested_at);
-    const now = new Date();
-    const daysSinceLastTest = Math.floor((now.getTime() - lastTested.getTime()) / (1000 * 60 * 60 * 24));
-
-    // Due if more than 30 days
-    return daysSinceLastTest >= 30;
-  } catch (error) {
-    console.error('Error checking if due for test:', error);
-    return false;
-  }
-}
-
-/**
- * Get test history trend (last 6 tests)
- */
-export async function getPerformanceTrend(
-  clientId: string,
-  testType: TestType
-): Promise<{
-  dates: string[];
-  values: number[];
-  trend: 'improving' | 'declining' | 'stable' | 'insufficient_data';
-}> {
-  try {
-    const tests = await getClientPerformanceTests(clientId, testType, 6);
-
-    if (tests.length < 2) {
-      return {
-        dates: [],
-        values: [],
-        trend: 'insufficient_data'
-      };
-    }
-
-    const dates = tests.map(t => t.tested_at).reverse();
-    const values = tests.map(t => {
-      if (testType === '1km_run') {
-        return t.time_seconds || 0;
-      } else {
-        return t.recovery_score || 0;
-      }
-    }).reverse();
-
-    // Calculate trend (simple linear regression)
-    const first = values[0];
-    const last = values[values.length - 1];
-    const change = last - first;
-    const changePercentage = (change / first) * 100;
-
-    let trend: 'improving' | 'declining' | 'stable';
-    
-    if (testType === '1km_run') {
-      // For run: lower time = better
-      if (changePercentage < -2) trend = 'improving';
-      else if (changePercentage > 2) trend = 'declining';
-      else trend = 'stable';
-    } else {
-      // For step test: higher score = better
-      if (changePercentage > 5) trend = 'improving';
-      else if (changePercentage < -5) trend = 'declining';
-      else trend = 'stable';
-    }
-
-    return {
-      dates,
-      values,
-      trend
-    };
-  } catch (error) {
-    console.error('Error in getPerformanceTrend:', error);
-    return {
-      dates: [],
-      values: [],
-      trend: 'insufficient_data'
-    };
-  }
-}
-
-/**
- * Format 1km run time from seconds to MM:SS
- */
-export function formatRunTime(seconds: number): string {
-  const minutes = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${minutes}:${secs.toString().padStart(2, '0')}`;
-}
-
-/**
- * Validate performance test data
- */
-export function validatePerformanceTest(
-  test: Partial<PerformanceTest>
-): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
-
-  if (!test.test_type) {
-    errors.push('Test type is required');
-  }
-
-  if (test.test_type === '1km_run') {
-    if (!test.time_seconds || test.time_seconds <= 0) {
-      errors.push('Run time must be greater than 0');
-    }
-    if (test.time_seconds && (test.time_seconds < 180 || test.time_seconds > 1800)) {
-      errors.push('Run time seems unrealistic (3-30 minutes expected)');
-    }
-  }
-
-  if (test.test_type === 'step_test') {
-    if (!test.heart_rate_pre) {
-      errors.push('Pre-exercise heart rate is required');
-    }
-    if (!test.heart_rate_1min || !test.heart_rate_2min || !test.heart_rate_3min) {
-      errors.push('All recovery heart rates (1min, 2min, 3min) are required');
-    }
-    if (test.heart_rate_pre && (test.heart_rate_pre < 40 || test.heart_rate_pre > 120)) {
-      errors.push('Pre-exercise HR seems unrealistic (40-120 bpm expected)');
-    }
-  }
-
-  if (test.perceived_effort && (test.perceived_effort < 1 || test.perceived_effort > 10)) {
-    errors.push('Perceived effort must be between 1 and 10');
-  }
+  const row = data as PerformanceTestResult
+  const { data: test } = await supabase
+    .from('performance_test_catalog')
+    .select(CATALOG_SELECT)
+    .eq('id', row.test_id)
+    .maybeSingle()
 
   return {
-    valid: errors.length === 0,
-    errors
-  };
+    ...row,
+    test: (test as PerformanceTestCatalogItem | null) ?? null,
+  }
 }
 
+export async function createPerformanceResult(
+  input: PerformanceResultInput,
+): Promise<PerformanceTestResult> {
+  const { data, error } = await supabase
+    .from('performance_test_results')
+    .insert({
+      client_id: input.client_id,
+      test_id: input.test_id,
+      tested_at: input.tested_at,
+      tested_by: input.tested_by,
+      result_value: input.result_value,
+      secondary_value: input.secondary_value ?? null,
+      conditions: input.conditions?.trim() || null,
+      perceived_effort: input.perceived_effort ?? null,
+      notes: input.notes?.trim() || null,
+      details: null,
+    })
+    .select(RESULT_SELECT)
+    .single()
+
+  if (error) throw error
+  const full = await fetchPerformanceResult(data.id)
+  if (!full) throw new Error('Result created but could not be reloaded')
+  try {
+    const { emitInAppNotification } = await import('@/lib/inAppNotificationEvents')
+    void emitInAppNotification({
+      event: 'client_test_recorded',
+      clientId: input.client_id,
+      testKind: 'performance',
+      testId: data.id,
+    })
+  } catch {
+    /* non-blocking */
+  }
+  return full
+}
+
+export async function updatePerformanceResult(
+  resultId: string,
+  updates: Partial<
+    Omit<PerformanceResultInput, 'client_id' | 'tested_by'>
+  > & { tested_by?: string | null },
+): Promise<PerformanceTestResult> {
+  const payload: Record<string, unknown> = {}
+  if (updates.test_id != null) payload.test_id = updates.test_id
+  if (updates.tested_at != null) payload.tested_at = updates.tested_at
+  if (updates.result_value != null) payload.result_value = updates.result_value
+  if (updates.secondary_value !== undefined) {
+    payload.secondary_value = updates.secondary_value
+  }
+  if (updates.conditions !== undefined) {
+    payload.conditions = updates.conditions?.trim() || null
+  }
+  if (updates.perceived_effort !== undefined) {
+    payload.perceived_effort = updates.perceived_effort
+  }
+  if (updates.notes !== undefined) {
+    payload.notes = updates.notes?.trim() || null
+  }
+
+  const { error } = await supabase
+    .from('performance_test_results')
+    .update(payload)
+    .eq('id', resultId)
+
+  if (error) throw error
+  const full = await fetchPerformanceResult(resultId)
+  if (!full) throw new Error('Result updated but could not be reloaded')
+  return full
+}
+
+export async function deletePerformanceResult(
+  resultId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('performance_test_results')
+    .delete()
+    .eq('id', resultId)
+  if (error) throw error
+}
+
+/**
+ * Rank client's latest result for a catalog test among the coach's roster.
+ * Direction-aware. Honest "solo" when only one roster member has a result.
+ */
+export async function getRosterPerformanceRank(
+  clientId: string,
+  testId: string,
+): Promise<RosterPerformanceRank> {
+  try {
+    const coachId = await resolveViewerCoachId(clientId)
+    if (!coachId) return { kind: 'unavailable' }
+
+    const { data: catalogRow } = await supabase
+      .from('performance_test_catalog')
+      .select('direction')
+      .eq('id', testId)
+      .maybeSingle()
+
+    const direction = (catalogRow?.direction ??
+      'higher_better') as PerformanceDirection
+
+    const { data: roster, error: rosterError } = await supabase
+      .from('clients')
+      .select('client_id')
+      .eq('coach_id', coachId)
+
+    if (rosterError || !roster?.length) return { kind: 'unavailable' }
+
+    const rosterIds = roster
+      .map((r) => r.client_id as string | null)
+      .filter((id): id is string => Boolean(id))
+
+    if (rosterIds.length === 0) return { kind: 'unavailable' }
+
+    const { data: tests, error: testsError } = await supabase
+      .from('performance_test_results')
+      .select('client_id, tested_at, result_value')
+      .eq('test_id', testId)
+      .in('client_id', rosterIds)
+      .order('tested_at', { ascending: false })
+
+    if (testsError) {
+      console.error('Error fetching roster performance results:', testsError)
+      return { kind: 'unavailable' }
+    }
+
+    const latestByClient = new Map<string, number>()
+    for (const row of tests ?? []) {
+      const cid = row.client_id as string
+      if (latestByClient.has(cid)) continue
+      const score = Number(row.result_value)
+      if (!Number.isFinite(score)) continue
+      latestByClient.set(cid, score)
+    }
+
+    if (!latestByClient.has(clientId)) return { kind: 'unavailable' }
+    if (latestByClient.size === 1) return { kind: 'solo' }
+
+    const sorted = Array.from(latestByClient.entries()).sort((a, b) =>
+      compareScores(a[1], b[1], direction),
+    )
+    const rank = sorted.findIndex(([id]) => id === clientId) + 1
+    if (rank < 1) return { kind: 'unavailable' }
+    return { kind: 'ranked', rank, total: sorted.length }
+  } catch (error) {
+    console.error('Error in getRosterPerformanceRank:', error)
+    return { kind: 'unavailable' }
+  }
+}

@@ -29,8 +29,8 @@ export function ProgramCompletedCard({ programWeek }: ProgramCompletedCardProps)
             Ask your coach for your next program
           </p>
           <Link
-            href="/client/progress/workout-logs"
-            className="inline-flex items-center text-xs font-semibold text-cyan-400 hover:text-cyan-300 underline underline-offset-2"
+            href="/client/progress/workout-logs?from=train"
+            className="inline-flex items-center text-xs font-semibold text-[color:var(--fc-group-c)] hover:text-[color-mix(in_srgb,var(--fc-group-c)_70%,white)] underline underline-offset-2"
           >
             View training history
           </Link>

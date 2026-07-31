@@ -1,0 +1,74 @@
+RESKIN Phase 1b — wire Drop / Superset / Giant onto LiveCard v6
+Date: 2026-07-17
+No git. Shared live-card reused; no new card components.
+
+================================================================================
+1. FILES MODIFIED
+================================================================================
+  src/components/client/workout-execution/blocks/DropSetExecutor.tsx
+  src/components/client/workout-execution/blocks/SupersetExecutor.tsx
+  src/components/client/workout-execution/blocks/GiantSetExecutor.tsx
+
+Shared live-card package: untouched (consume only).
+Gallery: untouched (already had Drop / Superset samples from Phase 1).
+
+================================================================================
+2. DIFF TABLE vs execution-screen-v6-CANONICAL.html
+================================================================================
+§2 Drop (solo + technique)
+| Mockup piece                         | Status | Notes |
+|--------------------------------------|--------|-------|
+| Solo .live + hue rail + lhead        | Yes    | Same shell as Straight |
+| .primary Target \| Effort            | Yes    | resolveSetPrescriptionTargets → LiveCardPrimary |
+| Numbers reps × weight                | Yes    | |
+| .stats Rest·Tempo·Last               | Yes    | LiveCardStats |
+| .tech “Drop set” + drop % sentence   | Yes    | LiveCardTechnique + formatDropTechniqueBody(pct) |
+| pct from slot drop_percentage        | Yes    | drop_sets[0].drop_percentage → fallback 20 |
+| .log fields + green ✓                | Yes    | Existing SetRowsListPanel in LiveCardLog |
+| No SetTypeBadge / nested card        | Yes    | |
+
+§3 Superset & Giant (grouped)
+| Mockup piece                         | Status | Notes |
+|--------------------------------------|--------|-------|
+| One .live holding N .gx blocks       | Yes    | LiveCardGroupedExercise per exercise |
+| A1/A2(/A3) badges                    | Yes    | A{exercise_order} |
+| Per-exercise Target \| Effort        | Yes    | Per-set targets via resolveSetPrescriptionTargets |
+| Per-exercise .gxlog Weight/Reps/✓    | Yes    | LiveCardLogField + LiveCardLogButton |
+| Logged exercise collapses (value+✓)  | Yes    | Local confirm → logged prop; write still one round call |
+| .glue shared rest / togetherness     | Yes    | Superset: “back to back · rest X after A2”; Giant: “all N back to back · rest X” |
+| Glue countdown resting state         | Partial| Component supports resting/timer; not driven by rest timer here (page chrome later) |
+| No SetTypeBadge / nested card        | Yes    | |
+
+================================================================================
+3. PROPS ADDED TO SHARED COMPONENTS
+================================================================================
+None. Consumed existing LiveCard / GroupedExercise / Glue / Technique / Log APIs only.
+
+================================================================================
+4. WIRED VS DEFERRED
+================================================================================
+Wired: DropSetExecutor, SupersetExecutor, GiantSetExecutor (all three).
+Deferred: none of the Phase 1b three. Protocol executors remain Phase 2–3.
+
+================================================================================
+5. UNTOUCHED CONFIRMATION
+================================================================================
+- Logging write path (useSetLoggingOrchestrator, /api/log-set, buildLogSetInsertData): unchanged.
+  Superset/Giant still call existing handleLogRound → logSetToDatabase once per round
+  after each exercise is locally confirmed (UI-only progressive collapse).
+- resolveSetPrescriptionTargets / re-plumb: unchanged (consumed for Row 1).
+- restoreWorkoutProgress, completeWorkoutService, deriveSetType: untouched.
+- Standalone template path: untouched.
+- Other executors (AMRAP … Endurance): untouched.
+- page.tsx header / progress chrome: untouched.
+
+Technique copy: used Phase-1 formatDropTechniqueBody (mockup sentence).
+buildPrescriptionSegments is coach-canvas (CanvasExercise + CanvasGroup) — not on
+the client executor path; drop % still read from slot-derived drop_sets[0].
+
+================================================================================
+6. tsc
+================================================================================
+npx tsc --noEmit → exit 0
+
+END

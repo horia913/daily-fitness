@@ -1,0 +1,249 @@
+# AUDIT (READ-ONLY) — Coach Clients list → collection card (client-forward)
+**Date:** 2026-07-06  
+**Ground truth:** `src/components/ui/CollectionCard.tsx` + `design/mockups/element-16-collection-card.html`  
+**Superseded (do not use as spec):** `design/mockups/coach-04-clients.html` (table + score rings)
+
+---
+
+## PART 1 — Locate
+
+| Item | Value |
+|------|-------|
+| **Route** | `/coach/clients` |
+| **Page** | `src/app/coach/clients/page.tsx` → `ClientManagementContent` |
+| **Shell** | `CoachPageShell widthVariant="data-7xl"` + `px-0` (not `canvas-full`) |
+| **Styles** | `src/app/coach/clients/coachClients.module.css` |
+| **Row components** | `CoachClientListRow.tsx` (list) · `CoachClientGridCard.tsx` (grid) |
+| **Utilities** | `coachClientsUtils.ts` · `coachClientsTypes.ts` |
+| **Detail (out of scope)** | `/coach/clients/[id]` and sub-routes |
+
+### Current presentation
+
+**Dual mode** — coach toggles list vs grid (`localStorage` key `coach-clients-view-mode`; default list on mobile, grid on desktop).
+
+- **List (`CoachClientListRow`):** Full-width hairline rows with **left severity border** (critical / warning / new / good from training tier), avatar, name, activity + check-in meta, program line (+ optional `W{n}` tag), training status badge, **athlete score ring chip** (when data exists), program pause kebab, chevron → detail.
+- **Grid (`CoachClientGridCard`):** 2-column card grid with similar content in a denser stat-block layout.
+
+This is **not** Element 16 collection cards today — custom roster chrome predating the governed primitive.
+
+### Header actions
+
+- **＋ Add** → `/coach/clients/add` (invite-link wizard; `fetchApi` invite generation)
+- **Bell** → `/coach/profile` (notification dot when `attentionCount > 0`)
+- **Search** + status pills (All / Active / Pending / Inactive)
+- **Quick filters:** Needs attention · Trained today · Checked in today
+- **Sort menu:** Last active · Name A-Z · Check-in streak · Workouts this week · Needs attention
+- **View toggle:** List / Grid
+
+### Per-row actions (today)
+
+| Action | Behavior |
+|--------|----------|
+| Row / chevron / grid body link | Navigate to `/coach/clients/{id}` |
+| `CoachClientListScoreChip` | Ring click → same detail URL |
+| `CoachClientProgramPauseMenu` | Kebab → Pause / Resume program (`PATCH` pause/resume routes) |
+| **No** message, edit profile, or deactivate client on the list |
+
+---
+
+## PART 2 — Data & per-client fields
+
+### Fetch path (confirmed)
+
+**Single API:** `GET /api/coach/clients` — `src/app/api/coach/clients/route.ts`
+
+Assembly (unchanged logic, documented for fences):
+
+1. `clients` table — `client_id, status, created_at, coach_id`
+2. `profiles` — name, email, `avatar_url`
+3. `getClientMetrics(clientIds)` — `src/lib/coachDashboardService.ts`
+4. `fetchCoachAthleteScoreSummariesByClientIds` — latest `athlete_scores` row + paused flag
+5. `fetchCoachClientListTrainingPayload` — `src/lib/coachClientListTrainingStatus.ts`
+
+### API response shape per client (confirmed)
+
+| Field | Source |
+|-------|--------|
+| `id`, `client_id`, `coach_id` | `clients` |
+| `status` | `clients.status` |
+| `name`, `email`, `avatar`, `firstName`, `profiles` | `profiles` |
+| `athleteScore` | `{ score, tier, paused }` or `null` |
+| `pauseStatus`, `hasActiveProgram`, `activeProgramAssignmentId` | training payload |
+| `trainingStatus` | `on_track` \| `behind` \| `missed_week` \| `paused` \| `no_program` |
+| `priorWeekScheduledCount`, `priorWeekCompletedCount`, `currentWeekCompletedCount`, `currentWeekScheduledPastCount` | training payload |
+| `metrics` | `ClientMetrics` (see below) |
+
+**Not returned today:** `created_at` / join date (fetched from DB but dropped in mapper).
+
+### `ClientMetrics` fields (from `getClientMetrics`)
+
+| Field | Real / derivable / gap |
+|-------|------------------------|
+| **name** | **Real** — profiles |
+| **avatar / initials** | **Real** — `avatar_url` on profile; UI uses first char of name + `ClientAvatar` severity |
+| **join date** | **Real in DB** (`clients.created_at`) — **not on list API** (would-need-data to expose) |
+| **roster status** | **Real** — `clients.status`: `active`, `inactive`, `pending` (confirmed on coach roster). Type also lists `at-risk` but **list API does not set it** — `at-risk` is computed on **detail** summary only |
+| **assigned program + week progress** | **Real** — `metrics.activeProgramName`, `programCurrentWeek`, `programDurationWeeks` from active `program_assignments` + instance week resolver |
+| **assigned meal plan** | **Real in DB** (`meal_plan_assignments`) — **not on list API** (no plan name/id in response). Only **nutrition signal on list:** `metrics.mealCompliance7dPct` |
+| **training adherence % (recent)** | **Derivable on list** — not a stored field, but payload has `currentWeekCompletedCount` / `currentWeekScheduledPastCount` (and prior-week counts). `trainingStatus` is the categorical output. **No single “adherence %” field** today |
+| **nutrition compliance** | **Derivable** — `mealCompliance7dPct`: distinct days with `meal_completions` in last 7d ÷ 7 × 100. **Null** when no completions in window (not same as assignments-tab `compliancePct30d`) |
+| **last check-in** | **Real** — `metrics.lastCheckinDate` (complete wellness log: sleep + stress + soreness) |
+| **last activity** | **Real** — `metrics.lastActive` (max of recent workout completion date vs wellness log date, 7d window for workout leg) |
+| **body metrics (weight)** | **Real in DB** (`body_metrics`) — used in alerts elsewhere — **not on list API** |
+| **athlete score (0–100)** | **Real when row exists** — `athlete_scores` table; see Part 3 |
+
+### Real rows — coach `b6014e58-f696-4606-bc63-d7707a21d5f1` (confirmed via DB read, 2026-07-06)
+
+**Roster:** 11 clients, all `status: active` (no pending/inactive in this coach today).
+
+| Client | athlete_scores (latest) | Active program | Active meal plan | Body metric |
+|--------|-------------------------|----------------|------------------|-------------|
+| **Client Popescu** `af9325e2-…` | score **0**, tier `benched`, calc **2026-05-15** | yes — “test nou 1”, start 2026-07-01 | yes, start 2026-07-04 | 54 kg, 2026-04-14 |
+| Roxana Micu | 100, beast_mode, 2026-05-15 | no | no | — |
+| Alice Persona | 100, beast_mode, 2026-05-15 | no | yes | 70.5 kg |
+| Bob Persona | 73, showing_up, 2026-05-15 | no | yes | 85.2 kg |
+| Carol Persona | 0, benched, 2026-05-15 | no | yes | 64.8 kg |
+| Dan Persona | 80, locked_in, 2026-05-12 | no | no | 78 kg |
+| Eve Persona | 50, slipping, 2026-05-13 | no | no | 66.3 kg |
+| e t, Luminita, Andreea, Client (×2) | **no row** | no | no | — |
+
+**Popescu activity (confirmed):** workouts completed **2026-07-01, 2026-07-02**; wellness logs last **2026-05-15–17**; **0** `meal_completions` in last 7d → list `mealCompliance7dPct` would be **null/0%**.
+
+**Athlete score coverage:** **7 / 11** have a persisted row; **4 / 11** null (chip hidden in current UI).
+
+**Staleness note:** Popescu has a fresh program (July 2026) but latest `athlete_scores` row is **May 2026** — list would still show **0** until cron/`calculateAthleteScore` runs again.
+
+---
+
+## PART 3 — The headline metric (score-ring decision)
+
+### Does a real client score exist?
+
+**Yes — confirmed.**
+
+| Aspect | Detail |
+|--------|--------|
+| **Storage** | `athlete_scores` table |
+| **Computation** | `calculateAthleteScore()` in `src/lib/athleteScoreService.ts` — program-week **adherence × execution** composite (0–100), tier via `getTier()` |
+| **When skipped** | No active program, paused program, or no data → **no new row** |
+| **Refresh** | Daily cron `src/app/api/cron/daily-sync/route.ts`; also after some workout discard paths |
+| **List consumption** | `fetchCoachAthleteScoreSummariesByClientIds` → `client.athleteScore` → `CoachClientListScoreChip` (**returns null when no row**) |
+
+**Populated for real clients?** Partially — 7/11 on sample coach; values exist but can be **stale** and **misleading** (Popescu: score 0 / benched while actively training in July).
+
+Element 16 mock **score ring 80** is **illustrative**; mock meta “Adherence 88%” is **not** a single list field (conflates training + other signals).
+
+### If not relying on score alone (recommended nuance)
+
+| Candidate right-stat | Verdict |
+|---------------------|---------|
+| **Athlete score ring** | Real composite; **best when row exists**; **null for 36%** of sample roster; **staleness risk** |
+| **Week training adherence %** | **Derivable now** from list payload: `round(currentWeekCompleted / currentWeekScheduledPast × 100)` when denominator > 0; **fresh** with training payload; **null** when no program / no past-due slots |
+| **Nutrition `mealCompliance7dPct`** | Real but **sparse** (Popescu 0); nutrition-only |
+| **Training status label** (“Behind”, “On track”) | Real, categorical — already `CoachClientTrainingStatusBadge`; not a single glance number |
+| **Last active relative** | Real (`metrics.lastActive`) — good **non-numeric** fallback |
+
+### Recommendation for Part 3 (audit read)
+
+**Use athlete score as a ring only when `athleteScore != null`**, with tier color (existing `CoachClientListScoreChip` / `tierColorForKey`) — **do not show a fake 0** when null.
+
+**When null:** prefer **week training adherence %** (derived from existing counts, no new schema) **or** muted **“—”** + sublabel, **not** a ring at 0.
+
+**Do not** put mock “Adherence 88%” in meta unless you pick one real definition (week % vs meal 7d vs athlete score) and label it.
+
+Same rigor as program-blocks audit: the **ring is real but incomplete and often stale** — treat null and stale as first-class UX states before build.
+
+---
+
+## PART 4 — Card mapping (client-forward)
+
+| Slot | Mapping | Real? |
+|------|---------|-------|
+| `hue` | **Recommend:** map `coachClientListVisualTierFromTraining(status, trainingStatus)` → `COLLECTION_HUES` (critical→D, warning→D/B, good→A/C, new→C) **or** stable `programCollectionHue(client.id)` if roster should not encode severity in rail. Today list uses severity borders — **severity-mapped hue** preserves behavior | ✓ (presentation choice) |
+| `name` | `client.name` | ✓ |
+| `status` | **Roster** `client.status` → Active / Inactive / Pending (`CollectionCard` inactive styling for non-active). **Optional:** `statusLabel` override when `pauseStatus === 'paused'` → “Paused” | ✓ roster; paused ✓ |
+| `meta` | **Real fields only (proposed):** `{activeProgramName \| "No program"}` · `Week {programCurrentWeek} of {programDurationWeeks}` **when both set** · `Activity {relative lastActive}` · `Check-in {relative lastCheckinDate}` (reuse page formatters). **Optional segment:** `Meals 7d {mealCompliance7dPct}%` when not null. **Omit:** meal plan name, join date, weight, mock adherence | ✓ partial; meal plan name ✗ |
+| `structure` | **Omit** | — |
+| `rightStat` | **Primary:** athlete score ring when `athleteScore` present (reuse chip logic). **Fallback:** week adherence % (derived) or muted `—`. **Sublabel:** tier name or `30d`/`wk` as appropriate | score ✓ with gaps; week % derivable |
+| `actions` | **View** → `/coach/clients/[id]` · **Pause/Resume** → existing `CoachClientProgramPauseMenu` (kebab; only when program/pause applicable). **No** message/edit/deactivate on list today | ✓ |
+
+**Training status badge:** Today separate from roster status pill — either fold into meta (“On track”) or keep as small text near meta; mock conflates with status pill — **decide before build** (recommend: roster in `status` pill, training label in meta or subline).
+
+---
+
+## PART 5 — Fences (logic to preserve)
+
+| Fence | Location |
+|-------|----------|
+| **List fetch assembly** | `GET /api/coach/clients` — do not change metric/training/score joins unless additive |
+| **Metrics batch** | `getClientMetrics()` |
+| **Training status** | `fetchCoachClientListTrainingPayload()` + `computeClientTrainingStatus()` |
+| **Athlete score summaries** | `fetchCoachAthleteScoreSummariesByClientIds()` |
+| **Pause / resume** | `PATCH /api/coach/clients/[clientId]/program/pause` · `.../resume` via `CoachClientProgramPauseMenu` |
+| **Add / invite client** | `/coach/clients/add` + its API calls |
+| **Client-side filter/sort** | `page.tsx` `filteredClients` pipeline |
+| **Detail navigation** | `/coach/clients/[id]` |
+| **Out of scope** | Detail summary `at-risk` computation, `updateAssignmentLabel`, body metrics |
+
+Build = **replace `CoachClientListRow` / `CoachClientGridCard` rendering** with `CollectionCardStack`; optionally **collapse list/grid to one card layout** (presentation). Do not change score calculation cron or training rules.
+
+---
+
+## PART 6 — Recommendation
+
+### What the client card should show
+
+**Direct application of Element 16** for shell (dark card, hue rail, right glow, meta line, side stat, icon actions) — **same primitive** as Programs and nutrition rosters.
+
+**Content is more nuanced** than plans/assignments because the list already carries **two status systems** (roster + training), **optional score**, and **rich meta** — closer to the Element 16 *illustrative* client example than to a pure entity rename.
+
+### Right-stat decision (before build)
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| **A. Athlete score ring only** (current chip) | Real 0–100 composite; already wired | 4/11 null on sample; stale (Popescu); misleading 0 |
+| **B. Ring if score, else week adherence %** | Always something meaningful when on program | Two metrics; need clear sublabels |
+| **C. Week adherence % only** | Fresh, derivable, no null table gap | Ignores execution multiplier; no row when no program |
+| **D. Non-numeric fallback** (training status + last active) | Honest when numbers absent | Less “glanceable” than mock ring |
+
+**Audit pick: B** — ring when `athleteScore != null`; else week adherence % when computable; else muted `—` (mirror nutrition assignments compliance-null pattern). **Do not** default ring to 0.
+
+**Optional pre-build product call:** refresh scores on list load (additive API/cron trigger) vs accept daily staleness — **not required for presentation-only** but affects trust in the ring.
+
+### What to omit
+
+- Structure strip  
+- Meal plan name (unless additive fetch approved)  
+- Join date, body weight on card (not in list API)  
+- Mock composite “adherence %” without definition  
+- `coach-04-clients.html` table layout  
+
+### Coherence
+
+Clients as collection cards completes the roster trilogy (Programs ✓, Nutrition plans/assignments ✓, Clients pending). Food DB / exercise catalogs stay tabular elsewhere.
+
+### Mockup for approval?
+
+**Mostly clean direct build** using `CollectionCard` + porting `CoachClientListScoreChip` into `rightStat`.
+
+**Warrant a quick approval pass** if choosing **severity-mapped hue** vs **stable id hue**, or **dual right-stat fallback (B)** — one static mock with Popescu (stale score + active program) and a null-score client avoids mid-build surprise.
+
+Not as novel as program phase strips; **more novel than nutrition cards** due to score null/stale and dual status.
+
+---
+
+## Inferring vs confirming
+
+| Claim | Status |
+|-------|--------|
+| Route, components, API path, field list | **Confirmed** — source read |
+| `at-risk` not on list API | **Confirmed** |
+| Meal plan / join date / body on list | **Confirmed absent** |
+| Sample coach rows + Popescu | **Confirmed** — DB read 2026-07-06 |
+| Score staleness for Popescu | **Confirmed** |
+| Week adherence % as fallback | **Derivable** — not currently displayed on list |
+| Element 16 mock adherence 88% | **Illustrative only** |
+
+---
+
+**No code, git, or migrations changed.**

@@ -1,0 +1,366 @@
+================================================================================
+INVESTIGATION (READ-ONLY) — Client Workout-Details Error + Missed-Workout Start Gap
+================================================================================
+Date: 2026-07-11
+Client: Popescu (af9325e2-76e7-4df6-8ed7-9effd9c764d8)
+Failing URL: /client/workouts/96aa425a-d2a2-498f-bd83-f93e046cb810/details
+Console:
+  - WorkoutDetailsPage -> assignment not found by ID, trying template fallback (page.tsx:264)
+  - Error loading workout details: Error: Workout assignment not found (page.tsx:295)
+
+Method: Live Supabase MCP queries + code reading. No code or SQL applied.
+
+================================================================================
+PART 1 — What is that ID, and what does the page do?
+================================================================================
+
+1.1 Live DB identity of 96aa425a-d2a2-498f-bd83-f93e046cb810
+--------------------------------------------------------------------------------
+
+OWNED BY: program_instance_workouts (single row)
+
+  id:                    96aa425a-d2a2-498f-bd83-f93e046cb810
+  name:                  Andreea test - Day 1
+  program_assignment_id: 3ffc6a7a-71d0-4fee-ab74-cffc66c327c5  (Popescu, active)
+  source_template_id:    3e2ea958-10ed-4815-ae25-dcfeeeeb4147
+
+NOT FOUND AS THIS ID IN:
+  - workout_assignments        (0 rows by id or workout_template_id)
+  - workout_templates          (0 rows — id is not a master template)
+  - program_day_assignments    (not the PDA id itself)
+
+LINKED INSTANCE SLOT (program_day_assignments):
+  id:                         dbdfd7fb-ad07-4333-984c-af903d5e99a2
+  program_assignment_id:      3ffc6a7a-71d0-4fee-ab74-cffc66c327c5
+  week_number:                2
+  day_number:                 8
+  workout_template_id:        NULL
+  program_instance_workout_id: 96aa425a-d2a2-498f-bd83-f93e046cb810
+
+Popescu active assignment:
+  program_assignments.id:     3ffc6a7a-71d0-4fee-ab74-cffc66c327c5
+  client_id:                  af9325e2-76e7-4df6-8ed7-9effd9c764d8
+  program_id:                 d505a552-ead9-4bf6-9068-1d5209f1398c
+  status:                     active
+
+Source template (for reference):
+  workout_templates.id:       3e2ea958-10ed-4815-ae25-dcfeeeeb4147
+  name:                       Andreea test - Day 1
+
+Master program_schedule still has a row for that template (week 2, day_of_week 0):
+  program_schedule.id:        be76e2ad-6476-4d6a-af95-a08e28ca1e0d
+  template_id:                3e2ea958-10ed-4815-ae25-dcfeeeeb4147
+
+Popescu's live spine uses instance-keyed slots (workout_template_id NULL,
+program_instance_workout_id set) — not master program_schedule rows for day content.
+
+
+1.2 Details page lookup flow (src/app/client/workouts/[id]/details/page.tsx)
+--------------------------------------------------------------------------------
+
+URL param `id` is read as assignmentId.
+
+STEP A — Primary lookup (lines 242–256):
+  Table:   workout_assignments
+  Filter:  .eq("id", assignmentId).eq("client_id", user.id)
+  Expects: a workout_assignment UUID
+
+STEP B — "Template fallback" (lines 263–295) — MISLEADING NAME:
+  This is NOT get_workout_blocks RPC and NOT a template-content fetch.
+  It is a second workout_assignments query:
+    .eq("workout_template_id", assignmentId)
+    .eq("client_id", user.id)
+    .order("created_at", { ascending: false }).limit(1)
+  Expects: URL id to be a master workout_templates.id with a matching assignment.
+
+  If both A and B return null → throws new Error("Workout assignment not found") at line 295.
+
+STEP C — Only after assignment found (lines 346–357):
+  Requires assignmentRow.workout_template_id (throws at 347–348 if null).
+  Loads blocks via:
+    WorkoutBlockService.getWorkoutBlocks(assignmentRow.workout_template_id)
+  which is a shim to workoutSetEntryService.ts — direct .from('workout_set_entries')
+  with instance fallback (loadInstanceWorkoutBlocksIfAny), NOT the get_workout_blocks RPC
+  on this code path.
+
+Error surfacing (lines 627–629):
+  catch logs "Error loading workout details:" + rethrows loadError.message verbatim.
+  So the exact console string "Workout assignment not found" comes from the thrown Error
+  at line 295, not from an RPC/PostgREST Forbidden response.
+
+
+1.3 Where Train "Open workout →" gets that ID
+--------------------------------------------------------------------------------
+
+File: src/components/client/train/TrainWeekDayList.tsx:199
+  window.location.href = `/client/workouts/${day.templateId}/details`;
+
+day.templateId originates from ProgramWeekDayCard.templateId, built in:
+  src/lib/trainPageDataMapper.ts:294  (and programWeekStateBuilder.ts:202)
+
+Upstream slot resolution:
+  src/lib/programStateService.ts:325–328 (programDayAssignmentToScheduleSlot):
+    templateId = workout_template_id if set, else program_instance_workout_id
+
+For Popescu's missed slot dbdfd7fb-…:
+  workout_template_id = null
+  program_instance_workout_id = 96aa425a-d2a2-498f-bd83-f93e046cb810
+  → templateId passed to details URL = INSTANCE workout id
+
+TYPE MISMATCH (root cause of observed failure):
+  Train passes program_instance_workouts.id
+  Details page expects workout_assignments.id OR workout_templates.id
+
+The week-list expand preview (loadDayCanvas) handles this correctly:
+  src/components/client/train/loadDayCanvas.ts:26–30
+  tries loadInstanceWorkoutForCanvas(instanceWorkoutId) first, then template fallback.
+  Details page has no equivalent instance-aware resolution.
+
+
+================================================================================
+PART 2 — Guard vs data (H1 / H2 decision)
+================================================================================
+
+2.1 Clarification: observed failure is NOT get_workout_blocks guard rejection
+--------------------------------------------------------------------------------
+
+The console flow stops at workout_assignments lookup (Part 1.2). get_workout_blocks is
+never called on the details page load path for this URL.
+
+Hypothesis H1 assumed fallback = get_workout_blocks(p_template_id). That assumption is
+false for this route. The log "trying template fallback" refers only to a second
+workout_assignments query keyed by workout_template_id.
+
+
+2.2 Guard branch tests (MCP) — for source_template_id 3e2ea958-10ed-4815-ae25-dcfeeeeb4147
+--------------------------------------------------------------------------------
+
+Simulated Wave 2B get_workout_blocks EXISTS branches for Popescu:
+
+  workout_assignments branch:              FALSE
+  program_assignments + program_schedule:  TRUE
+  instance path (pa → pda → piw.source_template_id): TRUE
+  instance id as p_template_id (96aa425a…): would be FALSE — no current branch
+
+If the details page were fixed to resolve content and called get_workout_blocks with
+source_template_id 3e2ea958-…, Popescu would PASS via the master program_schedule branch
+even without an instance-specific guard branch.
+
+If anything called get_workout_blocks('96aa425a-d2a2-498f-bd83-f93e046cb810') directly,
+the guard would RAISE 'Forbidden' (no branch matches instance id as template_id).
+That is a latent gap for RPC callers passing instance ids, but NOT what broke this page.
+
+Legitimacy join the guard lacks for pure-instance template_id (for SQL author):
+  program_assignments pa
+  JOIN program_day_assignments pda ON pda.program_assignment_id = pa.id
+  WHERE pa.client_id = v_caller AND pa.status = 'active'
+    AND pda.program_instance_workout_id = p_template_id
+
+Alternate join via source_template_id:
+  program_assignments pa
+  JOIN program_day_assignments pda ON pda.program_assignment_id = pa.id
+  JOIN program_instance_workouts piw ON piw.id = pda.program_instance_workout_id
+  WHERE pa.client_id = v_caller AND pa.status = 'active'
+    AND piw.source_template_id = p_template_id
+
+
+2.3 Would guard Forbidden surface as this exact console flow?
+--------------------------------------------------------------------------------
+
+No. Details page catch (page.tsx:627–629) would surface PostgREST/RPC errors as their
+message (e.g. "Forbidden" or error.details), not synthesize "Workout assignment not found".
+That string is thrown explicitly at line 295 when both workout_assignments queries return null.
+
+Indirect path if assignment were found with null workout_template_id:
+  line 347–348 throws "Workout template ID not found in assignment" — still not guard-related.
+
+workoutSetEntryService.getWorkoutBlocks(instanceId) would actually work if reached:
+  queries workout_set_entries (empty for instance id), then loadInstanceWorkoutBlocksIfAny
+  which detects program_instance_workouts row and loads instance blocks.
+
+
+2.4 Verdict
+--------------------------------------------------------------------------------
+
+PRIMARY: H2 — pre-existing spine / routing debt (wrong id type on details URL).
+  Evidence: id exists only as program_instance_workouts; page never queries instance tables;
+  failure occurs before any RPC; error message matches line 295 throw exactly.
+
+SECONDARY (latent, not trigger for this incident): H1-style guard gap IF get_workout_blocks
+  is invoked with program_instance_workouts.id as p_template_id (e.g. loadWorkoutBlocksByContentId,
+  start page RPC path). Not the details-page failure mode observed here.
+
+Both can coexist in the codebase, but Wave 2B guard did NOT cause this specific regression.
+
+
+================================================================================
+PART 3 — Missed-workout start gap (map only)
+================================================================================
+
+3.1 How Train decides what is startable today
+--------------------------------------------------------------------------------
+
+Data load (src/app/client/train/page.tsx:127–157):
+  supabase.rpc("get_train_page_data", { p_client_id, p_today_weekday })
+  → rpcResponseToProgramWeekState (trainPageDataMapper.ts)
+  → slots from getProgramScheduleSlotsForAssignment (program_day_assignments, instance-keyed)
+
+Primary CTA (page.tsx:363–376):
+  resolveTrainPrimaryWorkout(programWeek) — TrainHeroCard.tsx:90–96
+  Returns today's uncompleted slot with templateId, OR first uncompleted in week.
+  Does NOT prefer overdue/missed; on a day with today's workout, hero targets today.
+
+Missed appearance in week list (TrainWeekDayList.tsx:14–24):
+  getTrainDayRowStatus: if !completed && dayOfWeek < todayWeekday → "missed"
+  Missed rows expand to exercise preview + "Open workout →" only (lines 194–203).
+  No Start button on missed rows.
+
+overdueSlots ARE still computed:
+  trainPageDataMapper.ts:306–328 via getOverdueSlots (programStateService.ts:588–614)
+  Logic: uncompleted slots in unlocked week with day_number < today (or day_of_week < today on rest day)
+
+BUT OverdueWorkouts component is NOT mounted on train page (grep: no matches).
+  Legacy component src/components/client/train/OverdueWorkouts.tsx still has Start →
+  calling onComplete(scheduleId) — removed from current Train layout.
+
+
+3.2 What "start" requires
+--------------------------------------------------------------------------------
+
+Canonical client start: src/lib/startProgramWorkout.ts
+  POST /api/program-workouts/start-from-progress
+  Body: { program_day_assignment_id: "<scheduleId>" }
+  On success: navigate to /client/workouts/<new_workout_assignment_id>/start
+
+scheduleId on day cards = program_day_assignments.id
+  For Popescu missed workout: dbdfd7fb-ad07-4333-984c-af903d5e99a2
+
+Backend (start-from-progress/route.ts) already supports explicit missed slots:
+  validateAndResolveProgramDaySlot accepts requested program_day_assignment_id
+  Validates: belongs to active assignment, day_type=workout, not in completions ledger
+  Week lock via assertWeekUnlocked (missed slot in unlocked week 2 → allowed if week 2 unlocked)
+  Creates workout_assignment + session + log tagged with program_day_assignment_id
+  Instance content resolved via resolveProgramDayWorkoutMeta (handles instance workouts)
+
+No new server endpoint required for "start missed" — UI wiring only.
+
+
+3.3 Design map: "Start missed workout" affordance
+--------------------------------------------------------------------------------
+
+Touch points (minimal):
+
+  UI — TrainWeekDayList.tsx
+    For status === "missed" (and optionally "today"): add Start CTA beside Open workout
+    onClick: parent handleStartWorkout(day.scheduleId) — same as TrainPrimaryCta
+
+  UI — src/app/client/train/page.tsx
+    Pass handleStartWorkout + isStarting/startingScheduleId into TrainWeekDayList
+    (already defined at lines 218–272)
+
+  Optional — re-mount OverdueWorkouts above week list
+    programWeek.overdueSlots already populated; component exists with Start →
+    Duplicates week-list missed rows if both shown — pick one surface
+
+  Details route fix (separate from start, but related UX):
+    Either stop linking instance id to legacy details route, or teach details page
+    program_day_assignment / instance resolution (see Part 4)
+
+  No change required:
+    start-from-progress API, get_next_incomplete_program_slot (default when id omitted),
+    program_day_completions completion keying
+
+Completion keying remains program_day_assignment_id throughout spine.
+
+
+================================================================================
+PART 4 — Recommendations
+================================================================================
+
+4.1 Workout-details failure (H2 — code fix direction)
+--------------------------------------------------------------------------------
+
+Preferred fix: align Train link with spine identity.
+
+  Option A (smallest): TrainWeekDayList "Open workout" uses schedule-based route:
+    /client/program-days/${day.scheduleId}/details  (new or existing)
+    Resolve content from program_day_assignments + instance/template meta.
+
+  Option B: Keep URL shape; extend details page load():
+    If workout_assignments miss, try program_instance_workouts by id for active assignment
+    OR program_day_assignments where program_instance_workout_id = id and client owns assignment.
+    Load blocks via loadDayExerciseGroups / loadWorkoutBlocksByContentId pattern
+    (instance-first), not assignment.workout_template_id-only path.
+
+  Option C: Only link after start — "Open workout" goes to workout_assignment created by
+    start-from-progress bridge. Poor UX for preview-before-start.
+
+Do NOT pass day.templateId to a route that only understands workout_assignments.id /
+workout_templates.id when templateId is program_instance_workout_id.
+
+Fold vs fix legacy route:
+  Worth fixing preview for program slots — users expect details before starting missed work.
+  Can share loader with loadDayCanvas.ts (already instance-aware).
+
+
+4.2 H1 guard (only if RPC receives instance ids)
+--------------------------------------------------------------------------------
+
+If get_workout_blocks must accept program_instance_workouts.id as p_template_id, add:
+
+  EXISTS (
+    SELECT 1
+    FROM program_assignments pa
+    JOIN program_day_assignments pda ON pda.program_assignment_id = pa.id
+    WHERE pa.client_id = v_caller
+      AND pa.status = 'active'
+      AND pda.program_instance_workout_id = p_template_id
+  )
+
+Not required to fix the observed details-page bug (page does not call this RPC on load).
+
+
+4.3 Missed-workout start (product gap)
+--------------------------------------------------------------------------------
+
+Wire Start on missed week-list rows to existing handleStartWorkout(scheduleId).
+Backend already supports past-week incomplete slots within the unlocked calendar week.
+
+Consider surfacing programWeek.overdueSlots again (OverdueWorkouts) OR adding inline
+Start on missed pills — avoid two competing missed UIs.
+
+
+4.4 Other legacy reads on details page
+--------------------------------------------------------------------------------
+
+Still assignment-centric (pre-spine model):
+  - workout_assignments (primary + fallback) — lines 242–284
+  - workout_templates (category, estimated_duration) — lines 305–309
+  - WorkoutBlockService → workout_set_entries by template_id — lines 351–357
+
+Does NOT read:
+  - program_day_assignments
+  - program_instance_workouts
+  - program_assignments
+
+Ancillary Train naming debt:
+  trainPageDataMapper.ts:198–211 loads workout_templates by slot.template_id;
+  for instance-keyed slots template_id IS instance id → names/durations may fall back to
+  "Workout" / 0 unless enriched from program_instance_workouts or RPC template_name.
+  (Expand preview uses loadInstanceWorkoutForCanvas and works.)
+
+
+================================================================================
+APPENDIX — Key IDs (Popescu / repro)
+================================================================================
+
+Client:                         af9325e2-76e7-4df6-8ed7-9effd9c764d8
+Program assignment:             3ffc6a7a-71d0-4fee-ab74-cffc66c327c5
+Program:                        d505a552-ead9-4bf6-9068-1d5209f1398c
+Instance workout (URL id):      96aa425a-d2a2-498f-bd83-f93e046cb810
+Program day assignment (start): dbdfd7fb-ad07-4333-984c-af903d5e99a2
+Source template:                3e2ea958-10ed-4815-ae25-dcfeeeeb4147
+
+================================================================================
+END OF REPORT
+================================================================================

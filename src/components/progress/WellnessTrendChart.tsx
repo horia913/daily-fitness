@@ -52,17 +52,17 @@ export function WellnessTrendChart({
   const minSoreness = Math.min(...sorenessData.map((d) => d.sorenessLevel || 0), 0);
 
   const getSleepColor = (hours: number | null): string => {
-    if (hours == null) return "rgb(156, 163, 175)"; // gray
-    if (hours >= 7) return "rgb(34, 197, 94)"; // green
-    if (hours >= 6) return "rgb(234, 179, 8)"; // yellow
-    return "rgb(239, 68, 68)"; // red
+    if (hours == null) return "var(--fc-text-subtle)";
+    if (hours >= 7) return "var(--fc-status-success)";
+    if (hours >= 6) return "var(--fc-status-warning)";
+    return "var(--fc-status-error)";
   };
 
   const getStressSorenessColor = (level: number | null): string => {
-    if (level == null) return "rgb(156, 163, 175)"; // gray
-    if (level <= 2) return "rgb(34, 197, 94)"; // green (good)
-    if (level <= 3) return "rgb(234, 179, 8)"; // yellow
-    return "rgb(239, 68, 68)"; // red (bad)
+    if (level == null) return "var(--fc-text-subtle)";
+    if (level <= 2) return "var(--fc-status-success)";
+    if (level <= 3) return "var(--fc-status-warning)";
+    return "var(--fc-status-error)";
   };
 
   const formatDate = (dateStr: string): string => {
@@ -107,8 +107,8 @@ export function WellnessTrendChart({
     <div className={cn("fc-card-shell p-6", className)}>
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-[0_10px_20px_rgba(16,185,129,0.25)]">
-            <TrendingUp className="h-6 w-6 text-white" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-[color:var(--fc-hairline)] bg-[color:color-mix(in_srgb,var(--fc-status-success)_14%,transparent)]">
+            <TrendingUp className="h-6 w-6 text-[color:var(--fc-status-success)]" />
           </div>
           <div>
             <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
@@ -176,10 +176,9 @@ export function WellnessTrendChart({
                       y1={y}
                       x2={chartWidth - padding.right}
                       y2={y}
-                      stroke="currentColor"
+                      stroke="var(--fc-hairline)"
                       strokeWidth="1"
-                      strokeOpacity="0.1"
-                      className="text-[color:var(--fc-text-dim)]"
+                      strokeOpacity="1"
                     />
                   );
                 })}
@@ -193,7 +192,7 @@ export function WellnessTrendChart({
                       x={padding.left - 8}
                       y={y + 4}
                       textAnchor="end"
-                      className="text-xs fill-[color:var(--fc-text-dim)]"
+                      className="font-[family-name:var(--f-mono)] text-xs fill-[color:var(--fc-text-subtle)]"
                     >
                       {value.toFixed(1)}h
                     </text>
@@ -235,7 +234,7 @@ export function WellnessTrendChart({
                       x={x}
                       y={chartHeight - padding.bottom + 14}
                       textAnchor="middle"
-                      className="text-xs fill-[color:var(--fc-text-dim)]"
+                      className="font-[family-name:var(--f-mono)] text-xs fill-[color:var(--fc-text-subtle)]"
                     >
                       {formatDate(day.date)}
                     </text>
@@ -275,10 +274,9 @@ export function WellnessTrendChart({
                       y1={y}
                       x2={chartWidth - padding.right}
                       y2={y}
-                      stroke="currentColor"
+                      stroke="var(--fc-hairline)"
                       strokeWidth="1"
-                      strokeOpacity="0.1"
-                      className="text-[color:var(--fc-text-dim)]"
+                      strokeOpacity="1"
                     />
                   );
                 })}
@@ -292,7 +290,7 @@ export function WellnessTrendChart({
                       x={padding.left - 8}
                       y={y + 4}
                       textAnchor="end"
-                      className="text-xs fill-[color:var(--fc-text-dim)]"
+                      className="font-[family-name:var(--f-mono)] text-xs fill-[color:var(--fc-text-subtle)]"
                     >
                       {value.toFixed(1)}
                     </text>
@@ -311,7 +309,7 @@ export function WellnessTrendChart({
                       })
                       .join(" ")}
                     fill="none"
-                    stroke="rgb(239, 68, 68)"
+                    stroke="var(--fc-status-error)"
                     strokeWidth="2"
                     className={cn(
                       "transition-all duration-500",
@@ -331,7 +329,7 @@ export function WellnessTrendChart({
                       cy={y}
                       r="4"
                       fill={getStressSorenessColor(day.stressLevel)}
-                      stroke="white"
+                      stroke="var(--fc-bg-deep)"
                       strokeWidth="2"
                       className={cn(
                         "transition-all duration-300",
@@ -377,10 +375,9 @@ export function WellnessTrendChart({
                       y1={y}
                       x2={chartWidth - padding.right}
                       y2={y}
-                      stroke="currentColor"
+                      stroke="var(--fc-hairline)"
                       strokeWidth="1"
-                      strokeOpacity="0.1"
-                      className="text-[color:var(--fc-text-dim)]"
+                      strokeOpacity="1"
                     />
                   );
                 })}
@@ -394,7 +391,7 @@ export function WellnessTrendChart({
                       x={padding.left - 8}
                       y={y + 4}
                       textAnchor="end"
-                      className="text-xs fill-[color:var(--fc-text-dim)]"
+                      className="font-[family-name:var(--f-mono)] text-xs fill-[color:var(--fc-text-subtle)]"
                     >
                       {value.toFixed(1)}
                     </text>
@@ -412,7 +409,7 @@ export function WellnessTrendChart({
                       })
                       .join(" ")}
                     fill="none"
-                    stroke="rgb(249, 115, 22)"
+                    stroke="var(--fc-effort-hard)"
                     strokeWidth="2"
                     className={cn(
                       "transition-all duration-500",
@@ -432,7 +429,7 @@ export function WellnessTrendChart({
                       cy={y}
                       r="4"
                       fill={getStressSorenessColor(day.sorenessLevel)}
-                      stroke="white"
+                      stroke="var(--fc-bg-deep)"
                       strokeWidth="2"
                       className={cn(
                         "transition-all duration-300",

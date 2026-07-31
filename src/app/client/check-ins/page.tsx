@@ -1,14 +1,12 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
-import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { ClientPageShell } from "@/components/client-ui";
-import { CheckinHero, CheckinLimeAddButton, CheckinLinkRow } from "@/components/client/check-ins/checkinSuite";
+import { CheckinHero, CheckinActionAddButton, CheckinLinkRow } from "@/components/client/check-ins/checkinSuite";
 import checkinSuiteStyles from "@/components/client/check-ins/checkinSuite/checkinSuiteV1.module.css";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -21,18 +19,13 @@ import { LogMeasurementModal } from "@/components/client/LogMeasurementModal";
 import { AchievementUnlockModal } from "@/components/ui/AchievementUnlockModal";
 import type { Achievement } from "@/components/ui/AchievementCard";
 import { AlertTriangle } from "lucide-react";
-import {
-  getTodayLog,
-  getLogRange,
-  DailyWellnessLog,
-  MonthlyStats,
-} from "@/lib/wellnessService";
+import { getTodayLog, getLogRange, DailyWellnessLog } from "@/lib/wellnessService";
 import {
   getClientMeasurements,
   type BodyMeasurement,
 } from "@/lib/measurementService";
 import { getClientCheckInConfig } from "@/lib/checkInConfigService";
-import { usePageData } from "@/hooks/usePageData";
+import { toLocalDateString } from "@/lib/clientActivityService";
 import { supabase } from "@/lib/supabase";
 
 function getWeekStartMonday(): string {
@@ -41,7 +34,7 @@ function getWeekStartMonday(): string {
   const diff = d.getDate() - day + (day === 0 ? -6 : 1);
   const monday = new Date(d);
   monday.setDate(diff);
-  return monday.toISOString().split("T")[0];
+  return toLocalDateString(monday);
 }
 
 function getDueThreshold(frequencyDays: number): number {
@@ -65,140 +58,117 @@ interface CheckInPageData {
   checkInConfig: Awaited<ReturnType<typeof getClientCheckInConfig>>;
   currentStreak: number;
   bestStreak: number;
-  monthlyStats: MonthlyStats | null;
 }
 
 export default function ClientCheckInsPage() {
   const router = useRouter();
-  const { performanceSettings } = useTheme();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [showLogModal, setShowLogModal] = useState(false);
   const [newAchievementsQueue, setNewAchievementsQueue] = useState<Achievement[]>([]);
   const [achievementModalIndex, setAchievementModalIndex] = useState(0);
-  const [historyKey, setHistoryKey] = useState(0);
 
-  const fetchCheckInData = useCallback(async (): Promise<CheckInPageData> => {
-    if (!user?.id) {
-      return {
-        todayLog: null,
-        logRange: [],
-        latestMeasurement: null,
-        recentMeasurements: [],
-        activeCheckInGoals: [],
-        checkInConfig: null,
-        currentStreak: 0,
-        bestStreak: 0,
-        monthlyStats: null,
-      };
-    }
-    const todayStr = new Date().toISOString().split("T")[0];
-    const ninetyDaysAgo = new Date();
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-    const rangeStartDateStr = ninetyDaysAgo.toISOString().split("T")[0];
+  const todayLocalDate = toLocalDateString(new Date());
 
-    const [todayLogData, logs, measurements, config, goalsResult] = await Promise.all([
-      getTodayLog(user.id),
-      getLogRange(user.id, rangeStartDateStr, todayStr),
-      getClientMeasurements(user.id, 2),
-      getClientCheckInConfig(user.id),
-      supabase
-        .from("goals")
-        .select("id, title, pillar, goal_type, target_value")
-        .eq("client_id", user.id)
-        .eq("pillar", "checkins")
-        .eq("status", "active")
-        .not("target_value", "is", null),
-    ]);
-    const recentMeasurements = measurements ?? [];
-    const latest = recentMeasurements[0] ?? null;
+  const checkInsQuery = useQuery({
+    queryKey: ["client-check-ins", user?.id, todayLocalDate],
+    queryFn: async (): Promise<CheckInPageData> => {
+      const clientId = user!.id;
+      const todayStr = toLocalDateString(new Date());
+      const ninetyDaysAgo = new Date();
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+      const rangeStartDateStr = toLocalDateString(ninetyDaysAgo);
 
-    const completeDatesSet = new Set(
-      logs
-        .filter(
-          (r: DailyWellnessLog) =>
-            r.sleep_hours != null &&
-            r.sleep_quality != null &&
-            r.stress_level != null &&
-            r.soreness_level != null
-        )
-        .map((r) => r.log_date)
-    );
+      const [todayLogData, logs, measurements, config, goalsResult] =
+        await Promise.all([
+          getTodayLog(clientId),
+          getLogRange(clientId, rangeStartDateStr, todayStr),
+          getClientMeasurements(clientId, 2),
+          getClientCheckInConfig(clientId),
+          supabase
+            .from("goals")
+            .select("id, title, pillar, goal_type, target_value")
+            .eq("client_id", clientId)
+            .eq("pillar", "checkins")
+            .eq("status", "active")
+            .not("target_value", "is", null),
+        ]);
+      const recentMeasurements = measurements ?? [];
+      const latest = recentMeasurements[0] ?? null;
 
-    let streak = 0;
-    const d = new Date(todayStr + "T12:00:00Z");
-    for (let i = 0; i < 365; i++) {
-      const s = d.toISOString().split("T")[0];
-      if (s > todayStr) break;
-      if (!completeDatesSet.has(s)) break;
-      streak++;
-      d.setUTCDate(d.getUTCDate() - 1);
-    }
+      const completeDatesSet = new Set(
+        logs
+          .filter(
+            (r: DailyWellnessLog) =>
+              r.sleep_hours != null &&
+              r.sleep_quality != null &&
+              r.stress_level != null &&
+              r.soreness_level != null,
+          )
+          .map((r) => r.log_date),
+      );
 
-    const sortedDates = Array.from(completeDatesSet).sort();
-    let bestStreakCalc = 0;
-    let currentStreakCalc = 0;
-    let prevDate: Date | null = null;
-    for (const dateStr of sortedDates) {
-      const currentDate = new Date(dateStr + "T12:00:00Z");
-      if (prevDate === null) {
-        currentStreakCalc = 1;
-      } else {
-        const daysDiff = Math.floor((currentDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24));
-        if (daysDiff === 1) {
-          currentStreakCalc++;
-        } else {
-          bestStreakCalc = Math.max(bestStreakCalc, currentStreakCalc);
-          currentStreakCalc = 1;
-        }
+      let streak = 0;
+      const d = new Date(todayStr + "T12:00:00");
+      for (let i = 0; i < 365; i++) {
+        const s = toLocalDateString(d);
+        if (s > todayStr) break;
+        if (!completeDatesSet.has(s)) break;
+        streak++;
+        d.setDate(d.getDate() - 1);
       }
-      prevDate = currentDate;
-    }
-    bestStreakCalc = Math.max(bestStreakCalc, currentStreakCalc);
 
-    const now = new Date();
-    const currentMonth = now.getMonth() + 1;
-    const currentYear = now.getFullYear();
-    const monthEndDate = new Date(currentYear, currentMonth, 0);
-    const monthStartDateStr = new Date(currentYear, currentMonth - 1, 1).toISOString().split("T")[0];
-    const monthEndDateStr = monthEndDate.toISOString().split("T")[0];
-    const monthLogs = logs.filter((l) => l.log_date >= monthStartDateStr && l.log_date <= monthEndDateStr);
-    const completeMonthLogs = monthLogs.filter(
-      (l) =>
-        l.sleep_hours != null &&
-        l.sleep_quality != null &&
-        l.stress_level != null &&
-        l.soreness_level != null
-    );
+      const sortedDates = Array.from(completeDatesSet).sort();
+      let bestStreakCalc = 0;
+      let currentStreakCalc = 0;
+      let prevDate: Date | null = null;
+      for (const dateStr of sortedDates) {
+        const currentDate = new Date(dateStr + "T12:00:00");
+        if (prevDate === null) {
+          currentStreakCalc = 1;
+        } else {
+          const daysDiff = Math.floor(
+            (currentDate.getTime() - prevDate.getTime()) /
+              (1000 * 60 * 60 * 24),
+          );
+          if (daysDiff === 1) {
+            currentStreakCalc++;
+          } else {
+            bestStreakCalc = Math.max(bestStreakCalc, currentStreakCalc);
+            currentStreakCalc = 1;
+          }
+        }
+        prevDate = currentDate;
+      }
+      bestStreakCalc = Math.max(bestStreakCalc, currentStreakCalc);
 
-    return {
-      todayLog: todayLogData,
-      logRange: logs,
-      latestMeasurement: latest,
-      recentMeasurements,
-      activeCheckInGoals: (goalsResult.data ?? []).map((g) => ({
-        id: g.id,
-        title: g.title ?? null,
-        pillar: g.pillar ?? null,
-        metric_type: g.goal_type ?? null,
-        target_value:
-          g.target_value == null || Number.isNaN(Number(g.target_value))
-            ? null
-            : Number(g.target_value),
-      })),
-      checkInConfig: config,
-      currentStreak: streak,
-      bestStreak: bestStreakCalc,
-      monthlyStats: {
-        loggedDays: completeMonthLogs.length,
-        totalDays: monthEndDate.getDate(),
-        completionRate:
-          monthEndDate.getDate() > 0 ? Math.round((completeMonthLogs.length / monthEndDate.getDate()) * 100) : 0,
-      },
-    };
-  }, [user?.id, historyKey]);
+      return {
+        todayLog: todayLogData,
+        logRange: logs,
+        latestMeasurement: latest,
+        recentMeasurements,
+        activeCheckInGoals: (goalsResult.data ?? []).map((g) => ({
+          id: g.id,
+          title: g.title ?? null,
+          pillar: g.pillar ?? null,
+          metric_type: g.goal_type ?? null,
+          target_value:
+            g.target_value == null || Number.isNaN(Number(g.target_value))
+              ? null
+              : Number(g.target_value),
+        })),
+        checkInConfig: config,
+        currentStreak: streak,
+        bestStreak: bestStreakCalc,
+      };
+    },
+    enabled: !!user?.id,
+  });
 
-  const { data, loading: dataLoading, error } = usePageData(fetchCheckInData, [user?.id, historyKey]);
+  const data = checkInsQuery.data ?? null;
+  const dataLoading = checkInsQuery.isLoading;
+  const error = checkInsQuery.isError;
 
   const todayLog = data?.todayLog ?? null;
   const logRange = data?.logRange ?? [];
@@ -207,160 +177,199 @@ export default function ClientCheckInsPage() {
   const activeCheckInGoals = data?.activeCheckInGoals ?? [];
   const checkInConfig = data?.checkInConfig ?? null;
   const frequencyDays = checkInConfig?.frequency_days ?? 30;
+  const currentStreak = data?.currentStreak ?? 0;
+  const bestStreak = data?.bestStreak ?? 0;
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = todayLocalDate;
   const weekStart = useMemo(() => getWeekStartMonday(), []);
   const weekDays = useMemo(() => {
     const start = new Date(weekStart + "T12:00:00");
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(start);
       d.setDate(start.getDate() + i);
-      return d.toISOString().split("T")[0];
+      return toLocalDateString(d);
     });
   }, [weekStart]);
   const lastWeekStart = useMemo(() => {
     const d = new Date(weekStart + "T12:00:00");
     d.setDate(d.getDate() - 7);
-    return d.toISOString().split("T")[0];
+    return toLocalDateString(d);
   }, [weekStart]);
   const lastWeekDays = useMemo(() => {
     const start = new Date(lastWeekStart + "T12:00:00");
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(start);
       d.setDate(start.getDate() + i);
-      return d.toISOString().split("T")[0];
+      return toLocalDateString(d);
     });
   }, [lastWeekStart]);
-  const thisWeekLogs = useMemo(() => logRange.filter((l) => weekDays.includes(l.log_date)), [logRange, weekDays]);
-  const lastWeekLogs = useMemo(() => logRange.filter((l) => lastWeekDays.includes(l.log_date)), [logRange, lastWeekDays]);
+  const thisWeekLogs = useMemo(
+    () => logRange.filter((l) => weekDays.includes(l.log_date)),
+    [logRange, weekDays],
+  );
+  const lastWeekLogs = useMemo(
+    () => logRange.filter((l) => lastWeekDays.includes(l.log_date)),
+    [logRange, lastWeekDays],
+  );
 
   const daysSinceLast = useMemo(() => {
     if (!latestMeasurement?.measured_date) return null;
     const last = new Date(latestMeasurement.measured_date + "T12:00:00");
     const today = new Date(todayStr + "T12:00:00");
-    return Math.floor((today.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.floor(
+      (today.getTime() - last.getTime()) / (1000 * 60 * 60 * 24),
+    );
   }, [latestMeasurement?.measured_date, todayStr]);
 
   const addButtonOverdueDot = useMemo(() => {
     const dueThreshold = getDueThreshold(frequencyDays);
     if (daysSinceLast == null) return false;
-    const isOverdue = daysSinceLast > dueThreshold;
-    const overdueDays = isOverdue ? daysSinceLast - dueThreshold : 0;
-    return overdueDays > 0;
+    return daysSinceLast > dueThreshold;
   }, [daysSinceLast, frequencyDays]);
+
+  const invalidateAfterCheckIn = async () => {
+    await queryClient.invalidateQueries({
+      queryKey: ["client-check-ins", user?.id],
+    });
+    await queryClient.invalidateQueries({
+      queryKey: ["client-dashboard", user?.id],
+    });
+    await queryClient.invalidateQueries({
+      queryKey: ["client-progress", user?.id],
+    });
+  };
+
+  const invalidateAfterMeasurement = async () => {
+    await queryClient.invalidateQueries({
+      queryKey: ["client-check-ins", user?.id],
+    });
+    await queryClient.invalidateQueries({
+      queryKey: ["client-progress", user?.id],
+    });
+  };
 
   if (error) {
     return (
       <ProtectedRoute requiredRole="client">
-        <AnimatedBackground>
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
-            <EmptyState
-              icon={AlertTriangle}
-              title="Couldn't load this page"
-              description="Something went wrong. Please try again."
-              actionLabel="Retry"
-              onAction={() => window.location.reload()}
-            />
-          </ClientPageShell>
-        </AnimatedBackground>
+        <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
+          <EmptyState
+            icon={AlertTriangle}
+            title="Couldn't load this page"
+            description="Something went wrong. Please try again."
+            actionLabel="Retry"
+            onAction={() => void checkInsQuery.refetch()}
+          />
+        </ClientPageShell>
       </ProtectedRoute>
     );
   }
 
   return (
     <ProtectedRoute requiredRole="client">
-      <AnimatedBackground>
-        {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell
-            className={cn("max-w-lg mx-auto px-3 sm:px-6 pb-40 pt-2 sm:pt-4", checkinSuiteStyles.root)}
-          >
-          <CheckinHero
-            onBack={() => router.push("/client")}
-            backAriaLabel="Back to home"
-            eyebrow="Daily wellness"
-            eyebrowColor="var(--cs-cyan)"
-            title="Check-ins"
-            subtitle="Sleep, stress, soreness & steps"
-            rightSlot={
-              <CheckinLimeAddButton onClick={() => setShowAddSheet(true)} showDot={addButtonOverdueDot} />
-            }
-          />
+      <ClientPageShell
+        className={cn("max-w-lg lg:max-w-3xl mx-auto px-3 sm:px-6 pb-40 pt-2 sm:pt-4", checkinSuiteStyles.root)}
+      >
+        <CheckinHero
+          onBack={() => router.push("/client")}
+          backAriaLabel="Back to home"
+          eyebrow="Check-in"
+          eyebrowColor="var(--fc-accent)"
+          title="Daily check-in"
+          subtitle="Sleep, stress, soreness & steps"
+          rightSlot={
+            <CheckinActionAddButton onClick={() => setShowAddSheet(true)} showDot={addButtonOverdueDot} />
+          }
+        />
 
-          {user?.id && (
-            <>
-              <WeeklyCheckInCard
-                daysSinceLast={daysSinceLast}
-                lastMeasuredDate={latestMeasurement?.measured_date ?? null}
-                frequencyDays={frequencyDays}
-                recentMeasurements={recentMeasurements}
-                activeCheckInGoals={activeCheckInGoals}
-              />
+        {!dataLoading && (
+          <p className={checkinSuiteStyles.streakChip} aria-label={`Current streak ${currentStreak} days`}>
+            Streak{" "}
+            <span className={checkinSuiteStyles.streakChipValue}>
+              {currentStreak}
+              <span className="text-[11px] font-medium opacity-70">d</span>
+            </span>
+            {bestStreak > 0 ? (
+              <span className={checkinSuiteStyles.streakChipBest}>· best {bestStreak}d</span>
+            ) : null}
+          </p>
+        )}
 
-              <DailyCheckInForm
-                clientId={user.id}
-                initialTodayLog={todayLog}
-                onSuccess={() => setHistoryKey(Date.now())}
-              />
+        {user?.id && (
+          <>
+            <WeeklyCheckInCard
+              daysSinceLast={daysSinceLast}
+              lastMeasuredDate={latestMeasurement?.measured_date ?? null}
+              frequencyDays={frequencyDays}
+              recentMeasurements={recentMeasurements}
+              activeCheckInGoals={activeCheckInGoals}
+            />
 
-              {!dataLoading && (
-                <div className="mt-6 pt-4 border-t border-[color:var(--fc-glass-border)]/60 space-y-5">
-                  <WeeklyStrip weekStart={weekStart} todayStr={todayStr} logsThisWeek={thisWeekLogs} />
-                  <WellnessTrends thisWeekLogs={thisWeekLogs} lastWeekLogs={lastWeekLogs} />
-                  <CheckinLinkRow onClick={() => router.push("/client/check-ins/history")}>
-                    View full history
-                  </CheckinLinkRow>
-                </div>
-              )}
-            </>
-          )}
-
-          <AddCheckInSheet
-            open={showAddSheet}
-            onOpenChange={setShowAddSheet}
-            onQuickWeight={() => setShowLogModal(true)}
-            frequencyDays={frequencyDays}
-          />
-
-          {user?.id && showLogModal && (
-            <LogMeasurementModal
+            <DailyCheckInForm
               clientId={user.id}
-              lastMeasurement={latestMeasurement ?? undefined}
-              onClose={() => setShowLogModal(false)}
+              initialTodayLog={todayLog}
               onSuccess={() => {
-                setShowLogModal(false);
-                setHistoryKey(Date.now());
-              }}
-              onAchievementsUnlocked={(raw) => {
-                const mapped: Achievement[] = raw.map((a) => ({
-                  id: a.templateId,
-                  name: a.templateName,
-                  description: a.description ?? "",
-                  icon: a.templateIcon ?? "🏆",
-                  tier: (a.tier ?? null) as Achievement["tier"],
-                  unlocked: true,
-                }));
-                setNewAchievementsQueue(mapped);
-                setAchievementModalIndex(0);
+                void invalidateAfterCheckIn();
               }}
             />
-          )}
 
-          {newAchievementsQueue.length > 0 && (
-            <AchievementUnlockModal
-              achievement={newAchievementsQueue[achievementModalIndex] ?? null}
-              visible={achievementModalIndex < newAchievementsQueue.length}
-              onClose={() => {
-                if (achievementModalIndex < newAchievementsQueue.length - 1) {
-                  setAchievementModalIndex((i) => i + 1);
-                } else {
-                  setNewAchievementsQueue([]);
-                  setAchievementModalIndex(0);
-                }
-              }}
-            />
-          )}
-        </ClientPageShell>
-      </AnimatedBackground>
+            {!dataLoading && (
+              <div className="mt-6 pt-4 border-t border-[color:var(--cs-line)] space-y-5">
+                <WeeklyStrip weekStart={weekStart} todayStr={todayStr} logsThisWeek={thisWeekLogs} />
+                <WellnessTrends thisWeekLogs={thisWeekLogs} lastWeekLogs={lastWeekLogs} />
+                <CheckinLinkRow onClick={() => router.push("/client/check-ins/history")}>
+                  View full history
+                </CheckinLinkRow>
+              </div>
+            )}
+          </>
+        )}
+
+        <AddCheckInSheet
+          open={showAddSheet}
+          onOpenChange={setShowAddSheet}
+          onQuickWeight={() => setShowLogModal(true)}
+          frequencyDays={frequencyDays}
+        />
+
+        {user?.id && showLogModal && (
+          <LogMeasurementModal
+            clientId={user.id}
+            lastMeasurement={latestMeasurement ?? undefined}
+            onClose={() => setShowLogModal(false)}
+            onSuccess={() => {
+              setShowLogModal(false);
+              void invalidateAfterMeasurement();
+            }}
+            onAchievementsUnlocked={(raw) => {
+              const mapped: Achievement[] = raw.map((a) => ({
+                id: a.templateId,
+                name: a.templateName,
+                description: a.description ?? "",
+                icon: a.templateIcon ?? "🏆",
+                tier: (a.tier ?? null) as Achievement["tier"],
+                unlocked: true,
+              }));
+              setNewAchievementsQueue(mapped);
+              setAchievementModalIndex(0);
+            }}
+          />
+        )}
+
+        {newAchievementsQueue.length > 0 && (
+          <AchievementUnlockModal
+            achievement={newAchievementsQueue[achievementModalIndex] ?? null}
+            visible={achievementModalIndex < newAchievementsQueue.length}
+            onClose={() => {
+              if (achievementModalIndex < newAchievementsQueue.length - 1) {
+                setAchievementModalIndex((i) => i + 1);
+              } else {
+                setNewAchievementsQueue([]);
+                setAchievementModalIndex(0);
+              }
+            }}
+          />
+        )}
+      </ClientPageShell>
     </ProtectedRoute>
   );
 }

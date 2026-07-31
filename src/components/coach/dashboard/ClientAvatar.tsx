@@ -8,7 +8,7 @@ const tierGradients: Record<ClientAvatarSeverity, string> = {
   critical: "linear-gradient(135deg, var(--fc-sev-critical), #7f1d1d)",
   warning: "linear-gradient(135deg, var(--fc-sev-warning), #92400e)",
   neutral: "linear-gradient(135deg, #5EEAD4, #818CF8)",
-  new: "linear-gradient(135deg, #4FE3E8, #0e7490)",
+  new: "linear-gradient(135deg, var(--fc-group-c), #0e7490)",
   good: "linear-gradient(135deg, #5EEAD4, #818CF8)",
 };
 

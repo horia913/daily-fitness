@@ -1,4 +1,8 @@
-export { ProfileHero, type CoachingPillState } from './ProfileHero'
+export { ProfileHero } from './ProfileHero'
+export {
+  CoachingStatusPill,
+  type CoachingPillState,
+} from './CoachingStatusPill'
 export { ProfileSection } from './ProfileSection'
 export { SectionHead, type SectionIconTone } from './SectionHead'
 export { ProfileField } from './ProfileField'

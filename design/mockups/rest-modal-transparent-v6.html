@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rest modal — transparent surface</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;}
+  :root{
+    --bg:#0A0B0D; --hairline:rgba(255,255,255,.07); --hairline-2:rgba(255,255,255,.13);
+    --good:#22E56A; --warn:#FFB020; --orange:#FF7A2F; --bad:#FF5A4D; --accent:#2E7BFF; --cyan:#22D3EE;
+    --text:#EEF1F5; --dim:#98A2B3; --subtle:#5C6470;
+    --fb-sans:ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    --fb-mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+    --f-display:'Archivo',var(--fb-sans); --f-body:'Inter',var(--fb-sans); --f-mono:'JetBrains Mono',var(--fb-mono);
+  }
+  body{background:#07080A;color:var(--text);font-family:var(--f-body);-webkit-font-smoothing:antialiased;padding:26px 20px 70px;display:flex;gap:34px;flex-wrap:wrap;justify-content:center;align-items:flex-start;}
+  .disp{font-family:var(--f-display);font-stretch:125%;}
+  .col{width:375px;}
+  .cap{font-family:var(--f-mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--subtle);margin-bottom:10px;text-align:center;}
+  .cap b{color:var(--text);}
+
+  /* phone showing the real screen with the modal over it */
+  .phone{position:relative;width:375px;height:600px;background:var(--bg);border-radius:24px;border:1px solid var(--hairline-2);overflow:hidden;}
+
+  /* --- the screen behind --- */
+  .behind{padding:14px 12px;}
+  .ghead{display:flex;align-items:center;gap:9px;padding:8px 6px 8px;}
+  .badge{width:22px;height:22px;border-radius:6px;background:var(--accent);color:#04122E;display:flex;align-items:center;justify-content:center;font-family:var(--f-mono);font-size:10px;font-weight:700;}
+  .gname{font-family:var(--f-mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;font-weight:700;flex:1;}
+  .gsets{font-family:var(--f-mono);font-size:10px;color:var(--subtle);}
+  .live{position:relative;border:1px solid var(--hairline-2);border-radius:15px;overflow:hidden;}
+  .live::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent);}
+  .lh{display:flex;justify-content:space-between;padding:10px 12px 9px 16px;border-bottom:1px solid var(--hairline);}
+  .lh .s{font-family:var(--f-display);font-stretch:125%;font-size:14px;font-weight:800;}
+  .lh .r{font-family:var(--f-mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--cyan);font-weight:700;}
+  .exn{padding:11px 16px 0;font-family:var(--f-display);font-stretch:125%;font-size:17px;font-weight:700;}
+  .prim{display:grid;grid-template-columns:3fr 2fr;gap:10px;padding:9px 16px 10px;border-bottom:1px solid var(--hairline);margin-top:8px;}
+  .pl{font-family:var(--f-mono);font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:var(--subtle);margin-bottom:4px;}
+  .pv .big{font-family:var(--f-display);font-stretch:125%;font-size:26px;font-weight:900;line-height:1;}
+  .pv .u{font-family:var(--f-mono);font-size:11px;color:var(--dim);}
+  .ew{font-family:var(--f-display);font-stretch:125%;font-size:23px;font-weight:900;color:var(--warn);line-height:1;}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);padding:9px 16px 11px;border-bottom:1px solid var(--hairline);}
+  .sl{font-family:var(--f-mono);font-size:8px;letter-spacing:.09em;text-transform:uppercase;color:var(--subtle);}
+  .sv{font-family:var(--f-mono);font-size:12.5px;font-weight:600;margin-top:3px;}
+  .srow{display:flex;align-items:center;gap:10px;padding:8px 16px 8px 20px;border-top:1px solid var(--hairline);}
+  .tick{width:15px;height:15px;border-radius:50%;background:var(--good);color:#04240F;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;}
+  .sn{font-family:var(--f-mono);font-size:10px;color:var(--dim);width:40px;}
+  .sx{font-family:var(--f-mono);font-size:11px;color:var(--subtle);}
+
+  /* --- scrim + modal --- */
+  .scrim{position:absolute;inset:0;background:rgba(3,4,6,.82);display:flex;align-items:center;justify-content:center;padding:0 14px;}
+  .rest{width:100%;background:transparent;border:1px solid var(--hairline-2);border-radius:18px;overflow:hidden;}
+  .rhead{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 11px 16px;border-bottom:1px solid var(--hairline);}
+  .rhead .l{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--cyan);font-weight:700;}
+  .rhead .x{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--subtle);font-size:15px;}
+  .rbody{padding:16px 16px 6px;text-align:center;}
+  .rnext{font-family:var(--f-mono);font-size:10px;letter-spacing:.06em;color:var(--dim);}
+  .rnext b{color:var(--text);}
+  .rlast{font-family:var(--f-mono);font-size:10px;color:var(--subtle);margin-top:4px;}
+  .rtime{font-family:var(--f-display);font-stretch:125%;font-size:62px;font-weight:900;line-height:1;letter-spacing:-.03em;margin:14px 0 4px;font-variant-numeric:tabular-nums;}
+  .rbar{height:3px;border-radius:2px;background:rgba(255,255,255,.1);overflow:hidden;margin:12px 0 0;}
+  .rbar i{display:block;height:100%;width:62%;background:var(--cyan);border-radius:2px;}
+  .radj{display:flex;gap:8px;padding:14px 16px 0;}
+  .radj button{flex:1;height:40px;border-radius:11px;background:transparent;border:1px solid var(--hairline-2);color:var(--dim);font-family:var(--f-mono);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+  .rskip{margin:9px 16px 16px;height:44px;border-radius:11px;border:1px solid color-mix(in srgb, var(--accent) 45%, transparent);color:var(--accent);background:transparent;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:7px;}
+
+  .note{width:375px;font-size:11.5px;line-height:1.7;color:var(--subtle);border-left:2px solid var(--good);padding-left:12px;}
+  .note b{color:var(--text);} .note .x{color:var(--bad);font-weight:700;}
+</style></head>
+<body>
+
+<div class="col">
+  <div class="cap"><b>Rest modal</b> — transparent surface, scrimmed backdrop</div>
+  <div class="phone">
+
+    <div class="behind">
+      <div class="ghead"><span class="badge">A</span><span class="gname">Leg Press Wide Stance</span><span class="gsets">3 sets</span></div>
+      <div class="live">
+        <div class="lh"><span class="s disp">Set 2 of 3</span><span class="r">● Resting</span></div>
+        <div class="exn">Leg Press Wide Stance</div>
+        <div class="prim">
+          <div><div class="pl">Target</div><div class="pv"><span class="big disp">6</span> <span class="u">reps</span></div></div>
+          <div><div class="pl">Effort</div><div class="pv"><span class="ew disp">Hard</span></div></div>
+        </div>
+        <div class="stats">
+          <div><div class="sl">Rest</div><div class="sv">2:00</div></div>
+          <div><div class="sl">Tempo</div><div class="sv">—</div></div>
+          <div><div class="sl">Last</div><div class="sv">6 × 7.5</div></div>
+        </div>
+        <div class="srow"><span class="tick">✓</span><span class="sn">Set 1</span><span class="sx">6 × 10 kg</span></div>
+      </div>
+    </div>
+
+    <div class="scrim">
+      <div class="rest">
+        <div class="rhead"><span class="l">● Resting</span><span class="x">✕</span></div>
+        <div class="rbody">
+          <div class="rnext">Up next · <b>Set 2 of 3</b></div>
+          <div class="rlast">last set 6 × 10 kg</div>
+          <div class="rtime disp">1:46</div>
+          <div class="rbar"><i></i></div>
+        </div>
+        <div class="radj"><button>− 15s</button><button>+ 15s</button></div>
+        <div class="rskip">▶ Skip rest</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="note">
+  <b>The fix:</b> the modal has <span class="x">no fill at all</span> — transparent surface, hairline border, exactly like every other card. The separation comes from the <b>scrim</b> over the screen behind, not from making the panel a lighter grey box.<br><br>
+  Same for the ±15s buttons — they were inset dark boxes, now transparent with a hairline, matching the card language.<br><br>
+  You can see the dimmed live card behind it, which also keeps the client oriented: they can still see the set they're resting between.
+</div>
+
+</body></html>

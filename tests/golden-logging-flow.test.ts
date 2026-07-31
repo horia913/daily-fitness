@@ -18,6 +18,8 @@ import {
   retryDelayMs,
   MAX_RETRIES,
 } from "../src/lib/setLogging/goldenLogSet";
+import { buildLogSetInsertData } from "../src/lib/setLogging/buildLogSetInsertData";
+import { resolveCanonicalLogSetType } from "../src/lib/setLogging/resolveLogSetType";
 
 // ---------------------------------------------------------------------------
 // buildIdempotencyKey
@@ -32,7 +34,7 @@ describe("buildIdempotencyKey", () => {
       3,
     );
 
-    // Format: sessionId:blockId:exerciseId:setNumber:YYYY-MM-DD
+    // Format: sessionId:setEntryId:exerciseId:setNumber:YYYY-MM-DD
     const today = new Date().toISOString().split("T")[0];
     expect(key).toBe(`session-abc:block-123:exercise-456:3:${today}`);
   });
@@ -79,7 +81,7 @@ describe("createPendingEntry", () => {
 
     expect(entry.key).toBe("key-1");
     expect(entry.state).toBe(SetInstanceState.PendingLocal);
-    expect(entry.blockId).toBe("block-1");
+    expect(entry.setEntryId).toBe("block-1");
     expect(entry.blockType).toBe("straight_set");
     expect(entry.exerciseId).toBe("exercise-1");
     expect(entry.setNumber).toBe(1);
@@ -105,7 +107,7 @@ describe("buildSyncPayload", () => {
   const baseEntry: PendingSetEntry = {
     key: "test-key",
     state: SetInstanceState.PendingSync,
-    blockId: "b1",
+    setEntryId: "b1",
     blockType: "straight_set",
     exerciseId: "e1",
     setNumber: 1,
@@ -149,7 +151,7 @@ describe("shouldRetry", () => {
   const makeEntry = (attempts: number): PendingSetEntry => ({
     key: "k",
     state: SetInstanceState.SyncFailed,
-    blockId: "b",
+    setEntryId: "b",
     blockType: "straight_set",
     exerciseId: "e",
     setNumber: 1,
@@ -242,6 +244,135 @@ describe("State machine transitions", () => {
     entry.state = SetInstanceState.PendingSync;
     entry.syncAttempts = 1;
     expect(entry.state).toBe(SetInstanceState.PendingSync);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Canonical set_type insert payloads (log-set route insert builder)
+// ---------------------------------------------------------------------------
+
+describe("buildLogSetInsertData — canonical set_type payloads", () => {
+  const baseInsert = {
+    client_id: "client-1",
+    set_entry_id: "entry-1",
+    workout_log_id: "log-1",
+    set_type: "straight_set",
+    completed_at: "2026-06-11T12:00:00.000Z",
+  };
+
+  it("drop_set: builds insert without dropset_drops column and stores canonical type", () => {
+    expect(resolveCanonicalLogSetType("drop_set")).toBe("drop_set");
+    expect(resolveCanonicalLogSetType("dropset")).toBe("drop_set");
+
+    const result = buildLogSetInsertData(
+      {
+        set_type: "drop_set",
+        set_number: 1,
+        exercise_id: "ex-1",
+        dropset_drops: [
+          { weight: 80, reps: 8 },
+          { weight: 60, reps: 10 },
+        ],
+        dropset_initial_weight: 80,
+        dropset_initial_reps: 8,
+        dropset_final_weight: 60,
+        dropset_final_reps: 10,
+      },
+      "drop_set",
+      { ...baseInsert, set_type: "drop_set" },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.insertData.set_type).toBe("drop_set");
+    expect(result.insertData.dropset_initial_weight).toBe(80);
+    expect(result.insertData.dropset_final_weight).toBe(60);
+    expect(result.insertData.weight).toBe(80);
+    expect(result.insertData.reps).toBe(8);
+    expect(result.insertData).not.toHaveProperty("dropset_drops");
+  });
+
+  it("for_time: builds insert with canonical set_type", () => {
+    expect(resolveCanonicalLogSetType("for_time")).toBe("for_time");
+    expect(resolveCanonicalLogSetType("fortime")).toBe("for_time");
+
+    const result = buildLogSetInsertData(
+      {
+        set_type: "for_time",
+        exercise_id: "ex-1",
+        fortime_total_reps: 50,
+        fortime_time_taken_sec: 420,
+        fortime_time_cap_sec: 600,
+      },
+      "for_time",
+      { ...baseInsert, set_type: "for_time" },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.insertData.set_type).toBe("for_time");
+    expect(result.insertData.fortime_total_reps).toBe(50);
+    expect(result.insertData.fortime_time_taken_sec).toBe(420);
+  });
+
+  it("pre_exhaustion: builds insert with canonical set_type", () => {
+    expect(resolveCanonicalLogSetType("pre_exhaustion")).toBe("pre_exhaustion");
+    expect(resolveCanonicalLogSetType("preexhaust")).toBe("pre_exhaustion");
+
+    const result = buildLogSetInsertData(
+      {
+        set_type: "pre_exhaustion",
+        set_number: 1,
+        preexhaust_isolation_exercise_id: "iso-1",
+        preexhaust_isolation_weight: 20,
+        preexhaust_isolation_reps: 15,
+        preexhaust_compound_exercise_id: "cmp-1",
+        preexhaust_compound_weight: 80,
+        preexhaust_compound_reps: 8,
+      },
+      "pre_exhaustion",
+      { ...baseInsert, set_type: "pre_exhaustion" },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.insertData.set_type).toBe("pre_exhaustion");
+    expect(result.insertData.preexhaust_compound_weight).toBe(80);
+  });
+
+  it("straight_set and superset share the same canonical insert path", () => {
+    const straight = buildLogSetInsertData(
+      { exercise_id: "ex-1", weight: 100, reps: 5, set_number: 2 },
+      "straight_set",
+      { ...baseInsert, set_type: "straight_set" },
+    );
+    expect(straight.ok).toBe(true);
+    if (straight.ok) {
+      expect(straight.insertData.set_type).toBe("straight_set");
+      expect(straight.insertData.weight).toBe(100);
+    }
+
+    const superset = buildLogSetInsertData(
+      {
+        set_number: 1,
+        superset_exercise_a_id: "a-1",
+        superset_weight_a: 40,
+        superset_reps_a: 10,
+        superset_exercise_b_id: "b-1",
+        superset_weight_b: 30,
+        superset_reps_b: 12,
+      },
+      "superset",
+      { ...baseInsert, set_type: "superset" },
+    );
+    expect(superset.ok).toBe(true);
+    if (superset.ok) {
+      expect(superset.insertData.set_type).toBe("superset");
+      expect(superset.insertData.superset_weight_a).toBe(40);
+    }
   });
 });
 

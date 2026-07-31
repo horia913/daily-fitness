@@ -2,30 +2,63 @@
    Design System v2 — Dual theme (light default)
    Glass spec: light 0.55–0.75 opacity, border 0.10–0.18
    Density: STANDARD (page/card/gap/section/list-row)
+
+   SURFACE ROLES (client language — authoritative under .fc-client-surfaces /
+   html[data-fc-surface-scope="client"]; defaults below keep coach milky):
+   --fc-surface-inset  transparent     cards sitting on the page (+ hairline)
+   --fc-surface-float  var(--fc-bg-deep)  modals / nav / toast / sheets / drawers
+   --fc-surface-well   #050608         insets inside a card (inputs, log slots)
+   --fc-surface-tint   rgba(255,255,255,.035)  faint callout / technique blocks
+
+   RULE: a surface is transparent when it sits inside the page, page-black when
+   it floats above content, and darker when nested inside a card. Never lighter
+   than the page.
    ------------------------------------------------------------------- */
 :root {
-  --fc-bg-deep: #f6f2ec;
-  --fc-bg-basalt: #e8e3db;
-  --fc-text-primary: #1f2933;
-  --fc-text-dim: #59636e;
-  --fc-text-subtle: rgba(31, 41, 51, 0.45);
+  --fc-bg-deep: #0A0B0D;
+  --fc-bg-basalt: #0D0F13;
+  /* Aliases (were used without definitions) */
+  --fc-bg-base: var(--fc-bg-deep);
+  --fc-bg-page: var(--fc-bg-deep);
+  --fc-app-bg: var(--fc-bg-deep);
+  --fc-text-primary: #F7F6F1;
+  --fc-text-dim: #9B9C90;
+  --fc-text-subtle: #63645B;
 
-  --fc-glass-base: rgba(255, 255, 255, 0.7);
-  --fc-glass-soft: rgba(255, 255, 255, 0.5);
-  --fc-glass-border: rgba(82, 74, 66, 0.12);
-  --fc-glass-border-strong: rgba(82, 74, 66, 0.18);
-  --fc-glass-highlight: rgba(82, 74, 66, 0.12);
+  --fc-glass-base: #1B1E24;
+  --fc-glass-soft: #22262E;
+  --fc-glass-border: rgba(255, 255, 255, 0.10);
+  --fc-glass-border-strong: rgba(255, 255, 255, 0.14);
+  --fc-glass-highlight: rgba(255, 255, 255, 0.08);
 
-  --fc-accent-cyan: #0891b2;
+  /* NEW SYSTEM TOKENS */
+  --fc-accent: #2E7BFF;
+  --fc-accent-dim: rgba(46, 123, 255, 0.16);
+  --fc-accent-glow: rgba(46, 123, 255, 0.30);
+  --fc-hairline: rgba(255, 255, 255, 0.07);
+  --fc-hairline-strong: rgba(255, 255, 255, 0.13);
+  --fc-track: rgba(255, 255, 255, 0.08);
+  --fc-group-a: #2E7BFF;
+  --fc-group-a-dim: rgba(46, 123, 255, 0.18);
+  --fc-group-b: #9D6BFF;
+  --fc-group-b-dim: rgba(157, 107, 255, 0.18);
+  --fc-group-c: #22D3EE;
+  --fc-group-c-dim: rgba(34, 211, 238, 0.18);
+  --fc-group-c-soft: rgba(34, 211, 238, 0.12);
+  --fc-group-d: #FFB020;
+  --fc-group-d-dim: rgba(255, 176, 32, 0.18);
+
+  /* true cyan: --fc-group-c (#22D3EE) + -soft/-dim. Single aqua; #4FE3E8 collapsed here. */
   --fc-accent-purple: #7c3aed;
   --fc-accent-indigo: #4338ca;
   --fc-accent-violet: #6d28d9;
 
-  --fc-status-success: #059669;
-  --fc-status-warning: #d97706;
-  --fc-status-error: #dc2626;
-  --fc-status-info: #2563eb;
-  --fc-status-inactive: #6b7280;
+  --fc-status-success: #22E56A;
+  --fc-status-warning: #FFB020;
+  --fc-status-error: #FF5A4D;
+  --fc-status-danger: var(--fc-status-error); /* alias — prefer --fc-status-error */
+  --fc-status-info: var(--fc-accent); /* semantic alias: info = brand blue */
+  --fc-status-inactive: #63645B;
 
   --fc-domain-workouts: #0284c7;
   --fc-domain-meals: #16a34a;
@@ -61,24 +94,30 @@
 
   --fc-shadow-card: 0 12px 24px -12px rgba(31, 41, 51, 0.22);
   --fc-shadow-nav: 0 16px 32px rgba(31, 41, 51, 0.18);
-  --fc-glow-cyan: 0 0 18px rgba(8, 145, 178, 0.22);
+  --fc-glow-cyan: 0 0 22px var(--fc-accent-glow);
   --fc-glow-rose: 0 12px 28px rgba(190, 18, 60, 0.22);
 
-  --fc-vignette-edge: rgba(82, 74, 66, 0.18);
-  --fc-muted-overlay-start: #f6f2ec;
-  --fc-muted-overlay-mid: #efe9e1;
-  --fc-muted-overlay-end: #e6ded4;
+  --fc-vignette-edge: rgba(6, 8, 12, 0.7);
+  --fc-muted-overlay-start: #0A0B0D;
+  --fc-muted-overlay-mid: #0D0F13;
+  --fc-muted-overlay-end: #1B1E24;
 
   /* Surface tokens: solid surfaces for content cards (reduce glass overuse) */
-  --fc-surface-card: rgba(255, 255, 255, 0.55);
-  --fc-surface-card-border: rgba(82, 74, 66, 0.10);
-  --fc-surface-elevated: rgba(255, 255, 255, 0.7);
-  --fc-surface-sunken: rgba(82, 74, 66, 0.04);
+  --fc-surface-card: #1B1E24;
+  --fc-surface-card-border: rgba(255, 255, 255, 0.10);
+  --fc-surface-elevated: #22262E;
+  --fc-surface-sunken: rgba(255, 255, 255, 0.04);
+  --fc-surface: var(--fc-surface-card);
+  /* Role tokens — default = legacy milky (coach unchanged); client scope remaps */
+  --fc-surface-inset: var(--fc-surface-card);
+  --fc-surface-float: var(--fc-surface-card);
+  --fc-surface-well: var(--fc-surface-sunken);
+  --fc-surface-tint: var(--fc-glass-highlight);
 
-  /* Prescription-style card shell (neutral + semantic); matches Tailwind cyan-950/60 + cyan-500/40 */
-  --fc-card-shell-radius: 12px;
-  --fc-card-shell-bg: color-mix(in srgb, rgb(8, 51, 68) 60%, transparent);
-  --fc-card-shell-border-l: color-mix(in srgb, rgb(6, 182, 212) 40%, transparent);
+  /* Prescription-style card shell (neutral + semantic) */
+  --fc-card-shell-radius: 18px;
+  --fc-card-shell-bg: color-mix(in srgb, var(--fc-accent) 20%, var(--fc-surface-card));
+  --fc-card-shell-border-l: color-mix(in srgb, var(--fc-accent) 40%, transparent);
   /* Semantic shells (light): tinted fills + strong left edge — preserves quick scan cues */
   --fc-card-shell-success-bg: color-mix(in srgb, rgb(236, 253, 245) 94%, transparent);
   --fc-card-shell-success-border-l: color-mix(in srgb, rgb(5, 150, 105) 45%, transparent);
@@ -109,11 +148,7 @@
      [verify-light-theme] so the future pass can audit them.
      Refs: design-system-v4 §2.2, §2.3, §2.6, §2.7, §2.8, §2.9
      ============================================================ */
-  /* §2.3 Accent — lime (action) */
-  --fc-accent-lime:        #C5FF4A; /* [verify-light-theme] */
-  --fc-accent-lime-2:      #7FE89A; /* [verify-light-theme] */
-  --fc-accent-lime-soft:   rgba(197, 255, 74, 0.13); /* [verify-light-theme] */
-  --fc-accent-lime-glow:   rgba(197, 255, 74, 0.38); /* [verify-light-theme] */
+  /* action tokens removed in v5 — use --fc-accent / --fc-accent-dim / --fc-accent-glow */
   /* §2.3 Accent — gold (achievement) */
   --fc-accent-gold:        #F5C242; /* [verify-light-theme] */
   --fc-accent-gold-soft:   rgba(245, 194, 66, 0.13); /* [verify-light-theme] */
@@ -139,17 +174,27 @@
   /* §2.7 Achievement rarity (aliases) */
   --fc-rarity-common:      var(--fc-text-dim); /* [verify-light-theme] */
   --fc-rarity-uncommon:    var(--fc-status-success); /* [verify-light-theme] */
-  --fc-rarity-rare:        var(--fc-accent-cyan); /* [verify-light-theme] */
+  --fc-rarity-rare:        var(--fc-accent); /* [verify-light-theme] */
   --fc-rarity-epic:        var(--fc-accent-purple); /* [verify-light-theme] */
   --fc-rarity-legendary:   var(--fc-accent-gold); /* [verify-light-theme] */
 
+  /* Element 16 — Collection card (roster pages: Programs / Plans / Clients) */
+  --fc-collection-card: #0B0C0F; /* [verify-light-theme] */
+  --fc-collection-card-raised: #101318; /* [verify-light-theme] */
+  --fc-collection-card-border: rgba(255, 255, 255, 0.09); /* [verify-light-theme] */
+  /* Phase intensity scale — training stress at a glance (aliases to semantic status/group) */
+  --phase-light: var(--fc-status-success); /* light / base #22E56A */
+  --phase-mod: var(--fc-status-warning); /* moderate / build #FFB020 */
+  --phase-hard: var(--fc-status-error); /* hard / peak #FF5A4D */
+  --phase-deload: var(--fc-group-c); /* deload / recovery #22D3EE */
+
   /* Gym console — client card state (coach /gym-console).
-     Lifting / pending reuse lime + gold; done uses aqua straight token; noprog indigo; stalled unique. */
+     Lifting / pending reuse action + gold; done uses aqua straight token; noprog indigo; stalled unique. */
   --fc-border-hi:          var(--fc-glass-border-strong);
-  --fc-divider:            rgba(255, 255, 255, 0.06);
-  --fc-state-lifting:      var(--fc-accent-lime);
-  --fc-state-lifting-soft: rgba(197, 255, 74, 0.1);
-  --fc-state-lifting-border: rgba(197, 255, 74, 0.25);
+  --fc-divider:            var(--fc-hairline);
+  --fc-state-lifting:      var(--fc-accent);
+  --fc-state-lifting-soft: var(--fc-accent-dim);
+  --fc-state-lifting-border: var(--fc-accent-glow);
   --fc-state-pending:      var(--fc-accent-gold);
   --fc-state-pending-soft: rgba(245, 194, 66, 0.1);
   --fc-state-pending-border: rgba(245, 194, 66, 0.25);
@@ -172,17 +217,17 @@
   --fc-effort-medium:       #F5C242; /* [verify-light-theme] */
   --fc-effort-medium-soft:  rgba(245, 194, 66, 0.14); /* [verify-light-theme] */
   --fc-effort-medium-border:rgba(245, 194, 66, 0.30); /* [verify-light-theme] */
-  --fc-effort-hard:         #F59E42; /* [verify-light-theme] */
-  --fc-effort-hard-soft:    rgba(245, 158, 66, 0.14); /* [verify-light-theme] */
-  --fc-effort-hard-border:  rgba(245, 158, 66, 0.30); /* [verify-light-theme] */
-  --fc-effort-max:          #FF5A5F; /* [verify-light-theme] */
-  --fc-effort-max-soft:     rgba(255, 90, 95, 0.14); /* [verify-light-theme] */
-  --fc-effort-max-border:   rgba(255, 90, 95, 0.30); /* [verify-light-theme] */
+  --fc-effort-hard:         #FF7A2F; /* orange step between amber and red (picker v6) */
+  --fc-effort-hard-soft:    rgba(255, 122, 47, 0.14);
+  --fc-effort-hard-border:  rgba(255, 122, 47, 0.30);
+  --fc-effort-max:          #FF5A4D; /* [verify-light-theme] */
+  --fc-effort-max-soft:     rgba(255, 90, 77, 0.15); /* [verify-light-theme] */
+  --fc-effort-max-border:   rgba(255, 90, 77, 0.30); /* [verify-light-theme] */
 
   /* Set-type tier badges — mirror .dark for light theme until audited */
-  --fc-set-type-straight:        #0891b2;
-  --fc-set-type-straight-soft:   rgba(8, 145, 178, 0.12);
-  --fc-set-type-straight-border: rgba(8, 145, 178, 0.28);
+  --fc-set-type-straight:        #2E7BFF;
+  --fc-set-type-straight-soft:   rgba(46, 123, 255, 0.16);
+  --fc-set-type-straight-border: rgba(46, 123, 255, 0.30);
   --fc-set-type-dropset:         #4f46e5;
   --fc-set-type-dropset-soft:    rgba(79, 70, 229, 0.12);
   --fc-set-type-dropset-border:  rgba(79, 70, 229, 0.28);
@@ -204,9 +249,9 @@
   --fc-set-type-amrap:           #65a30d;
   --fc-set-type-amrap-soft:      rgba(101, 163, 13, 0.12);
   --fc-set-type-amrap-border:    rgba(101, 163, 13, 0.28);
-  --fc-set-type-emom:            #0e7490;
-  --fc-set-type-emom-soft:       rgba(14, 116, 144, 0.1);
-  --fc-set-type-emom-border:     rgba(14, 116, 144, 0.26);
+  --fc-set-type-emom:            #2E7BFF;
+  --fc-set-type-emom-soft:       rgba(46, 123, 255, 0.16);
+  --fc-set-type-emom-border:     rgba(46, 123, 255, 0.30);
   --fc-set-type-fortime:         #ca8a04;
   --fc-set-type-fortime-soft:    rgba(202, 138, 4, 0.12);
   --fc-set-type-fortime-border:  rgba(202, 138, 4, 0.28);
@@ -237,53 +282,74 @@
   --fc-meal-dinner:         #a78bfa;
   --fc-meal-dinner-soft:    rgba(167, 139, 250, 0.12);
 
-  /* Coach dashboard — action orange + roster severity (coach-dashboard-v1) */
+  /* Coach dashboard — one-accent law (coach CTAs = accent blue) */
   --fc-ink: #061018;
-  --fc-coach-action: #ff5a36;
-  --fc-coach-action-2: #ffb13b;
-  --fc-coach-action-soft: rgba(255, 90, 54, 0.14);
-  --fc-coach-action-border: rgba(255, 90, 54, 0.3);
-  --fc-coach-action-glow: rgba(255, 90, 54, 0.4);
+  --fc-coach-action: var(--fc-accent);
+  --fc-coach-action-2: color-mix(in srgb, var(--fc-accent) 78%, #ffffff);
+  --fc-coach-action-soft: var(--fc-accent-dim);
+  --fc-coach-action-border: var(--fc-accent-glow);
+  --fc-coach-action-glow: var(--fc-accent-glow);
   /* Severity: align critical with existing effort-max; distinct names for coach UI */
   --fc-sev-critical: var(--fc-effort-max);
   --fc-sev-critical-soft: var(--fc-effort-max-soft);
   --fc-sev-critical-border: var(--fc-effort-max-border);
-  --fc-sev-warning: #f5c242;
-  --fc-sev-warning-soft: rgba(245, 194, 66, 0.1);
-  --fc-sev-warning-border: rgba(245, 194, 66, 0.25);
-  --fc-sev-new: #4fe3e8;
-  --fc-sev-new-soft: rgba(79, 227, 232, 0.1);
-  --fc-sev-new-border: rgba(79, 227, 232, 0.25);
-  --fc-sev-good: #34d399;
-  --fc-sev-good-soft: rgba(52, 211, 153, 0.1);
-  --fc-sev-good-border: rgba(52, 211, 153, 0.25);
+  --fc-sev-warning: #FFB020;
+  --fc-sev-warning-soft: rgba(255, 176, 32, 0.15);
+  --fc-sev-warning-border: rgba(255, 176, 32, 0.25);
+  --fc-sev-new: #2E7BFF;
+  --fc-sev-new-soft: rgba(46, 123, 255, 0.16);
+  --fc-sev-new-border: rgba(46, 123, 255, 0.30);
+  --fc-sev-good: #22E56A;
+  --fc-sev-good-soft: rgba(34, 229, 106, 0.15);
+  --fc-sev-good-border: rgba(34, 229, 106, 0.25);
 }
 
 .dark {
   /* Base: darkest layer (page background) */
-  --fc-bg-deep: #0a0a0f;
-  --fc-bg-basalt: #121824;
-  --fc-text-primary: #ffffff;
-  --fc-text-dim: #a0a6b0;
-  --fc-text-subtle: rgba(255, 255, 255, 0.55);
+  --fc-bg-deep: #0A0B0D;
+  --fc-bg-basalt: #0D0F13;
+  --fc-bg-base: var(--fc-bg-deep);
+  --fc-bg-page: var(--fc-bg-deep);
+  --fc-app-bg: var(--fc-bg-deep);
+  --fc-text-primary: #F7F6F1;
+  --fc-text-dim: #9B9C90;
+  --fc-text-subtle: #63645B;
 
-  /* Card/surface: same blue-gray family as background (#0b0f14 / #121824), one step lighter */
-  --fc-glass-base: #1c2333;
-  --fc-glass-soft: #192030;
-  --fc-glass-border: rgba(255, 255, 255, 0.08);
+  /* Card/surface */
+  --fc-glass-base: #1B1E24;
+  --fc-glass-soft: #22262E;
+  --fc-glass-border: rgba(255, 255, 255, 0.10);
   --fc-glass-border-strong: rgba(255, 255, 255, 0.14);
   --fc-glass-highlight: rgba(255, 255, 255, 0.08);
 
-  --fc-accent-cyan: #00f2ff;
+  /* NEW SYSTEM TOKENS */
+  --fc-accent: #2E7BFF;
+  --fc-accent-dim: rgba(46, 123, 255, 0.16);
+  --fc-accent-glow: rgba(46, 123, 255, 0.30);
+  --fc-hairline: rgba(255, 255, 255, 0.07);
+  --fc-hairline-strong: rgba(255, 255, 255, 0.13);
+  --fc-track: rgba(255, 255, 255, 0.08);
+  --fc-group-a: #2E7BFF;
+  --fc-group-a-dim: rgba(46, 123, 255, 0.18);
+  --fc-group-b: #9D6BFF;
+  --fc-group-b-dim: rgba(157, 107, 255, 0.18);
+  --fc-group-c: #22D3EE;
+  --fc-group-c-dim: rgba(34, 211, 238, 0.18);
+  --fc-group-c-soft: rgba(34, 211, 238, 0.12);
+  --fc-group-d: #FFB020;
+  --fc-group-d-dim: rgba(255, 176, 32, 0.18);
+
+  /* true cyan: --fc-group-c (#22D3EE) + -soft/-dim. Single aqua; #4FE3E8 collapsed here. */
   --fc-accent-purple: #8e94ff;
   --fc-accent-indigo: #4f46e5;
   --fc-accent-violet: #7c3aed;
 
-  --fc-status-success: #10b981;
-  --fc-status-warning: #fbbf24;
-  --fc-status-error: #ef4444;
-  --fc-status-info: #3b82f6;
-  --fc-status-inactive: #9ca3af;
+  --fc-status-success: #22E56A;
+  --fc-status-warning: #FFB020;
+  --fc-status-error: #FF5A4D;
+  --fc-status-danger: var(--fc-status-error); /* alias — prefer --fc-status-error */
+  --fc-status-info: var(--fc-accent); /* semantic alias: info = brand blue */
+  --fc-status-inactive: #63645B;
 
   --fc-domain-workouts: #38bdf8;
   --fc-domain-meals: #4ade80;
@@ -296,23 +362,29 @@
 
   --fc-shadow-card: 0 12px 32px -12px rgba(0, 0, 0, 0.55);
   --fc-shadow-nav: 0 20px 44px rgba(0, 0, 0, 0.45);
-  --fc-glow-cyan: 0 0 22px rgba(6, 182, 212, 0.28);
+  --fc-glow-cyan: 0 0 22px var(--fc-accent-glow);
   --fc-glow-rose: 0 16px 42px rgba(244, 63, 94, 0.45);
 
   --fc-vignette-edge: rgba(6, 8, 12, 0.7);
-  --fc-muted-overlay-start: #0a0a0f;
-  --fc-muted-overlay-mid: #141a22;
-  --fc-muted-overlay-end: #10161e;
+  --fc-muted-overlay-start: #0A0B0D;
+  --fc-muted-overlay-mid: #0D0F13;
+  --fc-muted-overlay-end: #1B1E24;
 
-  /* Surface hierarchy: blue-gray, elevated one step from background */
-  --fc-surface-card: #1c2333;
-  --fc-surface-card-border: rgba(255, 255, 255, 0.08);
-  --fc-surface-elevated: #232d3f;
+  /* Surface hierarchy */
+  --fc-surface-card: #1B1E24;
+  --fc-surface-card-border: rgba(255, 255, 255, 0.10);
+  --fc-surface-elevated: #22262E;
   --fc-surface-sunken: rgba(255, 255, 255, 0.04);
+  --fc-surface: var(--fc-surface-card);
+  /* Role tokens — default = legacy milky (coach unchanged); client scope remaps */
+  --fc-surface-inset: var(--fc-surface-card);
+  --fc-surface-float: var(--fc-surface-card);
+  --fc-surface-well: var(--fc-surface-sunken);
+  --fc-surface-tint: var(--fc-glass-highlight);
 
-  /* Card shell (dark): same geometry; semantic tints align with emerald/red panels on workout flow */
-  --fc-card-shell-bg: color-mix(in srgb, rgb(8, 51, 68) 60%, transparent);
-  --fc-card-shell-border-l: color-mix(in srgb, rgb(6, 182, 212) 40%, transparent);
+  /* Card shell (dark) */
+  --fc-card-shell-bg: color-mix(in srgb, var(--fc-accent) 20%, var(--fc-surface-card));
+  --fc-card-shell-border-l: color-mix(in srgb, var(--fc-accent) 40%, transparent);
   --fc-card-shell-success-bg: color-mix(in srgb, rgb(6, 78, 59) 32%, transparent);
   --fc-card-shell-success-border-l: color-mix(in srgb, rgb(52, 211, 153) 55%, transparent);
   --fc-card-shell-error-bg: color-mix(in srgb, rgb(127, 29, 29) 30%, transparent);
@@ -327,11 +399,8 @@
      These are the authoritative dark-theme values per
      design-system-v4 §2.2, §2.3, §2.6, §2.7, §2.8, §2.9.
      ============================================================ */
-  /* §2.3 Accent — lime (action) */
-  --fc-accent-lime:        #C5FF4A;
-  --fc-accent-lime-2:      #7FE89A;
-  --fc-accent-lime-soft:   rgba(197, 255, 74, 0.13);
-  --fc-accent-lime-glow:   rgba(197, 255, 74, 0.38);
+  /* §2.3 Accent — action (action) → unified brand accent */
+  /* action tokens removed in v5 — use --fc-accent / --fc-accent-dim / --fc-accent-glow */
   /* §2.3 Accent — gold (achievement) */
   --fc-accent-gold:        #F5C242;
   --fc-accent-gold-soft:   rgba(245, 194, 66, 0.13);
@@ -356,16 +425,25 @@
   /* §2.7 Achievement rarity (aliases) */
   --fc-rarity-common:      var(--fc-text-dim);
   --fc-rarity-uncommon:    var(--fc-status-success);
-  --fc-rarity-rare:        var(--fc-accent-cyan);
+  --fc-rarity-rare:        var(--fc-accent);
   --fc-rarity-epic:        var(--fc-accent-purple);
   --fc-rarity-legendary:   var(--fc-accent-gold);
 
+  /* Element 16 — Collection card (roster pages: Programs / Plans / Clients) */
+  --fc-collection-card: #0B0C0F;
+  --fc-collection-card-raised: #101318;
+  --fc-collection-card-border: rgba(255, 255, 255, 0.09);
+  --phase-light: var(--fc-status-success);
+  --phase-mod: var(--fc-status-warning);
+  --phase-hard: var(--fc-status-error);
+  --phase-deload: var(--fc-group-c);
+
   /* Gym console — client card state (dark). */
   --fc-border-hi:          var(--fc-glass-border-strong);
-  --fc-divider:            rgba(255, 255, 255, 0.06);
-  --fc-state-lifting:      var(--fc-accent-lime);
-  --fc-state-lifting-soft: rgba(197, 255, 74, 0.1);
-  --fc-state-lifting-border: rgba(197, 255, 74, 0.25);
+  --fc-divider:            var(--fc-hairline);
+  --fc-state-lifting:      var(--fc-accent);
+  --fc-state-lifting-soft: var(--fc-accent-dim);
+  --fc-state-lifting-border: var(--fc-accent-glow);
   --fc-state-pending:      var(--fc-accent-gold);
   --fc-state-pending-soft: rgba(245, 194, 66, 0.1);
   --fc-state-pending-border: rgba(245, 194, 66, 0.25);
@@ -388,17 +466,17 @@
   --fc-effort-medium:       #F5C242;
   --fc-effort-medium-soft:  rgba(245, 194, 66, 0.14);
   --fc-effort-medium-border:rgba(245, 194, 66, 0.30);
-  --fc-effort-hard:         #F59E42;
-  --fc-effort-hard-soft:    rgba(245, 158, 66, 0.14);
-  --fc-effort-hard-border:  rgba(245, 158, 66, 0.30);
-  --fc-effort-max:          #FF5A5F;
-  --fc-effort-max-soft:     rgba(255, 90, 95, 0.14);
-  --fc-effort-max-border:   rgba(255, 90, 95, 0.30);
+  --fc-effort-hard:         #FF7A2F;
+  --fc-effort-hard-soft:    rgba(255, 122, 47, 0.14);
+  --fc-effort-hard-border:  rgba(255, 122, 47, 0.30);
+  --fc-effort-max:          #FF5A4D;
+  --fc-effort-max-soft:     rgba(255, 90, 77, 0.15);
+  --fc-effort-max-border:   rgba(255, 90, 77, 0.30);
 
   /* Set-type tier badges (workout details / execution — workout-details-v1) */
-  --fc-set-type-straight:        #4fe3e8;
-  --fc-set-type-straight-soft:   rgba(79, 227, 232, 0.13);
-  --fc-set-type-straight-border: rgba(79, 227, 232, 0.3);
+  --fc-set-type-straight:        #2E7BFF;
+  --fc-set-type-straight-soft:   rgba(46, 123, 255, 0.16);
+  --fc-set-type-straight-border: rgba(46, 123, 255, 0.30);
   --fc-set-type-dropset:         #818cf8;
   --fc-set-type-dropset-soft:    rgba(129, 140, 248, 0.14);
   --fc-set-type-dropset-border:  rgba(129, 140, 248, 0.3);
@@ -420,9 +498,9 @@
   --fc-set-type-amrap:           #bef264;
   --fc-set-type-amrap-soft:      rgba(190, 242, 100, 0.14);
   --fc-set-type-amrap-border:    rgba(190, 242, 100, 0.32);
-  --fc-set-type-emom:            #22d3ee;
-  --fc-set-type-emom-soft:       rgba(34, 211, 238, 0.12);
-  --fc-set-type-emom-border:     rgba(34, 211, 238, 0.28);
+  --fc-set-type-emom:            #2E7BFF;
+  --fc-set-type-emom-soft:       rgba(46, 123, 255, 0.16);
+  --fc-set-type-emom-border:     rgba(46, 123, 255, 0.30);
   --fc-set-type-fortime:         #eab308;
   --fc-set-type-fortime-soft:    rgba(234, 179, 8, 0.14);
   --fc-set-type-fortime-border:  rgba(234, 179, 8, 0.32);
@@ -454,23 +532,23 @@
   --fc-meal-dinner-soft:    rgba(167, 139, 250, 0.12);
 
   --fc-ink: #061018;
-  --fc-coach-action: #ff5a36;
-  --fc-coach-action-2: #ffb13b;
-  --fc-coach-action-soft: rgba(255, 90, 54, 0.14);
-  --fc-coach-action-border: rgba(255, 90, 54, 0.3);
-  --fc-coach-action-glow: rgba(255, 90, 54, 0.4);
+  --fc-coach-action: var(--fc-accent);
+  --fc-coach-action-2: color-mix(in srgb, var(--fc-accent) 78%, #ffffff);
+  --fc-coach-action-soft: var(--fc-accent-dim);
+  --fc-coach-action-border: var(--fc-accent-glow);
+  --fc-coach-action-glow: var(--fc-accent-glow);
   --fc-sev-critical: var(--fc-effort-max);
   --fc-sev-critical-soft: var(--fc-effort-max-soft);
   --fc-sev-critical-border: var(--fc-effort-max-border);
-  --fc-sev-warning: #f5c242;
-  --fc-sev-warning-soft: rgba(245, 194, 66, 0.1);
-  --fc-sev-warning-border: rgba(245, 194, 66, 0.25);
-  --fc-sev-new: #4fe3e8;
-  --fc-sev-new-soft: rgba(79, 227, 232, 0.1);
-  --fc-sev-new-border: rgba(79, 227, 232, 0.25);
-  --fc-sev-good: #34d399;
-  --fc-sev-good-soft: rgba(52, 211, 153, 0.1);
-  --fc-sev-good-border: rgba(52, 211, 153, 0.25);
+  --fc-sev-warning: #FFB020;
+  --fc-sev-warning-soft: rgba(255, 176, 32, 0.15);
+  --fc-sev-warning-border: rgba(255, 176, 32, 0.25);
+  --fc-sev-new: #2E7BFF;
+  --fc-sev-new-soft: rgba(46, 123, 255, 0.16);
+  --fc-sev-new-border: rgba(46, 123, 255, 0.30);
+  --fc-sev-good: #22E56A;
+  --fc-sev-good-soft: rgba(34, 229, 106, 0.15);
+  --fc-sev-good-border: rgba(34, 229, 106, 0.25);
 }
 
 /* Page shell: STANDARD density (use on main content wrapper) */
@@ -502,7 +580,7 @@
   position: fixed;
   inset: 0;
   z-index: -2;
-  filter: blur(var(--fc-blur-aurora));
+  filter: none;
   opacity: 0.5;
 }
 
@@ -547,30 +625,28 @@
   animation: fc-gradient-shift 10s ease-in-out infinite;
 }
 
-/* Glass: lighter treatment for cards (reduced blur, more solid) */
+/* Glass → role surfaces (inset on page; client scope remaps --fc-surface-inset) */
 .fc-glass {
-  background: var(--fc-surface-card);
-  border: 1px solid var(--fc-surface-card-border);
-  backdrop-filter: blur(8px);
-  box-shadow: var(--fc-shadow-card);
+  background: var(--fc-surface-inset);
+  border: 1px solid var(--fc-hairline);
+  box-shadow: none;
 }
 
-/* Glass Heavy: full blur for nav, overlays, modals */
 .fc-glass-heavy {
-  background: var(--fc-glass-base);
-  border: 1px solid var(--fc-glass-border);
-  backdrop-filter: blur(var(--fc-blur-card));
-  box-shadow: var(--fc-shadow-card);
+  background: var(--fc-surface-inset);
+  border: 1px solid var(--fc-hairline);
+  box-shadow: none;
 }
 
 .fc-glass-soft {
-  background: var(--fc-glass-soft);
-  border: 1px solid var(--fc-glass-border);
-  backdrop-filter: blur(var(--fc-blur-card));
+  background: var(--fc-surface-inset);
+  border: 1px solid var(--fc-hairline);
 }
 
 .fc-card {
-  border-radius: var(--fc-radius-xl);
+  border-radius: 18px;
+  background: var(--fc-surface-inset);
+  border: 1px solid var(--fc-hairline);
   position: relative;
   overflow: hidden;
 }
@@ -586,10 +662,11 @@
 }
 
 .fc-list-row {
-  background: var(--fc-glass-soft);
-  border: 1px solid var(--fc-glass-border);
-  border-radius: var(--fc-radius-lg);
-  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--fc-hairline);
+  border-radius: 0;
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .fc-table {
@@ -600,8 +677,7 @@
 .fc-table thead {
   position: sticky;
   top: 0;
-  background: var(--fc-glass-base);
-  backdrop-filter: blur(var(--fc-blur-card));
+  background: var(--fc-surface-float);
 }
 
 .fc-badge {
@@ -609,94 +685,110 @@
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  border-radius: 999px;
+  border-radius: 8px;
+  font-family: var(--font-mono, ui-monospace, monospace);
   padding: 2px 8px;
 }
 
 .fc-btn {
-  border-radius: var(--fc-radius-lg);
+  border-radius: 15px;
   font-weight: 700;
   transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .fc-btn-primary {
-  background: linear-gradient(90deg, #0891b2 0%, #22d3ee 100%);
+  background: var(--fc-accent);
   color: #ffffff;
   font-weight: 700;
-  box-shadow:
-    0 10px 15px -3px rgba(6, 182, 212, 0.25),
-    0 4px 6px -4px rgba(6, 182, 212, 0.15);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-radius: 15px;
+  box-shadow: 0 4px 24px var(--fc-accent-glow);
 }
 
 .fc-btn-primary:hover {
-  box-shadow:
-    0 10px 15px -3px rgba(6, 182, 212, 0.4),
-    0 4px 6px -4px rgba(6, 182, 212, 0.2);
+  box-shadow: 0 4px 24px var(--fc-accent-glow);
 }
 
 .fc-btn-secondary {
-  background: var(--fc-glass-base);
+  background: transparent;
   color: var(--fc-text-primary);
   border: 1px solid var(--fc-glass-border);
+  border-radius: 15px;
+  box-shadow: none;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .fc-btn-ghost {
   background: transparent;
-  color: var(--fc-text-dim);
+  color: var(--fc-text-primary);
+  border: none;
+  border-radius: 15px;
+  box-shadow: none;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .fc-btn-destructive {
   background: var(--fc-status-error);
   color: #ffffff;
-  box-shadow: var(--fc-glow-rose);
+  box-shadow: none;
 }
 
 .fc-input,
 .fc-select,
 .fc-textarea {
-  background: var(--fc-glass-soft);
-  border: 1px solid var(--fc-glass-border);
+  background: transparent;
+  border: none;
+  border-bottom: 1.5px solid var(--fc-glass-border);
   color: var(--fc-text-primary);
-  border-radius: var(--fc-radius-md);
+  border-radius: 0;
+}
+
+.fc-input:focus,
+.fc-select:focus,
+.fc-textarea:focus {
+  outline: none;
+  border-bottom-color: var(--fc-accent);
+  box-shadow: none;
 }
 
 /* Coach PR series picker: native <option> rows often pick up OS/light colors and
    end up white-on-white with our light text on the closed control. Force list colors. */
 select.fc-pr-series-select option {
-  background-color: var(--fc-surface-card);
+  background-color: var(--fc-surface-float);
   color: var(--fc-text-primary);
 }
 
 .fc-toast {
-  background: var(--fc-glass-base);
-  border: 1px solid var(--fc-glass-border);
-  border-radius: var(--fc-radius-lg);
-  backdrop-filter: blur(var(--fc-blur-nav));
+  background: var(--fc-surface-float);
+  border: 1px solid var(--fc-hairline);
+  border-radius: 18px;
+  box-shadow: none;
 }
 
 .fc-modal {
-  background: var(--fc-glass-base);
-  border: 1px solid var(--fc-glass-border-strong);
-  border-radius: var(--fc-radius-3xl);
-  backdrop-filter: blur(var(--fc-blur-nav));
+  background: var(--fc-surface-float);
+  border: 1px solid var(--fc-hairline);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
 }
 
-/* Navigation: always uses heavy glass */
+/* Navigation: floating opaque surface */
 .fc-nav {
-  background: var(--fc-glass-base);
-  border: 1px solid var(--fc-glass-border);
-  border-radius: var(--fc-radius-2xl);
-  backdrop-filter: blur(var(--fc-blur-nav));
-  -webkit-backdrop-filter: blur(var(--fc-blur-nav));
-  box-shadow: var(--fc-shadow-nav);
+  background: var(--fc-surface-float);
+  border: 1px solid var(--fc-hairline);
+  border-radius: 18px;
+  box-shadow: none;
 }
 
 .fc-nav-item-active {
-  background: var(--fc-glass-soft);
-  border: 1px solid var(--fc-glass-border);
-  color: var(--fc-text-primary);
+  background: var(--fc-accent-dim);
+  border: none;
+  color: var(--fc-accent);
   transform: scale(1.05);
-  box-shadow: var(--fc-shadow-card);
+  box-shadow: none;
 }
 
 .fc-nav-item-inactive {
@@ -704,17 +796,63 @@ select.fc-pr-series-select option {
 }
 
 .fc-nav-item-inactive:hover {
-  color: var(--fc-text-primary);
-  background: var(--fc-glass-soft);
+  color: var(--fc-accent);
+  background: var(--fc-accent-dim);
 }
 
 .fc-nav-indicator {
-  background: var(--fc-accent-cyan);
+  background: var(--fc-accent);
 }
 
 .fc-app-bg {
   background: var(--fc-bg-deep);
   color: var(--fc-text-primary);
+}
+
+/*
+ * Flat surface scope (v5) — remaps role + legacy tokens so call sites inherit
+ * without edits. Applied on /client* and /coach* via:
+ *   1) .fc-flat-surfaces (alias .fc-client-surfaces) on AppLayout / DesktopShell
+ *   2) html[data-fc-surface-scope="flat"] so portaled modals/toasts inherit
+ * Admin / marketing leave milky :root defaults.
+ */
+.fc-flat-surfaces,
+.fc-client-surfaces,
+html[data-fc-surface-scope="flat"],
+html[data-fc-surface-scope="client"] {
+  --fc-surface-inset: transparent;
+  --fc-surface-float: var(--fc-bg-deep);
+  --fc-surface-well: #050608;
+  --fc-surface-tint: rgba(255, 255, 255, 0.035);
+
+  /* Legacy token remaps — nests that were lighter than the page */
+  --fc-surface-card: var(--fc-surface-inset);
+  --fc-surface: var(--fc-surface-inset);
+  --fc-surface-elevated: var(--fc-surface-well);
+  --fc-surface-sunken: var(--fc-surface-well);
+  --fc-glass-base: var(--fc-surface-float);
+  --fc-glass-soft: var(--fc-surface-tint);
+  --fc-glass-highlight: var(--fc-surface-tint);
+  --fc-card-shell-bg: var(--fc-surface-inset);
+
+  /* Collection / roster cards — transparent inset + hairline (no milky fill) */
+  --fc-collection-card: var(--fc-surface-inset);
+  --fc-collection-card-raised: var(--fc-surface-tint);
+  --fc-collection-card-border: var(--fc-hairline);
+
+  /* shadcn mirrors used by Dialog / Popover */
+  --card: var(--fc-surface-float);
+  --popover: var(--fc-surface-float);
+}
+
+/* Kill collection-card radial glow under flat surfaces (v5: no glow).
+ * Note: CollectionCard uses CSS modules — module-local `:global(.fc-flat-surfaces) .card::after`
+ * in collectionCard.module.css is the authoritative kill for hashed class names. */
+.fc-flat-surfaces .card::after,
+.fc-client-surfaces .card::after,
+html[data-fc-surface-scope="flat"] .card::after,
+html[data-fc-surface-scope="client"] .card::after {
+  display: none;
 }
 
 .fc-press:active {
@@ -741,37 +879,37 @@ select.fc-pr-series-select option {
 .fc-section-heading .fc-line {
   flex: 1;
   height: 1px;
-  background: var(--fc-glass-border-strong);
+  background: var(--fc-hairline);
 }
 
 /* Floating action button (goals / add primary action) */
 .fc-fab {
   width: 64px;
   height: 64px;
-  border-radius: var(--fc-radius-lg);
+  border-radius: 15px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, var(--fc-status-error) 0%, #b91c1c 100%);
   color: white;
   border: none;
-  box-shadow: 0 12px 24px rgba(220, 38, 38, 0.35);
+  box-shadow: none;
   transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
 }
 .fc-fab:hover {
   transform: translateY(-4px);
-  box-shadow: 0 16px 32px rgba(220, 38, 38, 0.4);
+  box-shadow: none;
 }
 .dark .fc-fab {
-  box-shadow: 0 12px 24px rgba(239, 68, 68, 0.4);
+  box-shadow: none;
 }
 .dark .fc-fab:hover {
-  box-shadow: 0 16px 32px rgba(239, 68, 68, 0.5);
+  box-shadow: none;
 }
 
 .fc-selected {
-  background: color-mix(in srgb, var(--fc-accent-cyan) 20%, transparent);
-  box-shadow: inset 2px 0 0 var(--fc-accent-cyan);
+  background: var(--fc-accent-dim);
+  box-shadow: inset 2px 0 0 var(--fc-accent);
 }
 
 .fc-disabled {
@@ -786,7 +924,7 @@ select.fc-pr-series-select option {
 
 .fc-locked {
   opacity: 0.5;
-  filter: blur(0.5px);
+  filter: grayscale(1);
   border-style: dashed;
 }
 
@@ -858,13 +996,13 @@ select.fc-pr-series-select option {
   color: var(--fc-status-inactive);
 }
 
-/* §4.3 — Greeting name personalization (italic + cyan→lime gradient text)
+/* §4.3 — Greeting name personalization (italic + cyan→action gradient text)
    Used for "Hey, <em>{name}</em>" personalization on home/dashboard screens
    (client home, coach home, welcome). Phase 1 Screen 1 (B-J2 decision).
    Pattern parallels .tier-badge[data-tier="platinum"]: text-clipped gradient. */
 .fc-greeting-name {
   font-style: italic;
-  background-image: linear-gradient(90deg, var(--fc-accent-cyan), var(--fc-accent-lime));
+  background-image: linear-gradient(90deg, var(--fc-accent), var(--fc-accent));
   -webkit-background-clip: text;
           background-clip: text;
   color: transparent;
@@ -876,7 +1014,7 @@ select.fc-pr-series-select option {
   50% { opacity: 0.6; transform: scale(0.85); }
 }
 .fc-client-dashboard-eyebrow {
-  color: var(--fc-accent-lime);
+  color: var(--fc-accent);
 }
 .fc-client-dashboard-eyebrow::before {
   content: "";
@@ -884,8 +1022,8 @@ select.fc-pr-series-select option {
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: var(--fc-accent-lime);
-  box-shadow: 0 0 12px var(--fc-accent-lime-glow);
+  background: var(--fc-accent);
+  box-shadow: 0 0 12px var(--fc-accent-glow);
   animation: fc-client-dash-eyebrow-pulse 2s ease-in-out infinite;
 }
 
@@ -931,23 +1069,25 @@ select.fc-pr-series-select option {
 }
 
 .fc-pill {
-  border-radius: 999px;
+  border-radius: 8px;
   padding: 2px 8px;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  font-family: var(--font-mono, ui-monospace, monospace);
 }
 
 .fc-pill-glass {
-  background: color-mix(in srgb, var(--fc-text-primary) 6%, transparent);
-  border: 1px solid var(--fc-glass-border);
+  background: var(--fc-surface-card);
+  color: var(--fc-text-dim);
+  border: none;
 }
 
 .fc-icon-tile {
   width: 48px;
   height: 48px;
-  border-radius: var(--fc-radius-lg);
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1011,7 +1151,7 @@ select.fc-pr-series-select option {
 
 .fc-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--fc-accent-lime), var(--fc-accent-lime-2));
+  background: linear-gradient(90deg, var(--fc-accent), var(--fc-accent));
   border-radius: 4px;
   transition: width 1s cubic-bezier(0.65, 0, 0.35, 1);
 }
@@ -1020,8 +1160,8 @@ select.fc-pr-series-select option {
   width: 56px;
   height: 56px;
   border-radius: 12px;
-  background: var(--fc-glass-soft);
-  border: 1px solid var(--fc-glass-border);
+  background: var(--fc-surface-inset);
+  border: 1px solid var(--fc-hairline);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1048,11 +1188,12 @@ select.fc-pr-series-select option {
 
 .fc-status-pill {
   padding: 4px 12px;
-  border-radius: 999px;
+  border-radius: 8px;
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  font-family: var(--font-mono, ui-monospace, monospace);
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -1165,15 +1306,14 @@ select.fc-pr-series-select option {
 }
 
 .fc-header-bar.fc-header-collapsed {
-  background: color-mix(in srgb, var(--fc-bg-base) 88%, transparent);
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--fc-glass-border) 60%, transparent);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: var(--fc-surface-float);
+  border-bottom: 1px solid var(--fc-hairline);
+  box-shadow: none;
 }
 
 .fc-header-avatar {
-  background: var(--fc-surface-card);
-  border: 1px solid var(--fc-glass-border);
+  background: var(--fc-surface-float);
+  border: 1px solid var(--fc-hairline);
   color: var(--fc-text-primary);
 }
 
@@ -1210,12 +1350,10 @@ select.fc-pr-series-select option {
   z-index: 10000 !important;
   transform: none !important;
   height: 64px;
-  background: var(--fc-glass-base);
-  border: 1px solid var(--fc-glass-border);
-  border-radius: var(--fc-radius-2xl);
-  backdrop-filter: blur(var(--fc-blur-nav));
-  -webkit-backdrop-filter: blur(var(--fc-blur-nav));
-  box-shadow: var(--fc-shadow-nav);
+  background: var(--fc-surface-float);
+  border: 1px solid var(--fc-hairline);
+  border-radius: 19px;
+  box-shadow: none;
 }
 
 .fc-bottom-nav-inner {
@@ -1255,13 +1393,13 @@ select.fc-pr-series-select option {
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: var(--fc-accent-cyan);
-  box-shadow: 0 0 10px var(--fc-accent-cyan);
+  background: var(--fc-accent);
+  box-shadow: 0 0 10px var(--fc-accent-glow);
   z-index: 5;
   pointer-events: none;
 }
 
-/* Coach routes: v6 bar chrome + orange active (coach-dashboard-v1) */
+/* Coach routes: solid bar chrome + accent active */
 .fc-bottom-nav-float[data-coach-context="true"] {
   bottom: 14px;
   left: 14px;
@@ -1269,10 +1407,10 @@ select.fc-pr-series-select option {
   height: auto;
   min-height: 60px;
   padding: 2px 0;
-  background: rgba(7, 16, 26, 0.85);
-  border: 1px solid var(--fc-glass-border-strong);
+  background: var(--fc-surface-float);
+  border: 1px solid var(--fc-hairline);
   border-radius: 999px;
-  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+  box-shadow: none;
 }
 .fc-bottom-nav-float[data-coach-context="true"] .fc-bottom-nav-inner {
   padding: 8px 4px;
@@ -1282,29 +1420,41 @@ select.fc-pr-series-select option {
   gap: 3px;
 }
 .fc-bottom-nav-float[data-coach-context="true"] .fc-bottom-nav-active-dot {
-  background: var(--fc-accent-cyan);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--fc-accent-cyan) 35%, transparent);
+  background: var(--fc-accent);
+  box-shadow: 0 0 8px var(--fc-accent-glow);
 }
 .fc-bottom-nav-float[data-coach-context="true"] .fc-bottom-nav-item--active .fc-bottom-nav-active-dot {
-  background: var(--fc-accent-cyan);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--fc-accent-cyan) 40%, transparent);
+  background: var(--fc-accent);
+  box-shadow: 0 0 10px var(--fc-accent-glow);
 }
 
 .fc-bottom-nav-item:hover .fc-text-dim {
   color: var(--fc-text-primary);
 }
 
+/* Cluster 7 client bar: active = dot + icon color only (no pill background) */
+.fc-bottom-nav-float:not([data-coach-context="true"]) .fc-bottom-nav-item--active {
+  background: transparent;
+  color: inherit;
+}
+
+.fc-bottom-nav-item--active {
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
+}
+
 .fc-bottom-nav-pill {
   position: absolute;
   inset: 2px;
   border-radius: var(--fc-radius-md);
-  background: var(--fc-surface-sunken);
-  border: 1px solid var(--fc-glass-border);
+  background: transparent;
+  border: none;
 }
 
 .fc-bottom-nav-item--active .fc-bottom-nav-pill {
-  background: color-mix(in srgb, var(--fc-accent-cyan) 12%, transparent);
-  border-color: color-mix(in srgb, var(--fc-accent-cyan) 20%, transparent);
+  background: var(--fc-accent-dim);
+  border: none;
+  color: var(--fc-accent);
 }
 
 /* Center Train Button Styles */
@@ -1325,20 +1475,18 @@ select.fc-pr-series-select option {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: var(--fc-accent-cyan);
+  background: var(--fc-accent);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(8, 145, 178, 0.4),
-              0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 24px var(--fc-accent-glow);
   transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
   position: relative;
 }
 
 .fc-bottom-nav-item-center:hover .fc-bottom-nav-center-button {
   transform: scale(1.05);
-  box-shadow: 0 6px 16px rgba(8, 145, 178, 0.5),
-              0 4px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 24px var(--fc-accent-glow);
 }
 
 .fc-bottom-nav-item-center:active .fc-bottom-nav-center-button {
@@ -1349,7 +1497,7 @@ select.fc-pr-series-select option {
   position: absolute;
   inset: -4px;
   border-radius: 50%;
-  border: 2px solid var(--fc-accent-cyan);
+  border: 2px solid var(--fc-accent);
   opacity: 0.6;
   animation: pulse-ring 2s cubic-bezier(0.4, 0.0, 0.6, 1) infinite;
 }
@@ -1388,18 +1536,16 @@ select.fc-pr-series-select option {
 
 /* Dark mode adjustments for center button */
 .dark .fc-bottom-nav-center-button {
-  background: var(--fc-accent-cyan);
-  box-shadow: 0 4px 12px rgba(0, 242, 255, 0.4),
-              0 2px 4px rgba(0, 0, 0, 0.2);
+  background: var(--fc-accent);
+  box-shadow: 0 4px 24px var(--fc-accent-glow);
 }
 
 .dark .fc-bottom-nav-item-center:hover .fc-bottom-nav-center-button {
-  box-shadow: 0 6px 16px rgba(0, 242, 255, 0.5),
-              0 4px 8px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 24px var(--fc-accent-glow);
 }
 
 .dark .fc-bottom-nav-center-ring {
-  border-color: var(--fc-accent-cyan);
+  border-color: var(--fc-accent);
 }
 
 /* Athlete Score Ring Glow Animations */
@@ -1429,31 +1575,31 @@ select.fc-pr-series-select option {
   animation: athlete-score-ember-glow 4s ease-in-out infinite;
 }
 
-/* --- Surface Card (non-glass, for content) --- */
+/* --- Surface Card (inset role; hairline so transparent fills still read) --- */
 .fc-surface {
-  background: var(--fc-surface-card);
-  border: 1px solid var(--fc-surface-card-border);
-  border-radius: var(--fc-radius-xl);
+  background: var(--fc-surface-inset);
+  border: 1px solid var(--fc-hairline);
+  border-radius: 18px;
   position: relative;
   overflow: hidden;
 }
 
 .fc-surface-elevated {
-  background: var(--fc-surface-elevated);
-  border: 1px solid var(--fc-glass-border);
-  border-radius: var(--fc-radius-xl);
-  box-shadow: var(--fc-shadow-card);
+  background: var(--fc-surface-inset);
+  border: 1px solid var(--fc-hairline);
+  border-radius: 18px;
+  box-shadow: none;
   position: relative;
   overflow: hidden;
 }
 
-/* --- Card shell (prescription geometry: left accent, no full perimeter border) --- */
+/* --- Card shell (prescription: left accent + hairline perimeter) --- */
 .fc-card-shell {
-  border-radius: var(--fc-card-shell-radius);
-  border: none;
+  border-radius: 18px;
+  border: 1px solid var(--fc-hairline);
   border-left: 4px solid var(--fc-card-shell-border-l);
   background: var(--fc-card-shell-bg);
-  box-shadow: var(--fc-shadow-card);
+  box-shadow: none;
   position: relative;
   overflow: hidden;
 }
@@ -1480,10 +1626,10 @@ select.fc-pr-series-select option {
 
 /** Left accent + radius only; pair with Tailwind `bg-*` when overriding fill */
 .fc-card-shell-outline {
-  border-radius: var(--fc-card-shell-radius);
+  border-radius: 18px;
   border: none;
   border-left: 4px solid var(--fc-card-shell-border-l);
-  box-shadow: var(--fc-shadow-card);
+  box-shadow: none;
 }
 
 /* --- Metric Gauge Styles --- */
@@ -1537,8 +1683,8 @@ select.fc-pr-series-select option {
   display: flex;
   align-items: stretch;
   gap: 1px;
-  background: var(--fc-glass-border);
-  border-radius: var(--fc-radius-lg);
+  background: var(--fc-hairline);
+  border-radius: 18px;
   overflow: hidden;
 }
 
@@ -1549,7 +1695,7 @@ select.fc-pr-series-select option {
   align-items: center;
   justify-content: center;
   padding: 12px 8px;
-  background: var(--fc-surface-card);
+  background: var(--fc-surface-inset);
 }
 
 .fc-stats-strip-item:first-child {
@@ -1585,8 +1731,9 @@ select.fc-pr-series-select option {
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+  font-family: var(--font-mono, ui-monospace, monospace);
   padding: 3px 8px;
-  border-radius: 999px;
+  border-radius: 8px;
   border: 1px solid transparent;
   line-height: 1.2;
   box-sizing: border-box;
@@ -1689,9 +1836,9 @@ select.fc-pr-series-select option {
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  border-radius: var(--fc-radius-xl);
+  border-radius: 9px;
   background: var(--fc-surface-card);
-  border: 1px solid var(--fc-surface-card-border);
+  border: none;
   white-space: nowrap;
   font-size: 13px;
   font-weight: 600;
@@ -1703,8 +1850,8 @@ select.fc-pr-series-select option {
 }
 
 .fc-action-chip:hover {
-  background: var(--fc-surface-elevated);
-  border-color: var(--fc-glass-border);
+  background: var(--fc-surface-card);
+  border-color: transparent;
   transform: translateY(-1px);
 }
 
@@ -1715,7 +1862,7 @@ select.fc-pr-series-select option {
 .fc-action-chip-icon {
   width: 32px;
   height: 32px;
-  border-radius: var(--fc-radius-sm);
+  border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1786,9 +1933,9 @@ select.fc-pr-series-select option {
 
 /* --- Hero Card Upgrade --- */
 .fc-hero-card {
-  background: var(--fc-surface-elevated);
-  border: 1px solid var(--fc-glass-border);
-  border-radius: var(--fc-radius-xl);
+  background: var(--fc-surface-inset);
+  border: 1px solid var(--fc-hairline);
+  border-radius: 18px;
   position: relative;
   overflow: hidden;
 }
@@ -1811,7 +1958,7 @@ select.fc-pr-series-select option {
 }
 
 .fc-activity-bar--active {
-  background: linear-gradient(90deg, var(--fc-accent-cyan), var(--fc-status-success));
+  background: linear-gradient(90deg, var(--fc-accent), var(--fc-status-success));
 }
 
 .fc-activity-bar--inactive {
@@ -1858,7 +2005,7 @@ select.fc-pr-series-select option {
   position: absolute;
   inset: -14%;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(6, 182, 212, 0.28) 0%, rgba(34, 211, 238, 0.08) 45%, transparent 70%);
+  background: radial-gradient(circle, var(--fc-accent-glow) 0%, var(--fc-accent-dim) 45%, transparent 70%);
   pointer-events: none;
   z-index: 0;
 }
@@ -2126,7 +2273,7 @@ select.fc-pr-series-select option {
 .as-ring-tier-beast .as-ring-beast-score {
   text-shadow:
     0 0 10px rgba(125, 211, 252, 0.48),
-    0 0 24px rgba(6, 182, 212, 0.34),
+    0 0 24px var(--fc-accent-glow),
     0 0 34px rgba(190, 242, 100, 0.22);
   animation: as-ring-beast-text-glow 2s ease-in-out infinite;
 }
@@ -2156,16 +2303,13 @@ select.fc-pr-series-select option {
 /* §6.4 — Hero (action) card with diagonal-line texture overlay */
 .fc-hero-action {
   background:
-    radial-gradient(120% 80% at 0% 0%, color-mix(in srgb, var(--fc-accent-lime) 22%, transparent), transparent 50%),
-    radial-gradient(80% 80% at 100% 100%, color-mix(in srgb, var(--fc-accent-lime-2) 14%, transparent), transparent 60%),
-    linear-gradient(135deg, color-mix(in srgb, var(--fc-accent-lime) 8%, var(--fc-surface-card)), var(--fc-surface-card));
-  border: 1px solid color-mix(in srgb, var(--fc-accent-lime) 20%, transparent);
-  border-radius: var(--fc-radius-2xl);
+    radial-gradient(120% 80% at 0% 0%, color-mix(in srgb, var(--fc-accent) 22%, transparent), transparent 50%),
+    radial-gradient(80% 80% at 100% 100%, color-mix(in srgb, var(--fc-accent) 14%, transparent), transparent 60%),
+    linear-gradient(135deg, color-mix(in srgb, var(--fc-accent) 8%, var(--fc-surface-card)), var(--fc-surface-card));
+  border: 1px solid color-mix(in srgb, var(--fc-accent) 20%, transparent);
+  border-radius: 18px;
   padding: 22px;
-  box-shadow:
-    0 30px 60px -25px rgba(0, 0, 0, 0.5),
-    0 20px 50px -20px var(--fc-accent-lime-glow),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  box-shadow: 0 30px 60px -25px rgba(0, 0, 0, 0.5);
   position: relative;
   overflow: hidden;
 }
@@ -2191,24 +2335,24 @@ select.fc-pr-series-select option {
   border: 1px solid color-mix(in srgb, var(--fc-status-success) 16%, transparent);
 }
 .fc-card-status-info {
-  background: color-mix(in srgb, var(--fc-accent-cyan) 6%, var(--fc-surface-card));
-  border: 1px solid color-mix(in srgb, var(--fc-accent-cyan) 16%, transparent);
+  background: color-mix(in srgb, var(--fc-accent) 6%, var(--fc-surface-card));
+  border: 1px solid color-mix(in srgb, var(--fc-accent) 16%, transparent);
 }
 
 /* §3 — Atmospheric backdrops (role-based, static radial halos) */
 .fc-backdrop-action-top {
   background:
-    radial-gradient(ellipse 100% 60% at 50% -20%, var(--fc-accent-lime-soft), transparent 70%),
+    radial-gradient(ellipse 100% 60% at 50% -20%, var(--fc-accent-dim), transparent 70%),
     linear-gradient(180deg, transparent 0%, var(--fc-bg-basalt) 100%);
 }
 .fc-backdrop-action-bottom {
   background:
-    radial-gradient(ellipse 110% 50% at 50% 80%, color-mix(in srgb, var(--fc-accent-lime) 13%, transparent), transparent 70%),
+    radial-gradient(ellipse 110% 50% at 50% 80%, color-mix(in srgb, var(--fc-accent) 13%, transparent), transparent 70%),
     linear-gradient(180deg, var(--fc-bg-basalt) 0%, transparent 60%);
 }
 .fc-backdrop-info {
   background:
-    radial-gradient(ellipse 90% 50% at 50% -20%, color-mix(in srgb, var(--fc-accent-cyan) 6%, transparent), transparent 70%),
+    radial-gradient(ellipse 90% 50% at 50% -20%, color-mix(in srgb, var(--fc-accent) 6%, transparent), transparent 70%),
     linear-gradient(180deg, transparent 0%, var(--fc-bg-basalt) 100%);
 }
 .fc-backdrop-warning {
@@ -2251,23 +2395,17 @@ select.fc-pr-series-select option {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: linear-gradient(
-    135deg,
-    var(--fc-accent-lime),
-    color-mix(in srgb, var(--fc-accent-lime) 70%, var(--fc-accent-lime-2, #7FE89A))
-  );
-  color: #061018;
+  background: var(--fc-accent);
+  color: #ffffff;
   font-weight: 700;
   /* workout-exec-v6 mock .log-btn */
   font-size: 14px;
   padding: 15px;
-  border-radius: 14px;
+  border-radius: 15px;
   border: none;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  box-shadow:
-    0 12px 30px -8px var(--fc-accent-lime-glow),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 24px var(--fc-accent-glow);
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
@@ -2284,24 +2422,22 @@ select.fc-pr-series-select option {
   filter: grayscale(0.4);
 }
 
-/* Coach primary CTA — orange gradient (coach-dashboard-v1) */
+/* Coach primary CTA — accent blue (one-accent law) */
 .btn-action-coach {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: linear-gradient(135deg, var(--fc-coach-action), var(--fc-coach-action-2));
-  color: var(--fc-ink);
+  background: var(--fc-accent);
+  color: #ffffff;
   font-weight: 700;
   font-size: 14px;
   padding: 15px;
-  border-radius: 14px;
+  border-radius: 15px;
   border: none;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  box-shadow:
-    0 12px 30px -8px var(--fc-coach-action-glow),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 24px var(--fc-accent-glow);
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
@@ -2334,8 +2470,9 @@ select.fc-pr-series-select option {
   font-weight: 700;
   font-size: 14px;
   padding: 14px 18px;
-  border-radius: var(--fc-radius-lg);
+  border-radius: 15px;
   border: none;
+  box-shadow: none;
   cursor: pointer;
   transition: transform 0.15s ease, filter 0.2s ease;
 }
@@ -2345,19 +2482,23 @@ select.fc-pr-series-select option {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--fc-accent-cyan);
-  border: 1px solid var(--fc-glass-border);
-  border-radius: 999px;
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
+  border: none;
+  border-radius: 8px;
   padding: 6px 14px;
   font-size: 12px;
   font-weight: 600;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   cursor: pointer;
   transition: background 0.2s ease, border-color 0.2s ease;
 }
 .btn-pill:hover {
-  background: color-mix(in srgb, var(--fc-accent-cyan) 8%, transparent);
-  border-color: color-mix(in srgb, var(--fc-accent-cyan) 25%, transparent);
+  background: var(--fc-accent-dim);
+  border-color: transparent;
+  color: var(--fc-accent);
 }
 .btn-ghost-icon,
 .btn-ghost-icon-sm {
@@ -2365,10 +2506,13 @@ select.fc-pr-series-select option {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  background: rgba(255, 255, 255, 0.05);
+  background: transparent;
   border: 1px solid var(--fc-glass-border);
-  color: var(--fc-text-dim);
-  border-radius: var(--fc-radius-md);
+  color: var(--fc-text-primary);
+  border-radius: 10px;
+  box-shadow: none;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
   padding: 8px 12px;
   cursor: pointer;
   transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
@@ -2387,7 +2531,7 @@ select.fc-pr-series-select option {
   border-color: color-mix(in srgb, var(--fc-status-error) 30%, transparent);
 }
 
-/* §6.21 — Floating Action Button (lime, NOT red).
+/* §6.21 — Floating Action Button (action, NOT red).
    Phase 0b Task 6: replaces .fc-fab on create CTAs.
    `--fc-fab-bottom` (globals.css): ~7.2rem mobile (clearance above floating pill nav);
    desktop uses a fixed rem offset — independent of `--fc-bottom-safe-area`. */
@@ -2398,9 +2542,9 @@ select.fc-pr-series-select option {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--fc-accent-lime), var(--fc-accent-lime-2));
-  color: #061018;
-  box-shadow: 0 16px 40px -8px var(--fc-accent-lime-glow);
+  background: var(--fc-accent);
+  color: #ffffff;
+  box-shadow: 0 4px 24px var(--fc-accent-glow);
   display: grid;
   place-items: center;
   border: none;
@@ -2441,6 +2585,7 @@ select.fc-pr-series-select option {
 }
 .input-cell .num {
   font-family: var(--font-display, var(--font-number, var(--font-mono, ui-monospace, monospace)));
+  font-stretch: 125%;
   font-weight: 700;
   font-size: 28px;
   line-height: 1;
@@ -2457,7 +2602,10 @@ select.fc-pr-series-select option {
   font-size: 11px;
   font-weight: 600;
   padding: 2px 6px;
-  border-radius: 999px;
+  border-radius: 8px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   font-feature-settings: "tnum";
 }
 .delta.up      { color: var(--fc-status-success); background: color-mix(in srgb, var(--fc-status-success) 10%, transparent); }
@@ -2470,9 +2618,12 @@ select.fc-pr-series-select option {
   align-items: center;
   gap: 4px;
   padding: 3px 8px;
-  border-radius: 999px;
+  border-radius: 8px;
   font-size: 11px;
   font-weight: 600;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 .variance-pill[data-variance="on-target"]   { color: var(--fc-macro-on-target);   background: color-mix(in srgb, var(--fc-macro-on-target)   10%, transparent); }
 .variance-pill[data-variance="near-target"] { color: var(--fc-macro-near-target); background: color-mix(in srgb, var(--fc-macro-near-target) 10%, transparent); }
@@ -2482,11 +2633,12 @@ select.fc-pr-series-select option {
 .priority-pill {
   display: inline-flex;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 8px;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.10em;
   text-transform: uppercase;
+  font-family: var(--font-mono, ui-monospace, monospace);
 }
 .priority-pill[data-priority="high"]   { color: var(--fc-status-warning); background: color-mix(in srgb, var(--fc-status-warning) 12%, transparent); }
 .priority-pill[data-priority="medium"] { color: var(--fc-text-dim);       background: rgba(255, 255, 255, 0.05); }
@@ -2496,25 +2648,27 @@ select.fc-pr-series-select option {
 .tag-system {
   display: inline-flex;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 8px;
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--fc-accent-cyan);
-  background: color-mix(in srgb, var(--fc-accent-cyan) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--fc-accent-cyan) 20%, transparent);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  color: var(--fc-accent);
+  background: var(--fc-accent-dim);
+  border: none;
 }
 
 /* §6.17 — Status tag (status-tinted) */
 .tag-status {
   display: inline-flex;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 8px;
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+  font-family: var(--font-mono, ui-monospace, monospace);
   border: 1px solid transparent;
 }
 .tag-status[data-status="completed"] { color: var(--fc-status-success); background: color-mix(in srgb, var(--fc-status-success) 12%, transparent); }
@@ -2528,17 +2682,18 @@ select.fc-pr-series-select option {
 .tier-badge {
   display: inline-flex;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 8px;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.10em;
   text-transform: uppercase;
+  font-family: var(--font-mono, ui-monospace, monospace);
 }
 .tier-badge[data-tier="bronze"]   { color: var(--fc-accent-bronze); background: color-mix(in srgb, var(--fc-accent-bronze) 14%, transparent); }
 .tier-badge[data-tier="silver"]   { color: var(--fc-accent-silver); background: color-mix(in srgb, var(--fc-accent-silver) 12%, transparent); }
 .tier-badge[data-tier="gold"]     { color: var(--fc-accent-gold);   background: var(--fc-accent-gold-soft); }
 .tier-badge[data-tier="platinum"] {
-  background-image: linear-gradient(90deg, var(--fc-accent-gold), var(--fc-accent-cyan));
+  background-image: linear-gradient(90deg, var(--fc-accent-gold), var(--fc-accent));
   -webkit-background-clip: text;
           background-clip: text;
   color: transparent;
@@ -2548,7 +2703,7 @@ select.fc-pr-series-select option {
    cyan→silver→ice ("cold prestige"). Pattern parallels platinum: text-clipped
    gradient, color: transparent. */
 .tier-badge[data-tier="diamond"] {
-  background-image: linear-gradient(90deg, var(--fc-accent-cyan), var(--fc-accent-silver), #E0F2FE);
+  background-image: linear-gradient(90deg, var(--fc-accent), var(--fc-accent-silver), #E0F2FE);
   -webkit-background-clip: text;
           background-clip: text;
   color: transparent;
@@ -2558,11 +2713,12 @@ select.fc-pr-series-select option {
 .rarity-pill {
   display: inline-flex;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 8px;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.10em;
   text-transform: uppercase;
+  font-family: var(--font-mono, ui-monospace, monospace);
 }
 .rarity-pill[data-rarity="common"]    { color: var(--fc-rarity-common); }
 .rarity-pill[data-rarity="uncommon"]  { color: var(--fc-rarity-uncommon);  background: color-mix(in srgb, var(--fc-rarity-uncommon)  10%, transparent); }
@@ -2618,8 +2774,8 @@ select.fc-pr-series-select option {
 
 /* §6.13 — Coach quote zone (system/coach voice) */
 .coach-quote {
-  background: color-mix(in srgb, var(--fc-accent-cyan) 5%, transparent);
-  border-left: 2px solid var(--fc-accent-cyan);
+  background: color-mix(in srgb, var(--fc-accent) 5%, transparent);
+  border-left: 2px solid var(--fc-accent);
   border-radius: 2px 10px 10px 2px;
   padding: 10px 14px;
   color: var(--fc-text-primary);
@@ -2630,6 +2786,7 @@ select.fc-pr-series-select option {
 /* §6.28 — Difficulty rating (numeric on a session, e.g. "8/10") */
 .difficulty-rating {
   font-family: var(--font-display, var(--font-number, var(--font-mono, ui-monospace, monospace)));
+  font-stretch: 125%;
   font-weight: 600;
   font-size: 16px;
   font-feature-settings: "tnum";
@@ -2653,11 +2810,14 @@ select.fc-pr-series-select option {
 }
 .filter-pill {
   padding: 6px 12px;
-  border-radius: 999px;
+  border-radius: 8px;
   font-size: 12px;
   font-weight: 600;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   border: 1px solid transparent;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-card);
   color: var(--fc-text-dim);
   white-space: nowrap;
   cursor: pointer;
@@ -2668,9 +2828,9 @@ select.fc-pr-series-select option {
   color: var(--fc-text-primary);
 }
 .filter-pill.active {
-  background: color-mix(in srgb, var(--fc-accent-cyan) 12%, transparent);
-  color: var(--fc-accent-cyan);
-  border-color: color-mix(in srgb, var(--fc-accent-cyan) 30%, transparent);
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
+  border-color: transparent;
 }
 
 /* §6.37 — Add-item placeholder (dashed-border CTA at end of a list) */
@@ -2693,8 +2853,8 @@ select.fc-pr-series-select option {
 }
 .add-placeholder:hover,
 .add-placeholder:focus-visible {
-  border-color: color-mix(in srgb, var(--fc-accent-cyan) 40%, transparent);
-  color: var(--fc-accent-cyan);
+  border-color: color-mix(in srgb, var(--fc-accent) 40%, transparent);
+  color: var(--fc-accent);
   outline: none;
 }
 
@@ -2708,7 +2868,7 @@ select.fc-pr-series-select option {
   justify-content: space-between;
   align-items: baseline;
   padding-bottom: 8px;
-  border-bottom: 1px solid var(--fc-glass-border);
+  border-bottom: 1px solid var(--fc-hairline);
 }
 .archive-eyebrow {
   font-size: 9px;

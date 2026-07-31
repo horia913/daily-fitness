@@ -1,36 +1,33 @@
 /* Client profile v1 — scoped v6 tokens (aligned with coachAnalyticsHub / gym-console drawer) */
 .root {
-  --bg: #07101a;
-  --card: #0e1f2e;
-  --card-2: #0b1824;
-  --line: rgba(255, 255, 255, 0.08);
-  --line-2: rgba(255, 255, 255, 0.05);
-  --t1: #fff;
-  --t2: rgba(255, 255, 255, 0.65);
-  --t3: rgba(255, 255, 255, 0.42);
-  --t4: rgba(255, 255, 255, 0.26);
-  --cyan: #4fe3e8;
-  --cyan-soft: rgba(79, 227, 232, 0.12);
-  --cyan-dim: rgba(79, 227, 232, 0.18);
-  --lime: #c5ff4a;
-  --lime-2: #7fe89a;
-  --lime-soft: rgba(197, 255, 74, 0.14);
-  --critical: #ff5a5f;
-  --critical-soft: rgba(255, 90, 95, 0.12);
-  --warning: #f5c242;
-  --warning-soft: rgba(245, 194, 66, 0.12);
-  --good: #34d399;
-  --good-soft: rgba(52, 211, 153, 0.12);
-  --good-dim: rgba(52, 211, 153, 0.25);
-  --warning-dim: rgba(245, 194, 66, 0.25);
+  --bg: var(--fc-bg-deep);
+  --card: var(--fc-surface-card);
+  --card-2: var(--fc-bg-deep);
+  --line: var(--fc-glass-border);
+  --line-2: var(--fc-hairline);
+  --t1: var(--fc-text-primary);
+  --t2: var(--fc-text-dim);
+  --t3: var(--fc-text-subtle);
+  --t4: var(--fc-text-quaternary);
+  --good: var(--fc-status-success);
+  --good-soft: color-mix(in srgb, var(--fc-status-success) 12%, transparent);
+  --good-dim: color-mix(in srgb, var(--fc-status-success) 25%, transparent);
+  --warning: var(--fc-status-warning);
+  --warning-soft: color-mix(in srgb, var(--fc-status-warning) 12%, transparent);
+  --warning-dim: color-mix(in srgb, var(--fc-status-warning) 25%, transparent);
+  --critical: var(--fc-status-error);
+  --critical-soft: color-mix(in srgb, var(--fc-status-error) 12%, transparent);
+  --f-head: var(--f-headline);
+  --f-body: var(--font-body);
+  --f-mono: var(--f-mono);
+  --f-display: var(--f-display);
+
+  --warning-dim: color-mix(in srgb, var(--fc-status-warning) 25%, transparent);
   --purple: #a78bfa;
   --purple-soft: rgba(167, 139, 250, 0.12);
   --rose: #f472b6;
   --rose-soft: rgba(244, 114, 182, 0.12);
-  --avatar-initial: #0a1a26;
-  --f-head: "Bricolage Grotesque", var(--font-geist-sans, system-ui, sans-serif);
-  --f-body: var(--font-geist-sans, "Geist", system-ui, sans-serif);
-  --f-mono: var(--font-geist-mono, "Geist Mono", ui-monospace, monospace);
+  --avatar-initial: var(--fc-ink);
   color: var(--t1);
   padding-bottom: 8px;
 }
@@ -42,9 +39,9 @@
 }
 
 .sectionCard {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 18px;
+  background: transparent;
+  border: 1px solid var(--line-2);
+  border-radius: 16px;
   padding: 14px;
   display: flex;
   flex-direction: column;
@@ -67,21 +64,21 @@
 }
 
 .sectionIconCyan {
-  background: var(--cyan-soft);
-  color: var(--cyan);
-  border: 1px solid var(--cyan-dim);
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
+  border: 1px solid var(--fc-accent-glow);
 }
 
 .sectionIconPurple {
-  background: var(--purple-soft);
-  color: var(--purple);
-  border: 1px solid rgba(167, 139, 250, 0.22);
+  background: color-mix(in srgb, var(--fc-group-d) 14%, transparent);
+  color: var(--fc-group-d);
+  border: 1px solid color-mix(in srgb, var(--fc-group-d) 28%, transparent);
 }
 
 .sectionIconWarn {
   background: var(--warning-soft);
   color: var(--warning);
-  border: 1px solid rgba(245, 194, 66, 0.22);
+  border: 1px solid color-mix(in srgb, var(--fc-status-warning) 22%, transparent);
 }
 
 .sectionIconRose {
@@ -90,10 +87,10 @@
   border: 1px solid rgba(244, 114, 182, 0.22);
 }
 
-.sectionIconLime {
-  background: var(--lime-soft);
-  color: var(--lime);
-  border: 1px solid rgba(197, 255, 74, 0.22);
+.sectionIconAction {
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
+  border: 1px solid var(--fc-accent-glow);
 }
 
 .sectionMeta {
@@ -102,9 +99,9 @@
 }
 
 .sectionTitle {
-  font-family: var(--f-head);
-  font-weight: 600;
-  font-size: 14px;
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 15px;
   color: var(--t1);
   line-height: 1.2;
 }
@@ -155,8 +152,8 @@
 .select {
   width: 100%;
   padding: 11px 12px;
-  background: var(--card-2);
-  border: 1px solid var(--line);
+  background: var(--fc-surface-well, #050608);
+  border: 1px solid var(--line-2);
   border-radius: 11px;
   color: var(--t1);
   font-size: 13px;
@@ -196,24 +193,24 @@
 .input:focus,
 .textarea:focus,
 .select:focus {
-  border-color: var(--cyan);
-  box-shadow: 0 0 0 3px var(--cyan-soft);
-  background: var(--card);
+  border-color: var(--fc-accent-glow);
+  box-shadow: none;
+  background: var(--fc-surface-well, #050608);
 }
 
 .inputDirty,
 .textareaDirty,
 .selectDirty {
-  border-color: var(--lime);
-  box-shadow: 0 0 0 3px rgba(197, 255, 74, 0.1);
+  border-color: var(--fc-hairline-strong, var(--line));
+  box-shadow: inset 0 0 0 1px var(--fc-accent-dim);
 }
 
 .inputDirty:focus,
 .textareaDirty:focus,
 .selectDirty:focus {
-  border-color: var(--cyan);
-  box-shadow: 0 0 0 3px var(--cyan-soft);
-  background: var(--card);
+  border-color: var(--fc-accent-glow);
+  box-shadow: inset 0 0 0 1px var(--fc-accent-dim);
+  background: var(--fc-surface-well, #050608);
 }
 
 .inputError,
@@ -258,8 +255,8 @@
 .infoCallout {
   padding: 9px 12px;
   border-radius: 11px;
-  background: rgba(79, 227, 232, 0.04);
-  border: 1px solid var(--cyan-dim);
+  background: color-mix(in srgb, var(--fc-accent) 4%, transparent);
+  border: 1px solid var(--fc-accent-glow);
   display: flex;
   gap: 8px;
   align-items: flex-start;
@@ -268,7 +265,7 @@
 .infoCalloutIcon {
   width: 13px;
   height: 13px;
-  color: var(--cyan);
+  color: var(--fc-accent);
   flex-shrink: 0;
   margin-top: 1px;
 }
@@ -299,7 +296,7 @@
 }
 
 .hubRow:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--fc-surface-sunken);
   border-color: var(--line);
 }
 
@@ -315,7 +312,7 @@
 .hubIconWarn {
   background: var(--warning-soft);
   color: var(--warning);
-  border: 1px solid rgba(245, 194, 66, 0.22);
+  border: 1px solid color-mix(in srgb, var(--fc-status-warning) 22%, transparent);
 }
 
 .hubIconGood {
@@ -357,7 +354,7 @@
 .countPillWarn {
   background: var(--warning-soft);
   color: var(--warning);
-  border: 1px solid rgba(245, 194, 66, 0.28);
+  border: 1px solid color-mix(in srgb, var(--fc-status-warning) 28%, transparent);
 }
 
 .countPillGood {
@@ -367,7 +364,7 @@
 }
 
 .countPillMuted {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
   color: var(--t3);
   border: 1px solid var(--line);
 }
@@ -400,7 +397,7 @@
 }
 
 .accountRow:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--fc-surface-sunken);
 }
 
 .accountIcon {
@@ -413,13 +410,13 @@
 }
 
 .accountRowNeutral .accountIcon {
-  background: var(--cyan-soft);
-  color: var(--cyan);
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
 }
 
 .accountRowDanger {
   color: var(--critical);
-  border-color: rgba(255, 90, 95, 0.18);
+  border-color: color-mix(in srgb, var(--fc-status-error) 18%, transparent);
 }
 
 .accountRowDanger .accountIcon {
@@ -429,7 +426,7 @@
 
 .accountRowDanger:hover {
   background: var(--critical-soft);
-  border-color: rgba(255, 90, 95, 0.3);
+  border-color: color-mix(in srgb, var(--fc-status-error) 30%, transparent);
 }
 
 .accountRowDanger .hubChevron {
@@ -446,52 +443,45 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  padding: 18px 16px;
-  border-radius: 20px;
-  border: 1px solid var(--line);
-  background: linear-gradient(135deg, var(--card) 0%, var(--card-2) 100%);
+  align-items: stretch;
+  gap: 0;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line-2);
+  background: transparent;
 }
 
 .hero::before {
-  content: "";
-  position: absolute;
-  top: -60px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 240px;
-  height: 240px;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--cyan-soft), transparent 70%);
-  pointer-events: none;
+  display: none;
 }
 
 .heroInner {
   position: relative;
   z-index: 1;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   width: 100%;
 }
 
 .avatarWrap {
   position: relative;
-  width: 84px;
-  height: 84px;
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
 }
 
 .avatar {
-  width: 84px;
-  height: 84px;
-  border-radius: 24px;
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
   display: grid;
   place-items: center;
   overflow: hidden;
-  box-shadow: 0 8px 28px rgba(79, 227, 232, 0.3);
-  background: linear-gradient(135deg, var(--cyan), #2da8b0);
+  box-shadow: none;
+  border: 1px solid var(--fc-accent-glow);
+  background: var(--fc-accent-dim);
 }
 
 .avatar img {
@@ -501,10 +491,10 @@
 }
 
 .avatarInitials {
-  font-family: var(--f-head);
-  font-weight: 700;
-  font-size: 28px;
-  color: var(--avatar-initial);
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 22px;
+  color: var(--fc-accent);
   line-height: 1;
 }
 
@@ -512,62 +502,75 @@
   position: absolute;
   bottom: -2px;
   right: -2px;
-  width: 28px;
-  height: 28px;
-  border-radius: 10px;
-  background: var(--card);
-  border: 2px solid var(--bg);
-  color: var(--cyan);
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--fc-bg-deep);
+  border: 1px solid var(--line);
+  color: var(--fc-accent);
   display: grid;
   place-items: center;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  box-shadow: none;
 }
 
 .avatarEdit input {
   display: none;
 }
 
+.heroMeta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .heroName {
-  font-family: var(--f-head);
-  font-weight: 700;
-  font-size: 22px;
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 18px;
   color: var(--t1);
-  line-height: 1.1;
-  text-align: center;
+  line-height: 1.15;
+  text-align: left;
+  letter-spacing: -0.01em;
 }
 
 .heroEmail {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--t3);
-  text-align: center;
+  text-align: left;
   word-break: break-word;
   max-width: 100%;
+  font-family: var(--f-mono);
 }
 
 .pills {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  justify-content: center;
+  justify-content: flex-start;
+  margin-top: 4px;
 }
 
 .pill {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-family: var(--f-body);
-  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 7px;
+  font-size: 10px;
+  font-family: var(--f-mono);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   border: 1px solid transparent;
 }
 
 .pillCyan {
-  background: var(--cyan-soft);
-  border-color: var(--cyan-dim);
-  color: var(--cyan);
+  background: var(--fc-accent-dim);
+  border-color: var(--fc-accent-glow);
+  color: var(--fc-accent);
 }
 
 .pillGood {
@@ -583,7 +586,7 @@
 }
 
 .pillMuted {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
   border-color: var(--line);
   color: var(--t3);
 }
@@ -613,22 +616,18 @@
   bottom: 8px;
   margin-top: 4px;
   padding: 10px 12px;
-  background: var(--card);
-  border: 1px solid var(--cyan-dim);
+  background: var(--fc-bg-deep);
+  border: 1px solid var(--line-2);
   border-radius: 14px;
   display: flex;
   align-items: center;
   gap: 8px;
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.5),
-    0 0 0 1px var(--cyan-dim);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
 }
 
 .stickyBarDirty {
-  border-color: var(--lime);
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(197, 255, 74, 0.3);
+  border-color: var(--fc-accent-glow);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
 }
 
 .stickyStatus {
@@ -649,7 +648,7 @@
 }
 
 .stickyEyebrowDirty {
-  color: var(--lime);
+  color: var(--fc-accent);
 }
 
 .stickyDot {
@@ -661,8 +660,8 @@
 }
 
 .stickyDotGlow {
-  background: var(--lime);
-  box-shadow: 0 0 6px var(--lime);
+  background: var(--fc-accent);
+  box-shadow: none;
 }
 
 .stickyText {
@@ -701,7 +700,7 @@
 }
 
 .btnGhostSm:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--fc-surface-sunken);
   color: var(--t1);
 }
 
@@ -722,9 +721,9 @@
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  color: var(--lime-text, #0a1a18);
-  background: linear-gradient(135deg, var(--lime) 0%, var(--lime-2) 100%);
-  box-shadow: 0 4px 16px rgba(197, 255, 74, 0.22);
+  color: var(--fc-ink);
+  background: linear-gradient(135deg, var(--fc-accent) 0%, var(--fc-accent) 100%);
+  box-shadow: 0 4px 16px var(--fc-accent-glow);
   transition: opacity 0.15s ease;
 }
 
@@ -749,10 +748,36 @@
   gap: 8px;
 }
 
+.weightReadonly {
+  border-radius: 11px;
+  border: 1px solid var(--line-2);
+  background: var(--fc-surface-well, #050608);
+  padding: 11px 12px;
+}
+
+.weightValue {
+  font-family: var(--f-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--t1);
+  font-variant-numeric: tabular-nums;
+}
+
+.weightMeta {
+  margin-top: 2px;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  color: var(--t3);
+}
+
 .cyanLink {
-  color: var(--cyan);
+  color: var(--fc-accent);
   font-weight: 600;
   text-decoration: none;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .cyanLink:hover {

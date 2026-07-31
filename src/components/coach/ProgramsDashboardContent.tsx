@@ -1,25 +1,43 @@
 "use client";
 
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "@/contexts/ThemeContext";
-import { supabase } from "@/lib/supabase";
-import WorkoutTemplateService from "@/lib/workoutTemplateService";
-import ProgramCard from "@/components/features/programs/ProgramCard";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   RefreshCw,
   Plus,
-  BookOpen,
   X,
+  Eye,
+  UserPlus,
+  Edit,
+  Trash2,
+  ArrowLeft,
 } from "lucide-react";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
+import WorkoutTemplateService from "@/lib/workoutTemplateService";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
-import { Skeleton, SkeletonCard } from "@/components/ui/Skeleton";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useToast } from "@/components/ui/toast-provider";
 import { fetchApi } from "@/lib/apiClient";
+import {
+  CollectionCard,
+  CollectionCardAssignedStat,
+  CollectionCardIconAction,
+  CollectionCardMetaChip,
+  CollectionCardMetaSep,
+  CollectionCardMetaText,
+  CollectionCardMetaValue,
+  CollectionCardStack,
+} from "@/components/ui/CollectionCard";
+import { mapProgramBlocksToStructureSegments } from "@/lib/programs/mapProgramBlockPhaseSegments";
+import type { MasterProgramBlockRow } from "@/lib/programs/masterProgramBlocksBatch";
+import {
+  avatarHueByIndex,
+  formatDifficultyLevel,
+  formatPeriodizationListLabel,
+  programCollectionHue,
+} from "@/lib/programs/programListDisplayUtils";
+import styles from "@/components/coach/programs/coachProgramsWorkspace.module.css";
 
 interface Program {
   id: string;
@@ -27,26 +45,30 @@ interface Program {
   description?: string;
   coach_id: string;
   difficulty_level: "beginner" | "intermediate" | "advanced" | "athlete";
-  duration_weeks: number;
+  totalWeeks: number;
   target_audience: string;
-  category?: string | null;
+  periodization_style?: string | null;
   is_public?: boolean;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  blocks?: MasterProgramBlockRow[];
+  assignedPreview?: {
+    count: number;
+    initials: string[];
+  };
 }
 
 export default function ProgramsDashboardContent() {
   const router = useRouter();
   const { user } = useAuth();
   const { addToast } = useToast();
-  const { getSemanticColor } = useTheme();
 
   const [programs, setPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState(true);
   const loadingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
-  const [programFilter, setProgramFilter] = useState<'active' | 'all'>('active');
+  const [programFilter, setProgramFilter] = useState<"active" | "all">("active");
   const [assignmentCountByProgram, setAssignmentCountByProgram] = useState<
     Record<string, number>
   >({});
@@ -62,10 +84,12 @@ export default function ProgramsDashboardContent() {
     { client_id: string; program_name: string }[]
   >([]);
   const [assignStartDate, setAssignStartDate] = useState<string>(
-    new Date().toISOString().split("T")[0]
+    new Date().toISOString().split("T")[0],
   );
   const [assignNotes, setAssignNotes] = useState<string>("");
-  const [assignProgressionMode, setAssignProgressionMode] = useState<'auto' | 'coach_managed'>('coach_managed');
+  const [assignProgressionMode, setAssignProgressionMode] = useState<
+    "auto" | "coach_managed"
+  >("coach_managed");
   const [clientSearchQuery, setClientSearchQuery] = useState<string>("");
 
   const coachId = user?.id || "";
@@ -88,7 +112,7 @@ export default function ProgramsDashboardContent() {
 
   const loadPrograms = useCallback(async (signal?: AbortSignal) => {
     if (!coachId) {
-      setError('loadPrograms called without coachId');
+      setError("loadPrograms called without coachId");
       setLoading(false);
       return;
     }
@@ -102,10 +126,10 @@ export default function ProgramsDashboardContent() {
     setError(null);
 
     try {
-      const filter = programFilter === 'all' ? 'all' : 'active';
+      const filter = programFilter === "all" ? "all" : "active";
       const res = await fetchApi(`/api/coach/programs?filter=${filter}`, {
         signal: signal ?? null,
-        cache: 'no-store',
+        cache: "no-store",
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -113,15 +137,18 @@ export default function ProgramsDashboardContent() {
       }
       const { programs: list, assignmentCountByProgram: counts } = await res.json();
       setPrograms(Array.isArray(list) ? list : []);
-      setAssignmentCountByProgram(counts && typeof counts === 'object' ? counts : {});
+      setAssignmentCountByProgram(
+        counts && typeof counts === "object" ? counts : {},
+      );
       setError(null);
     } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') {
+      if (err instanceof Error && err.name === "AbortError") {
         if (signal) didLoadRef.current = false;
         return;
       }
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error loading programs';
-      console.error('[ProgramsDashboard] Error loading programs:', errorMessage);
+      const errorMessage =
+        err instanceof Error ? err.message : "Unknown error loading programs";
+      console.error("[ProgramsDashboard] Error loading programs:", errorMessage);
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -169,7 +196,7 @@ export default function ProgramsDashboardContent() {
         setClients([]);
       }
     },
-    [coachId]
+    [coachId],
   );
 
   const clientLabel = useCallback(
@@ -181,31 +208,36 @@ export default function ProgramsDashboardContent() {
       if (p?.email) return String(p.email);
       return clientId.slice(0, 8) + "…";
     },
-    [clients]
+    [clients],
   );
 
   const doAssignAndClose = useCallback(async () => {
     if (!assignProgramId || selectedClients.length === 0) return;
     try {
-      const { successful, failed } = await WorkoutTemplateService.assignProgramToClients(
-        assignProgramId,
-        selectedClients,
-        coachId,
-        assignStartDate,
-        assignNotes,
-        assignProgressionMode
-      );
+      const { successful, failed } =
+        await WorkoutTemplateService.assignProgramToClients(
+          assignProgramId,
+          selectedClients,
+          coachId,
+          assignStartDate,
+          assignNotes,
+          assignProgressionMode,
+        );
       await loadPrograms();
 
       if (failed.length > 0) {
         const failLines = failed.map(
           (f) =>
             `${clientLabel(f.clientId)}: ${f.stage} — ${f.error}${
-              f.orphanedAssignmentId ? ` (orphan id ${f.orphanedAssignmentId})` : ""
-            }`
+              f.orphanedAssignmentId
+                ? ` (orphan id ${f.orphanedAssignmentId})`
+                : ""
+            }`,
         );
         if (successful.length > 0) {
-          const okNames = successful.map((s) => clientLabel(s.clientId)).join(", ");
+          const okNames = successful
+            .map((s) => clientLabel(s.clientId))
+            .join(", ");
           addToast({
             title: `Assigned ${successful.length} client(s); ${failed.length} failed`,
             description: `Succeeded: ${okNames}.\nFailed:\n${failLines.join("\n")}`,
@@ -236,7 +268,10 @@ export default function ProgramsDashboardContent() {
       });
     } catch (error) {
       console.error("Error assigning program:", error);
-      addToast({ title: "Error assigning program. Please try again.", variant: "destructive" });
+      addToast({
+        title: "Error assigning program. Please try again.",
+        variant: "destructive",
+      });
     }
   }, [
     assignProgramId,
@@ -252,7 +287,8 @@ export default function ProgramsDashboardContent() {
 
   const submitAssign = useCallback(async () => {
     if (!assignProgramId || selectedClients.length === 0) return;
-    const withActive = await WorkoutTemplateService.getClientsWithActiveProgram(selectedClients);
+    const withActive =
+      await WorkoutTemplateService.getClientsWithActiveProgram(selectedClients);
     if (withActive.length > 0) {
       setReplaceConfirmList(withActive);
       setShowReplaceConfirm(true);
@@ -271,7 +307,10 @@ export default function ProgramsDashboardContent() {
       setConfirmImpact(false);
     } catch (error) {
       console.error("Error deleting program:", error);
-      addToast({ title: "Couldn't delete program. Please try again.", variant: "destructive" });
+      addToast({
+        title: "Couldn't delete program. Please try again.",
+        variant: "destructive",
+      });
     }
   }, [programToDelete, confirmImpact, loadPrograms, addToast]);
 
@@ -292,469 +331,452 @@ export default function ProgramsDashboardContent() {
     return () => clearTimeout(t);
   }, [loading]);
 
+  const totalPrograms = programs.length;
+  const activePrograms = programs.filter((p) => p.is_active).length;
+  const totalAssignments = Object.values(assignmentCountByProgram).reduce(
+    (a, b) => a + b,
+    0,
+  );
+
   if (!coachId) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="fc-card-shell p-6">
-          <p className="text-[color:var(--fc-text-dim)]">
-            Please sign in to view programs.
-          </p>
-        </div>
+      <div className={styles.page}>
+        <p className={styles.modalCopy}>Please sign in to view programs.</p>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen p-4 sm:p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
-          <Skeleton className="h-8 w-40 rounded-2xl" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[...Array(3)].map((_, i) => (
-              <SkeletonCard key={i} className="h-64 rounded-2xl" />
-            ))}
-          </div>
+      <div className={styles.page}>
+        <Link href="/coach" className={styles.back}>
+          <ArrowLeft className="h-3 w-3 shrink-0" />
+          Dashboard
+        </Link>
+        <div className={styles.stackGap}>
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className={styles.cardSkeleton} />
+          ))}
         </div>
       </div>
     );
   }
 
-  const totalPrograms = programs.length;
-  const activePrograms = programs.filter((p) => p.is_active).length;
-  const totalAssignments = Object.values(assignmentCountByProgram).reduce(
-    (a, b) => a + b,
-    0
-  );
-
   return (
     <>
-      <div className="space-y-3">
-        <div className="flex min-h-12 items-center justify-between gap-3">
-          <h1 className="text-lg font-semibold text-[color:var(--fc-text-primary)] sm:text-xl">
-            Training Programs
-          </h1>
-          <div className="flex shrink-0 items-center gap-2">
-            <Button
-              variant="fc-ghost"
-              size="sm"
-              className="h-9"
+      <div className={styles.page}>
+        <Link href="/coach" className={styles.back}>
+          <ArrowLeft className="h-3 w-3 shrink-0" />
+          Dashboard
+        </Link>
+
+        <div className={styles.headerRow}>
+          <div>
+            <h1 className={styles.h1}>Training Programs</h1>
+            {programs.length > 0 && !error ? (
+              <p className={styles.sub}>
+                {totalPrograms} program{totalPrograms !== 1 ? "s" : ""} ·{" "}
+                {activePrograms} active · {totalAssignments} assignment
+                {totalAssignments !== 1 ? "s" : ""}
+              </p>
+            ) : null}
+          </div>
+          <div className={styles.headerActions}>
+            <button
+              type="button"
+              className={styles.ghostBtn}
               onClick={() => loadPrograms()}
             >
-              <RefreshCw className="w-4 h-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">Refresh</span>
-            </Button>
-            <Link href="/coach/programs/create">
-              <Button variant="fc-primary" size="sm" className="h-9">
-                <Plus className="w-4 h-4 sm:mr-1.5" />
-                Create Program
-              </Button>
+              <RefreshCw className="h-4 w-4" />
+              Refresh
+            </button>
+            <Link href="/coach/programs/create" className={styles.primaryCta}>
+              <Plus className="h-4 w-4" />
+              Create program
             </Link>
           </div>
         </div>
 
-          {/* Error Banner */}
-          {error && (
-            <ErrorBanner
-              title="Couldn't load programs"
-              message="Please check your connection and try again."
-              onRetry={() => loadPrograms()}
-              onDismiss={() => setError(null)}
-            />
-          )}
+        {error ? (
+          <ErrorBanner
+            title="Couldn't load programs"
+            message="Please check your connection and try again."
+            onRetry={() => loadPrograms()}
+            onDismiss={() => setError(null)}
+          />
+        ) : null}
 
-          {/* Stats — single line */}
-          {programs.length > 0 && !error && (
-            <p className="text-sm text-gray-400">
-              {totalPrograms} program{totalPrograms !== 1 ? "s" : ""} ·{" "}
-              {activePrograms} active · {totalAssignments} assignment
-              {totalAssignments !== 1 ? "s" : ""}
-            </p>
-          )}
-
-          {/* Filter pills — no card wrapper */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setProgramFilter("active")}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                programFilter === "active"
-                  ? "bg-[color:var(--fc-domain-workouts)]/25 text-[color:var(--fc-text-primary)] ring-1 ring-[color:var(--fc-domain-workouts)]/40"
-                  : "text-gray-400 hover:text-[color:var(--fc-text-primary)]"
-              }`}
-            >
-              Active
-            </button>
-            <button
-              type="button"
-              onClick={() => setProgramFilter("all")}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                programFilter === "all"
-                  ? "bg-[color:var(--fc-domain-workouts)]/25 text-[color:var(--fc-text-primary)] ring-1 ring-[color:var(--fc-domain-workouts)]/40"
-                  : "text-gray-400 hover:text-[color:var(--fc-text-primary)]"
-              }`}
-            >
-              All
-            </button>
-          </div>
-
-          {/* Programs: flat rows below sm, grid from sm */}
-          {programs.length > 0 && !error && (
-            <>
-              <div className="sm:hidden divide-y divide-[color:var(--fc-glass-border)]/50 border-t border-b border-[color:var(--fc-glass-border)]/50">
-                {programs.map((program) => (
-                  <ProgramCard
-                    key={program.id}
-                    layout="row"
-                    program={program}
-                    onEdit={() => {
-                      window.location.href = `/coach/programs/${program.id}/edit`;
-                    }}
-                    onOpenDetails={() => {
-                      window.location.href = `/coach/programs/${program.id}`;
-                    }}
-                    onDelete={() => {
-                      setProgramToDelete(program);
-                      setConfirmImpact(false);
-                      setShowDeleteModal(true);
-                    }}
-                    onAssign={() => openAssignModal(program.id)}
-                    assignmentCount={assignmentCountByProgram[program.id] || 0}
-                  />
-                ))}
-              </div>
-              <div className="hidden sm:grid sm:grid-cols-2 gap-4">
-                {programs.map((program) => (
-                  <ProgramCard
-                    key={program.id}
-                    program={program}
-                    onEdit={() => {
-                      window.location.href = `/coach/programs/${program.id}/edit`;
-                    }}
-                    onOpenDetails={() => {
-                      window.location.href = `/coach/programs/${program.id}`;
-                    }}
-                    onDelete={() => {
-                      setProgramToDelete(program);
-                      setConfirmImpact(false);
-                      setShowDeleteModal(true);
-                    }}
-                    onAssign={() => openAssignModal(program.id)}
-                    assignmentCount={assignmentCountByProgram[program.id] || 0}
-                  />
-                ))}
-              </div>
-            </>
-          )}
-
-          {/* Empty State */}
-          {programs.length === 0 && !error && !loading && (
-            <EmptyState
-              icon={<BookOpen className="h-8 w-8" />}
-              title="No active programs yet"
-              description="Create your first workout program with template schedules and progression rules for comprehensive client training."
-              action={{
-                label: "Create Your First Program",
-                onClick: () => router.push("/coach/programs/create"),
-              }}
-            />
-          )}
+        <div className={styles.filterRow}>
+          <button
+            type="button"
+            className={`${styles.chip} ${
+              programFilter === "active" ? styles.chipOn : styles.chipOff
+            }`}
+            onClick={() => setProgramFilter("active")}
+          >
+            Active
+          </button>
+          <button
+            type="button"
+            className={`${styles.chip} ${
+              programFilter === "all" ? styles.chipOn : styles.chipOff
+            }`}
+            onClick={() => setProgramFilter("all")}
+          >
+            All
+          </button>
         </div>
 
-      {/* Assignment Modal */}
-      {showAssignModal && (
-        <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-          style={{
-            background: "rgba(0,0,0,0.5)",
-            backdropFilter: "blur(4px)",
-          }}
-        >
-          <div className="fc-card-shell max-w-2xl w-full max-h-[90vh] overflow-hidden">
-            <div
-              className="flex items-center justify-between p-6"
-              style={{
-                borderBottom: "1px solid var(--fc-surface-card-border)",
-              }}
-            >
-              <h2 className="text-xl font-bold fc-text-primary">
-                Assign Program
-              </h2>
+        {programs.length > 0 && !error ? (
+          <CollectionCardStack>
+            {programs.map((program) => {
+              const blocks = program.blocks ?? [];
+              const structure =
+                blocks.length > 1
+                  ? mapProgramBlocksToStructureSegments(blocks)
+                  : undefined;
+              const preview = program.assignedPreview;
+              const assignCount =
+                preview?.count ??
+                assignmentCountByProgram[program.id] ??
+                0;
+              const periodizationLabel = formatPeriodizationListLabel(
+                program.periodization_style,
+              );
+              const hue = programCollectionHue(program.id);
+
+              return (
+                <CollectionCard
+                  key={program.id}
+                  hue={hue}
+                  name={program.name}
+                  status={program.is_active ? "active" : "inactive"}
+                  meta={
+                    <>
+                      <CollectionCardMetaChip>
+                        {formatDifficultyLevel(program.difficulty_level)}
+                      </CollectionCardMetaChip>
+                      <CollectionCardMetaSep />
+                      <CollectionCardMetaText>
+                        <CollectionCardMetaValue>
+                          {program.totalWeeks > 0 ? program.totalWeeks : "—"}
+                        </CollectionCardMetaValue>{" "}
+                        wks
+                      </CollectionCardMetaText>
+                      {periodizationLabel ? (
+                        <>
+                          <CollectionCardMetaSep />
+                          <CollectionCardMetaText>
+                            {periodizationLabel}
+                          </CollectionCardMetaText>
+                        </>
+                      ) : null}
+                    </>
+                  }
+                  structure={structure}
+                  rightStat={
+                    <CollectionCardAssignedStat
+                      count={assignCount}
+                      avatars={
+                        assignCount > 0 && preview?.initials?.length
+                          ? preview.initials.slice(0, 3).map((initials, i) => ({
+                              initials,
+                              background: avatarHueByIndex(i),
+                            }))
+                          : undefined
+                      }
+                    />
+                  }
+                  actions={
+                    <>
+                      <CollectionCardIconAction
+                        icon={<Eye className="h-[15px] w-[15px]" />}
+                        label="View program"
+                        onClick={() =>
+                          router.push(`/coach/programs/${program.id}`)
+                        }
+                      />
+                      <CollectionCardIconAction
+                        icon={<UserPlus className="h-[15px] w-[15px]" />}
+                        label="Assign program"
+                        onClick={() => openAssignModal(program.id)}
+                      />
+                      <CollectionCardIconAction
+                        icon={<Edit className="h-[15px] w-[15px]" />}
+                        label="Edit program"
+                        onClick={() =>
+                          router.push(`/coach/programs/${program.id}/edit`)
+                        }
+                      />
+                      <CollectionCardIconAction
+                        icon={<Trash2 className="h-[15px] w-[15px]" />}
+                        label="Delete program"
+                        variant="danger"
+                        onClick={() => {
+                          setProgramToDelete(program);
+                          setConfirmImpact(false);
+                          setShowDeleteModal(true);
+                        }}
+                      />
+                    </>
+                  }
+                />
+              );
+            })}
+          </CollectionCardStack>
+        ) : null}
+
+        {programs.length === 0 && !error && !loading ? (
+          <>
+            <p className={styles.emptyLine}>No programs yet.</p>
+            <div className={styles.emptyActions}>
+              <Link href="/coach/programs/create" className={styles.primaryCta}>
+                <Plus className="h-4 w-4" />
+                Create program
+              </Link>
+            </div>
+          </>
+        ) : null}
+      </div>
+
+      {showAssignModal ? (
+        <div className={styles.modalScrim}>
+          <div className={`${styles.modalPanel} ${styles.modalPanelWide}`}>
+            <div className={styles.modalHead}>
+              <h2 className={styles.modalTitle}>Assign Program</h2>
               <button
+                type="button"
+                className={styles.modalClose}
                 onClick={() => {
                   setShowAssignModal(false);
                   setClientSearchQuery("");
                   setSelectedClients([]);
                 }}
-                className="p-2 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                aria-label="Close"
               >
-                <X className="w-5 h-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="p-6 space-y-4 overflow-y-auto max-h-[60vh]">
-              <div>
-                <label className="block text-sm font-semibold mb-2 fc-text-primary">
-                  Search Clients
-                </label>
-                <input
-                  type="text"
-                  value={clientSearchQuery}
-                  onChange={(e) => setClientSearchQuery(e.target.value)}
-                  placeholder="Search by name or email"
-                  className="w-full p-3 rounded-xl fc-text-primary"
-                  style={{
-                    background: "var(--fc-surface-sunken)",
-                    border: "1px solid var(--fc-surface-card-border)",
-                  }}
-                />
-              </div>
+            <div className={`${styles.modalBody} ${styles.modalBodyWide}`}>
+              <label className={styles.fieldLabel} htmlFor="client-search">
+                Search Clients
+              </label>
+              <input
+                id="client-search"
+                type="text"
+                value={clientSearchQuery}
+                onChange={(e) => setClientSearchQuery(e.target.value)}
+                placeholder="Search by name or email"
+                className={styles.fieldInput}
+              />
 
-              <div className="space-y-2">
+              <div style={{ marginTop: 16 }}>
                 {filteredClients.map((client) => (
-                  <label
-                    key={client.id}
-                    className="flex items-center gap-3 p-3 rounded-xl cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-                  >
+                  <label key={client.id} className={styles.clientRow}>
                     <input
                       type="checkbox"
                       checked={selectedClients.includes(client.client_id)}
                       onChange={(e) => {
                         if (e.target.checked) {
-                          setSelectedClients([...selectedClients, client.client_id]);
+                          setSelectedClients([
+                            ...selectedClients,
+                            client.client_id,
+                          ]);
                         } else {
                           setSelectedClients(
-                            selectedClients.filter((id) => id !== client.client_id)
+                            selectedClients.filter(
+                              (id) => id !== client.client_id,
+                            ),
                           );
                         }
                       }}
-                      className="w-5 h-5"
                     />
-                    <span className="font-medium fc-text-primary">
+                    <span className={styles.clientName}>
                       {client.profiles?.first_name} {client.profiles?.last_name}
                     </span>
                   </label>
                 ))}
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold mb-2 fc-text-primary">
+              <div style={{ marginTop: 20 }}>
+                <label className={styles.fieldLabel} htmlFor="assign-start">
                   Start Date
                 </label>
                 <input
+                  id="assign-start"
                   type="date"
                   value={assignStartDate}
                   onChange={(e) => setAssignStartDate(e.target.value)}
-                  className="w-full p-3 rounded-xl fc-text-primary"
-                  style={{
-                    background: "var(--fc-surface-sunken)",
-                    border: "1px solid var(--fc-surface-card-border)",
-                  }}
+                  className={styles.fieldInput}
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold mb-2 fc-text-primary">
+              <div style={{ marginTop: 20 }}>
+                <label className={styles.fieldLabel} htmlFor="assign-notes">
                   Notes (Optional)
                 </label>
                 <textarea
+                  id="assign-notes"
                   value={assignNotes}
                   onChange={(e) => setAssignNotes(e.target.value)}
                   placeholder="Add any notes for the client"
                   rows={3}
-                  className="w-full p-3 rounded-xl resize-none fc-text-primary"
-                  style={{
-                    background: "var(--fc-surface-sunken)",
-                    border: "1px solid var(--fc-surface-card-border)",
-                  }}
+                  className={`${styles.fieldInput} ${styles.fieldTextarea}`}
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold mb-2 fc-text-primary">
-                  Progression Mode
+              <div style={{ marginTop: 20 }}>
+                <span className={styles.fieldLabel}>Progression Mode</span>
+                <label
+                  className={`${styles.progressionOption} ${
+                    assignProgressionMode === "coach_managed"
+                      ? styles.progressionOptionSelected
+                      : ""
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="progressionMode"
+                    checked={assignProgressionMode === "coach_managed"}
+                    onChange={() => setAssignProgressionMode("coach_managed")}
+                  />
+                  <div>
+                    <p className={styles.progressionTitle}>Coach-managed</p>
+                    <p className={styles.progressionHint}>
+                      You review and advance weekly
+                    </p>
+                  </div>
                 </label>
-                <div className="space-y-2">
-                  <label
-                    className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors"
-                    style={{
-                      background: assignProgressionMode === 'coach_managed'
-                        ? 'var(--fc-surface-card-active, var(--fc-surface-sunken))'
-                        : 'var(--fc-surface-sunken)',
-                      border: assignProgressionMode === 'coach_managed'
-                        ? '2px solid var(--fc-domain-workouts, #6366f1)'
-                        : '1px solid var(--fc-surface-card-border)',
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="progressionMode"
-                      checked={assignProgressionMode === 'coach_managed'}
-                      onChange={() => setAssignProgressionMode('coach_managed')}
-                      className="mt-1"
-                    />
-                    <div>
-                      <p className="text-sm font-medium fc-text-primary">Coach-managed</p>
-                      <p className="text-xs fc-text-dim">You review and advance weekly</p>
-                    </div>
-                  </label>
-                  <label
-                    className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors"
-                    style={{
-                      background: assignProgressionMode === 'auto'
-                        ? 'var(--fc-surface-card-active, var(--fc-surface-sunken))'
-                        : 'var(--fc-surface-sunken)',
-                      border: assignProgressionMode === 'auto'
-                        ? '2px solid var(--fc-domain-workouts, #6366f1)'
-                        : '1px solid var(--fc-surface-card-border)',
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="progressionMode"
-                      checked={assignProgressionMode === 'auto'}
-                      onChange={() => setAssignProgressionMode('auto')}
-                      className="mt-1"
-                    />
-                    <div>
-                      <p className="text-sm font-medium fc-text-primary">Automatic</p>
-                      <p className="text-xs fc-text-dim">Weeks unlock when completed</p>
-                    </div>
-                  </label>
-                </div>
+                <label
+                  className={`${styles.progressionOption} ${
+                    assignProgressionMode === "auto"
+                      ? styles.progressionOptionSelected
+                      : ""
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="progressionMode"
+                    checked={assignProgressionMode === "auto"}
+                    onChange={() => setAssignProgressionMode("auto")}
+                  />
+                  <div>
+                    <p className={styles.progressionTitle}>Automatic</p>
+                    <p className={styles.progressionHint}>
+                      Weeks unlock when completed
+                    </p>
+                  </div>
+                </label>
               </div>
             </div>
 
-            <div
-              className="flex items-center justify-end gap-3 p-6"
-              style={{
-                borderTop: "1px solid var(--fc-surface-card-border)",
-              }}
-            >
-              <Button
-                variant="ghost"
+            <div className={styles.modalFoot}>
+              <button
+                type="button"
+                className={styles.modalGhostBtn}
                 onClick={() => {
                   setShowAssignModal(false);
                   setClientSearchQuery("");
                   setSelectedClients([]);
                 }}
-                className="rounded-xl"
               >
                 Cancel
-              </Button>
-              <Button
+              </button>
+              <button
+                type="button"
+                className={styles.modalPrimaryBtn}
                 onClick={submitAssign}
                 disabled={selectedClients.length === 0}
-                className="rounded-xl"
-                style={{
-                  background: getSemanticColor("success").gradient,
-                  opacity: selectedClients.length === 0 ? 0.5 : 1,
-                }}
               >
                 Assign to {selectedClients.length} client
                 {selectedClients.length !== 1 ? "s" : ""}
-              </Button>
+              </button>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {showReplaceConfirm && replaceConfirmList.length > 0 && (
-        <div
-          className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
-          style={{
-            background: "rgba(0,0,0,0.5)",
-            backdropFilter: "blur(4px)",
-          }}
-        >
-          <div className="fc-card-shell max-w-md w-full p-6">
-            <h2 className="text-xl font-bold mb-2 fc-text-primary">
-              Replace active program?
-            </h2>
-            <p className="mb-6 text-sm fc-text-dim">
-              {replaceConfirmList.length === 1 && selectedClients.length === 1
-                ? `This client currently has an active program: "${replaceConfirmList[0].program_name}". Assigning a new program will deactivate it. Continue?`
-                : `${replaceConfirmList.length} of ${selectedClients.length} selected client(s) have an active program. Assigning will deactivate those programs. Continue?`}
-            </p>
-            <div className="flex justify-end gap-3">
-              <Button
-                variant="ghost"
+      {showReplaceConfirm && replaceConfirmList.length > 0 ? (
+        <div className={`${styles.modalScrim} ${styles.modalScrimTop}`}>
+          <div className={styles.modalPanel}>
+            <div className={styles.modalHead}>
+              <h2 className={styles.modalTitle}>Replace active program?</h2>
+            </div>
+            <div className={styles.modalBody}>
+              <p className={styles.modalCopy}>
+                {replaceConfirmList.length === 1 && selectedClients.length === 1
+                  ? `This client currently has an active program: "${replaceConfirmList[0].program_name}". Assigning a new program will deactivate it. Continue?`
+                  : `${replaceConfirmList.length} of ${selectedClients.length} selected client(s) have an active program. Assigning will deactivate those programs. Continue?`}
+              </p>
+            </div>
+            <div className={styles.modalFoot}>
+              <button
+                type="button"
+                className={styles.modalGhostBtn}
                 onClick={() => {
                   setShowReplaceConfirm(false);
                   setReplaceConfirmList([]);
                 }}
-                className="rounded-xl"
               >
                 Cancel
-              </Button>
-              <Button
+              </button>
+              <button
+                type="button"
+                className={styles.modalPrimaryBtn}
                 onClick={() => doAssignAndClose()}
-                className="rounded-xl"
-                style={{
-                  background: getSemanticColor("success").gradient,
-                }}
               >
                 Replace Program
-              </Button>
+              </button>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {showDeleteModal && programToDelete && (
-        <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-          style={{
-            background: "rgba(0,0,0,0.5)",
-            backdropFilter: "blur(4px)",
-          }}
-        >
-          <div className="fc-card-shell max-w-md w-full p-6">
-            <h2 className="text-xl font-bold mb-4 fc-text-primary">
-              Delete Program?
-            </h2>
-            <p className="mb-6 fc-text-dim">
-              Are you sure you want to delete "{programToDelete.name}"? This action
-              cannot be undone.
-            </p>
-            <label className="flex items-center gap-2 mb-6 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={confirmImpact}
-                onChange={(e) => setConfirmImpact(e.target.checked)}
-                className="w-5 h-5"
-              />
-              <span className="text-sm fc-text-primary">
+      {showDeleteModal && programToDelete ? (
+        <div className={styles.modalScrim}>
+          <div className={styles.modalPanel}>
+            <div className={styles.modalHead}>
+              <h2 className={styles.modalTitle}>Delete Program?</h2>
+            </div>
+            <div className={styles.modalBody}>
+              <p className={styles.modalCopy}>
+                Are you sure you want to delete &quot;{programToDelete.name}
+                &quot;? This action cannot be undone.
+              </p>
+              <label className={styles.confirmCheck}>
+                <input
+                  type="checkbox"
+                  checked={confirmImpact}
+                  onChange={(e) => setConfirmImpact(e.target.checked)}
+                />
                 I understand this will affect assigned clients
-              </span>
-            </label>
-            <div className="flex items-center justify-end gap-3">
-              <Button
-                variant="ghost"
+              </label>
+            </div>
+            <div className={styles.modalFoot}>
+              <button
+                type="button"
+                className={styles.modalGhostBtn}
                 onClick={() => {
                   setShowDeleteModal(false);
                   setProgramToDelete(null);
                   setConfirmImpact(false);
                 }}
-                className="rounded-xl"
               >
                 Cancel
-              </Button>
-              <Button
+              </button>
+              <button
+                type="button"
+                className={`${styles.modalPrimaryBtn} ${styles.modalDangerBtn}`}
                 onClick={handleDelete}
                 disabled={!confirmImpact}
-                className="rounded-xl"
-                style={{
-                  background: getSemanticColor("critical").gradient,
-                  opacity: !confirmImpact ? 0.5 : 1,
-                }}
               >
                 Delete Program
-              </Button>
+              </button>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </>
   );
 }
-

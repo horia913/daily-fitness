@@ -15,6 +15,7 @@ import {
   type ProgramScheduleSlot,
 } from './programStateService'
 import { computeCurrentProgramWeekForAssignment } from '@/lib/programWeekCalendar'
+import { isCoachSkipNote } from '@/lib/programInstanceResolver'
 import {
   addCalendarDaysYmd,
   mondayYmdOfZonedWeekContaining,
@@ -35,7 +36,7 @@ export interface TrainPageRpcScheduleRow {
 }
 
 export interface TrainPageRpcCompletionRow {
-  program_schedule_id: string
+  program_day_assignment_id: string
   completed_at: string
 }
 
@@ -92,6 +93,7 @@ const emptyState: ProgramWeekState = {
   completedCount: 0,
   totalSlots: 0,
   currentWeekNumber: 1,
+  displayWeekNumber: 1,
   progressionMode: 'auto',
   isWeekCompleteAwaitingReview: false,
   coachFeedback: null,
@@ -193,22 +195,72 @@ export async function rpcResponseToProgramWeekState(
 
   const tz = resolveEffectiveTimezone(data, profileTimezone ?? null)
 
-  const templateIds = [...new Set(slots.map((s) => s.template_id).filter(Boolean))]
-  const templateMap = new Map<string, { name: string; estimated_duration: number }>()
-  if (templateIds.length > 0) {
+  const rpcSlotMeta = new Map<string, { name: string; estimated_duration: number }>()
+  for (const row of data.schedule ?? []) {
+    if (!row.template_id) continue
+    rpcSlotMeta.set(row.template_id, {
+      name: row.template_name?.trim() || 'Workout',
+      estimated_duration: row.estimated_duration ?? 0,
+    })
+  }
+
+  const masterTemplateIds = [
+    ...new Set(
+      slots
+        .filter((s) => s.template_id && !s.program_instance_workout_id)
+        .map((s) => s.template_id),
+    ),
+  ]
+  const instanceWorkoutIds = [
+    ...new Set(
+      slots
+        .map((s) => s.program_instance_workout_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ]
+
+  const contentMetaMap = new Map<string, { name: string; estimated_duration: number }>()
+  for (const [id, meta] of rpcSlotMeta) {
+    contentMetaMap.set(id, meta)
+  }
+
+  const missingMasterIds = masterTemplateIds.filter((id) => !contentMetaMap.has(id))
+  if (missingMasterIds.length > 0) {
     const { data: tmplRows } = await supabase
       .from('workout_templates')
       .select('id, name, estimated_duration')
-      .in('id', templateIds)
+      .in('id', missingMasterIds)
     for (const row of tmplRows ?? []) {
       const r = row as { id: string; name: string | null; estimated_duration: number | null }
-      templateMap.set(r.id, {
+      contentMetaMap.set(r.id, {
         name: r.name ?? 'Workout',
         estimated_duration: r.estimated_duration ?? 0,
       })
     }
   }
 
+  const missingInstanceIds = instanceWorkoutIds.filter((id) => !contentMetaMap.has(id))
+  if (missingInstanceIds.length > 0) {
+    const { data: instanceRows } = await supabase
+      .from('program_instance_workouts')
+      .select('id, name, estimated_duration')
+      .in('id', missingInstanceIds)
+    for (const row of instanceRows ?? []) {
+      const r = row as { id: string; name: string | null; estimated_duration: number | null }
+      contentMetaMap.set(r.id, {
+        name: r.name ?? 'Workout',
+        estimated_duration: r.estimated_duration ?? 0,
+      })
+    }
+  }
+
+  const resolveSlotMeta = (slot: ProgramScheduleSlot) =>
+    contentMetaMap.get(slot.template_id) ?? { name: 'Workout', estimated_duration: 0 }
+
+  const totalWeeksCap =
+    typeof data.durationWeeks === 'number' && data.durationWeeks > 0
+      ? data.durationWeeks
+      : null
   const assignmentForUnlock = {
     progression_mode: data.progressionMode ?? 'auto',
     start_date: data.assignmentStartDate ?? null,
@@ -217,7 +269,7 @@ export async function rpcResponseToProgramWeekState(
     pause_status: data.pauseStatus ?? data.pause_status ?? 'active',
     paused_at: data.pausedAt ?? null,
     timezone_snapshot: tz,
-    duration_weeks: data.durationWeeks ?? null,
+    totalWeeksCap,
   }
   const unlockedWeekMax =
     (typeof data.currentProgramWeek === 'number' && data.currentProgramWeek >= 1)
@@ -226,18 +278,27 @@ export async function rpcResponseToProgramWeekState(
   const todaySlotRaw = getTodaySlot(slots, unlockedWeekMax, todayWeekday)
   const isRestDay = todaySlotRaw === null
 
+  // N (total weeks) is canonical: SUM(instance phases) from the resolver,
+  // surfaced via the RPC durationWeeks. Distinct slot weeks are only a fallback.
   const weekNumbers = [...new Set(slots.map((s) => s.week_number))].sort((a, b) => a - b)
-  const totalWeeks = weekNumbers.length
+  const totalWeeks =
+    typeof data.durationWeeks === 'number' && data.durationWeeks > 0
+      ? data.durationWeeks
+      : weekNumbers.length
   const currentWeekSlots = slots.filter((s) => s.week_number === unlockedWeekMax)
 
-  // All-time: for nextSlot, isCompleted, completedCount (week unlock uses all completions)
-  const completedScheduleIdsAllTime = new Set(completedSlots.map((c) => c.program_schedule_id))
+  // All-time: for nextSlot, isCompleted, completedCount (week unlock uses all completions).
+  // Instance-keyed (program_day_assignment_id), no master program_schedule join.
+  const slotKey = (slot: ProgramScheduleSlot): string | null => slot.program_day_assignment_id ?? null
+  const completedKeysAllTime = new Set(
+    completedSlots.map((c) => c.program_day_assignment_id).filter((id): id is string => !!id),
+  )
 
   // In coach_managed mode, the client can stay on a week indefinitely — date-window
   // filtering would hide completions that happened after the calculated window expired.
-  // Use all-time completions since each program_schedule_id is unique per week.
+  // Use all-time completions since each instance slot is unique per week.
   const progressionModeRaw = data.progressionMode ?? 'auto'
-  let completedScheduleIdsCurrentWeek: Set<string>
+  let completedKeysCurrentWeek: Set<string>
   const derivedWeek = computeCurrentProgramWeekForAssignment(
     {
       start_date: data.assignmentStartDate ?? null,
@@ -245,40 +306,42 @@ export async function rpcResponseToProgramWeekState(
       pause_status: data.pauseStatus ?? data.pause_status ?? null,
       paused_at: data.pausedAt ?? null,
       timezone_snapshot: tz,
-      duration_weeks: data.durationWeeks ?? null,
     },
-    tz
+    tz,
+    { totalWeeksCap },
   ).week
   if (progressionModeRaw === 'coach_managed') {
-    completedScheduleIdsCurrentWeek = completedScheduleIdsAllTime
+    completedKeysCurrentWeek = completedKeysAllTime
   } else if (data.assignmentStartDate) {
     const { startIso, endIso } = zonedUtcBoundsForProgramWeek(
       data.assignmentStartDate,
       derivedWeek,
       tz
     )
-    completedScheduleIdsCurrentWeek = new Set(
+    completedKeysCurrentWeek = new Set(
       completedSlots
         .filter((c) => c.completed_at >= startIso && c.completed_at <= endIso)
-        .map((c) => c.program_schedule_id)
+        .map((c) => c.program_day_assignment_id)
+        .filter((id): id is string => !!id)
     )
   } else {
-    completedScheduleIdsCurrentWeek = completedScheduleIdsAllTime
+    completedKeysCurrentWeek = completedKeysAllTime
   }
 
-  const completedScheduleIds = completedScheduleIdsCurrentWeek
+  const completedKeys = completedKeysCurrentWeek
 
   const toDayCard = (slot: ProgramScheduleSlot): ProgramWeekDayCard => {
-    const template = templateMap.get(slot.template_id)
+    const meta = resolveSlotMeta(slot)
     return {
       scheduleId: slot.id ?? null,
       dayNumber: slot.day_number,
       dayLabel: `Day ${slot.day_number}`,
       dayOfWeek: slot.day_of_week,
       templateId: slot.template_id,
-      workoutName: template?.name ?? 'Workout',
-      estimatedDuration: template?.estimated_duration ?? 0,
-      isCompleted: slot.id != null && completedScheduleIds.has(slot.id),
+      instanceWorkoutId: slot.program_instance_workout_id ?? null,
+      workoutName: meta.name,
+      estimatedDuration: meta.estimated_duration,
+      isCompleted: slotKey(slot) != null && completedKeys.has(slotKey(slot)!),
       isOptional: slot.is_optional ?? false,
     }
   }
@@ -295,7 +358,7 @@ export async function rpcResponseToProgramWeekState(
     2
   )
   const overdueSlots: OverdueSlotCard[] = overdueRaw.map((slot) => {
-    const template = templateMap.get(slot.template_id)
+    const meta = resolveSlotMeta(slot)
     return {
       scheduleId: slot.id ?? null,
       dayNumber: slot.day_number,
@@ -303,18 +366,18 @@ export async function rpcResponseToProgramWeekState(
       dayLabel: `Day ${slot.day_number}`,
       templateId: slot.template_id,
       workoutId: slot.template_id,
-      workoutName: template?.name ?? 'Workout',
-      estimatedDuration: template?.estimated_duration ?? 0,
-      isCompleted: slot.id != null && completedScheduleIds.has(slot.id),
+      workoutName: meta.name,
+      estimatedDuration: meta.estimated_duration,
+      isCompleted: slotKey(slot) != null && completedKeys.has(slotKey(slot)!),
       isOptional: slot.is_optional ?? false,
     }
   })
 
   const totalSlots = slots.length
-  const completedCount = completedSlots.length
+  const completedCount = completedSlots.filter((c) => !isCoachSkipNote(c.notes)).length
   const nextSlot =
-    slots.find((s) => s.id != null && !completedScheduleIdsAllTime.has(s.id)) ?? null
-  const isCompleted = nextSlot === null && completedCount > 0
+    slots.find((s) => slotKey(s) != null && !completedKeysAllTime.has(slotKey(s)!)) ?? null
+  const isCompleted = nextSlot === null && completedSlots.length > 0
 
   const progressionMode = (data.progressionMode === 'coach_managed' ? 'coach_managed' : 'auto') as 'auto' | 'coach_managed'
 
@@ -322,7 +385,7 @@ export async function rpcResponseToProgramWeekState(
   const requiredCurrentWeekSlots = currentWeekSlots.filter(s => !s.is_optional)
   const allRequiredCurrentWeekComplete = requiredCurrentWeekSlots.length > 0 &&
     requiredCurrentWeekSlots.every(
-      (s) => s.id != null && completedScheduleIdsAllTime.has(s.id),
+      (s) => slotKey(s) != null && completedKeysAllTime.has(slotKey(s)!),
     )
   const isWeekCompleteAwaitingReview =
     progressionMode === 'coach_managed' && allRequiredCurrentWeekComplete && !isCompleted
@@ -355,6 +418,10 @@ export async function rpcResponseToProgramWeekState(
       completedCount,
       totalSlots,
       currentWeekNumber: unlockedWeekMax,
+      displayWeekNumber:
+        typeof data.currentProgramWeek === 'number' && data.currentProgramWeek >= 1
+          ? data.currentProgramWeek
+          : unlockedWeekMax,
       progressionMode,
       isWeekCompleteAwaitingReview,
       coachFeedback,

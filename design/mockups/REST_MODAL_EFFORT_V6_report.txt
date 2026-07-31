@@ -1,0 +1,33 @@
+REST MODAL + EFFORT PICKER v6 — presentation pass
+=================================================
+
+1. Files modified
+   - src/components/client/workout-execution/RestTimerModal.tsx
+   - src/components/client/workout-execution/restTimerModal.module.css (new)
+   - src/components/client/workout-execution/ui/setEffortPicker.module.css
+   - src/components/client/workout-execution/ui/LoggedSetsList.tsx
+   - src/components/client-workout-complete/CompressedSetList.tsx
+   - src/styles/ui-system.css (--fc-effort-hard token)
+
+2. Rest modal (vs rest-modal-transparent-v6.html)
+   - Transparent panel: background none, hairline border (~18px radius), no box-shadow/glow
+   - Scrim backdrop rgba(3,4,6,.82); live card visible behind
+   - Header: ● Resting (mono/cyan) + close ✕; dismiss = minimise only
+   - Copy: Up next · Set N of M; last set reps × weight kg on muted line
+   - Countdown: display font ~62px/900, font-variant-numeric: tabular-nums
+   - Progress: 3px cyan fill on 10% white track (remaining time width)
+   - ±15s: transparent, hairline border, mono; Skip rest: blue outline, transparent fill
+
+3. Effort picker (vs rest-modal-effort-picker-v6.html)
+   - No nested card: promptBlock flat inside logged-set card (~41px inset)
+   - promptLabel: mono 8px, .13em tracking, uppercase, --fc-text-subtle
+   - 2×2 grid, 44px options, inset #050608, display labels
+   - Four colours: success / warning / --fc-effort-hard (#FF7A2F) / error
+   - Selected: 14% colour tint + full-strength border
+   - Applied: LoggedSetsList, CompressedSetList (complete tap-to-rate)
+
+4. Logic untouched
+   - Rest: deadline/resume, shouldOpenRestTimer, resolveRestSeconds, skip/adjust/dismiss
+   - Effort: EFFORT_TO_RPE 4/6/8/10, onSelect → PATCH unchanged
+
+5. tsc: 0 errors (npx tsc -p tsconfig.json --noEmit)

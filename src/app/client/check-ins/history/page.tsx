@@ -3,10 +3,7 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
-import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { ClientPageShell, ClientGlassCard, SectionHeader } from "@/components/client-ui";
 import { CheckinHero } from "@/components/client/check-ins/checkinSuite";
 import checkinSuiteStyles from "@/components/client/check-ins/checkinSuite/checkinSuiteV1.module.css";
@@ -22,6 +19,7 @@ import { AlertTriangle } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { getLogRange, DailyWellnessLog, MonthlyStats } from "@/lib/wellnessService";
 import { getClientMeasurements } from "@/lib/measurementService";
+import { toLocalDateString } from "@/lib/clientActivityService";
 import { usePageData } from "@/hooks/usePageData";
 
 function getWeekStartMonday(): string {
@@ -30,7 +28,7 @@ function getWeekStartMonday(): string {
   const diff = d.getDate() - day + (day === 0 ? -6 : 1);
   const monday = new Date(d);
   monday.setDate(diff);
-  return monday.toISOString().split("T")[0];
+  return toLocalDateString(monday);
 }
 
 interface HistoryPageData {
@@ -43,7 +41,6 @@ interface HistoryPageData {
 
 export default function CheckInsHistoryPage() {
   const router = useRouter();
-  const { performanceSettings } = useTheme();
   const { user } = useAuth();
   const [pillarGoals, setPillarGoals] = useState<
     Array<{
@@ -65,20 +62,20 @@ export default function CheckInsHistoryPage() {
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(start);
       d.setDate(start.getDate() + i);
-      return d.toISOString().split("T")[0];
+      return toLocalDateString(d);
     });
   }, [weekStart]);
   const lastWeekStart = useMemo(() => {
     const d = new Date(weekStart + "T12:00:00");
     d.setDate(d.getDate() - 7);
-    return d.toISOString().split("T")[0];
+    return toLocalDateString(d);
   }, [weekStart]);
   const lastWeekDays = useMemo(() => {
     const start = new Date(lastWeekStart + "T12:00:00");
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(start);
       d.setDate(start.getDate() + i);
-      return d.toISOString().split("T")[0];
+      return toLocalDateString(d);
     });
   }, [lastWeekStart]);
 
@@ -92,10 +89,10 @@ export default function CheckInsHistoryPage() {
         monthlyStats: null,
       };
     }
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = toLocalDateString(new Date());
     const ninetyDaysAgo = new Date();
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-    const rangeStartDateStr = ninetyDaysAgo.toISOString().split("T")[0];
+    const rangeStartDateStr = toLocalDateString(ninetyDaysAgo);
 
     const [logs, measurements] = await Promise.all([
       getLogRange(user.id, rangeStartDateStr, todayStr),
@@ -115,13 +112,13 @@ export default function CheckInsHistoryPage() {
     );
 
     let streak = 0;
-    const d = new Date(todayStr + "T12:00:00Z");
+    const d = new Date(todayStr + "T12:00:00");
     for (let i = 0; i < 365; i++) {
-      const s = d.toISOString().split("T")[0];
+      const s = toLocalDateString(d);
       if (s > todayStr) break;
       if (!completeDatesSet.has(s)) break;
       streak++;
-      d.setUTCDate(d.getUTCDate() - 1);
+      d.setDate(d.getDate() - 1);
     }
 
     const sortedDates = Array.from(completeDatesSet).sort();
@@ -129,11 +126,13 @@ export default function CheckInsHistoryPage() {
     let currentStreakCalc = 0;
     let prevDate: Date | null = null;
     for (const dateStr of sortedDates) {
-      const currentDate = new Date(dateStr + "T12:00:00Z");
+      const currentDate = new Date(dateStr + "T12:00:00");
       if (prevDate === null) {
         currentStreakCalc = 1;
       } else {
-        const daysDiff = Math.floor((currentDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24));
+        const daysDiff = Math.floor(
+          (currentDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24)
+        );
         if (daysDiff === 1) {
           currentStreakCalc++;
         } else {
@@ -149,8 +148,8 @@ export default function CheckInsHistoryPage() {
     const currentMonth = now.getMonth() + 1;
     const currentYear = now.getFullYear();
     const monthEndDate = new Date(currentYear, currentMonth, 0);
-    const monthStartDateStr = new Date(currentYear, currentMonth - 1, 1).toISOString().split("T")[0];
-    const monthEndDateStr = monthEndDate.toISOString().split("T")[0];
+    const monthStartDateStr = toLocalDateString(new Date(currentYear, currentMonth - 1, 1));
+    const monthEndDateStr = toLocalDateString(monthEndDate);
     const monthLogs = logs.filter((l) => l.log_date >= monthStartDateStr && l.log_date <= monthEndDateStr);
     const completeMonthLogs = monthLogs.filter(
       (l) =>
@@ -169,15 +168,14 @@ export default function CheckInsHistoryPage() {
         loggedDays: completeMonthLogs.length,
         totalDays: monthEndDate.getDate(),
         completionRate:
-          monthEndDate.getDate() > 0 ? Math.round((completeMonthLogs.length / monthEndDate.getDate()) * 100) : 0,
+          monthEndDate.getDate() > 0
+            ? Math.round((completeMonthLogs.length / monthEndDate.getDate()) * 100)
+            : 0,
       },
     };
   }, [user?.id]);
 
-  const { data, loading: dataLoading, error, refetch } = usePageData(
-    fetchHistoryData,
-    [user?.id],
-  );
+  const { data, loading: dataLoading, error, refetch } = usePageData(fetchHistoryData, [user?.id]);
 
   const logRange = data?.logRange ?? [];
   const measurementsForComparison = data?.measurementsForComparison ?? [];
@@ -186,8 +184,14 @@ export default function CheckInsHistoryPage() {
   const monthlyStats = data?.monthlyStats ?? null;
   const currentBody = measurementsForComparison[0] ?? null;
   const previousBody = measurementsForComparison[1] ?? null;
-  const thisWeekLogs = useMemo(() => logRange.filter((l) => weekDays.includes(l.log_date)), [logRange, weekDays]);
-  const lastWeekLogs = useMemo(() => logRange.filter((l) => lastWeekDays.includes(l.log_date)), [logRange, lastWeekDays]);
+  const thisWeekLogs = useMemo(
+    () => logRange.filter((l) => weekDays.includes(l.log_date)),
+    [logRange, weekDays]
+  );
+  const lastWeekLogs = useMemo(
+    () => logRange.filter((l) => lastWeekDays.includes(l.log_date)),
+    [logRange, lastWeekDays]
+  );
 
   const fetchPillarGoals = useCallback(async () => {
     if (!user?.id) return;
@@ -213,133 +217,133 @@ export default function CheckInsHistoryPage() {
 
   return (
     <ProtectedRoute requiredRole="client">
-      <AnimatedBackground>
-        {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell
-          className={cn("max-w-lg mx-auto px-3 sm:px-6 pb-40 pt-2 sm:pt-4 overflow-x-hidden", checkinSuiteStyles.root)}
-        >
-          <CheckinHero
-            onBack={() => router.push("/client/check-ins")}
-            backAriaLabel="Back to check-ins"
-            eyebrow="Wellness · history"
-            eyebrowColor="var(--cs-cyan)"
-            title="Check-in history"
-            subtitle="Calendar, goals, and body trends"
+      <ClientPageShell
+        className={cn(
+          "max-w-lg lg:max-w-3xl mx-auto px-3 sm:px-6 pb-40 pt-2 sm:pt-4 overflow-x-hidden",
+          checkinSuiteStyles.root
+        )}
+      >
+        <CheckinHero
+          onBack={() => router.push("/client/check-ins")}
+          backAriaLabel="Back to check-ins"
+          eyebrow="Wellness · history"
+          eyebrowColor="var(--fc-accent)"
+          title="Check-in history"
+          subtitle="Calendar, goals, and body trends"
+        />
+
+        {error ? (
+          <EmptyState
+            icon={AlertTriangle}
+            title="Couldn't load history"
+            description="Something went wrong while loading your check-in history."
+            actionLabel="Retry"
+            onAction={() => void refetch()}
           />
+        ) : null}
 
-          {error ? (
-            <EmptyState
-              icon={AlertTriangle}
-              title="Couldn't load history"
-              description="Something went wrong while loading your check-in history."
-              actionLabel="Retry"
-              onAction={() => void refetch()}
-            />
-          ) : null}
+        {user?.id && !dataLoading && !error && (
+          <>
+            <section className="mb-4 min-w-0 overflow-x-auto">
+              <CheckInHistory
+                clientId={user.id}
+                initialLogRange={logRange}
+                initialCurrentStreak={currentStreak}
+                initialBestStreak={bestStreak}
+                initialMonthlyStats={monthlyStats}
+              />
+            </section>
 
-          {user?.id && !dataLoading && !error && (
-            <>
-              <section className="mb-4 min-w-0 overflow-x-auto">
-                <CheckInHistory
-                  clientId={user.id}
-                  initialLogRange={logRange}
-                  initialCurrentStreak={currentStreak}
-                  initialBestStreak={bestStreak}
-                  initialMonthlyStats={monthlyStats}
-                />
-              </section>
+            <section className="mb-4 min-w-0 overflow-x-auto">
+              <WellnessTrendsCard
+                logRange={logRange}
+                weekStart={weekStart}
+                weekDays={weekDays}
+                lastWeekStart={lastWeekStart}
+                lastWeekDays={lastWeekDays}
+              />
+            </section>
 
-              <section className="mb-4 min-w-0 overflow-x-auto">
-                <WellnessTrendsCard
-                  logRange={logRange}
-                  weekStart={weekStart}
-                  weekDays={weekDays}
-                  lastWeekStart={lastWeekStart}
-                  lastWeekDays={lastWeekDays}
-                />
-              </section>
+            <section className="mb-4 min-w-0 overflow-x-auto">
+              <WeeklyComparison
+                current={currentBody}
+                previous={previousBody}
+                wellnessThisWeek={thisWeekLogs}
+                wellnessLastWeek={lastWeekLogs}
+              />
+            </section>
 
-              <section className="mb-4 min-w-0 overflow-x-auto">
-                <WeeklyComparison
-                  current={currentBody}
-                  previous={previousBody}
-                  wellnessThisWeek={thisWeekLogs}
-                  wellnessLastWeek={lastWeekLogs}
-                />
-              </section>
+            <section className="mb-4 border-b border-[color:var(--cs-line)] pb-4">
+              <button
+                type="button"
+                onClick={() => router.push("/client/progress/body-metrics")}
+                className="text-left text-sm font-medium fc-text-primary py-2 rounded-lg hover:bg-[color:var(--fc-surface-tint)] px-1 -ml-1 w-full transition-colors bg-transparent border-0 cursor-pointer"
+              >
+                Full body metrics history →
+              </button>
+            </section>
+          </>
+        )}
 
-              <section className="mb-4 border-b border-[color:var(--fc-glass-border)] pb-4">
-                <button
-                  type="button"
-                  onClick={() => router.push("/client/progress/body-metrics")}
-                  className="text-left text-sm font-medium fc-text-primary py-2 rounded-lg hover:bg-[color:var(--fc-glass-highlight)] px-1 -ml-1 w-full transition-colors bg-transparent border-0 cursor-pointer"
-                >
-                  Full body metrics history →
-                </button>
-              </section>
-            </>
-          )}
-
-          <section>
-            <SectionHeader
-              title={
-                pillarGoals.length > 0
-                  ? `Check-in Goals · ${Math.round(pillarGoals.reduce((s, g) => s + (g.progress_percentage ?? 0), 0) / pillarGoals.length)}% adherence`
-                  : "Check-in Goals"
-              }
-            />
-            <ClientGlassCard className="p-3 sm:p-4">
-              {pillarGoals.length > 0 ? (
-                <div className="space-y-2 mb-3">
-                  {pillarGoals.map((g) => (
-                    <CompactGoalCard
-                      key={g.id}
-                      goal={{
-                        id: g.id,
-                        title: g.title,
-                        target_value: g.target_value,
-                        current_value: g.current_value,
-                        target_unit: g.target_unit,
-                        progress_percentage: g.progress_percentage,
-                        status: g.status,
-                      }}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="fc-text-dim text-sm mb-4">
-                  No active check-in goals yet. Add one below to start tracking your progress consistently.
-                </p>
-              )}
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Button
-                  type="button"
-                  variant="btn-action"
-                  className="h-10 w-full sm:w-auto"
-                  onClick={() => setShowAddGoalModal(true)}
-                >
-                  + Add Check-in Goal
-                </Button>
-                <Button
-                  type="button"
-                  variant="fc-secondary"
-                  className="h-10 w-full sm:w-auto"
-                  onClick={() => router.push("/client/goals")}
-                >
-                  Manage all goals
-                </Button>
+        <section>
+          <SectionHeader
+            title={
+              pillarGoals.length > 0
+                ? `Check-in Goals · ${Math.round(pillarGoals.reduce((s, g) => s + (g.progress_percentage ?? 0), 0) / pillarGoals.length)}% adherence`
+                : "Check-in Goals"
+            }
+          />
+          <ClientGlassCard className="p-3 sm:p-4">
+            {pillarGoals.length > 0 ? (
+              <div className="space-y-2 mb-3">
+                {pillarGoals.map((g) => (
+                  <CompactGoalCard
+                    key={g.id}
+                    goal={{
+                      id: g.id,
+                      title: g.title,
+                      target_value: g.target_value,
+                      current_value: g.current_value,
+                      target_unit: g.target_unit,
+                      progress_percentage: g.progress_percentage,
+                      status: g.status,
+                    }}
+                  />
+                ))}
               </div>
-            </ClientGlassCard>
-          </section>
+            ) : (
+              <p className="fc-text-dim text-sm mb-4">
+                No active check-in goals yet. Add one below to start tracking your progress consistently.
+              </p>
+            )}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button
+                type="button"
+                variant="btn-action"
+                className="h-10 w-full sm:w-auto"
+                onClick={() => setShowAddGoalModal(true)}
+              >
+                + Add Check-in Goal
+              </Button>
+              <Button
+                type="button"
+                variant="fc-secondary"
+                className="h-10 w-full sm:w-auto"
+                onClick={() => router.push("/client/goals")}
+              >
+                Manage all goals
+              </Button>
+            </div>
+          </ClientGlassCard>
+        </section>
 
-          <GoalWizard
-            open={showAddGoalModal}
-            onClose={() => setShowAddGoalModal(false)}
-            initialCategory="body_composition"
-            onSuccess={fetchPillarGoals}
-          />
-        </ClientPageShell>
-      </AnimatedBackground>
+        <GoalWizard
+          open={showAddGoalModal}
+          onClose={() => setShowAddGoalModal(false)}
+          initialCategory="body_composition"
+          onSuccess={fetchPillarGoals}
+        />
+      </ClientPageShell>
     </ProtectedRoute>
   );
 }

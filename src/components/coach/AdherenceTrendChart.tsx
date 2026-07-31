@@ -106,7 +106,7 @@ function AdherenceTrendChartCoachV6({ data }: { data: HistoricalTrendDataPoint[]
         <span className={chartStyles.v6LegendItem}>
           <span
             className={chartStyles.v6LegendSwatch}
-            style={{ background: 'var(--fc-accent-lime-2)' }}
+            style={{ background: 'var(--fc-accent)' }}
           />
           Habits
         </span>
@@ -169,7 +169,7 @@ function AdherenceTrendChartCoachV6({ data }: { data: HistoricalTrendDataPoint[]
             <path
               d={habitsPath}
               fill="none"
-              stroke="var(--fc-accent-lime-2)"
+              stroke="var(--fc-accent)"
               strokeWidth={2}
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -222,7 +222,7 @@ function AdherenceTrendChartCoachV6({ data }: { data: HistoricalTrendDataPoint[]
               <div style={{ color: 'var(--fc-text-quaternary)' }}>Nutrition: —</div>
             )}
             {hoverPoint.habits != null ? (
-              <div style={{ color: 'var(--fc-accent-lime-2)' }}>Habits: {hoverPoint.habits}%</div>
+              <div style={{ color: 'var(--fc-accent)' }}>Habits: {hoverPoint.habits}%</div>
             ) : (
               <div style={{ color: 'var(--fc-text-quaternary)' }}>Habits: —</div>
             )}
@@ -327,7 +327,7 @@ function AdherenceTrendChartDefault({
             Check-ins
           </div>
           <div className="flex items-center gap-2 text-[color:var(--fc-text-primary)]">
-            <span className="inline-block w-6 h-[3px] rounded bg-lime-500" />
+            <span className="inline-block w-6 h-[3px] rounded bg--[#84cc16]" />
             Nutrition
           </div>
           <div className="flex items-center gap-2 text-[color:var(--fc-text-primary)]">
@@ -446,7 +446,7 @@ function AdherenceTrendChartDefault({
               <div className="text-blue-400">Workouts: {hoverPoint.workout}%</div>
               <div className="text-teal-300">Check-ins: {hoverPoint.checkins}%</div>
               {hoverPoint.nutrition != null ? (
-                <div className="text-lime-400">Nutrition: {hoverPoint.nutrition}%</div>
+                <div className="text--[#a3e635]">Nutrition: {hoverPoint.nutrition}%</div>
               ) : (
                 <div className="text-[color:var(--fc-text-dim)]">Nutrition: —</div>
               )}

@@ -1,0 +1,92 @@
+RESKIN Phase 3 — measurement trio onto LiveCard v6
+Date: 2026-07-17
+No git. Escape hatch: Part A done; Part B (protocols) deferred.
+
+================================================================================
+1. FILES MODIFIED
+================================================================================
+Shared (additive only):
+  src/components/client/workout-execution/live-card/types.ts
+  src/components/client/workout-execution/live-card/LiveCardPrimary.tsx
+  src/components/client/workout-execution/live-card/LiveCardStats.tsx
+  src/components/client/workout-execution/live-card/LiveCardLog.tsx
+  src/components/client/workout-execution/live-card/formatLiveCard.ts
+  src/components/client/workout-execution/live-card/index.ts
+
+Executors:
+  src/components/client/workout-execution/blocks/TimedSetExecutor.tsx
+  src/components/client/workout-execution/blocks/EnduranceExecutor.tsx
+  src/components/client/workout-execution/blocks/SpeedWorkExecutor.tsx
+
+================================================================================
+2. DIFF TABLE vs mockup
+================================================================================
+§2 Timed
+| Mockup piece                         | Status | Notes |
+|--------------------------------------|--------|-------|
+| Target “45 seconds”                  | Yes    | kind: time from resolveSetPrescriptionTargets.work_seconds → duration_seconds fallback |
+| Effort word + RPE                    | Yes    | |
+| Rest · Load · Last                   | Yes    | middleLabel="Load" (bodyweight) |
+| Log Time held + ✓                    | Yes    | LiveCardLogTimeHeld + existing finishSet write |
+| Countdown / start-pause              | Yes    | Kept existing timer UI above the time-held field |
+
+§2 Distance (Endurance & Speed)
+| Mockup piece                         | Status | Notes |
+|--------------------------------------|--------|-------|
+| Target “400 metres”                  | Yes    | kind: distance; km unit when ≥1000 m |
+| Rest · Pace · Last                   | Yes    | Endurance: pace from endurance_sets; Speed: Pace — or Load %BW when set |
+| Log Distance + Time + ✓              | Yes    | LiveCardLogDistanceTime; Endurance writes distance+time; Speed still writes interval time (distance is target/display; write path unchanged) |
+| Intervals (Speed)                    | Yes    | Heading “Interval N of M” |
+
+§4 Protocols (AMRAP / EMOM / Tabata / for-time) — DEFERRED (see §5)
+
+================================================================================
+3. ADDITIONS TO SHARED CARD
+================================================================================
+LiveCardPrimary / LiveCardTarget:
+  - kind: "time"    → { seconds, unit?: "seconds" }
+  - kind: "distance"→ { meters, unit?: "metres" | "km" }
+  reps_weight / reps_only / single unchanged (same JSX branches).
+
+LiveCardStats:
+  - optional middleLabel?: "Tempo" | "Load" | "Pace" | string (default "Tempo")
+  - value prop still named `tempo` for backward compat — existing callers identical.
+
+LiveCardLog:
+  - LiveCardLogTimeHeld — label “Time held”
+  - LiveCardLogDistanceTime — Distance + Time field pair
+  Existing LiveCardLog / LogField / LogButton unchanged.
+
+formatLiveCard:
+  - formatLiveLastDuration / formatLiveLastDistance helpers.
+
+================================================================================
+4. PROTOCOL CLOCK
+================================================================================
+N/A this pass (protocols deferred). When Part B lands: clock will be a
+LiveCardGlue `timer` prop placeholder unless an existing in-executor timer
+already exposes a value — no new workout timer / page chrome.
+
+================================================================================
+5. WIRED VS DEFERRED
+================================================================================
+Wired:    TimedSetExecutor, EnduranceExecutor, SpeedWorkExecutor
+Deferred: AmrapExecutor, EmomExecutor, TabataExecutor, ForTimeExecutor (Part B)
+
+================================================================================
+6. UNTOUCHED CONFIRMATION
+================================================================================
+- Earlier card types (Straight / Drop / Superset / Giant / Cluster / Rest-pause):
+  no behaviour change to reps×weight / reps-only; Stats default middleLabel remains Tempo.
+- Logging write payloads unchanged (timed: actual_duration_seconds; endurance:
+  distance+time; speed: actual_time_seconds per interval).
+- resolveSetPrescriptionTargets internals untouched (consumed for work_seconds /
+  distance_meters + rir).
+- Protocol executors, page.tsx chrome, restore/complete/deriveSetType/standalone: untouched.
+
+================================================================================
+7. tsc
+================================================================================
+npx tsc --noEmit → exit 0
+
+END

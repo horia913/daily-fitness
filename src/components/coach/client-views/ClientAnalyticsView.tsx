@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React, { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
@@ -109,18 +109,18 @@ export default function ClientAnalyticsView({
       <div className="space-y-6">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="fc-card-shell p-5 animate-pulse h-28" />
+            <div key={i} className="rounded-[18px] border border-[color:rgba(255,255,255,0.08)] bg-transparent p-5 animate-pulse h-28" />
           ))}
         </div>
-        <div className="animate-pulse h-64 fc-card-shell" />
-        <div className="animate-pulse h-48 fc-card-shell" />
+        <div className="animate-pulse h-64 rounded-[18px] border border-[color:rgba(255,255,255,0.08)] bg-transparent" />
+        <div className="animate-pulse h-48 rounded-[18px] border border-[color:rgba(255,255,255,0.08)] bg-transparent" />
       </div>
     )
   }
 
   if (error || !data) {
     return (
-      <div className="fc-card-shell p-8">
+      <div className="rounded-[18px] border border-[color:rgba(255,255,255,0.08)] bg-transparent p-8">
         <EmptyState
           icon={BarChart3}
           title={error ? 'Could not load analytics' : 'No analytics yet'}
@@ -173,22 +173,22 @@ export default function ClientAnalyticsView({
         <h2 className="text-lg font-semibold fc-text-primary mb-4">Overview</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {/* Card 1: Overall Adherence */}
-          <div className="fc-card-shell p-5 text-center">
+          <div className="rounded-[18px] border border-[color:rgba(255,255,255,0.08)] bg-transparent p-5 text-center">
             <div className="mx-auto mb-2 fc-icon-tile fc-icon-workouts flex justify-center">
               <Target className="w-5 h-5" />
             </div>
-            <p className="text-2xl font-bold text-cyan-400 tabular-nums leading-tight">
-              {overview.overallAdherencePct != null ? `${overview.overallAdherencePct}%` : '—'}
+            <p className="text-2xl font-bold text-[color:var(--fc-group-c)] tabular-nums leading-tight">
+              {overview.overallAdherencePct != null ? `${overview.overallAdherencePct}%` : 'â€”'}
             </p>
             <p className="text-xs fc-text-dim">Overall Adherence</p>
           </div>
 
           {/* Card 2: Training Volume */}
-          <div className="fc-card-shell p-5 text-center">
+          <div className="rounded-[18px] border border-[color:rgba(255,255,255,0.08)] bg-transparent p-5 text-center">
             <div className="mx-auto mb-2 fc-icon-tile fc-icon-workouts flex justify-center">
               <Dumbbell className="w-5 h-5" />
             </div>
-            <p className="text-2xl font-bold text-cyan-400 tabular-nums leading-tight">
+            <p className="text-2xl font-bold text-[color:var(--fc-group-c)] tabular-nums leading-tight">
               {overview.trainingVolumeThisWeek >= 1000
                 ? `${(overview.trainingVolumeThisWeek / 1000).toFixed(1)}k`
                 : overview.trainingVolumeThisWeek}
@@ -205,17 +205,17 @@ export default function ClientAnalyticsView({
           </div>
 
           {/* Card 3: Check-In Streak */}
-          <div className="fc-card-shell p-5 text-center">
+          <div className="rounded-[18px] border border-[color:rgba(255,255,255,0.08)] bg-transparent p-5 text-center">
             <div className="mx-auto mb-2 fc-icon-tile fc-icon-workouts flex justify-center">
               <Flame className="w-5 h-5" />
             </div>
-            <p className="text-2xl font-bold text-cyan-400 tabular-nums leading-tight">{overview.checkinStreak}</p>
+            <p className="text-2xl font-bold text-[color:var(--fc-group-c)] tabular-nums leading-tight">{overview.checkinStreak}</p>
             <p className="text-xs fc-text-dim">Check-in streak</p>
             <p className="text-xs fc-text-subtle mt-1">Best: {overview.bestStreak}</p>
           </div>
 
           {/* Card 4: Body Composition Trend */}
-          <div className="fc-card-shell p-5 text-center">
+          <div className="rounded-[18px] border border-[color:rgba(255,255,255,0.08)] bg-transparent p-5 text-center">
             <div className="mx-auto mb-2 fc-icon-tile fc-icon-workouts flex justify-center">
               <Scale className="w-5 h-5" />
             </div>
@@ -224,7 +224,7 @@ export default function ClientAnalyticsView({
           </div>
 
           {/* Card 5: Program Progress */}
-          <div className="fc-card-shell p-5 text-center">
+          <div className="rounded-[18px] border border-[color:rgba(255,255,255,0.08)] bg-transparent p-5 text-center">
             <div className="mx-auto mb-2 fc-icon-tile fc-icon-workouts flex justify-center">
               <BarChart3 className="w-5 h-5" />
             </div>
@@ -233,9 +233,9 @@ export default function ClientAnalyticsView({
                 <p className="text-sm font-semibold fc-text-primary leading-tight">
                   Week {overview.programProgress.weekNum} of {overview.programProgress.totalWeeks} ({overview.programProgress.pct}%)
                 </p>
-                <div className="mt-2 h-1.5 w-full rounded-full bg-[color:var(--fc-glass-highlight)] overflow-hidden">
+                <div className="mt-2 h-1.5 w-full rounded-full bg-transparent overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-cyan-400"
+                    className="h-full rounded-full bg-gradient-to-r from-[color:var(--fc-group-c)] to-[color:var(--fc-group-c)]"
                     style={{ width: `${overview.programProgress.pct}%` }}
                   />
                 </div>
@@ -247,11 +247,11 @@ export default function ClientAnalyticsView({
           </div>
 
           {/* Card 6: Days Active */}
-          <div className="fc-card-shell p-5 text-center">
+          <div className="rounded-[18px] border border-[color:rgba(255,255,255,0.08)] bg-transparent p-5 text-center">
             <div className="mx-auto mb-2 fc-icon-tile fc-icon-workouts flex justify-center">
               <Calendar className="w-5 h-5" />
             </div>
-            <p className="text-2xl font-bold text-cyan-400 tabular-nums leading-tight">
+            <p className="text-2xl font-bold text-[color:var(--fc-group-c)] tabular-nums leading-tight">
               {overview.daysActiveLast30} <span className="text-sm font-normal fc-text-dim">/ {overview.totalDays30}</span>
             </p>
             <p className="text-xs fc-text-dim">Days active (30d)</p>
@@ -267,13 +267,13 @@ export default function ClientAnalyticsView({
             <h3 className="text-base font-medium fc-text-primary mb-3">Workout adherence (this week)</h3>
             {workout.scheduledThisWeek > 0 ? (
               <>
-                <p className="text-2xl font-bold text-cyan-400 tabular-nums">
+                <p className="text-2xl font-bold text-[color:var(--fc-group-c)] tabular-nums">
                   {workout.completedThisWeek} / {workout.scheduledThisWeek} completed
                   {workout.programAdherenceThisWeek != null && ` (${workout.programAdherenceThisWeek}%)`}
                 </p>
-                <div className="mt-2 h-2 w-full rounded-full bg-[color:var(--fc-glass-highlight)] overflow-hidden">
+                <div className="mt-2 h-2 w-full rounded-full bg-transparent overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-cyan-400"
+                    className="h-full rounded-full bg-gradient-to-r from-[color:var(--fc-group-c)] to-[color:var(--fc-group-c)]"
                     style={{
                       width: `${workout.programAdherenceThisWeek ?? 0}%`,
                     }}
@@ -308,7 +308,7 @@ export default function ClientAnalyticsView({
                       </span>
                       <div className="relative min-h-[48px] w-full flex-1 overflow-hidden rounded-t fc-progress-track">
                         <div
-                          className="absolute bottom-0 w-full rounded-t bg-gradient-to-t from-cyan-500 to-cyan-400 transition-all"
+                          className="absolute bottom-0 w-full rounded-t bg-gradient-to-t from-[color:var(--fc-group-c)] to-[color:var(--fc-group-c)] transition-all"
                           style={{ height: `${pct}%` }}
                         />
                       </div>
@@ -355,7 +355,7 @@ export default function ClientAnalyticsView({
                     <div key={m.id} className="flex-1 flex flex-col items-center gap-1 min-w-0">
                       <div className="w-full fc-progress-track rounded-t relative flex-1 min-h-[32px] overflow-hidden">
                         <div
-                          className="absolute bottom-0 w-full rounded-t bg-cyan-500/85"
+                          className="absolute bottom-0 w-full rounded-t bg-[color-mix(in_srgb,var(--fc-group-c)_85%,transparent)]"
                           style={{
                             height: `${h}%`,
                           }}
@@ -371,7 +371,7 @@ export default function ClientAnalyticsView({
                 </div>
                 {body.firstMeasurement && body.measurements[0] && (
                   <p className="text-sm fc-text-subtle mt-2">
-                    Start: {body.firstMeasurement.weight_kg?.toFixed(1)} kg → Current: {body.measurements[0].weight_kg?.toFixed(1)} kg
+                    Start: {body.firstMeasurement.weight_kg?.toFixed(1)} kg â†’ Current: {body.measurements[0].weight_kg?.toFixed(1)} kg
                     {body.weightGoal != null && ` | Goal: ${body.weightGoal} kg`}
                   </p>
                 )}
@@ -380,8 +380,8 @@ export default function ClientAnalyticsView({
                 <div>
                   <h3 className="text-base font-medium fc-text-primary mb-2">Body fat & circumferences</h3>
                   <p className="text-sm fc-text-subtle">
-                    First vs latest: Body fat {body.firstMeasurement?.body_fat_percentage?.toFixed(1) ?? '—'}% → {body.measurements[0]?.body_fat_percentage?.toFixed(1) ?? '—'}% |
-                    Waist {body.firstMeasurement?.waist_circumference?.toFixed(1) ?? '—'} cm → {body.measurements[0]?.waist_circumference?.toFixed(1) ?? '—'} cm
+                    First vs latest: Body fat {body.firstMeasurement?.body_fat_percentage?.toFixed(1) ?? 'â€”'}% â†’ {body.measurements[0]?.body_fat_percentage?.toFixed(1) ?? 'â€”'}% |
+                    Waist {body.firstMeasurement?.waist_circumference?.toFixed(1) ?? 'â€”'} cm â†’ {body.measurements[0]?.waist_circumference?.toFixed(1) ?? 'â€”'} cm
                   </p>
                 </div>
               )}
@@ -396,7 +396,7 @@ export default function ClientAnalyticsView({
                 {photos.slice(0, 10).map((p) => (
                   <div
                     key={p.date}
-                    className="flex-shrink-0 w-24 h-24 rounded-xl bg-[color:var(--fc-glass-highlight)] overflow-hidden border border-[color:var(--fc-glass-border)] relative"
+                    className="flex-shrink-0 w-24 h-24 rounded-xl bg-transparent overflow-hidden border border-[color:var(--fc-glass-border)] relative"
                   >
                     {p.previewUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -452,11 +452,11 @@ export default function ClientAnalyticsView({
               <>
                 <p className="text-2xl font-bold fc-text-primary">{nutrition.adherencePct}%</p>
                 <p className="text-sm fc-text-subtle mt-1">
-                  This week: {nutrition.complianceThisWeek ?? '—'}% | This month: {nutrition.complianceThisMonth ?? '—'}%
+                  This week: {nutrition.complianceThisWeek ?? 'â€”'}% nutrition adherence | This month: {nutrition.complianceThisMonth ?? 'â€”'}%
                 </p>
               </>
             ) : (
-              <p className="text-sm fc-text-subtle">No compliance data for this period.</p>
+              <p className="text-sm fc-text-subtle">No adherence data for this period.</p>
             )}
           </div>
         </section>
@@ -466,10 +466,10 @@ export default function ClientAnalyticsView({
         <section>
           <div className="rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-3 text-center">
             <UtensilsCrossed className="w-10 h-10 fc-text-dim mx-auto mb-2" />
-            <p className="fc-text-subtle">No nutrition goals set. Set nutrition targets to track compliance.</p>
+            <p className="fc-text-subtle">No nutrition goals set. Set nutrition targets to track adherence.</p>
             <button
               type="button"
-              className="mt-3 text-sm font-medium text-[color:var(--fc-accent-cyan)]"
+              className="mt-3 text-sm font-medium text-[color:var(--fc-accent)]"
               onClick={() => {
                 window.location.href = `/coach/clients/${clientId}/progress?section=goals`;
               }}
@@ -499,9 +499,9 @@ export default function ClientAnalyticsView({
                       {Math.round(Math.min(100, Math.max(0, g.progress_percentage ?? 0)))}%
                     </span>
                   </div>
-                  <div className="h-2 w-full rounded-full bg-[color:var(--fc-glass-highlight)] overflow-hidden">
+                  <div className="h-2 w-full rounded-full bg-transparent overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-[color:var(--fc-accent-cyan)]"
+                      className="h-full rounded-full bg-[color:var(--fc-accent)]"
                       style={{ width: `${Math.min(100, g.progress_percentage ?? 0)}%` }}
                     />
                   </div>
@@ -513,9 +513,9 @@ export default function ClientAnalyticsView({
           )}
           <Link
             href={`/coach/clients/${clientId}/progress?section=goals`}
-            className="inline-block text-sm font-medium text-[color:var(--fc-accent-cyan)] pt-1"
+            className="inline-block text-sm font-medium text-[color:var(--fc-accent)] pt-1"
           >
-            {goals.active.length > 0 ? 'View all goals →' : 'View goals page →'}
+            {goals.active.length > 0 ? 'View all goals â†’' : 'View goals page â†’'}
           </Link>
         </div>
       </section>
@@ -534,7 +534,7 @@ export default function ClientAnalyticsView({
                   <li key={a.id} className="flex justify-between items-center border-b border-[color:var(--fc-glass-border)] py-2 last:border-b-0">
                     <span className="text-sm fc-text-primary">{a.name ?? 'Habit'}</span>
                     <span className="text-sm fc-text-subtle">
-                      {comp?.completed ?? 0} / {comp?.total ?? 30} ({pct}%) · Streak: {comp?.streak ?? 0}
+                      {comp?.completed ?? 0} / {comp?.total ?? 30} ({pct}%) Â· Streak: {comp?.streak ?? 0}
                     </span>
                   </li>
                 )

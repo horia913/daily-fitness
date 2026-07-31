@@ -15,6 +15,7 @@ import {
   Accessibility,
   ImageIcon,
   Scale,
+  HeartPulse,
   ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -24,11 +25,9 @@ function go(href: string) {
   window.location.href = href;
 }
 
-function scheduledCheckInTitle(frequencyDays: number): string {
-  if (frequencyDays === 7) return "Weekly Check-in";
-  if (frequencyDays === 30) return "Monthly Check-in";
-  if (frequencyDays === 14) return "Bi-weekly Check-in";
-  return `Check-in (every ${frequencyDays} days)`;
+function scheduledCheckInTitle(_frequencyDays: number): string {
+  // Settled product name — frequency lives in subtitle/config, not the title.
+  return "Periodical check-in";
 }
 
 interface AddCheckInSheetProps {
@@ -55,22 +54,7 @@ function OptionRow({
     <button
       type="button"
       onClick={onClick}
-      className={cn(
-        "flex w-full cursor-pointer items-center gap-2.5 rounded-[13px] border p-3 text-left transition-colors",
-        checkinSuiteStyles.fontBody,
-      )}
-      style={{
-        borderColor: "var(--cs-line-2)",
-        background: "var(--cs-card-2)",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = "#0F2334";
-        e.currentTarget.style.borderColor = "var(--cs-cyan-dim)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = "var(--cs-card-2)";
-        e.currentTarget.style.borderColor = "var(--cs-line-2)";
-      }}
+      className={cn(checkinSuiteStyles.sheetOptionRow, checkinSuiteStyles.fontBody)}
     >
       <span
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]"
@@ -117,12 +101,12 @@ export function AddCheckInSheet({
         <DialogPrimitive.Content
           className={cn(
             checkinSuiteStyles.root,
-            "fixed inset-x-0 bottom-0 z-[10021] flex max-h-[min(88dvh,calc(100dvh-env(safe-area-inset-bottom)-12px))] w-full flex-col gap-1.5 overflow-hidden rounded-t-[24px] border-t border-[color:var(--cs-line)] p-0 shadow-2xl outline-none",
+            "fixed inset-x-0 bottom-0 z-[10021] flex max-h-[min(88dvh,calc(100dvh-env(safe-area-inset-bottom)-12px))] w-full flex-col gap-1.5 overflow-hidden rounded-t-[24px] border-t border-[color:var(--cs-line)] p-0 shadow-none outline-none",
             "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
             "data-[state=closed]:slide-out-to-bottom-4 data-[state=open]:slide-in-from-bottom-4 duration-300",
           )}
           style={{
-            background: "var(--cs-card)",
+            background: "var(--fc-bg-deep)",
             paddingTop: "18px",
             paddingLeft: "16px",
             paddingRight: "16px",
@@ -131,7 +115,7 @@ export function AddCheckInSheet({
         >
           <div
             className="mx-auto mb-3.5 h-1 w-10 rounded-full"
-            style={{ background: "rgba(255,255,255,0.18)" }}
+            style={{ background: "var(--cs-line)" }}
             aria-hidden
           />
 
@@ -160,8 +144,8 @@ export function AddCheckInSheet({
                 go("/client/check-ins/weekly");
               }}
               iconWrapStyle={{
-                background: "var(--cs-cyan-soft)",
-                color: "var(--cs-cyan)",
+                background: "var(--fc-accent-dim)",
+                color: "var(--fc-accent)",
               }}
               icon={<Calendar className="h-4 w-4" strokeWidth={2} />}
             />
@@ -179,17 +163,30 @@ export function AddCheckInSheet({
               icon={<Ruler className="h-4 w-4" strokeWidth={2} />}
             />
             <OptionRow
-              title="Mobility assessment"
-              subtitle="Flexibility & ROM"
+              title="Mobility"
+              subtitle="View coach assessments"
               onClick={() => {
                 onOpenChange(false);
                 go("/client/progress/mobility?from=check-ins");
               }}
               iconWrapStyle={{
-                background: "var(--cs-orange-soft)",
-                color: "var(--cs-orange)",
+                background: "var(--cs-good-soft)",
+                color: "var(--cs-good)",
               }}
               icon={<Accessibility className="h-4 w-4" strokeWidth={2} />}
+            />
+            <OptionRow
+              title="Recovery & wellness"
+              subtitle="Load, soreness & sleep trends"
+              onClick={() => {
+                onOpenChange(false);
+                go("/client/progress/recovery?from=check-ins");
+              }}
+              iconWrapStyle={{
+                background: "var(--fc-accent-dim)",
+                color: "var(--fc-accent)",
+              }}
+              icon={<HeartPulse className="h-4 w-4" strokeWidth={2} />}
             />
             <OptionRow
               title="Progress photos"
@@ -199,8 +196,8 @@ export function AddCheckInSheet({
                 go("/client/progress/body-metrics?from=check-ins&tab=photos");
               }}
               iconWrapStyle={{
-                background: "var(--cs-purple-soft)",
-                color: "var(--cs-purple)",
+                background: "var(--fc-accent-dim)",
+                color: "var(--fc-accent)",
               }}
               icon={<ImageIcon className="h-4 w-4" strokeWidth={2} />}
             />
@@ -231,14 +228,6 @@ export function AddCheckInSheet({
               color: "var(--cs-t2)",
             }}
             onClick={() => onOpenChange(false)}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = "var(--cs-t1)";
-              e.currentTarget.style.background = "rgba(255,255,255,0.04)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = "var(--cs-t2)";
-              e.currentTarget.style.background = "transparent";
-            }}
           >
             Cancel
           </button>

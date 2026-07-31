@@ -1,5 +1,5 @@
-import type { CurrentWeekRules } from '@/lib/clientProgressionService'
-import { getExercisePreviousPerformance, isRuleEffectivelyEmpty } from '@/lib/clientProgressionService'
+﻿import type { CurrentWeekRules } from '@/lib/clientProgressionService'
+import { isRuleEffectivelyEmpty } from '@/lib/clientProgressionService'
 
 export type WorkLineOutput = {
   primary: string | null
@@ -17,23 +17,6 @@ export function daysAgoText(iso: string): string {
   if (days <= 0) return "today";
   if (days === 1) return "1 day ago";
   return `${days} days ago`;
-}
-
-function toDateKey(value: string): string | null {
-  const time = new Date(value).getTime();
-  if (!Number.isFinite(time)) return null;
-  return new Date(time).toISOString().slice(0, 10);
-}
-
-export function wasLastSessionPr(
-  previous: Awaited<ReturnType<typeof getExercisePreviousPerformance>> | undefined,
-  prDateKeys: Set<string> | undefined,
-): boolean {
-  const lastDate = previous?.lastWorkout?.date;
-  if (!lastDate || !prDateKeys || prDateKeys.size === 0) return false;
-  const lastKey = toDateKey(lastDate);
-  if (!lastKey) return false;
-  return prDateKeys.has(lastKey);
 }
 
 function loadSuffix(rule: CurrentWeekRules): string {
@@ -79,10 +62,10 @@ function straightPrimaryString(rule: CurrentWeekRules): string | null {
 
   if (sets != null) {
     if (parsed) {
-      return `${sets} Ã— ${parsed}${load}`;
+      return `${sets} × ${parsed}${load}`;
     }
     if (raw) {
-      return `${sets} Ã— ${raw}${load}`;
+      return `${sets} × ${raw}${load}`;
     }
     return `${sets} sets${load}`;
   }
@@ -124,9 +107,9 @@ function metaTempoOnly(rule: CurrentWeekRules): string[] {
 function buildRestPauseBlockLines(rule: CurrentWeekRules): string[] {
   const out: string[] = [];
   if (rule.maxRestPauses != null && rule.restPauseDuration != null) {
-    out.push(`rest-pause ${rule.maxRestPauses}Ã— / ${rule.restPauseDuration}s`);
+    out.push(`rest-pause ${rule.maxRestPauses}× / ${rule.restPauseDuration}s`);
   } else if (rule.maxRestPauses != null) {
-    out.push(`rest-pause ${rule.maxRestPauses}Ã—`);
+    out.push(`rest-pause ${rule.maxRestPauses}×`);
   } else if (rule.restPauseDuration != null) {
     out.push(`rest-pause hold ${rule.restPauseDuration}s`);
   }
@@ -168,9 +151,9 @@ function buildByBlockType(rule: CurrentWeekRules): WorkLineParts {
     case "cluster_set": {
       let primary: string | null = null;
       if (rule.clustersPerSet != null && rule.targetSets != null && rule.repsPerCluster != null) {
-        primary = `${rule.targetSets} Ã— ${rule.repsPerCluster} Ã— ${rule.clustersPerSet} clusters${load}`;
+        primary = `${rule.targetSets} × ${rule.repsPerCluster} × ${rule.clustersPerSet} clusters${load}`;
       } else if (rule.repsPerCluster != null && rule.targetSets != null) {
-        primary = `${rule.targetSets} Ã— ${rule.repsPerCluster} reps/cluster${load}`;
+        primary = `${rule.targetSets} × ${rule.repsPerCluster} reps/cluster${load}`;
       } else {
         primary = straightPrimaryString(rule);
       }
@@ -187,7 +170,7 @@ function buildByBlockType(rule: CurrentWeekRules): WorkLineParts {
         rule.exerciseReps?.trim() || rule.repsVarchar?.trim() || parsed || null;
       let primary: string | null = null;
       if (rule.targetSets != null && mainReps) {
-        primary = `${rule.targetSets} Ã— ${mainReps}${load}`;
+        primary = `${rule.targetSets} × ${mainReps}${load}`;
       } else if (mainReps) {
         primary = `${mainReps}${load}`;
       } else {
@@ -217,7 +200,7 @@ function buildByBlockType(rule: CurrentWeekRules): WorkLineParts {
         formatRepsParsed(rule);
       let primary: string | null = null;
       if (rule.targetSets != null && repsForThisExercise) {
-        primary = `${rule.targetSets} Ã— ${repsForThisExercise}${load}`;
+        primary = `${rule.targetSets} × ${repsForThisExercise}${load}`;
       } else if (repsForThisExercise) {
         primary = `${repsForThisExercise}${load}`;
       } else {
@@ -235,7 +218,7 @@ function buildByBlockType(rule: CurrentWeekRules): WorkLineParts {
         rule.repsVarchar?.trim() || formatRepsParsed(rule);
       let primary: string | null = null;
       if (rule.targetSets != null && reps) {
-        primary = `${rule.targetSets} Ã— ${reps}${load}`;
+        primary = `${rule.targetSets} × ${reps}${load}`;
       } else if (reps) {
         primary = `${reps}${load}`;
       } else {
@@ -257,7 +240,7 @@ function buildByBlockType(rule: CurrentWeekRules): WorkLineParts {
         formatRepsParsed(rule);
       let primary: string | null = null;
       if (rule.targetSets != null && repsForThisExercise) {
-        primary = `${rule.targetSets} Ã— ${repsForThisExercise}${load}`;
+        primary = `${rule.targetSets} × ${repsForThisExercise}${load}`;
       } else if (repsForThisExercise) {
         primary = `${repsForThisExercise}${load}`;
       } else {
@@ -280,7 +263,7 @@ function buildByBlockType(rule: CurrentWeekRules): WorkLineParts {
         primary = `AMRAP${load}`;
       }
       if (rule.targetReps != null) {
-        primary += ` Â· target ${rule.targetReps} reps`;
+        primary += ` · target ${rule.targetReps} reps`;
       }
       return { primary, metadata: metaRirTempoRest(rule), blockSpecific: [] };
     }
@@ -289,11 +272,11 @@ function buildByBlockType(rule: CurrentWeekRules): WorkLineParts {
       let primary =
         rule.durationMinutes != null ? `EMOM ${rule.durationMinutes}m` : "EMOM";
       if (rule.workSeconds != null) {
-        primary += ` Â· ${rule.workSeconds}s work/min`;
+        primary += ` · ${rule.workSeconds}s work/min`;
       }
       primary += load;
       if (rule.targetReps != null) {
-        primary += ` Â· target ${rule.targetReps} reps`;
+        primary += ` · target ${rule.targetReps} reps`;
       }
       const block: string[] = [];
       if (rule.emomMode) block.push(`mode: ${rule.emomMode}`);
@@ -306,7 +289,7 @@ function buildByBlockType(rule: CurrentWeekRules): WorkLineParts {
       const rest = rule.restSeconds;
       let primary: string | null = null;
       if (r != null && w != null && rest != null) {
-        primary = `Tabata ${r} Ã— ${w}s / ${rest}s off`;
+        primary = `Tabata ${r} × ${w}s / ${rest}s off`;
       } else if (r != null) {
         primary = `Tabata ${r} rounds`;
       } else if (w != null && rest != null) {
@@ -328,10 +311,10 @@ function buildByBlockType(rule: CurrentWeekRules): WorkLineParts {
     case "for_time": {
       let primary = "For time";
       if (rule.timeCapMinutes != null) {
-        primary += ` Â· cap ${rule.timeCapMinutes}m`;
+        primary += ` · cap ${rule.timeCapMinutes}m`;
       }
       if (rule.targetReps != null) {
-        primary += ` Â· ${rule.targetReps} reps`;
+        primary += ` · ${rule.targetReps} reps`;
       }
       primary += load;
       return { primary, metadata: metaRirTempoRest(rule), blockSpecific: [] };

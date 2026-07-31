@@ -2,58 +2,75 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Eyebrow } from "@/components/ui/Eyebrow";
-import {
-  TrendingDown,
-  ChevronLeft,
-  ChevronRight,
-  MoreVertical,
-  Pencil,
-  Plus,
-  Target,
-  Repeat2,
-  Timer,
-  Flame,
-} from "lucide-react";
+import { ChevronLeft, MoreVertical, Pencil, Plus } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
-import {
-  BaseBlockExecutorLayout,
-  calculateSuggestedWeightUtil,
-  formatRestSeconds,
-} from "../BaseBlockExecutor";
-import type { PrescriptionItem } from "../ui/PrescriptionCard";
-import { LogSetButton } from "../ui/LogSetButton";
 import { parseRepsTarget } from "@/lib/workout/parseRepsTarget";
-import { LargeInput } from "../ui/LargeInput";
-import logPairStyles from "../ui/logWeightRepsPair.module.css";
-import { BaseBlockExecutorProps } from "../types";
-import { LoggedSet } from "@/types/workoutBlocks";
+import { BaseSetEntryExecutorProps } from "../types";
+import { useWorkoutExecutionChrome } from "../WorkoutExecutionChromeContext";
+import { NavigationControls } from "../ui/NavigationControls";
+import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
+import { LastSessionSetsSection } from "../ui/LastSessionSetsSection";
+import { ProgressionNudge } from "../ui/ProgressionNudge";
+import { LoggedSet } from "@/types/workoutSetEntries";
 import { LoggedSetsList, type LoggedSetRow } from "../ui/LoggedSetsList";
 import { useUpdateSetRpe } from "../hooks/useUpdateSetRpe";
-import { appendTargetEffortItem } from "../appendTargetEffortItem";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import {
   getWeightDefaultAndSuggestion,
   getCoachSuggestedWeight,
 } from "@/lib/weightDefaultService";
-import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
 import { fetchApi } from "@/lib/apiClient";
 import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
 import { parseWeightKgInput } from "@/lib/parseWeightKgInput";
+import { useSetRowsState } from "../hooks/useSetRowsState";
+import { SetUnitRow } from "../ui/set-rows/SetUnitRow";
+import setUnitStyles from "../ui/set-rows/setUnitRow.module.css";
+import { WeightRepsInlineFields } from "../ui/set-rows/SetRowFieldsByType";
+import {
+  resolveDropWeightFromInitial,
+  resolveSetRowWeightDefault,
+} from "../ui/set-rows/resolveSetRowWeightDefault";
+import { resolveSetPrescriptionTargets } from "../ui/set-rows/resolveSetPrescriptionTargets";
+import {
+  LiveCard,
+  LiveCardExerciseName,
+  LiveCardPrimary,
+  LiveCardStats,
+  LiveCardTechnique,
+  LiveCardNote,
+  LiveCardLog,
+  LiveCardLogField,
+  LiveCardLogButton,
+  formatDropTechniqueBody,
+  effortFromPrescribedRir,
+  formatLiveRest,
+  resolveRestSeconds,
+  formatLiveLast,
+  groupIndexToHue,
+  type LiveCardTarget,
+} from "../live-card";
+import { LoggedEffortInline } from "../ui/LoggedEffortInline";
+
+interface DropRow {
+  setNumber: number;
+  drops: Array<{ weight: string; reps: string }>;
+  expanded: boolean;
+  done: boolean;
+}
 
 export function DropSetExecutor({
-  block,
-  onBlockComplete,
-  onNextBlock,
+  liveSetEntry,
+  onSetEntryComplete,
+  onNextSetEntry,
   e1rmMap = {},
   onE1rmUpdate,
   lastPerformedWeightByExerciseId = {},
   lastSessionWeightByExerciseId = {},
   sessionId,
   assignmentId,
-  allBlocks = [],
-  currentBlockIndex = 0,
-  onBlockChange,
+  allSetEntries = [],
+  currentSetEntryIndex = 0,
+  onSetEntryChange,
   currentExerciseIndex = 0,
   onExerciseIndexChange,
   logSetToDatabase,
@@ -72,11 +89,11 @@ export function DropSetExecutor({
   onSetLogUpsert,
   onSetEditSaved,
   loggedSets,
-}: BaseBlockExecutorProps) {
+}: BaseSetEntryExecutorProps) {
   const { addToast } = useToast();
-  const currentExercise = block.block.exercises?.[currentExerciseIndex];
-  const totalSets = block.block.total_sets || 1;
-  const completedSets = block.completedSets || 0;
+  const currentExercise = liveSetEntry.setEntry.exercises?.[currentExerciseIndex];
+  const totalSets = liveSetEntry.setEntry.total_sets || 1;
+  const completedSets = liveSetEntry.completedSets || 0;
   const currentSetNumber = completedSets + 1;
 
   /** Parent-owned logged sets; single source of truth. Persists across block navigation. */
@@ -89,6 +106,8 @@ export function DropSetExecutor({
   const MAX_DROPS = 5;
   const [isLoggingSet, setIsLoggingSet] = useState(false);
   useLoggingReset(isLoggingSet, setIsLoggingSet);
+  /** Tap-to-jump: override first-incomplete when client picks an upcoming set */
+  const [jumpRowIndex, setJumpRowIndex] = useState<number | null>(null);
   const [isWeightPristine, setIsWeightPristine] = useState(true);
   const [viewingSetIndex, setViewingSetIndex] = useState(0);
   /** Collapsible set history: show all sets or only last 2 */
@@ -120,10 +139,10 @@ export function DropSetExecutor({
       if (idx === -1) return;
       const oldEntry = list[idx];
       const newEntry = { ...oldEntry, id: set_log_id };
-      onSetLogUpsert?.(block.block.id, newEntry, { replaceId: oldEntry.id });
+      onSetLogUpsert?.(liveSetEntry.setEntry.id, newEntry, { replaceId: oldEntry.id });
     });
     return () => {};
-  }, [registerSetLogIdResolved, onSetLogUpsert, block.block.id]);
+  }, [registerSetLogIdResolved, onSetLogUpsert, liveSetEntry.setEntry.id]);
   useEffect(() => {
     if (viewingSetIndex > loggedSetsList.length)
       setViewingSetIndex(loggedSetsList.length);
@@ -165,18 +184,68 @@ export function DropSetExecutor({
     : null;
   const loadPercentage = currentExercise?.load_percentage ?? null;
   const e1rm = exerciseId ? (e1rmMap[exerciseId] ?? null) : null;
-  const { default_weight, suggested_weight } =
-    getWeightDefaultAndSuggestion({
-      sessionStickyWeight: sessionStickyWeight ?? null,
-      lastSessionWeight: lastSessionWeight ?? null,
-      loadPercentage,
-      e1rm: e1rm ?? null,
-    });
+  const { default_weight, suggested_weight } = getWeightDefaultAndSuggestion({
+    sessionStickyWeight: sessionStickyWeight ?? null,
+    lastSessionWeight: lastSessionWeight ?? null,
+    loadPercentage,
+    e1rm: e1rm ?? null,
+  });
   const coachSuggestedWeight = getCoachSuggestedWeight(loadPercentage, e1rm);
+  const weightFallback =
+    coachSuggestedWeight != null && coachSuggestedWeight > 0
+      ? coachSuggestedWeight
+      : suggested_weight;
+  const lastSessionSetDetails =
+    exerciseId && previousPerformanceMap
+      ? (previousPerformanceMap.get(exerciseId)?.lastWorkout?.setDetails ?? null)
+      : null;
 
-  const exerciseReps = currentExercise?.reps || block.block.reps_per_set || "";
+  const exerciseReps = currentExercise?.reps || liveSetEntry.setEntry.reps_per_set || "";
   const dropSetReps = exerciseReps;
   const dropRepsParsed = parseRepsTarget(exerciseReps);
+  const rowsState = useSetRowsState<DropRow>({
+    rowCount: totalSets,
+    // Structural only — sticky/suggested weight must NOT be in resetKey (wipes done flags).
+    resetKey: `${liveSetEntry.setEntry.id}:${exerciseId}`,
+    loggedCount: completedSets,
+    createDefaultRow: (index, previous) => {
+      const setNumber = index + 1;
+      const targets = resolveSetPrescriptionTargets(
+        currentExercise,
+        setNumber,
+        liveSetEntry.setEntry.reps_per_set,
+      );
+      const setRepsParsed = parseRepsTarget(targets.reps);
+      const repsPrefill =
+        setRepsParsed.numericDefault > 0
+          ? String(setRepsParsed.numericDefault)
+          : "";
+      const initialWeightStr = resolveSetRowWeightDefault({
+        setNumber,
+        previousRowWeight: previous?.drops?.[0]?.weight,
+        lastSessionSetDetails,
+        defaultWeight: default_weight,
+        suggestedWeight: weightFallback,
+        prescribedWeightKg: targets.weight_kg,
+      });
+      const initialWeightNum =
+        initialWeightStr.trim() !== ""
+          ? parseWeightKgInput(initialWeightStr)
+          : null;
+      return {
+        setNumber,
+        drops: [
+          { weight: initialWeightStr, reps: repsPrefill },
+          {
+            weight: resolveDropWeightFromInitial(initialWeightNum),
+            reps: repsPrefill,
+          },
+        ],
+        expanded: false,
+        done: false,
+      };
+    },
+  });
 
   useEffect(() => {
     setIsWeightPristine(true);
@@ -210,29 +279,75 @@ export function DropSetExecutor({
     exerciseId,
   ]);
 
-  const restSecDrop =
-    currentExercise?.rest_seconds ?? block.block.rest_seconds ?? 60;
-
-  const prescriptionItems: PrescriptionItem[] = [
-    { icon: Target, label: "Sets", value: totalSets },
-    { icon: Repeat2, label: "Initial reps", value: exerciseReps || "—" },
-    { icon: TrendingDown, label: "Max drops", value: MAX_DROPS },
-    {
-      icon: Timer,
-      label: "Rest",
-      value: formatRestSeconds(restSecDrop),
-      unit: "s",
-    },
-  ];
-
-  appendTargetEffortItem(
-    prescriptionItems,
-    currentExercise ? (currentExercise as { rir?: unknown }).rir : undefined,
-    Flame,
+  const restSecDrop = resolveRestSeconds(
+    currentExercise?.rest_seconds,
+    liveSetEntry.setEntry.rest_seconds,
   );
 
   const instructions =
-    currentExercise?.notes || block.block.set_notes || undefined;
+    currentExercise?.notes || liveSetEntry.setEntry.set_notes || undefined;
+
+  const firstIncompleteIndex = rowsState.rows.findIndex((r) => !r.done);
+  const activeRowIndex =
+    jumpRowIndex != null &&
+    jumpRowIndex >= 0 &&
+    rowsState.rows[jumpRowIndex] &&
+    !rowsState.rows[jumpRowIndex].done
+      ? jumpRowIndex
+      : firstIncompleteIndex;
+  const activeRow =
+    activeRowIndex >= 0 ? rowsState.rows[activeRowIndex] : null;
+  const activeInitial = activeRow?.drops?.[0];
+
+  const activeSetNumber = Math.min(
+    Math.max(1, activeRow?.setNumber ?? rowsState.doneCount + 1),
+    totalSets,
+  );
+  const activeTargets = resolveSetPrescriptionTargets(
+    currentExercise,
+    activeSetNumber,
+    liveSetEntry.setEntry.reps_per_set,
+  );
+  const activeEffort = effortFromPrescribedRir(activeTargets.rir);
+  const liveTarget: LiveCardTarget =
+    activeTargets.weight_kg != null
+      ? {
+          kind: "reps_weight",
+          reps: activeTargets.reps ?? "—",
+          weight: activeTargets.weight_kg,
+        }
+      : {
+          kind: "reps_only",
+          reps: activeTargets.reps ?? "—",
+          unit: "reps",
+        };
+  const lastForActiveSet = lastSessionSetDetails?.find(
+    (s) => s.set_number === activeSetNumber,
+  );
+  const lastLabel = formatLiveLast(
+    lastForActiveSet?.reps_completed ?? null,
+    lastForActiveSet?.weight_kg ?? null,
+  );
+  const tempoLabel =
+    activeTargets.tempo && String(activeTargets.tempo).trim()
+      ? String(activeTargets.tempo).trim()
+      : null;
+
+  /** Slot technique config (instance path → drop_sets[0] / optional scalar). */
+  const dropPctRaw =
+    currentExercise?.drop_sets?.[0]?.drop_percentage ??
+    (currentExercise as { drop_percentage?: number | null } | undefined)
+      ?.drop_percentage ??
+    null;
+  const dropPct =
+    dropPctRaw != null && Number.isFinite(Number(dropPctRaw))
+      ? Number(dropPctRaw)
+      : 20;
+  const slotMaxDrops =
+    (currentExercise as { max_drops?: number | null } | undefined)?.max_drops ??
+    null;
+  const effectiveMaxDrops =
+    slotMaxDrops != null && slotMaxDrops > 0 ? slotMaxDrops : MAX_DROPS;
 
   const handleEditSet = (setEntry: LoggedSet) => {
     const s = setEntry as LoggedSet & {
@@ -268,7 +383,7 @@ export function DropSetExecutor({
       if (process.env.NODE_ENV !== "production") {
         console.log("[SAVE EDITS guard]", {
           executor: "DropSetExecutor",
-          blockTypeFromUI: block.block.set_type,
+          blockTypeFromUI: liveSetEntry.setEntry.set_type,
           editingSetId,
           isSavingEdit,
           timestamp: Date.now(),
@@ -306,7 +421,7 @@ export function DropSetExecutor({
     const pct = w0 > 0 ? ((w0 - wLast) / w0) * 100 : 0;
     setIsSavingEdit(true);
     try {
-      const payload = buildSetEditPatchPayload(block.block.set_type, {
+      const payload = buildSetEditPatchPayload(liveSetEntry.setEntry.set_type, {
         dropset_initial_weight: w0,
         dropset_initial_reps: r0,
         dropset_final_weight: wLast,
@@ -322,7 +437,7 @@ export function DropSetExecutor({
         console.log("[SAVE EDITS]", {
           executor: "DropSetExecutor",
           setId: editingSetId,
-          blockTypeFromUI: block.block.set_type,
+          blockTypeFromUI: liveSetEntry.setEntry.set_type,
           payloadKeys: Object.keys(payload),
         });
       }
@@ -340,14 +455,14 @@ export function DropSetExecutor({
           id: editingSetId,
           exercise_id:
             current?.exercise_id ?? currentExercise?.exercise_id ?? "",
-          set_entry_id: block.block.id,
+          set_entry_id: liveSetEntry.setEntry.id,
           set_number: editDraft.set_number,
           weight_kg: w0,
           reps_completed: r0,
           completed_at: current?.completed_at ?? new Date(),
           dropset_drops: dropsParsed,
         };
-        onSetEditSaved?.(block.block.id, updatedEntry);
+        onSetEditSaved?.(liveSetEntry.setEntry.id, updatedEntry);
         setEditingSetId(null);
         setEditDraft(null);
         addToast({ title: "Set updated", variant: "success", duration: 2000 });
@@ -376,10 +491,12 @@ export function DropSetExecutor({
     setEditDraft(null);
   };
 
-  const handleLog = async () => {
+  const handleLogSet = async (rowIndex: number) => {
     if (!currentExercise || isLoggingSet) return;
+    const row = rowsState.rows[rowIndex];
+    if (!row || row.done) return;
 
-    const dropsParsed = drops
+    const dropsParsed = row.drops
       .map((d) => ({
         weight: parseWeightKgInput(d.weight),
         reps: parseInt(d.reps, 10),
@@ -419,9 +536,9 @@ export function DropSetExecutor({
           : 0;
 
       const logData: any = {
-        set_type: "dropset",
-        set_number: currentSetNumber,
-        isLastSet: currentSetNumber >= totalSets,
+        set_type: "drop_set",
+        set_number: row.setNumber,
+        isLastSet: rowsState.doneCount + 1 >= totalSets,
         dropset_drops: dropsParsed,
         dropset_initial_weight: initialWeightNum,
         dropset_initial_reps: initialRepsNum,
@@ -432,7 +549,7 @@ export function DropSetExecutor({
 
       const resolvedExerciseId =
         currentExercise?.exercise_id ||
-        block.block.exercises?.[0]?.exercise_id;
+        liveSetEntry.setEntry.exercises?.[0]?.exercise_id;
       if (resolvedExerciseId) logData.exercise_id = resolvedExerciseId;
 
       const result = await logSetToDatabase(logData);
@@ -441,16 +558,16 @@ export function DropSetExecutor({
         const newLoggedSet: LoggedSet & {
           dropset_drops?: Array<{ weight: number; reps: number }>;
         } = {
-          id: result.set_log_id || `temp-${currentSetNumber}-${Date.now()}`,
+          id: result.set_log_id || `temp-${row.setNumber}-${Date.now()}`,
           exercise_id: currentExercise.exercise_id,
-          set_entry_id: block.block.id,
-          set_number: currentSetNumber,
+          set_entry_id: liveSetEntry.setEntry.id,
+          set_number: row.setNumber,
           weight_kg: initialWeightNum,
           reps_completed: initialRepsNum,
           completed_at: new Date(),
           dropset_drops: dropsParsed,
         } as LoggedSet;
-        onSetLogUpsert?.(block.block.id, newLoggedSet);
+        onSetLogUpsert?.(liveSetEntry.setEntry.id, newLoggedSet);
 
         if (result.e1rm && onE1rmUpdate) {
           onE1rmUpdate(currentExercise.exercise_id, result.e1rm);
@@ -463,7 +580,20 @@ export function DropSetExecutor({
           duration: 2000,
         });
 
-        const newCompletedSets = currentSetNumber;
+        rowsState.markDone(rowIndex, true);
+        rowsState.setRow(rowIndex, (current) => ({ ...current, expanded: false }));
+        if (rowIndex + 1 < totalSets && row.drops?.[0]?.weight) {
+          const carryWeight = row.drops[0].weight;
+          rowsState.setRow(rowIndex + 1, (next) => {
+            const drops = [...(next.drops ?? [])];
+            if (drops[0]) {
+              drops[0] = { ...drops[0], weight: carryWeight };
+            }
+            return { ...next, drops };
+          });
+        }
+        setJumpRowIndex(null);
+        const newCompletedSets = rowsState.doneCount + 1;
         if (newCompletedSets < totalSets) {
           onLastSetLoggedForRest?.({
             weight: initialWeightNum,
@@ -476,12 +606,8 @@ export function DropSetExecutor({
         onSetComplete?.(newCompletedSets);
 
         if (newCompletedSets >= totalSets) {
-          onBlockComplete(block.block.id, [...loggedSetsList, newLoggedSet]);
+          onSetEntryComplete(liveSetEntry.setEntry.id, [...loggedSetsList, newLoggedSet]);
         }
-        setDrops([
-          { weight: String(initialWeightNum), reps: "" },
-          { weight: String(Math.round(last.weight * 0.9 * 2) / 2), reps: "" },
-        ]);
       } else {
         addToast({
           title: "Failed to Save",
@@ -511,7 +637,7 @@ export function DropSetExecutor({
   const isViewingLoggedSet = !!viewedSetEntry;
 
   const updateSetRpe = useUpdateSetRpe({
-    blockId: block.block.id,
+    setEntryId: liveSetEntry.setEntry.id,
     onSetLogUpsert,
   });
   const loggedSetRows: LoggedSetRow[] = loggedSetsList.map((setEntry) => ({
@@ -564,349 +690,398 @@ export function DropSetExecutor({
       <LoggedSetsList rows={loggedSetRows} />
     ) : null;
 
-  const loggingInputs = (
-    <div className="space-y-4">
-      <div
-        className="p-4 rounded-xl"
-        style={{ background: "var(--fc-surface-sunken)" }}
-      >
-        <div className="flex items-center justify-center gap-2 mb-4">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setViewingSetIndex((i) => Math.max(0, i - 1));
-            }}
-            disabled={viewingSetIndex === 0}
-            className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-lg fc-text-primary disabled:opacity-40 disabled:pointer-events-none hover:bg-black/10 focus:outline-none focus:ring-2"
-            aria-label="Previous set"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <Eyebrow
-            as="span"
-            tone="dim"
-            density="section"
-            className="min-w-[6rem] justify-center text-center"
-          >
-            Set {displaySetNumber} of {totalSets}
-          </Eyebrow>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setViewingSetIndex((i) => Math.min(loggedSetsList.length, i + 1));
-            }}
-            disabled={viewingSetIndex >= loggedSetsList.length}
-            title={
-              loggedSetsList.length === 0
-                ? "Log at least one set to review previous sets"
-                : undefined
-            }
-            className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-lg fc-text-primary disabled:opacity-40 disabled:pointer-events-none hover:bg-black/10 focus:outline-none focus:ring-2"
-            aria-label={
-              loggedSetsList.length === 0
-                ? "Next set (log a set first to review)"
-                : "Next set"
-            }
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        </div>
-        <h4
-          className="font-semibold mb-4 text-lg"
-          style={{ color: "var(--fc-accent-cyan)" }}
-        >
-          {editDraft
-            ? "Edit set"
-            : "Drop Set — Set " + displaySetNumber + " of " + totalSets}
-        </h4>
-        {(editDraft ? editDraft.drops : drops).map((drop, idx) => (
-          <div key={idx} className="mb-4">
-            <h5 className="text-sm font-medium fc-text-dim mb-2">
-              {idx === 0 ? "Initial" : `Drop ${idx}`}
-            </h5>
-            <div className={`${logPairStyles.pair} ${logPairStyles.pairGapLg}`}>
-              <div className="min-w-0 space-y-2">
-                <LargeInput
-                  label="Weight"
-                  unit="kg"
-                  value={drop.weight}
-                  onChange={(val) => {
-                    if (editDraft)
-                      setEditDraft((d) =>
-                        d
-                          ? {
-                              ...d,
-                              drops: d.drops.map((x, i) =>
-                                i === idx ? { ...x, weight: val } : x,
-                              ),
-                            }
-                          : null,
-                      );
-                    else {
-                      setIsWeightPristine(false);
-                      setDrops((prev) =>
-                        prev.map((x, i) =>
-                          i === idx ? { ...x, weight: val } : x,
-                        ),
-                      );
-                    }
-                  }}
-                  placeholder="0"
-                  step="0.5"
-                  showStepper
-                  stepAmount={2.5}
-                      />
-                {!editDraft &&
-                  idx === 0 &&
-                  coachSuggestedWeight != null &&
-                  coachSuggestedWeight > 0 && (
-                    <ApplySuggestedWeightButton
-                      suggestedKg={coachSuggestedWeight}
-                      onApply={() => {
-                        setDrops((prev) => [
-                          {
-                            weight: String(coachSuggestedWeight),
-                            reps: prev[0]?.reps ?? "",
-                          },
-                          ...prev.slice(1),
-                        ]);
-                        setIsWeightPristine(false);
-                      }}
-                    />
-                  )}
-              </div>
-              <LargeInput
-                label="Reps"
-                hint={
-                  idx === 0 && !editDraft
-                    ? dropRepsParsed.displayHint ?? undefined
-                    : undefined
-                }
-                value={drop.reps}
-                onChange={(val) => {
-                  if (editDraft)
-                    setEditDraft((d) =>
-                      d
-                        ? {
-                            ...d,
-                            drops: d.drops.map((x, i) =>
-                              i === idx ? { ...x, reps: val } : x,
-                            ),
-                          }
-                        : null,
-                    );
-                  else
-                    setDrops((prev) =>
-                      prev.map((x, i) => (i === idx ? { ...x, reps: val } : x)),
-                    );
-                }}
-                placeholder="0"
-                step="1"
-                showStepper
-                stepAmount={1}
-                  />
-            </div>
-            {idx > 0 && (editDraft ? editDraft.drops : drops).length > 2 && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (editDraft)
-                    setEditDraft((d) =>
-                      d
-                        ? {
-                            ...d,
-                            drops: d.drops.filter((_, i) => i !== idx),
-                          }
-                        : null,
-                    );
-                  else setDrops((prev) => prev.filter((_, i) => i !== idx));
-                }}
-                className="mt-2 text-xs text-amber-500 hover:underline"
-              >
-                Remove drop
-              </button>
-            )}
-          </div>
-        ))}
-        {!editDraft && drops.length < MAX_DROPS && (
-          <button
-            type="button"
-            onClick={() =>
-              setDrops((prev) => [
-                ...prev,
-                {
-                  weight:
-                    prev.length > 0
-                      ? String(
-                          Math.round(
-                            parseWeightKgInput(
-                              prev[prev.length - 1].weight || "0",
-                            ) *
-                              0.85 *
-                              2,
-                          ) / 2,
-                        )
-                      : "",
-                  reps: "",
-                },
-              ])
-            }
-            className="text-sm fc-text-dim hover:fc-text-primary flex items-center gap-1"
-          >
-            <Plus className="w-4 h-4" /> Add Drop
-          </button>
-        )}
-        {editDraft && editDraft.drops.length < MAX_DROPS && (
-          <button
-            type="button"
-            onClick={() =>
-              setEditDraft((d) =>
-                d
-                  ? {
-                      ...d,
-                      drops: [
-                        ...d.drops,
-                        {
-                          weight:
-                            d.drops.length > 0
-                              ? String(
-                                  Math.round(
-                                    parseWeightKgInput(
-                                      d.drops[d.drops.length - 1].weight || "0",
-                                    ) *
-                                      0.85 *
-                                      2,
-                                  ) / 2,
-                                )
-                              : "",
-                          reps: "",
-                        },
-                      ],
-                    }
-                  : null,
-              )
-            }
-            className="text-sm fc-text-dim hover:fc-text-primary flex items-center gap-1"
-          >
-            <Plus className="w-4 h-4" /> Add Drop
-          </button>
-        )}
-      </div>
-    </div>
-  );
+  const fillRemainingTargets = () => {
+    rowsState.fillRemaining((index, prev) => {
+      const setNumber = index + 1;
+      const targets = resolveSetPrescriptionTargets(
+        currentExercise,
+        setNumber,
+        liveSetEntry.setEntry.reps_per_set,
+      );
+      const setRepsParsed = parseRepsTarget(targets.reps);
+      const repsSeed =
+        setRepsParsed.numericDefault > 0
+          ? String(setRepsParsed.numericDefault)
+          : (prev?.drops?.[0]?.reps ?? "");
+      const initialWeightStr = resolveSetRowWeightDefault({
+        setNumber,
+        previousRowWeight: prev?.drops?.[0]?.weight,
+        lastSessionSetDetails,
+        defaultWeight: default_weight,
+        suggestedWeight: weightFallback,
+        prescribedWeightKg: targets.weight_kg,
+      });
+      const initialWeightNum =
+        initialWeightStr.trim() !== ""
+          ? parseWeightKgInput(initialWeightStr)
+          : null;
+      return {
+        drops: [
+          { weight: initialWeightStr, reps: repsSeed },
+          {
+            weight: resolveDropWeightFromInitial(initialWeightNum),
+            reps: repsSeed,
+          },
+        ],
+      };
+    });
+  };
 
-  const dropsParsedPreview = drops
-    .map((d) => ({
-      weight: parseWeightKgInput(d.weight),
-      reps: parseInt(d.reps, 10),
-    }))
-    .filter(
-      (d) =>
-        !isNaN(d.weight) && d.weight >= 0 && !isNaN(d.reps) && d.reps > 0,
+  const formatUpcomingDropSummary = (setNumber: number) => {
+    const t = resolveSetPrescriptionTargets(
+      currentExercise,
+      setNumber,
+      liveSetEntry.setEntry.reps_per_set,
     );
-  const dropLogReady =
-    !isLoggingSet &&
-    completedSets < totalSets &&
-    dropsParsedPreview.length >= 2;
+    if (t.weight_kg != null) {
+      return `${t.reps ?? "—"} × ${t.weight_kg} · drops`;
+    }
+    return `${t.reps ?? "—"} reps · drops`;
+  };
+
+  const nudgeActiveDropField = (
+    dropIndex: number,
+    key: "weight" | "reps",
+    delta: number,
+  ) => {
+    if (activeRowIndex < 0) return;
+    rowsState.setRow(activeRowIndex, (current) => {
+      const nextDrops = [...current.drops];
+      const curVal =
+        key === "weight"
+          ? parseWeightKgInput(nextDrops[dropIndex]?.weight || "0")
+          : parseInt(nextDrops[dropIndex]?.reps || "0", 10);
+      const next =
+        key === "weight"
+          ? Math.max(0, (isNaN(curVal) ? 0 : curVal) + delta)
+          : Math.max(0, (isNaN(curVal) ? 0 : curVal) + delta);
+      nextDrops[dropIndex] = {
+        ...nextDrops[dropIndex],
+        [key]:
+          key === "weight"
+            ? String(Math.round(next * 2) / 2)
+            : String(next),
+      };
+      return { ...current, drops: nextDrops };
+    });
+  };
 
   const isEditMode = !!editingSetId && !!editDraft;
-  const logButton = isEditMode ? (
-    <div className="flex gap-2 w-full">
-      <Button
-        variant="outline"
-        onClick={handleCancelEdit}
-        className="flex-1 h-12 text-base font-semibold rounded-xl"
-      >
-        Cancel
-      </Button>
-      <Button
-        onClick={handleSaveEdit}
-        disabled={
-          isSavingEdit ||
-          !editDraft ||
-          editDraft.drops.length < 2 ||
-          editDraft.drops.some(
-            (d) =>
-              isNaN(parseWeightKgInput(d.weight)) ||
-              parseWeightKgInput(d.weight) < 0 ||
-              isNaN(parseInt(d.reps, 10)) ||
-              parseInt(d.reps, 10) <= 0,
-          )
-        }
-        variant="fc-primary"
-        className="flex-1 h-12 text-base font-bold uppercase tracking-wider rounded-xl"
-      >
-        {isSavingEdit ? "Saving…" : "Save edits"}
-      </Button>
-    </div>
-  ) : viewedSetEntry ? (
-    <Button
-      onClick={() => handleEditSet(viewedSetEntry)}
-      variant="fc-primary"
-      className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl"
-    >
-      <Pencil className="w-5 h-5 mr-2" />
-      Edit this set
-    </Button>
-  ) : (
-    <LogSetButton
-      onClick={handleLog}
-      ready={dropLogReady}
-      loading={isLoggingSet}
-      label="Log drop set"
-    />
-  );
+  const chrome = useWorkoutExecutionChrome();
+  const hideCompactBack = chrome?.hideCompactBack ?? false;
+  const totalSetEntries = allSetEntries.length || 1;
+  const canGoPrevious = currentSetEntryIndex > 0;
+  const canGoNext = currentSetEntryIndex < totalSetEntries - 1;
+  const previousPerfForExercise =
+    exerciseId && previousPerformanceMap
+      ? (previousPerformanceMap.get(exerciseId) ?? null)
+      : null;
+  const lastWorkoutForLastWeek = previousPerfForExercise?.lastWorkout ?? null;
 
   return (
-    <BaseBlockExecutorLayout
-      {...{
-        block,
-        onBlockComplete,
-        onNextBlock,
-        e1rmMap,
-        onE1rmUpdate,
-        sessionId,
-        assignmentId,
-        allBlocks,
-        currentBlockIndex,
-        onBlockChange,
-        currentExerciseIndex,
-        onExerciseIndexChange,
-        logSetToDatabase,
-        formatTime,
-        calculateSuggestedWeight,
-        onVideoClick,
-        onAlternativesClick,
-              onRestTimerClick,
-        onWorkoutBack,
-        progressionSuggestion,
-        previousPerformanceMap,
-      }}
-      exerciseName={currentExercise?.exercise?.name || "Exercise"}
-      prescriptionItems={prescriptionItems}
-      instructions={instructions}
-      currentSet={displaySetNumber}
-      totalSets={totalSets}
-      progressLabel="Set"
-      loggingInputs={loggingInputs}
-      logButton={logButton}
-      showNavigation={true}
-      currentExercise={currentExercise}
-      showRestTimer={
-        !!(block.block.rest_seconds || currentExercise?.rest_seconds)
-      }
-      onApplySuggestion={(w, _r) => {
-        if (w != null)
-          setDrops((prev) => [
-            { ...prev[0], weight: String(w) },
-            ...prev.slice(1),
-          ]);
-      }}
-      aboveStickyContent={aboveStickyContent}
-    />
+    <>
+      <div className="flex flex-col border-b border-white/5">
+        <div className="flex flex-col gap-3 px-0 pb-2 pt-1 sm:px-1">
+          {onWorkoutBack && !hideCompactBack ? (
+            <button
+              type="button"
+              onClick={onWorkoutBack}
+              className="-ml-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/10 hover:text-white active:scale-95"
+              aria-label="Back"
+            >
+              <ChevronLeft className="h-5 w-5" aria-hidden />
+            </button>
+          ) : null}
+
+          <LiveCard
+            hue={groupIndexToHue(currentSetEntryIndex)}
+            heading={`Set ${activeSetNumber} of ${totalSets}`}
+            status={
+              rowsState.doneCount >= totalSets ? "complete" : "logging"
+            }
+          >
+            <div>
+              <LiveCardExerciseName
+                name={currentExercise?.exercise?.name || "Exercise"}
+                endSlot={
+                  currentExercise ? (
+                    <ExerciseActionButtons
+                      exercise={currentExercise}
+                      onVideoClick={onVideoClick}
+                      onAlternativesClick={onAlternativesClick}
+                    />
+                  ) : undefined
+                }
+              />
+            </div>
+            <LiveCardPrimary
+              target={liveTarget}
+              effort={activeEffort}
+              loadPct={loadPercentage}
+            />
+            <LiveCardStats
+              rest={formatLiveRest(restSecDrop)}
+              tempo={tempoLabel}
+              last={lastLabel}
+            />
+            <LiveCardTechnique title="Drop set">
+              {formatDropTechniqueBody(dropPct)}
+            </LiveCardTechnique>
+            {instructions ? (
+              <LiveCardNote>{instructions}</LiveCardNote>
+            ) : null}
+
+            {rowsState.rows
+              .filter((row) => row.done)
+              .map((row) => {
+                const initial = row.drops[0];
+                const logged = (loggedSets ?? []).find(
+                  (s) => Number(s.set_number) === row.setNumber,
+                );
+                return (
+                  <SetUnitRow
+                    key={`done-${row.setNumber}`}
+                    label={`Set ${row.setNumber}`}
+                    done
+                    summary={
+                      <>
+                        {initial?.reps || "—"} ×{" "}
+                        <span className={setUnitStyles.sxAccent}>
+                          {initial?.weight || "—"}
+                        </span>{" "}
+                        kg
+                        <span className={setUnitStyles.sxMuted}>
+                          {" "}
+                          · {Math.max(0, row.drops.length - 1)} drops
+                        </span>
+                        <LoggedEffortInline rpe={logged?.rpe ?? null} />
+                      </>
+                    }
+                  />
+                );
+              })}
+
+            {activeRow && activeInitial ? (
+              <LiveCardLog>
+                  <LiveCardLogField
+                    label="Weight"
+                    value={activeInitial.weight}
+                    onChange={(value) =>
+                      rowsState.setRow(activeRowIndex, (c) => {
+                        const nextDrops = [...c.drops];
+                        nextDrops[0] = { ...nextDrops[0], weight: value };
+                        return { ...c, drops: nextDrops };
+                      })
+                    }
+                    onIncrement={() => nudgeActiveDropField(0, "weight", 2.5)}
+                    onDecrement={() => nudgeActiveDropField(0, "weight", -2.5)}
+                  />
+                  <LiveCardLogField
+                    label="Reps"
+                    value={activeInitial.reps}
+                    onChange={(value) =>
+                      rowsState.setRow(activeRowIndex, (c) => {
+                        const nextDrops = [...c.drops];
+                        nextDrops[0] = { ...nextDrops[0], reps: value };
+                        return { ...c, drops: nextDrops };
+                      })
+                    }
+                    onIncrement={() => nudgeActiveDropField(0, "reps", 1)}
+                    onDecrement={() => nudgeActiveDropField(0, "reps", -1)}
+                  />
+                  <LiveCardLogButton
+                    disabled={isLoggingSet}
+                    onClick={() => void handleLogSet(activeRowIndex)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      rowsState.setRow(activeRowIndex, (c) => ({
+                        ...c,
+                        expanded: !c.expanded,
+                      }))
+                    }
+                    className="self-start text-[10px] font-semibold uppercase tracking-wide text-[color:var(--fc-accent)]"
+                  >
+                    {activeRow.expanded ? "Hide drops" : "Edit drops"}
+                  </button>
+                  {activeRow.expanded ? (
+                    <div className="space-y-1.5">
+                      {activeRow.drops.map((drop, dropIndex) =>
+                        dropIndex === 0 ? null : (
+                          <div
+                            key={`drop-${dropIndex}`}
+                            className="rounded-md border border-white/10 bg-black/20 px-2 py-2"
+                          >
+                            <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-zinc-400">
+                              Drop {dropIndex}
+                            </p>
+                            <WeightRepsInlineFields
+                              weight={drop.weight}
+                              reps={drop.reps}
+                              onWeightChange={(value) =>
+                                rowsState.setRow(activeRowIndex, (current) => {
+                                  const nextDrops = [...current.drops];
+                                  nextDrops[dropIndex] = {
+                                    ...nextDrops[dropIndex],
+                                    weight: value,
+                                  };
+                                  return { ...current, drops: nextDrops };
+                                })
+                              }
+                              onRepsChange={(value) =>
+                                rowsState.setRow(activeRowIndex, (current) => {
+                                  const nextDrops = [...current.drops];
+                                  nextDrops[dropIndex] = {
+                                    ...nextDrops[dropIndex],
+                                    reps: value,
+                                  };
+                                  return { ...current, drops: nextDrops };
+                                })
+                              }
+                            />
+                          </div>
+                        ),
+                      )}
+                      {activeRow.drops.length < effectiveMaxDrops ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            rowsState.setRow(activeRowIndex, (current) => {
+                              const lastWeight = parseWeightKgInput(
+                                current.drops[current.drops.length - 1]
+                                  ?.weight || "",
+                              );
+                              return {
+                                ...current,
+                                drops: [
+                                  ...current.drops,
+                                  {
+                                    weight:
+                                      !isNaN(lastWeight) && lastWeight > 0
+                                        ? String(
+                                            Math.round(lastWeight * 0.85 * 2) /
+                                              2,
+                                          )
+                                        : "",
+                                    reps: current.drops[0]?.reps ?? "",
+                                  },
+                                ],
+                              };
+                            })
+                          }
+                          className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200"
+                        >
+                          <Plus className="h-3.5 w-3.5" /> Add drop
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {isEditMode ? (
+                    <div className="mt-1 flex gap-2 w-full">
+                      <Button
+                        variant="outline"
+                        onClick={handleCancelEdit}
+                        className="flex-1 h-12 text-base font-semibold rounded-xl"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleSaveEdit}
+                        disabled={
+                          isSavingEdit ||
+                          !editDraft ||
+                          editDraft.drops.length < 2 ||
+                          editDraft.drops.some(
+                            (d) =>
+                              isNaN(parseWeightKgInput(d.weight)) ||
+                              parseWeightKgInput(d.weight) < 0 ||
+                              isNaN(parseInt(d.reps, 10)) ||
+                              parseInt(d.reps, 10) <= 0,
+                          )
+                        }
+                        variant="fc-primary"
+                        className="flex-1 h-12 text-base font-bold uppercase tracking-wider rounded-xl"
+                      >
+                        {isSavingEdit ? "Saving…" : "Save edits"}
+                      </Button>
+                    </div>
+                  ) : null}
+              </LiveCardLog>
+            ) : null}
+
+            {rowsState.rows
+              .filter((row) => !row.done && row.setNumber !== activeRow?.setNumber)
+              .map((row) => (
+                <SetUnitRow
+                  key={`upcoming-${row.setNumber}`}
+                  label={`Set ${row.setNumber}`}
+                  summary={
+                    <span className={setUnitStyles.sxMuted}>
+                      {formatUpcomingDropSummary(row.setNumber)}
+                    </span>
+                  }
+                  onSelect={() =>
+                    setJumpRowIndex(
+                      rowsState.rows.findIndex((r) => r.setNumber === row.setNumber),
+                    )
+                  }
+                />
+              ))}
+
+            {rowsState.doneCount < totalSets ? (
+              <button
+                type="button"
+                onClick={fillRemainingTargets}
+                className="mx-[18px] mb-2 self-start text-[10px] font-semibold uppercase tracking-wide text-[color:var(--fc-text-subtle)] hover:text-[color:var(--fc-accent)]"
+              >
+                Prefill remaining targets
+              </button>
+            ) : null}
+          </LiveCard>
+
+          {previousPerfForExercise?.lastWorkout != null ||
+          progressionSuggestion ? (
+            <div className="mx-4">
+              <ProgressionNudge
+                suggestion={progressionSuggestion}
+                previousPerformance={previousPerfForExercise}
+                previousSessionSetNumber={activeSetNumber}
+                showPreviousSession={false}
+                onApplySuggestion={(w) => {
+                  if (w != null) {
+                    setDrops((prev) => [
+                      { ...prev[0], weight: String(w) },
+                      ...prev.slice(1),
+                    ]);
+                    setIsWeightPristine(false);
+                  }
+                }}
+              />
+            </div>
+          ) : null}
+
+          {aboveStickyContent}
+
+          <NavigationControls
+            currentBlock={currentSetEntryIndex + 1}
+            totalBlocks={totalSetEntries}
+            onPrevious={() => {
+              if (onSetEntryChange && canGoPrevious) {
+                onSetEntryChange(currentSetEntryIndex - 1);
+              }
+            }}
+            onNext={() => {
+              if (onSetEntryChange && canGoNext) {
+                onSetEntryChange(currentSetEntryIndex + 1);
+              }
+            }}
+            canGoPrevious={canGoPrevious}
+            canGoNext={canGoNext}
+          />
+        </div>
+        <LastSessionSetsSection lastWorkout={lastWorkoutForLastWeek} />
+      </div>
+    </>
   );
 }

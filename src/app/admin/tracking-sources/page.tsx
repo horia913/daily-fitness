@@ -109,7 +109,7 @@ export default function TrackingSourcesPage() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-12 h-12 border-4 border-[color-mix(in_srgb,var(--fc-group-c)_30%,transparent)] border-t-[color:var(--fc-group-c)] rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-slate-400">Loading tracking sources...</p>
         </div>
       </div>
@@ -121,7 +121,7 @@ export default function TrackingSourcesPage() {
       {/* Header */}
       <GlassCard elevation={2} className="fc-card-shell p-6 sm:p-10">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent-cyan)] shrink-0">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
             <Database className="w-6 h-6" />
           </div>
           <div>
@@ -136,11 +136,11 @@ export default function TrackingSourcesPage() {
       </GlassCard>
 
       {/* Info Banner */}
-      <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-4 flex items-start gap-3">
-        <Info className="w-5 h-5 text-cyan-400 mt-0.5 flex-shrink-0" />
+      <div className="bg-[color-mix(in_srgb,var(--fc-group-c)_10%,transparent)] border border-[color-mix(in_srgb,var(--fc-group-c)_30%,transparent)] rounded-lg p-4 flex items-start gap-3">
+        <Info className="w-5 h-5 text-[color:var(--fc-group-c)] mt-0.5 flex-shrink-0" />
         <div>
-          <p className="text-cyan-400 font-medium">How to use tracking sources</p>
-          <p className="text-cyan-300 text-sm mt-1">
+          <p className="text-[color:var(--fc-group-c)] font-medium">How to use tracking sources</p>
+          <p className="text-[color-mix(in_srgb,var(--fc-group-c)_70%,white)] text-sm mt-1">
             When creating goal templates or achievements, you can link them to a tracking source 
             to enable automatic progress tracking. The app will automatically update progress 
             based on the data collected from the corresponding table.
@@ -165,14 +165,14 @@ export default function TrackingSourcesPage() {
             placeholder="Search tracking sources..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-group-c)]"
           />
         </div>
         <div className="relative">
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="appearance-none pl-4 pr-10 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            className="appearance-none pl-4 pr-10 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-group-c)]"
           >
             <option value="all">All Categories</option>
             {categories.map(cat => (
@@ -259,7 +259,7 @@ function SourceCard({
   return (
     <div 
       className={`bg-slate-800/50 border rounded-lg overflow-hidden transition-all ${
-        expanded ? 'border-cyan-500/50' : 'border-slate-700 hover:border-slate-600'
+        expanded ? 'border-[color-mix(in_srgb,var(--fc-group-c)_50%,transparent)]' : 'border-slate-700 hover:border-slate-600'
       }`}
     >
       <button
@@ -269,7 +269,7 @@ function SourceCard({
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
             <h4 className="font-medium text-white">{source.display_name}</h4>
-            <code className="text-xs text-cyan-400 bg-cyan-400/10 px-1.5 py-0.5 rounded mt-1 inline-block">
+            <code className="text-xs text-[color:var(--fc-group-c)] bg-[color-mix(in_srgb,var(--fc-group-c)_10%,transparent)] px-1.5 py-0.5 rounded mt-1 inline-block">
               {source.source_key}
             </code>
           </div>
@@ -319,7 +319,7 @@ function SourceCard({
               e.stopPropagation();
               navigator.clipboard.writeText(source.source_key);
             }}
-            className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+            className="text-xs text-[color:var(--fc-group-c)] hover:text-[color-mix(in_srgb,var(--fc-group-c)_70%,white)] transition-colors"
           >
             Copy source_key to clipboard
           </button>

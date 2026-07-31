@@ -60,7 +60,7 @@ export function WorkoutProgressBar({
         aria-label="Workout progress"
       >
         <div
-          className="h-full transition-all duration-500 ease-out bg-[linear-gradient(90deg,var(--fc-accent-lime),var(--fc-accent-lime-2))]"
+          className="h-full transition-all duration-500 ease-out bg-[linear-gradient(90deg,var(--fc-accent),var(--fc-accent))]"
           style={{
             width: `${clampedProgress}%`,
           }}

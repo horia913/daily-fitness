@@ -2,7 +2,7 @@ import type { WorkoutSetLog } from "./workoutSetLogTypes";
 
 export type { WorkoutSetLog };
 
-export type CompleteAccent = "lime" | "cyan" | "purple" | "warning";
+export type CompleteAccent = "action" | "cyan" | "purple" | "warning";
 
 export type BlockGroupLite = {
   set_entry_id: string;
@@ -18,6 +18,10 @@ export type SetGroup = {
   weight: number;
   count: number;
   containsPR: boolean;
+  /** set_log ids in this collapsed group (for rating). */
+  setLogIds: string[];
+  prescribedRir: number | null;
+  loggedRpe: number | null;
 };
 
 export type ExerciseSummaryModel = {
@@ -31,4 +35,9 @@ export type ExerciseSummaryModel = {
   sets: WorkoutSetLog[];
   blockType: string;
   exerciseNames: Map<string, string>;
+  /** Footnote for technique (e.g. drop set note). */
+  techniqueNote?: string | null;
 };
+
+/** Prescribed RIR keyed by `${set_entry_id}:${exercise_id}:${set_number}` */
+export type PrescribedRirMap = Map<string, number | null>;

@@ -31,13 +31,16 @@ export function TrainingVolumeSection({
   busy,
   error,
   onRetry,
+  hideRangeTabs = false,
 }: {
   stats: VolumeStats | null;
   volumeWeeks: VolumeWindowWeeks;
-  onVolumeWeeksChange: (w: VolumeWindowWeeks) => void;
+  onVolumeWeeksChange?: (w: VolumeWindowWeeks) => void;
   busy?: boolean;
   error?: string | null;
   onRetry?: () => void;
+  /** When true, page-level time control owns the window — hide local 8W/12W/6M tabs. */
+  hideRangeTabs?: boolean;
 }) {
   const weeklyVolumes = useMemo(() => {
     if (!stats?.weeklyData?.length) return [];
@@ -161,11 +164,13 @@ export function TrainingVolumeSection({
         <DeltaPill pct={delta} />
       </div>
 
-      <VolumeRangeTabs
-        value={volumeWeeks}
-        onChange={onVolumeWeeksChange}
-        disabled={busy}
-      />
+      {!hideRangeTabs && onVolumeWeeksChange ? (
+        <VolumeRangeTabs
+          value={volumeWeeks}
+          onChange={onVolumeWeeksChange}
+          disabled={busy}
+        />
+      ) : null}
 
       <WeeklyBarChart
         values={weeklyVolumes}

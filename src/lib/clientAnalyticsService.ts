@@ -16,11 +16,11 @@ import { getPeriodBounds } from "./metrics/period";
 import { getNutritionCompliance } from "./metrics/nutrition";
 import { getNutritionComplianceTrend } from "./nutritionLogService";
 import { dbToUiScale } from "./wellnessService";
-import { computeCurrentProgramWeekForAssignment } from "./programWeekCalendar";
 import {
-  resolveProgramTotalDisplayWeeks,
-  sumTrainingBlockWeeksFromRows,
-} from "./programDurationResolver";
+  resolveInstanceWeekForAssignment,
+  computeInstanceAdherenceForWeek,
+  type InstanceCompletionRow,
+} from "./programInstanceResolver";
 import { fetchClientHabits } from "./habitTemplateService";
 import { normalizeClientTimezone } from "@/lib/clientZonedCalendar";
 
@@ -107,6 +107,60 @@ export function resolveStatsTabTimezone(
   return "UTC";
 }
 
+export type ClientProgramAdherenceSnapshot = {
+  adherencePct: number | null;
+  completedThisWeek: number;
+  scheduledThisWeek: number;
+};
+
+/** Program adherence for the client's active assignment (current week, required slots only). */
+export async function fetchClientProgramAdherenceSnapshot(
+  clientId: string,
+): Promise<ClientProgramAdherenceSnapshot> {
+  const { data: assignment } = await supabase
+    .from("program_assignments")
+    .select("id")
+    .eq("client_id", clientId)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (!assignment?.id) {
+    return { adherencePct: null, completedThisWeek: 0, scheduledThisWeek: 0 };
+  }
+
+  const [{ data: schedule }, { data: completions }, weekRes] = await Promise.all([
+    supabase
+      .from("program_day_assignments")
+      .select("id, week_number, is_optional")
+      .eq("program_assignment_id", assignment.id),
+    supabase
+      .from("program_day_completions")
+      .select("program_day_assignment_id, notes")
+      .eq("program_assignment_id", assignment.id),
+    resolveInstanceWeekForAssignment(supabase, assignment.id),
+  ]);
+
+  const weekNum = weekRes?.currentWeek ?? 1;
+  const slots = (schedule ?? []).map(
+    (s: { id: string; week_number: number; is_optional?: boolean | null }) => ({
+      id: s.id,
+      week_number: s.week_number,
+      is_optional: s.is_optional ?? null,
+    }),
+  );
+  const comps = (completions ?? []) as InstanceCompletionRow[];
+  const thisWeek = computeInstanceAdherenceForWeek(slots, comps, weekNum);
+
+  return {
+    scheduledThisWeek: thisWeek.required,
+    completedThisWeek: thisWeek.completed,
+    adherencePct:
+      thisWeek.required > 0
+        ? Math.round((thisWeek.completed / thisWeek.required) * 100)
+        : null,
+  };
+}
+
 export async function getClientAnalytics(
   clientId: string,
   clientTimezone: string
@@ -136,7 +190,7 @@ export async function getClientAnalytics(
     supabase
       .from("program_assignments")
       .select(
-        "id, program_id, start_date, duration_weeks, total_days, pause_accumulated_days, pause_status, paused_at, timezone_snapshot"
+        "id, program_id, start_date, total_days, pause_accumulated_days, pause_status, paused_at, timezone_snapshot"
       )
       .eq("client_id", clientId)
       .eq("status", "active")
@@ -175,69 +229,49 @@ export async function getClientAnalytics(
   let programAdherencePriorWeek: number | null = null;
 
   if (assignment?.id) {
-    const [{ data: schedule }, { data: completions }, { data: trainingBlockRows }] =
-      await Promise.all([
-        supabase
-          .from("program_schedule")
-          .select("id, week_number, is_optional")
-          .eq("program_id", assignment.program_id),
-        supabase
-          .from("program_day_completions")
-          .select("program_schedule_id, program_schedule(week_number)")
-          .eq("program_assignment_id", assignment.id),
-        supabase
-          .from("training_blocks")
-          .select("duration_weeks")
-          .eq("program_id", assignment.program_id),
-      ]);
+    // Instance-keyed: schedule from program_day_assignments, completions by
+    // program_day_assignment_id; Week X of N + adherence from the canonical
+    // resolver (N = instance phases, coach-skip excluded from the denominator).
+    const [{ data: schedule }, { data: completions }, weekRes] = await Promise.all([
+      supabase
+        .from("program_day_assignments")
+        .select("id, week_number, is_optional")
+        .eq("program_assignment_id", assignment.id),
+      supabase
+        .from("program_day_completions")
+        .select("program_day_assignment_id, notes")
+        .eq("program_assignment_id", assignment.id),
+      resolveInstanceWeekForAssignment(supabase, assignment.id),
+    ]);
 
-    const sumBlockWeeks = sumTrainingBlockWeeksFromRows(
-      trainingBlockRows as { duration_weeks: number | null }[] | null
-    );
-
-    const assignmentRow = assignment as {
-      duration_weeks?: number | null;
-      total_days?: number | null;
-    };
-
-    const totalWeeks = resolveProgramTotalDisplayWeeks({
-      sumTrainingBlockWeeks: sumBlockWeeks,
-      assignmentDurationWeeks: assignmentRow.duration_weeks ?? null,
-      assignmentTotalDays: assignmentRow.total_days ?? null,
-    });
-
-    const { week: weekNum } = computeCurrentProgramWeekForAssignment(
-      {
-        start_date: assignment.start_date ?? null,
-        duration_weeks: totalWeeks,
-        pause_accumulated_days: assignment.pause_accumulated_days ?? 0,
-        pause_status: assignment.pause_status ?? null,
-        paused_at: assignment.paused_at ?? null,
-        timezone_snapshot: assignment.timezone_snapshot ?? null,
-      },
-      tzCanonical
-    );
+    const weekNum = weekRes?.currentWeek ?? 1;
+    const totalWeeks = weekRes?.totalWeeks ?? 0;
 
     programProgress = {
       weekNum,
       totalWeeks,
       pct: totalWeeks > 0 ? Math.min(100, Math.round((weekNum / totalWeeks) * 100)) : 0,
     };
-    const slotsThisWeek = (schedule ?? []).filter((s: { week_number: number }) => s.week_number === weekNum);
-    const requiredSlotsThisWeek = slotsThisWeek.filter((s: { is_optional?: boolean }) => !s.is_optional);
-    scheduledThisWeek = requiredSlotsThisWeek.length;
-    const slotIds = new Set(requiredSlotsThisWeek.map((s: { id: string }) => s.id));
-    completedThisWeek = (completions ?? []).filter((c: { program_schedule_id: string }) => slotIds.has(c.program_schedule_id)).length;
-    programAdherenceThisWeek = scheduledThisWeek > 0 ? Math.round((completedThisWeek / scheduledThisWeek) * 100) : null;
+
+    const slots = (schedule ?? []).map(
+      (s: { id: string; week_number: number; is_optional?: boolean | null }) => ({
+        id: s.id,
+        week_number: s.week_number,
+        is_optional: s.is_optional ?? null,
+      })
+    );
+    const comps = (completions ?? []) as InstanceCompletionRow[];
+
+    const thisWeek = computeInstanceAdherenceForWeek(slots, comps, weekNum);
+    scheduledThisWeek = thisWeek.required;
+    completedThisWeek = thisWeek.completed;
+    programAdherenceThisWeek =
+      thisWeek.required > 0 ? Math.round((thisWeek.completed / thisWeek.required) * 100) : null;
 
     if (weekNum > 1) {
-      const prevWeek = weekNum - 1;
-      const slotsPrev = (schedule ?? []).filter((s: { week_number: number }) => s.week_number === prevWeek);
-      const requiredPrev = slotsPrev.filter((s: { is_optional?: boolean }) => !s.is_optional);
-      const prevIds = new Set(requiredPrev.map((s: { id: string }) => s.id));
-      const donePrev = (completions ?? []).filter((c: { program_schedule_id: string }) => prevIds.has(c.program_schedule_id)).length;
+      const prev = computeInstanceAdherenceForWeek(slots, comps, weekNum - 1);
       programAdherencePriorWeek =
-        requiredPrev.length > 0 ? Math.round((donePrev / requiredPrev.length) * 100) : null;
+        prev.required > 0 ? Math.round((prev.completed / prev.required) * 100) : null;
     }
   }
 

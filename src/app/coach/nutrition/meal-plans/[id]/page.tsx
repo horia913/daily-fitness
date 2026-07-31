@@ -1,61 +1,279 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { CoachPageShell } from "@/components/coach-ui/CoachPageShell";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { GlassCard } from "@/components/ui/GlassCard";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { Card, CardContent } from "@/components/ui/card";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { MealPlanService, MealPlan, Meal } from "@/lib/mealPlanService";
-import MealCreator from "@/components/coach/MealCreator";
-import MealOptionEditor from "@/components/coach/MealOptionEditor";
-import { ArrowLeft, Plus, ChefHat, Edit, Settings2, Zap } from "lucide-react";
+import { type MealPlan } from "@/lib/mealPlanService";
+import { DatabaseService, type Client } from "@/lib/database";
+import { MealPlanMetadataModal } from "@/components/coach/nutrition/MealPlanMetadataModal";
+import MealPlanAssignmentModal from "@/components/features/nutrition/MealPlanAssignmentModal";
+import { CoachPlanBuilderView } from "@/components/meal-display/CoachPlanBuilderView";
+import { MealPlanDraftResumeDialog } from "@/components/meal-display/MealPlanDraftResumeDialog";
+import {
+  MealPlanDraftProvider,
+  useMealPlanDraft,
+} from "@/contexts/MealPlanDraftContext";
+import { LeaveConfirmDialog } from "@/components/coach/programs/station/LeaveConfirmDialog";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { useToast } from "@/components/ui/toast-provider";
+import { isTypingInField } from "@/lib/mealPlans/isTypingInField";
+import type { MealListEditorHandle } from "@/components/meal-display/MealListEditor";
+
+function MealPlanBuilderContent({
+  mealPlan,
+  setMealPlan,
+  assignedCount,
+  setAssignedCount,
+}: {
+  mealPlan: MealPlan;
+  setMealPlan: (p: MealPlan) => void;
+  assignedCount: number;
+  setAssignedCount: (n: number) => void;
+}) {
+  const { user } = useAuth();
+  const { addToast } = useToast();
+  const router = useRouter();
+  const draft = useMealPlanDraft();
+
+  const [openMealId, setOpenMealId] = useState<string | null>(null);
+  const [showMetadataModal, setShowMetadataModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [selectedClients, setSelectedClients] = useState<string[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [leaveOpen, setLeaveOpen] = useState(false);
+  const [leaveSaving, setLeaveSaving] = useState(false);
+  const pendingNavRef = useRef<string | null>(null);
+  const mealListEditorRef = useRef<MealListEditorHandle>(null);
+
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!draft.isDirty) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [draft.isDirty]);
+
+  const handleToggleMeal = (mealId: string) => {
+    setOpenMealId((prev) => (prev === mealId ? null : mealId));
+  };
+
+  const handleAddMeal = useCallback(() => {
+    const newId = draft.addMeal();
+    if (newId) setOpenMealId(newId);
+  }, [draft]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (isTypingInField(e.target)) return;
+      if (e.key === "m" || e.key === "M") {
+        e.preventDefault();
+        handleAddMeal();
+      }
+      if (e.key === "f" || e.key === "F") {
+        e.preventDefault();
+        mealListEditorRef.current?.openFoodSearch();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [handleAddMeal]);
+
+  const handleSave = async () => {
+    const ok = await draft.commit();
+    if (ok) {
+      addToast({ title: "Meal plan saved", variant: "success" });
+    } else if (draft.saveError) {
+      addToast({ title: draft.saveError, variant: "destructive" });
+    }
+    return ok;
+  };
+
+  const handleBackNavigate = (): boolean => {
+    if (!draft.isDirty) return true;
+    pendingNavRef.current = "/coach/nutrition";
+    setLeaveOpen(true);
+    return false;
+  };
+
+  const handleAssign = async () => {
+    if (!user?.id) return;
+    setSelectedClients([]);
+    try {
+      const coachClients = await DatabaseService.getClients(user.id);
+      setClients(coachClients);
+      setShowAssignModal(true);
+    } catch (error) {
+      console.error("Error loading clients:", error);
+      addToast({
+        title: "Error",
+        description: "Error loading clients. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const loadAssignedCount = useCallback(async () => {
+    const { count, error } = await supabase
+      .from("meal_plan_assignments")
+      .select("id", { count: "exact", head: true })
+      .eq("meal_plan_id", mealPlan.id)
+      .eq("is_active", true);
+    if (!error) setAssignedCount(count ?? 0);
+  }, [mealPlan.id, setAssignedCount]);
+
+  if (draft.loading || !draft.workingCopy) {
+    return <PageSkeleton variant="dashboard" />;
+  }
+
+  return (
+    <>
+      <CoachPlanBuilderView
+        mealPlan={mealPlan}
+        meals={draft.workingCopy.meals}
+        assignedCount={assignedCount}
+        openMealId={openMealId}
+        saveState={draft.saveState}
+        isDirty={draft.isDirty}
+        saveError={draft.saveError}
+        maxOptionsPerMeal={draft.maxOptionsPerMeal}
+        onToggleMeal={handleToggleMeal}
+        onEditMetadata={() => setShowMetadataModal(true)}
+        onAssign={() => void handleAssign()}
+        onSave={() => void handleSave()}
+        onAddMeal={handleAddMeal}
+        onUpdateMeal={draft.updateMeal}
+        onDeleteMeal={(id) => {
+          draft.removeMeal(id);
+          if (openMealId === id) setOpenMealId(null);
+        }}
+        onAddOption={(id) => {
+          draft.addOption(id);
+          setOpenMealId(id);
+        }}
+        onUpdateOption={draft.updateOption}
+        onDeleteOption={draft.removeOption}
+        onAddFood={draft.addFood}
+        onRemoveFood={draft.removeFood}
+        onUpdateFoodQuantity={draft.updateFoodQuantity}
+        onBackNavigate={handleBackNavigate}
+        mealListEditorRef={mealListEditorRef}
+      />
+
+      {draft.resumePrompt ? (
+        <MealPlanDraftResumeDialog
+          open
+          savedAt={draft.resumePrompt.savedAt}
+          onResume={draft.acceptResume}
+          onDiscard={draft.discardStoredDraft}
+        />
+      ) : null}
+
+      <LeaveConfirmDialog
+        open={leaveOpen}
+        saving={leaveSaving}
+        onCancel={() => {
+          setLeaveOpen(false);
+          pendingNavRef.current = null;
+        }}
+        onDiscard={() => {
+          draft.discardToBaseline();
+          setLeaveOpen(false);
+          const href = pendingNavRef.current;
+          pendingNavRef.current = null;
+          if (href) router.push(href);
+        }}
+        onSave={async () => {
+          setLeaveSaving(true);
+          const ok = await handleSave();
+          setLeaveSaving(false);
+          if (ok) {
+            setLeaveOpen(false);
+            const href = pendingNavRef.current;
+            pendingNavRef.current = null;
+            if (href) router.push(href);
+          }
+        }}
+      />
+
+      <MealPlanMetadataModal
+        isOpen={showMetadataModal}
+        onClose={() => setShowMetadataModal(false)}
+        mode="edit"
+        mealPlan={mealPlan}
+        onUpdated={(updated) => {
+          setMealPlan(updated);
+          setShowMetadataModal(false);
+        }}
+      />
+
+      {showAssignModal ? (
+        <MealPlanAssignmentModal
+          mealPlan={mealPlan}
+          clients={clients}
+          selectedClients={selectedClients}
+          onSelectedClientsChange={setSelectedClients}
+          onClose={() => {
+            setShowAssignModal(false);
+            setSelectedClients([]);
+          }}
+          onComplete={async () => {
+            setShowAssignModal(false);
+            setSelectedClients([]);
+            await loadAssignedCount();
+          }}
+        />
+      ) : null}
+    </>
+  );
+}
 
 export default function MealPlanDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const { user } = useAuth();
   const { performanceSettings } = useTheme();
 
   const mealPlanId = params.id as string;
 
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
-  const [meals, setMeals] = useState<Meal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showMealCreator, setShowMealCreator] = useState(false);
-  const [editingMealOptions, setEditingMealOptions] = useState<{ id: string; name: string } | null>(null);
+  const [assignedCount, setAssignedCount] = useState(0);
 
-  // Sum option-1 macro totals across all loaded meals
-  const dailyTotals = useMemo(() => {
-    if (meals.length === 0) return null;
-    return {
-      calories: meals.reduce((s, m) => s + m.total_calories, 0),
-      protein:  meals.reduce((s, m) => s + m.total_protein,  0),
-      carbs:    meals.reduce((s, m) => s + m.total_carbs,    0),
-      fat:      meals.reduce((s, m) => s + m.total_fat,      0),
-      fiber:    meals.reduce((s, m) => s + m.total_fiber,    0),
-    };
-  }, [meals]);
-
-  // Wait for both mealPlanId and user before loading — on a hard refresh,
-  // user is null until the auth context resolves, so we must not fire early.
   const mealPlanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const loadMealPlan = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("meal_plans")
+      .select("*")
+      .eq("id", mealPlanId)
+      .single();
+
+    if (error) {
+      console.error("Error loading meal plan:", error);
+      setMealPlan(null);
+    } else {
+      setMealPlan(data as MealPlan);
+    }
+  }, [mealPlanId]);
+
+  const loadAssignedCount = useCallback(async () => {
+    const { count, error } = await supabase
+      .from("meal_plan_assignments")
+      .select("id", { count: "exact", head: true })
+      .eq("meal_plan_id", mealPlanId)
+      .eq("is_active", true);
+
+    if (!error) setAssignedCount(count ?? 0);
+  }, [mealPlanId]);
 
   useEffect(() => {
     if (!mealPlanId || !user) return;
@@ -64,200 +282,30 @@ export default function MealPlanDetailPage() {
       mealPlanTimeoutRef.current = null;
       setLoading(false);
     }, 20_000);
-    Promise.all([loadMealPlan(), loadMeals()]).finally(() => {
+
+    setLoading(true);
+    Promise.all([loadMealPlan(), loadAssignedCount()]).finally(() => {
+      setLoading(false);
       if (mealPlanTimeoutRef.current) {
         clearTimeout(mealPlanTimeoutRef.current);
         mealPlanTimeoutRef.current = null;
       }
     });
+
     return () => {
       if (mealPlanTimeoutRef.current) {
         clearTimeout(mealPlanTimeoutRef.current);
         mealPlanTimeoutRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mealPlanId, user]);
-
-  const loadMealPlan = async () => {
-    try {
-      setLoading(true);
-      // Query the specific plan directly — no need to fetch all plans
-      const { data, error } = await supabase
-        .from("meal_plans")
-        .select("*")
-        .eq("id", mealPlanId)
-        .single();
-
-      if (error) {
-        console.error("Error loading meal plan:", error);
-        setMealPlan(null);
-      } else {
-        setMealPlan(data as MealPlan);
-      }
-    } catch (error) {
-      console.error("Error loading meal plan:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadMeals = async () => {
-    try {
-      // ----------------------------------------------------------------
-      // IMPORTANT: Do NOT use deep nested joins like
-      //   meals(*,meal_food_items(*,foods(*)))
-      // The meal_food_items RLS policy evaluates a subquery per row,
-      // which causes statement timeouts with even moderate row counts.
-      //
-      // Instead we use 4 lightweight batch queries and join in JS.
-      // We also only load Option 1's food items so calorie totals are
-      // per-option, not the sum of all options.
-      // ----------------------------------------------------------------
-
-      // Step 1: Load meals (no joins)
-      const { data: mealsData, error: mealsError } = await supabase
-        .from('meals')
-        .select('id, name, meal_type, order_index, created_at')
-        .eq('meal_plan_id', mealPlanId)
-        .order('order_index', { ascending: true });
-
-      if (mealsError) {
-        console.error("Error loading meals:", mealsError);
-        setMeals([]);
-        return;
-      }
-
-      if (!mealsData || mealsData.length === 0) {
-        // Fall back to legacy meal_plan_items table
-        const { data: legacyItems } = await supabase
-          .from('meal_plan_items')
-          .select('*, foods(*)')
-          .eq('meal_plan_id', mealPlanId)
-          .order('created_at', { ascending: true });
-
-        if (!legacyItems || legacyItems.length === 0) { setMeals([]); return; }
-
-        const grouped = new Map<string, any[]>();
-        legacyItems.forEach((item: any) => {
-          if (!grouped.has(item.meal_type)) grouped.set(item.meal_type, []);
-          grouped.get(item.meal_type)!.push({ ...item, food: item.foods });
-        });
-        const legacy: Meal[] = [];
-        grouped.forEach((items, meal_type) => {
-          const totals = items.reduce((acc: any, item: any) => {
-            if (!item.food) return acc;
-            const m = item.quantity / (item.food.serving_size || 1);
-            return {
-              total_calories: acc.total_calories + item.food.calories_per_serving * m,
-              total_protein: acc.total_protein + item.food.protein * m,
-              total_carbs: acc.total_carbs + item.food.carbs * m,
-              total_fat: acc.total_fat + item.food.fat * m,
-              total_fiber: acc.total_fiber + (item.food.fiber || 0) * m,
-            };
-          }, { total_calories: 0, total_protein: 0, total_carbs: 0, total_fat: 0, total_fiber: 0 });
-          legacy.push({ meal_type: meal_type as any, day_of_week: undefined, items, ...totals });
-        });
-        setMeals(legacy);
-        return;
-      }
-
-      const mealIds = mealsData.map((m: any) => m.id);
-
-      // Step 2: Load first option per meal in one batch
-      const { data: optionsData } = await supabase
-        .from('meal_options')
-        .select('id, meal_id, name, order_index')
-        .in('meal_id', mealIds)
-        .order('order_index', { ascending: true });
-
-      const firstOptionByMeal = new Map<string, string>();
-      (optionsData ?? []).forEach((opt: any) => {
-        if (!firstOptionByMeal.has(opt.meal_id)) firstOptionByMeal.set(opt.meal_id, opt.id);
-      });
-      const firstOptionIds = Array.from(firstOptionByMeal.values());
-
-      // Step 3: Load food items for option 1 only — avoids multiplying calories
-      let itemsByMeal = new Map<string, any[]>();
-      if (firstOptionIds.length > 0) {
-        const { data: foodItemsData } = await supabase
-          .from('meal_food_items')
-          .select('id, meal_id, meal_option_id, food_id, quantity, unit')
-          .in('meal_option_id', firstOptionIds);
-
-        // Step 4: Load all unique foods in one batch
-        const foodIds = [...new Set((foodItemsData ?? []).map((fi: any) => fi.food_id))] as string[];
-        let foodsById = new Map<string, any>();
-        if (foodIds.length > 0) {
-          const { data: foodsData } = await supabase
-            .from('foods')
-            .select('id, name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, fiber_per_100g, calories_per_serving, protein, carbs, fat, fiber, serving_size')
-            .in('id', foodIds);
-          foodsById = new Map((foodsData ?? []).map((f: any) => [f.id, f]));
-        }
-
-        (foodItemsData ?? []).forEach((item: any) => {
-          if (!itemsByMeal.has(item.meal_id)) itemsByMeal.set(item.meal_id, []);
-          itemsByMeal.get(item.meal_id)!.push({ ...item, food: foodsById.get(item.food_id) || null });
-        });
-      }
-
-      // Build Meal objects using only Option 1's macros
-      const allMeals: Meal[] = mealsData.map((meal: any) => {
-        const items = itemsByMeal.get(meal.id) ?? [];
-        const totals = items.reduce((acc: any, item: any) => {
-          const food = item.food;
-          if (!food) return acc;
-          // Prefer per-100g macros (generator format) — quantity is stored in grams
-          if (food.calories_per_100g != null) {
-            const ratio = item.quantity / 100;
-            return {
-              total_calories: acc.total_calories + food.calories_per_100g * ratio,
-              total_protein: acc.total_protein + (food.protein_per_100g || 0) * ratio,
-              total_carbs: acc.total_carbs + (food.carbs_per_100g || 0) * ratio,
-              total_fat: acc.total_fat + (food.fat_per_100g || 0) * ratio,
-              total_fiber: acc.total_fiber + (food.fiber_per_100g || 0) * ratio,
-            };
-          }
-          // Legacy fallback: per-serving macros
-          const m = item.quantity / (food.serving_size || 1);
-          return {
-            total_calories: acc.total_calories + (food.calories_per_serving || 0) * m,
-            total_protein: acc.total_protein + (food.protein || 0) * m,
-            total_carbs: acc.total_carbs + (food.carbs || 0) * m,
-            total_fat: acc.total_fat + (food.fat || 0) * m,
-            total_fiber: acc.total_fiber + (food.fiber || 0) * m,
-          };
-        }, { total_calories: 0, total_protein: 0, total_carbs: 0, total_fat: 0, total_fiber: 0 });
-
-        return {
-          id: meal.id,
-          name: meal.name,
-          meal_type: meal.meal_type as 'breakfast' | 'lunch' | 'dinner' | 'snack',
-          day_of_week: undefined,
-          items,
-          ...totals,
-        };
-      });
-
-      console.log("Loaded meals:", allMeals);
-      setMeals(allMeals);
-    } catch (error) {
-      console.error("Error loading meals:", error);
-    }
-  };
-
-  const handleMealSaved = async () => {
-    await loadMeals();
-    setShowMealCreator(false);
-  };
+  }, [mealPlanId, user, loadMealPlan, loadAssignedCount]);
 
   if (loading && !mealPlan) {
     return (
       <ProtectedRoute requiredRole="coach">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <CoachPageShell widthVariant="default-5xl" className="p-4 sm:p-6">
+          <CoachPageShell widthVariant="canvas-full" className="p-0 sm:p-0">
             <PageSkeleton variant="dashboard" />
           </CoachPageShell>
         </AnimatedBackground>
@@ -265,20 +313,20 @@ export default function MealPlanDetailPage() {
     );
   }
 
-  if (!mealPlan) {
+  if (!mealPlan || !user?.id) {
     return (
       <ProtectedRoute requiredRole="coach">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <CoachPageShell widthVariant="default-5xl" className="p-4 sm:p-6">
-            <GlassCard elevation={2} className="fc-card-shell p-10 text-center">
-              <h2 className="text-2xl font-bold text-[color:var(--fc-text-primary)] mb-4">
-                Meal Plan Not Found
+          <CoachPageShell widthVariant="canvas-full" className="p-0 sm:p-0">
+            <div className="text-center py-16">
+              <h2 className="text-xl font-semibold fc-text-primary mb-4">
+                Meal plan not found
               </h2>
               <Link href="/coach/nutrition">
-                <Button className="fc-btn fc-btn-primary">Back to Meal Plans</Button>
+                <Button className="fc-btn fc-btn-primary">Back to Nutrition</Button>
               </Link>
-            </GlassCard>
+            </div>
           </CoachPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
@@ -289,316 +337,17 @@ export default function MealPlanDetailPage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <CoachPageShell widthVariant="default-5xl" className="p-4 sm:p-6 space-y-6">
-          <Link href="/coach/nutrition" className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium">
-              <ArrowLeft className="w-4 h-4 shrink-0" />
-              Back to Nutrition
-            </Link>
-            <GlassCard elevation={2} className="fc-card-shell p-6 sm:p-10">
-              <div className="flex items-start gap-4">
-                <Link href="/coach/nutrition" className="fc-card-shell w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
-                  <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
-                </Link>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora-green)]/20 text-[color:var(--fc-accent-green)] shrink-0">
-                        <ChefHat className="w-6 h-6" />
-                      </div>
-                      <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
-                        {mealPlan.name}
-                      </h1>
-                    </div>
-                    <Link href={`/coach/nutrition/meal-plans/${mealPlan.id}/edit`}>
-                      <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost">
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                    </Link>
-                  </div>
-                  <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
-                    {mealPlan.notes ?? mealPlan.description ?? "No notes"}
-                  </p>
-                  {mealPlan.target_calories && (
-                    <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
-                      Target: {mealPlan.target_calories} calories
-                    </p>
-                  )}
-                  {(mealPlan.target_protein != null ||
-                    mealPlan.target_carbs != null ||
-                    mealPlan.target_fat != null) && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {mealPlan.target_protein != null && (
-                        <span className="text-xs font-medium rounded-lg px-2.5 py-1 border border-[color-mix(in_srgb,var(--fc-domain-meals)_35%,transparent)] bg-[color-mix(in_srgb,var(--fc-domain-meals)_12%,transparent)] text-[color:var(--fc-domain-meals)]">
-                          P {Math.round(Number(mealPlan.target_protein))}g
-                        </span>
-                      )}
-                      {mealPlan.target_carbs != null && (
-                        <span className="text-xs font-medium rounded-lg px-2.5 py-1 border border-[color-mix(in_srgb,var(--fc-status-info)_35%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-info)_12%,transparent)] text-[color:var(--fc-status-info)]">
-                          C {Math.round(Number(mealPlan.target_carbs))}g
-                        </span>
-                      )}
-                      {mealPlan.target_fat != null && (
-                        <span className="text-xs font-medium rounded-lg px-2.5 py-1 border border-[color-mix(in_srgb,var(--fc-status-warning)_35%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-warning)_12%,transparent)] text-[color:var(--fc-status-warning)]">
-                          F {Math.round(Number(mealPlan.target_fat))}g
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  {/* Raw portions notice — shown for generated plans */}
-                  {(mealPlan as any).generated_config && (
-                    <p className="text-xs mt-2 px-2.5 py-1 rounded-full inline-flex items-center gap-1.5 border border-[color-mix(in_srgb,var(--fc-status-success)_35%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-success)_12%,transparent)] fc-text-success font-medium w-fit">
-                      🥩 All portions are for <strong>raw / uncooked</strong> ingredients
-                    </p>
-                  )}
-                </div>
-              </div>
-            </GlassCard>
-
-            {/* Daily totals summary — derived from Option 1 of each meal */}
-            {dailyTotals && (
-              <GlassCard elevation={2} className="fc-card-shell p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <Zap className="w-4 h-4 text-[color:var(--fc-accent-cyan)]" />
-                  <span className="text-sm font-semibold text-[color:var(--fc-text-primary)]">
-                    Daily Totals
-                    <span className="text-xs font-normal text-[color:var(--fc-text-dim)] ml-2">(Option 1 of each meal)</span>
-                  </span>
-                  {mealPlan?.target_calories && (
-                    <span className="text-xs text-[color:var(--fc-text-dim)] ml-auto">
-                      target: {mealPlan.target_calories.toLocaleString()} kcal
-                    </span>
-                  )}
-                </div>
-                <div className="grid grid-cols-5 gap-2">
-                  {[
-                    { label: "kcal",    value: dailyTotals.calories, color: "text-[color:var(--fc-accent-cyan)]",       unit: "" },
-                    { label: "Protein", value: dailyTotals.protein,  color: "text-[color:var(--fc-domain-meals)]", unit: "g" },
-                    { label: "Carbs",   value: dailyTotals.carbs,    color: "text-[color:var(--fc-status-info)]",  unit: "g" },
-                    { label: "Fat",     value: dailyTotals.fat,      color: "text-[color:var(--fc-status-warning)]", unit: "g" },
-                    { label: "Fiber",   value: dailyTotals.fiber,    color: "text-[color:var(--fc-accent-purple)]", unit: "g" },
-                  ].map(({ label, value, color, unit }) => (
-                    <div key={label} className="text-center p-2.5 fc-surface rounded-xl border border-[color:var(--fc-surface-card-border)]">
-                      <div className={`text-base font-bold ${color}`}>
-                        {label === "kcal"
-                          ? Math.round(value).toLocaleString()
-                          : Math.round(value)}
-                        <span className="text-xs font-normal ml-0.5">{unit}</span>
-                      </div>
-                      <div className="text-[10px] text-[color:var(--fc-text-dim)] font-medium uppercase tracking-wide mt-0.5">
-                        {label}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </GlassCard>
-            )}
-
-            {/* Actions */}
-            <div className="flex gap-3">
-              <Button
-                type="button"
-                onClick={() => setShowMealCreator(true)}
-                className="fc-btn fc-btn-primary"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Meal
-              </Button>
-            </div>
-
-            {/* Meals List */}
-            <div className="fc-card-shell rounded-3xl p-6 border border-[color:var(--fc-surface-card-border)]">
-              {meals.length === 0 ? (
-                <div className="text-center py-12">
-                  <ChefHat className="w-16 h-16 mx-auto fc-text-dim mb-4" aria-hidden />
-                  <h3 className="text-lg font-semibold fc-text-primary mb-2">
-                    No meals added yet
-                  </h3>
-                  <p className="fc-text-dim mb-6">
-                    Start building your meal plan by adding individual meals.
-                  </p>
-                  <Button
-                    type="button"
-                    onClick={() => setShowMealCreator(true)}
-                    className="fc-btn fc-btn-primary"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add First Meal
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {meals.map((meal, index) => {
-                    const stripeClass =
-                      index % 2 === 0
-                        ? "bg-[color:var(--fc-glass-highlight)]"
-                        : "bg-[color:var(--fc-surface)]";
-
-                    return (
-                      <Card
-                        key={(meal as any).id || index}
-                        className={`rounded-xl border border-[color:var(--fc-glass-border)] shadow-sm hover:shadow-md transition-shadow duration-200 ${stripeClass}`}
-                      >
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              {(meal as any).name && (
-                                <h3 className="font-semibold fc-text-primary text-lg mb-2">
-                                  {(meal as any).name}
-                                </h3>
-                              )}
-                              <div className="flex items-center gap-3 mb-3">
-                                <Badge className="border border-[color-mix(in_srgb,var(--fc-status-info)_40%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-info)_12%,transparent)] fc-text-primary font-medium capitalize">
-                                  {meal.meal_type}
-                                </Badge>
-                                {meal.day_of_week && (
-                                  <Badge
-                                    variant="outline"
-                                    className="text-xs border-[color:var(--fc-glass-border)] fc-text-dim"
-                                  >
-                                    Day {meal.day_of_week}
-                                  </Badge>
-                                )}
-                              </div>
-                              <div className="grid grid-cols-5 gap-3 text-sm mb-3">
-                                <div className="text-center p-2 fc-surface rounded-lg border border-[color:var(--fc-surface-card-border)]">
-                                  <div className="font-bold fc-text-primary">
-                                    {Math.round(meal.total_calories)}
-                                  </div>
-                                  <div className="text-xs fc-text-dim">
-                                    Calories
-                                  </div>
-                                </div>
-                                <div className="text-center p-2 fc-surface rounded-lg border border-[color:var(--fc-surface-card-border)]">
-                                  <div className="font-bold text-[color:var(--fc-domain-meals)]">
-                                    {Math.round(meal.total_protein)}g
-                                  </div>
-                                  <div className="text-xs fc-text-dim">
-                                    Protein
-                                  </div>
-                                </div>
-                                <div className="text-center p-2 fc-surface rounded-lg border border-[color:var(--fc-surface-card-border)]">
-                                  <div className="font-bold text-[color:var(--fc-status-info)]">
-                                    {Math.round(meal.total_carbs)}g
-                                  </div>
-                                  <div className="text-xs fc-text-dim">
-                                    Carbs
-                                  </div>
-                                </div>
-                                <div className="text-center p-2 fc-surface rounded-lg border border-[color:var(--fc-surface-card-border)]">
-                                  <div className="font-bold text-[color:var(--fc-status-warning)]">
-                                    {Math.round(meal.total_fat)}g
-                                  </div>
-                                  <div className="text-xs fc-text-dim">
-                                    Fat
-                                  </div>
-                                </div>
-                                <div className="text-center p-2 fc-surface rounded-lg border border-[color:var(--fc-surface-card-border)]">
-                                  <div className="font-bold text-[color:var(--fc-accent-purple)]">
-                                    {Math.round(meal.total_fiber)}g
-                                  </div>
-                                  <div className="text-xs fc-text-dim">
-                                    Fiber
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="mt-3">
-                                <p className="text-sm fc-text-dim mb-2">
-                                  {meal.items.length} food item
-                                  {meal.items.length !== 1 ? "s" : ""}
-                                </p>
-                                {meal.items.length > 0 && (
-                                  <div className="space-y-1">
-                                    {meal.items.map((item, itemIndex) => (
-                                      <div
-                                        key={itemIndex}
-                                        className="flex items-center justify-between text-xs fc-surface rounded-lg p-2 border border-[color:var(--fc-glass-border)]"
-                                      >
-                                        <span className="fc-text-primary font-medium">
-                                          {item.food?.name || "Unknown Food"}
-                                        </span>
-                                        <span className="fc-text-dim">
-                                          {item.quantity}g
-                                        </span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-
-                              {(meal as any).id && (
-                                <div className="mt-4 pt-3 border-t border-[color:var(--fc-glass-border)]">
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                      setEditingMealOptions({
-                                        id: (meal as any).id,
-                                        name: (meal as any).name || meal.meal_type,
-                                      })
-                                    }
-                                    className="w-full justify-center gap-2 rounded-lg"
-                                  >
-                                    <Settings2 className="w-4 h-4" />
-                                    Manage Options
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+        <CoachPageShell widthVariant="canvas-full" className="p-0 sm:p-0">
+          <MealPlanDraftProvider mealPlanId={mealPlanId} coachId={user.id}>
+            <MealPlanBuilderContent
+              mealPlan={mealPlan}
+              setMealPlan={setMealPlan}
+              assignedCount={assignedCount}
+              setAssignedCount={setAssignedCount}
+            />
+          </MealPlanDraftProvider>
         </CoachPageShell>
       </AnimatedBackground>
-
-      {/* Meal Creator Modal */}
-      {showMealCreator && (
-        <MealCreator
-          mealPlanId={mealPlanId}
-          onClose={() => setShowMealCreator(false)}
-          onSave={handleMealSaved}
-        />
-      )}
-
-      <Dialog
-        open={!!editingMealOptions}
-        onOpenChange={(open) => {
-          if (!open) {
-            setEditingMealOptions(null);
-            void loadMeals();
-          }
-        }}
-      >
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col gap-0 border border-[color:var(--fc-glass-border)] p-0">
-          <DialogHeader className="fc-glass border-b border-[color:var(--fc-glass-border)] px-6 py-4 text-left">
-            <DialogTitle className="fc-text-primary">Meal Options</DialogTitle>
-            {editingMealOptions && (
-              <DialogDescription className="fc-text-dim">
-                {editingMealOptions.name}
-              </DialogDescription>
-            )}
-          </DialogHeader>
-          {editingMealOptions && (
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-              <MealOptionEditor
-                mealId={editingMealOptions.id}
-                mealPlanId={mealPlanId}
-                onOptionsChange={() => {
-                  // No-op: reloading on every options state change causes
-                  // an infinite re-render loop because MealOptionEditor
-                  // fires this callback on initial mount as well.
-                  // The meal summary will refresh next time the modal closes.
-                }}
-              />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </ProtectedRoute>
   );
 }

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
@@ -90,7 +90,7 @@ export default function ClientProgressBodySection({
   );
 
   const formatDelta = (change: number | null, lowerIsBetter: boolean) => {
-    if (change == null) return { text: "—" as string, className: "" };
+    if (change == null) return { text: "â€”" as string, className: "" };
     const cls =
       change < 0
         ? lowerIsBetter
@@ -103,18 +103,18 @@ export default function ClientProgressBodySection({
           : "";
     const text =
       change < 0
-        ? `▼ ${change.toFixed(1)}`
+        ? `â–¼ ${change.toFixed(1)}`
         : change > 0
-          ? `▲ +${change.toFixed(1)}`
-          : "—";
+          ? `â–² +${change.toFixed(1)}`
+          : "â€”";
     return { text, className: cls };
   };
 
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="animate-pulse h-48 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl" />
-        <div className="animate-pulse h-64 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl" />
+        <div className="animate-pulse h-48 bg-transparent border border-[color:var(--fc-glass-border)] rounded-2xl" />
+        <div className="animate-pulse h-64 bg-transparent border border-[color:var(--fc-glass-border)] rounded-2xl" />
       </div>
     );
   }
@@ -166,9 +166,9 @@ export default function ClientProgressBodySection({
                   <tr className="border-b border-[color:var(--fc-glass-border)]/50">
                     <td className="py-2 pr-4 font-medium">Weight</td>
                     <td className="text-right py-2 px-2 font-mono">
-                      {weightPair ? `${weightPair.prior.toFixed(1)} kg` : "—"}
+                      {weightPair ? `${weightPair.prior.toFixed(1)} kg` : "â€”"}
                     </td>
-                    <td className="text-right py-2 px-2 font-mono text-cyan-400 font-bold">
+                    <td className="text-right py-2 px-2 font-mono text-[color:var(--fc-group-c)] font-bold">
                       {(weightPair?.latest ?? latestWeight)?.toFixed(1)} kg
                     </td>
                     <td
@@ -182,14 +182,14 @@ export default function ClientProgressBodySection({
                   <tr className="border-b border-[color:var(--fc-glass-border)]/50">
                     <td className="py-2 pr-4 font-medium">Body fat</td>
                     <td className="text-right py-2 px-2 font-mono">
-                      {bodyFatPair ? `${bodyFatPair.prior.toFixed(1)}%` : "—"}
+                      {bodyFatPair ? `${bodyFatPair.prior.toFixed(1)}%` : "â€”"}
                     </td>
                     <td className="text-right py-2 px-2 font-mono">
                       {bodyFatPair
                         ? `${bodyFatPair.latest.toFixed(1)}%`
                         : latestBf != null
                           ? `${latestBf.toFixed(1)}%`
-                          : "—"}
+                          : "â€”"}
                     </td>
                     <td
                       className={`text-right py-2 pl-2 font-mono ${formatDelta(bodyFatPair ? bodyFatPair.latest - bodyFatPair.prior : null, true).className}`}
@@ -202,14 +202,14 @@ export default function ClientProgressBodySection({
                   <tr className="border-b border-[color:var(--fc-glass-border)]/50">
                     <td className="py-2 pr-4 font-medium">Waist</td>
                     <td className="text-right py-2 px-2 font-mono">
-                      {waistPair ? `${waistPair.prior.toFixed(1)} cm` : "—"}
+                      {waistPair ? `${waistPair.prior.toFixed(1)} cm` : "â€”"}
                     </td>
-                    <td className="text-right py-2 px-2 font-mono text-cyan-400 font-bold">
+                    <td className="text-right py-2 px-2 font-mono text-[color:var(--fc-group-c)] font-bold">
                       {waistPair
                         ? `${waistPair.latest.toFixed(1)} cm`
                         : latestWaist != null
                           ? `${latestWaist.toFixed(1)} cm`
-                          : "—"}
+                          : "â€”"}
                     </td>
                     <td
                       className={`text-right py-2 pl-2 font-mono ${formatDelta(waistPair ? waistPair.latest - waistPair.prior : null, true).className}`}
@@ -226,8 +226,8 @@ export default function ClientProgressBodySection({
         )}
         {wellnessStats && wellnessStats.loggedDays > 0 && (
           <p className="text-sm fc-text-subtle mt-4">
-            Sleep avg: {wellnessStats.averages.sleep_hours.toFixed(1)}h · Stress avg:{" "}
-            {wellnessStats.averages.stress.toFixed(1)}/5 · Check-in streak:{" "}
+            Sleep avg: {wellnessStats.averages.sleep_hours.toFixed(1)}h Â· Stress avg:{" "}
+            {wellnessStats.averages.stress.toFixed(1)}/5 Â· Check-in streak:{" "}
             {wellnessStats.loggedDays}/7 days
           </p>
         )}
@@ -261,7 +261,7 @@ export default function ClientProgressBodySection({
                       <td className="text-right py-2 px-2 font-mono">
                         {firstMeasurement.weight_kg.toFixed(1)} kg
                       </td>
-                      <td className="text-right py-2 px-2 font-mono text-cyan-400 font-bold">{latestWeight.toFixed(1)} kg</td>
+                      <td className="text-right py-2 px-2 font-mono text-[color:var(--fc-group-c)] font-bold">{latestWeight.toFixed(1)} kg</td>
                       <td
                         className={`text-right py-2 pl-2 font-mono ${formatSinceStart(latestWeight, firstMeasurement.weight_kg, "kg", true).improving ? "fc-text-success" : "fc-text-warning"}`}
                       >
@@ -275,7 +275,7 @@ export default function ClientProgressBodySection({
                       <td className="text-right py-2 px-2 font-mono">
                         {firstMeasurement.body_fat_percentage.toFixed(1)}%
                       </td>
-                      <td className="text-right py-2 px-2 font-mono text-cyan-400 font-bold">{latestBf.toFixed(1)}%</td>
+                      <td className="text-right py-2 px-2 font-mono text-[color:var(--fc-group-c)] font-bold">{latestBf.toFixed(1)}%</td>
                       <td
                         className={`text-right py-2 pl-2 font-mono ${formatSinceStart(latestBf, firstMeasurement.body_fat_percentage, "%", true).improving ? "fc-text-success" : "fc-text-warning"}`}
                       >
@@ -289,7 +289,7 @@ export default function ClientProgressBodySection({
                       <td className="text-right py-2 px-2 font-mono">
                         {firstMeasurement.waist_circumference.toFixed(1)} cm
                       </td>
-                      <td className="text-right py-2 px-2 font-mono text-cyan-400 font-bold">{latestWaist.toFixed(1)} cm</td>
+                      <td className="text-right py-2 px-2 font-mono text-[color:var(--fc-group-c)] font-bold">{latestWaist.toFixed(1)} cm</td>
                       <td
                         className={`text-right py-2 pl-2 font-mono ${formatSinceStart(latestWaist, firstMeasurement.waist_circumference, "cm", true).improving ? "fc-text-success" : "fc-text-warning"}`}
                       >
@@ -304,7 +304,7 @@ export default function ClientProgressBodySection({
         )}
 
       {weightSparkData.length >= 2 && (
-        <div className="fc-card-shell p-6">
+        <div className="rounded-[18px] border border-[color:rgba(255,255,255,0.08)] bg-transparent p-6">
           <h3 className="text-lg font-semibold fc-text-primary mb-4">Weight trend (last 12 weeks)</h3>
           <div className="flex items-end gap-0.5 h-12">
             {weightSparkData.map((m) => {
@@ -316,9 +316,9 @@ export default function ClientProgressBodySection({
               return (
                 <div
                   key={m.id}
-                  className="flex-1 min-w-[4px] rounded-t bg-cyan-500/80"
+                  className="flex-1 min-w-[4px] rounded-t bg-[color-mix(in_srgb,var(--fc-group-c)_80%,transparent)]"
                   style={{ height: `${Math.max(h, 4)}%` }}
-                  title={`${m.weight_kg?.toFixed(1)} kg · ${new Date(m.measured_date).toLocaleDateString()}`}
+                  title={`${m.weight_kg?.toFixed(1)} kg Â· ${new Date(m.measured_date).toLocaleDateString()}`}
                 />
               );
             })}

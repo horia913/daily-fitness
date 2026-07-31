@@ -13,9 +13,9 @@ interface Program {
   description?: string;
   coach_id: string;
   difficulty_level: "beginner" | "intermediate" | "advanced" | "athlete";
-  duration_weeks: number;
+  /** Derived from SUM(training_blocks.duration_weeks) — not workout_programs.duration_weeks */
+  totalWeeks: number;
   target_audience: string;
-  category?: string | null;
   is_public?: boolean;
   is_active: boolean;
   created_at: string;
@@ -53,14 +53,14 @@ export default function ProgramCard({
     .filter(Boolean)
     .join(" · ");
 
-  const tagLabel =
-    program.category?.trim() ||
-    difficultyLabel;
+  const tagLabel = difficultyLabel;
+
+  const weekCount = program.totalWeeks > 0 ? program.totalWeeks : "—";
 
   const subtitlePills = (
     <div className="flex flex-wrap items-center gap-1.5">
       <span className="inline-flex items-center rounded-full border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)] px-2 py-0.5 text-xs text-[color:var(--fc-text-primary)]">
-        {program.duration_weeks} weeks
+        {weekCount} weeks
       </span>
       <span className="inline-flex items-center rounded-full border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)] px-2 py-0.5 text-xs text-[color:var(--fc-text-primary)]">
         {assignmentCount} client{assignmentCount !== 1 ? "s" : ""} assigned
@@ -80,7 +80,7 @@ export default function ProgramCard({
             {program.name}
           </span>
           <span className="text-sm text-gray-400">
-            {program.duration_weeks} wk · {assignmentCount}{" "}
+            {weekCount} wk · {assignmentCount}{" "}
             {assignmentCount === 1 ? "client" : "clients"}
           </span>
         </button>

@@ -1,8 +1,8 @@
 /* Shared coach client detail v6 — uses design-system fc tokens only */
 
 .section {
-  background: var(--fc-surface-card);
-  border: 1px solid var(--fc-glass-border);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 18px;
   padding: 14px;
   display: flex;
@@ -19,7 +19,7 @@
 }
 
 .eyebrow {
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 10px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -36,7 +36,7 @@
 }
 
 .sectionTitle {
-  font-family: var(--f-headline, var(--font-geist-sans));
+  font-family: var(--f-headline);
   font-weight: 600;
   font-size: 14px;
   color: var(--fc-text-primary);
@@ -44,7 +44,7 @@
 }
 
 .sectionMeta {
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 10px;
   color: var(--fc-text-quaternary);
 }
@@ -60,7 +60,7 @@
   border-radius: 8px;
   border: 1px solid var(--fc-glass-border);
   background: transparent;
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 10px;
   color: var(--fc-text-subtle);
   cursor: pointer;
@@ -95,11 +95,11 @@
   border-radius: 13px;
   border: none;
   cursor: pointer;
-  font-family: var(--font-geist-sans, ui-sans-serif);
+  font-family: var(--font-body);
   font-weight: 600;
   font-size: 12.5px;
   color: var(--fc-ink);
-  background: linear-gradient(135deg, var(--fc-accent-lime), var(--fc-accent-lime-2));
+  background: linear-gradient(135deg, var(--fc-accent), color-mix(in srgb, var(--fc-accent) 85%, white));
 }
 
 .btnPrimary:disabled {
@@ -116,7 +116,7 @@
   border-radius: 13px;
   border: none;
   cursor: pointer;
-  font-family: var(--font-geist-sans, ui-sans-serif);
+  font-family: var(--font-body);
   font-weight: 600;
   font-size: 12.5px;
   color: var(--fc-ink);
@@ -136,7 +136,7 @@
   border-radius: 13px;
   border: 1px solid var(--fc-glass-border);
   background: transparent;
-  font-family: var(--font-geist-sans, ui-sans-serif);
+  font-family: var(--font-body);
   font-weight: 600;
   font-size: 12.5px;
   color: var(--fc-text-primary);
@@ -157,7 +157,7 @@
   border-radius: 13px;
   border: 1px solid var(--fc-effort-max-border);
   background: transparent;
-  font-family: var(--font-geist-sans, ui-sans-serif);
+  font-family: var(--font-body);
   font-weight: 600;
   font-size: 12.5px;
   color: var(--fc-effort-max);
@@ -177,8 +177,8 @@
 }
 
 .statTile {
-  background: var(--fc-glass-soft);
-  border: 1px solid var(--fc-divider);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   padding: 10px 8px;
   text-align: center;
@@ -194,7 +194,8 @@
 }
 
 .statTileNum {
-  font-family: var(--f-display, var(--font-geist-sans));
+  font-family: var(--f-display);
+  font-stretch: 125%;
   font-weight: 700;
   font-size: 20px;
   line-height: 1.1;
@@ -213,13 +214,13 @@
   color: var(--fc-effort-medium);
 }
 
-.statTileNumLime {
-  color: var(--fc-accent-lime-2);
+.statTileNumAction {
+  color: var(--fc-accent);
 }
 
 .statTileLabel {
   margin-top: 5px;
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 8.5px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -227,7 +228,7 @@
 }
 
 .statSuffix {
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 11px;
   font-weight: 400;
   color: var(--fc-text-quaternary);
@@ -239,7 +240,7 @@
   align-items: center;
   padding: 2px 8px;
   border-radius: 999px;
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 10px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -260,7 +261,7 @@
   border: 1px solid var(--fc-set-type-straight-border);
   background: var(--fc-set-type-straight-soft);
   cursor: pointer;
-  font-family: var(--font-geist-sans, ui-sans-serif);
+  font-family: var(--font-body);
   font-weight: 500;
 }
 
@@ -270,9 +271,9 @@
   gap: 5px;
   padding: 6px 10px;
   border-radius: 10px;
-  border: 1px solid var(--fc-glass-border);
-  background: var(--fc-glass-soft);
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  font-family: var(--f-mono);
   font-size: 11px;
   color: var(--fc-text-secondary);
   cursor: pointer;
@@ -287,15 +288,16 @@
 }
 
 .statTileLg {
-  background: var(--fc-glass-soft);
-  border: 1px solid var(--fc-divider);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   padding: 14px 10px;
   text-align: center;
 }
 
 .statTileNum28 {
-  font-family: var(--f-display, var(--font-geist-sans));
+  font-family: var(--f-display);
+  font-stretch: 125%;
   font-weight: 700;
   font-size: 28px;
   line-height: 1.1;

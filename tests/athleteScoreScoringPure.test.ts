@@ -3,6 +3,7 @@ import {
   computeWeightScore,
   computeRpeScore,
   intensityMultiplier,
+  computeProgramAthleteScore,
 } from "@/lib/athleteScoreScoringPure";
 
 describe("athleteScoreScoringPure", () => {
@@ -37,5 +38,13 @@ describe("athleteScoreScoringPure", () => {
     expect(computeRpeScore(8, 7)).toBeCloseTo(2 / 3);
     expect(computeRpeScore(10, 7)).toBe(0);
     expect(computeRpeScore(null, 7)).toBeNull();
+  });
+
+  test("computeProgramAthleteScore", () => {
+    expect(computeProgramAthleteScore(100, 100)).toBe(100);
+    expect(computeProgramAthleteScore(100, 50)).toBe(65);
+    expect(computeProgramAthleteScore(50, 100)).toBe(50);
+    expect(computeProgramAthleteScore(50, 50)).toBe(33);
+    expect(computeProgramAthleteScore(80, null)).toBe(80);
   });
 });

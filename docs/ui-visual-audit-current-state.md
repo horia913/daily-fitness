@@ -1,5 +1,7 @@
 # UI VISUAL AUDIT (CURRENT STATE)
 
+> **STALE (2026-07).** Token values and lime/atmosphere guidance here predate client flat surfaces and design-system-v5. Prefer [`design-system-v5.md`](./design-system-v5.md) + `src/styles/ui-system.css`.
+
 Add-on to the FitCoach Pro UI/UX Improvement Plan. Token-level and small component-level alignment only. No implementation in this step.
 
 ---

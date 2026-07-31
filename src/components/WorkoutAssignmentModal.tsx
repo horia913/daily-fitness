@@ -114,6 +114,7 @@ export default function WorkoutAssignmentModal({
         .select("id, name, description, estimated_duration, difficulty_level, category")
         .eq("coach_id", user.id)
         .eq("is_active", true)
+        .eq("kind", "library")
         .order("created_at", { ascending: false });
 
       console.log("[WorkoutAssignmentModal] Templates query result:", {

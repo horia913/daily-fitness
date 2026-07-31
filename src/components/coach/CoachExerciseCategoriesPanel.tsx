@@ -231,7 +231,7 @@ export function CoachExerciseCategoriesPanel() {
             <button
               type="button"
               onClick={() => setShowCreateForm(true)}
-              className="inline-flex items-center gap-3 py-4 px-8 rounded-[20px] border-none text-base font-semibold text-white bg-[color:var(--fc-accent-lime)] cursor-pointer transition-all duration-200 shadow-[0_2px_4px_rgba(0,0,0,0.1)]"
+              className="inline-flex items-center gap-3 py-4 px-8 rounded-[20px] border-none text-base font-semibold text-white bg-[color:var(--fc-accent)] cursor-pointer transition-all duration-200 shadow-[0_2px_4px_rgba(0,0,0,0.1)]"
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = "scale(1.05)";
               }}

@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { ATHLETIC_DEVELOPMENT_CATEGORY } from "@/lib/programs/stationWeekVolume";
 
 export interface ExerciseProgressionDataPoint {
   date: string;
@@ -25,6 +26,24 @@ export interface TrainedExercise {
   name: string;
   lastTrained: string;
   sessionCount: number;
+  category?: string | null;
+  primaryMuscleGroupId?: string | null;
+}
+
+/**
+ * Est-1RM / strength-progression eligibility — same gate as the coach volume rail:
+ * exclude athletic_development; require a primary muscle tag (loaded resistance).
+ */
+export function isEst1RmEligibleExercise(ex: {
+  category?: string | null;
+  primaryMuscleGroupId?: string | null;
+  primary_muscle_group_id?: string | null;
+}): boolean {
+  const muscleId = ex.primaryMuscleGroupId ?? ex.primary_muscle_group_id ?? null;
+  if (!muscleId) return false;
+  const cat = (ex.category ?? "").trim().toLowerCase();
+  if (cat === ATHLETIC_DEVELOPMENT_CATEGORY) return false;
+  return true;
 }
 
 const DEFAULT_TIME_RANGES = {
@@ -243,7 +262,9 @@ export async function getTrainedExercises(
       completed_at,
       exercises (
         id,
-        name
+        name,
+        category,
+        primary_muscle_group_id
       )
     `
     )
@@ -255,7 +276,13 @@ export async function getTrainedExercises(
 
   const byExercise = new Map<
     string,
-    { name: string; lastDate: string; count: number }
+    {
+      name: string;
+      lastDate: string;
+      count: number;
+      category: string | null;
+      primaryMuscleGroupId: string | null;
+    }
   >();
 
   for (const row of setLogs as any[]) {
@@ -263,11 +290,28 @@ export async function getTrainedExercises(
     const id = ex?.id ?? row.exercise_id;
     const name = ex?.name ?? "Unknown";
     if (!id) continue;
+    const category = (ex?.category as string | null) ?? null;
+    const primaryMuscleGroupId =
+      (ex?.primary_muscle_group_id as string | null) ?? null;
+    if (
+      !isEst1RmEligibleExercise({
+        category,
+        primaryMuscleGroupId,
+      })
+    ) {
+      continue;
+    }
     const dateStr = row.completed_at
       ? getDateKey(new Date(row.completed_at).toISOString())
       : "";
     if (!byExercise.has(id)) {
-      byExercise.set(id, { name, lastDate: dateStr, count: 0 });
+      byExercise.set(id, {
+        name,
+        lastDate: dateStr,
+        count: 0,
+        category,
+        primaryMuscleGroupId,
+      });
     }
     const entry = byExercise.get(id)!;
     entry.count += 1;
@@ -275,11 +319,13 @@ export async function getTrainedExercises(
   }
 
   return Array.from(byExercise.entries())
-    .map(([id, { name, lastDate, count }]) => ({
+    .map(([id, { name, lastDate, count, category, primaryMuscleGroupId }]) => ({
       id,
       name,
       lastTrained: lastDate,
       sessionCount: count,
+      category,
+      primaryMuscleGroupId,
     }))
     .sort((a, b) => b.lastTrained.localeCompare(a.lastTrained));
 }

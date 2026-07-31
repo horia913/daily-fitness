@@ -43,7 +43,7 @@
 }
 
 .back:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
 }
 
 .tab {
@@ -67,7 +67,7 @@
 }
 
 .tab:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
   color: var(--fc-text-primary);
 }
 
@@ -109,17 +109,14 @@
 
 .glowDotCyan {
   background: var(--fc-set-type-straight);
-  box-shadow: 0 0 8px var(--fc-set-type-straight);
 }
 
 .glowDotGood {
   background: var(--fc-effort-easy);
-  box-shadow: 0 0 8px var(--fc-effort-easy);
 }
 
 .glowDotPurple {
   background: var(--fc-meal-dinner);
-  box-shadow: 0 0 8px var(--fc-meal-dinner);
 }
 
 .tabLabel {

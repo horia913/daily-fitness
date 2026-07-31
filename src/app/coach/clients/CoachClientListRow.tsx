@@ -89,7 +89,7 @@ export function CoachClientListRow({
                 className={cn("h-2.5 w-2.5 shrink-0", !hasProgram && "opacity-45")}
                 aria-hidden
                 style={{
-                  color: hasProgram ? "var(--fc-accent-cyan)" : "var(--fc-text-quaternary)",
+                  color: hasProgram ? "var(--fc-accent)" : "var(--fc-text-quaternary)",
                 }}
               />
               {hasProgram ? (

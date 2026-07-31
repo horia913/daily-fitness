@@ -2,14 +2,14 @@ import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import styles from './clientProfileV1.module.css'
 
-export type SectionIconTone = 'cyan' | 'purple' | 'warn' | 'rose' | 'lime'
+export type SectionIconTone = 'cyan' | 'purple' | 'warn' | 'rose' | 'action'
 
 const toneClass: Record<SectionIconTone, string> = {
   cyan: styles.sectionIconCyan,
   purple: styles.sectionIconPurple,
   warn: styles.sectionIconWarn,
   rose: styles.sectionIconRose,
-  lime: styles.sectionIconLime,
+  action: styles.sectionIconAction,
 }
 
 export function SectionHead({

@@ -158,7 +158,7 @@ export function ProgramEditSetTypePill({
         style={monoFont}
         className={cn(
           mono,
-          "border-[rgba(79,227,232,0.18)] text-[#4FE3E8] bg-[rgba(79,227,232,0.12)]",
+          "border-[rgba(34, 211, 238, 0.18)] text-[color:var(--fc-group-c)] bg-[color:var(--fc-group-c-soft)]",
           className,
         )}
       >
@@ -172,7 +172,7 @@ export function ProgramEditSetTypePill({
       style={monoFont}
       className={cn(
         mono,
-        "border-[rgba(79,227,232,0.18)] text-[#4FE3E8] bg-[rgba(79,227,232,0.12)]",
+        "border-[rgba(34, 211, 238, 0.18)] text-[color:var(--fc-group-c)] bg-[color:var(--fc-group-c-soft)]",
         className,
       )}
     >

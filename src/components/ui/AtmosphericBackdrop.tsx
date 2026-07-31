@@ -11,8 +11,8 @@
  * Phase 0a / 0b note (per user decision):
  *   - AnimatedBackground is NOT modified. AtmosphericBackdrop renders on TOP
  *     of AnimatedBackground inside the page shells. Cyan stays as the system /
- *     ambient color in the background; lime appears only via the role-based
- *     overlay on action-dominant screens. This preserves lime's meaning as the
+ *     ambient color in the background; action appears only via the role-based
+ *     overlay on action-dominant screens. This preserves action's meaning as the
  *     action color.
  *   - In Phase 0a this component is built and showcased in /dev/v4-lab. It is
  *     NOT yet wired into ClientPageShell / CoachPageShell — that wiring is a
@@ -29,7 +29,6 @@
  */
 
 import React from "react";
-import { cn } from "@/lib/utils";
 
 export type AtmosphericVariant =
   | "action-top"
@@ -51,30 +50,9 @@ export interface AtmosphericBackdropProps {
   className?: string;
 }
 
-const VARIANT_CLASS: Record<AtmosphericVariant, string> = {
-  "action-top": "fc-backdrop-action-top",
-  "action-bottom": "fc-backdrop-action-bottom",
-  info: "fc-backdrop-info",
-  warning: "fc-backdrop-warning",
-  achievement: "fc-backdrop-achievement",
-  error: "fc-backdrop-error",
-};
-
-export function AtmosphericBackdrop({
-  variant,
-  absolute = true,
-  className,
-}: AtmosphericBackdropProps) {
-  return (
-    <div
-      aria-hidden="true"
-      className={cn(
-        VARIANT_CLASS[variant],
-        absolute && "absolute inset-0 pointer-events-none",
-        className
-      )}
-    />
-  );
+export function AtmosphericBackdrop(_props: AtmosphericBackdropProps) {
+  // Retired per design-system effect budget — page-level atmospheric layers are outside the sanctioned effects.
+  return null;
 }
 
 export default AtmosphericBackdrop;

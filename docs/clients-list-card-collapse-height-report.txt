@@ -1,0 +1,74 @@
+# CLIENTS LIST CARD — collapse empty height (structure-strip reservation)
+**Date:** 2026-07-06  
+**Scope:** Presentation/CSS only — `CollectionCard` collapse when `structure` absent
+
+---
+
+## 1. Files changed
+
+| Path | Change |
+|------|--------|
+| `src/components/ui/CollectionCard.tsx` | `hasStructure` flag → `cardNoStructure` class when `structure` absent/empty |
+| `src/components/ui/collectionCard.module.css` | `.cardNoStructure` rules — no stretch, no side space-between growth |
+
+**Untouched:** API, fetch, client card logic, grid mode, program/nutrition panel components (they still pass `structure` when applicable).
+
+---
+
+## 2. What was reserving height + how it collapsed
+
+**Root cause (not an empty structure DOM node):**  
+Structure markup was already conditional (`structure?.length > 0` only). The empty band came from **flex layout**:
+
+| Mechanism | Effect on strip-less cards |
+|-----------|----------------------------|
+| `.card` default `align-items: stretch` | Body column stretched to match taller `.side` (ring + actions), leaving dead space below meta inside `.body` |
+| `.body { flex: 1 }` | In the **mobile** breakpoint (`flex-direction: column`), `flex: 1` made `.body` **grow vertically** to fill the card — large empty band between meta and the side row |
+| `.side { justify-content: space-between }` | When `.side` was stretched tall, stat and actions pinned to top/bottom of an artificially tall column |
+
+**No** `min-height` on `.card` or `.struct` was found. No empty structure container was rendered.
+
+**Fix — `.cardNoStructure` (when `structure` absent/empty):**
+```css
+.cardNoStructure { align-items: flex-start; }
+.cardNoStructure .body { flex: 0 1 auto; }
+.cardNoStructure .side {
+  justify-content: flex-start;
+  gap: 10px;
+  align-self: flex-start;
+}
+```
+Plus mobile: `.cardNoStructure .body { flex: 0 1 auto; width: 100%; }`
+
+Card height is now `max(body content, side content)` with no internal stretch.
+
+---
+
+## 3. Program / nutrition cards unchanged
+
+- **Programs** with multi-block `structure` arrays → **no** `cardNoStructure` class → default stretch + `space-between` side preserved (structure strip at full height).
+- **Nutrition** plans/assignments (no `structure` prop) → gain collapse (desired — same strip-less roster).
+- **Clients grid** → `CoachClientGridCard` unchanged.
+
+Single-block programs that omit `structure` will also collapse (no strip to show) — height matches content, side actions sit under stat instead of being vertically distributed across a tall column.
+
+---
+
+## 4. Ring tier-color confirmation
+
+**Confirmed:** `ClientListScoreRing` uses `tierColorForKey(tier)` for both the arc `stroke` and the centered value `color` — not `var(--fc-accent)` or `--collection-hue`.
+
+Roxana/Alice (`beast_mode`, score 100) render **blue** because the tier definition in `ATHLETE_TIERS` sets `beast_mode.color` to `#0369A1` (intentional tier palette). That can resemble accent blue but is the correct tier color. Other tiers (e.g. `locked_in` → `#EA580C`, `showing_up` → `#06B6D4`) are clearly non-accent.
+
+Arc fill remains proportional: `strokeDashoffset = circumference - (pct/100) * circumference`.
+
+---
+
+## 5. `tsc` result
+
+```
+npx tsc --noEmit
+exit code: 0
+```
+
+No git commits.

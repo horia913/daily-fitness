@@ -1,0 +1,269 @@
+# AUDIT (READ-ONLY) — COACH PROGRAMS LIST PAGE (Phase B rebuild)
+**Date:** 2026-07-05  
+**Mockup target:** `design/mockups/coach-03-programs.html`  
+**Ground truth:** current `src/` code + mockup (not stale audits)
+
+---
+
+## PART 1 — Route resolution
+
+### Canonical Programs LIST page
+
+| Item | Value |
+|------|-------|
+| **Route** | `/coach/programs` |
+| **Page file** | `src/app/coach/programs/page.tsx` |
+| **Top-level component** | `ProgramsDashboardContent` (`src/components/coach/ProgramsDashboardContent.tsx`) |
+| **Shell** | `CoachPageShell widthVariant="data-7xl"` + Dashboard back link |
+
+**Confirmed:** This is the live programs list. Coach menu (`src/app/coach/menu/page.tsx` L50), Training hub (`src/app/coach/training/page.tsx` L21), `CoachHomeTriage`, `ActionItems`, and multiple coach views link here.
+
+### Route map (verified in `src/app/`)
+
+| Route | File | Renders | Status |
+|-------|------|---------|--------|
+| **`/coach/programs`** | `src/app/coach/programs/page.tsx` | `ProgramsDashboardContent` — program list | **Canonical list** |
+| **`/coach/training`** | `src/app/coach/training/page.tsx` | Training hub (nav cards to Programs, Templates, Exercises, …) | **Hub** — links to `/coach/programs`, not a list |
+| **`/coach/training/programs`** | *(no file in `src/app/`)* | — | **Does not exist** — stale docs only; list is `/coach/programs` |
+| **`/coach/programs/create`** | `src/app/coach/programs/create/page.tsx` | Metadata form → `WorkoutTemplateService.createProgram` → redirect to station | **Live create flow** |
+| **`/coach/programs/new`** | `src/app/coach/programs/new/page.tsx` | `export { default } from "../create/page"` | **Alias** of create |
+| **`/coach/programs/[id]/edit`** | `src/app/coach/programs/[id]/edit/page.tsx` | `ProgramStationShell` | **Canonical station editor** (rebuilt) |
+| **`/coach/programs/[id]`** | `src/app/coach/programs/[id]/page.tsx` | Inline `ProgramDetailsContent` — read-only week/schedule detail + duplicate | **Live detail** (legacy presentation; not station) |
+| **`/coach/programs-workouts`** | *(no file in `src/app/`)* | — | **Removed / absent** — docs reference redirect to templates; **legacy candidate** for doc cleanup only |
+| **`/coach/clients/[id]/programs/[programId]/edit`** | `src/app/coach/clients/[id]/programs/[programId]/edit/page.tsx` | `ProgramStationShell` (client instance mode) | **Client instance station** — not master list |
+| **`/coach/clients/[id]/programs/[programId]`** | `src/app/coach/clients/[id]/programs/[programId]/page.tsx` | `router.replace(…/edit)` | **Redirect** to client instance station |
+
+### API routes (list-related)
+
+| Route | File | Role |
+|-------|------|------|
+| `GET /api/coach/programs` | `src/app/api/coach/programs/route.ts` | List + assignment counts (used by list page) |
+| `POST /api/coach/programs/[id]/duplicate` | `src/app/api/coach/programs/[id]/duplicate/route.ts` | Duplicate master program (used from **detail** page, not list) |
+
+---
+
+## PART 2 — Current list structure
+
+### Layout today
+
+| Aspect | Current state |
+|--------|---------------|
+| **Presentation** | **Cards**, not open table. `ProgramCard` (`src/components/features/programs/ProgramCard.tsx`) |
+| **Desktop (≥sm)** | `grid sm:grid-cols-2` of elevated cards (`rounded-[22px]`, `fc-surface-card`, shadow, border) |
+| **Mobile (<sm)** | `layout="row"` — flat rows with hairline dividers (closer to mockup density but still card-action chrome) |
+| **Shell width** | `data-7xl` (~1280px cap) — **not** `canvas-full` like plan builder |
+| **Chrome** | `FloatingParticles` on list page; generic Dashboard back link (not mono eyebrow) |
+| **Header** | `text-lg font-semibold` "Training Programs" — not Archivo display stack |
+| **Stats line** | `{total} programs · {active} active · {assignments} assignments` — plain `text-sm text-gray-400` |
+| **Filter** | Active / All pills — `rounded-full` with `--fc-domain-workouts` tint (pre-system domain color) |
+
+### Per-program meta shown (confirmed in `ProgramCard` + API)
+
+| Field | Source | Shown in UI |
+|-------|--------|-------------|
+| **name** | `workout_programs.name` | Title |
+| **difficulty_level** | `workout_programs.difficulty_level` | Badge / eyebrow (`beginner` \| `intermediate` \| `advanced` \| `athlete`) |
+| **totalWeeks** | **Derived** — `SUM(training_blocks.duration_weeks)` via `getMasterProgramTotalWeeksBatch` (not `workout_programs.duration_weeks`) | "{n} weeks" pill |
+| **assignment count** | Count of `program_assignments` rows per `program_id` (coach-scoped) | "{n} client(s) assigned" |
+| **is_active** | `workout_programs.is_active` | "Inactive" in eyebrow when false; filter hides inactive unless "All" |
+| **description** | `workout_programs.description` | Card body only (line-clamp-2); not in row layout |
+| **target_audience** | API normalizes to `'general_fitness'` default | **Not displayed** on card |
+| **created_at / updated_at** | Returned by API | **Not displayed** on list |
+
+**Not shown on list (mockup also omits):** published/public status, periodization style, program type (fixed/recurring).
+
+---
+
+## PART 3 — Data & actions (post-spine)
+
+### Data source
+
+**List fetch:** `ProgramsDashboardContent.loadPrograms()` →  
+`fetchApi(\`/api/coach/programs?filter=${active|all}\`)`  
+(`src/app/api/coach/programs/route.ts`)
+
+**Queries (confirmed in route):**
+
+1. `workout_programs` — `select('*')`, `coach_id = user.id`, optional `is_active = true`, `order by created_at desc`
+2. `program_assignments` — `select('program_id')`, `coach_id = user.id` → aggregated to `assignmentCountByProgram`
+3. `training_blocks` — batch via `getMasterProgramTotalWeeksBatch()` (`src/lib/programs/masterProgramWeeks.ts`) → `totalWeeks` per program
+
+**Response shape per program:** spread of `workout_programs` row + `totalWeeks: number` + `target_audience` default.
+
+### Page-level actions
+
+| Action | Trigger | Calls / navigates |
+|--------|---------|-------------------|
+| **Refresh** | Header button | `loadPrograms()` (re-fetch API) |
+| **Create program** | Header link | `href="/coach/programs/create"` |
+| **Filter Active / All** | Pills | `setProgramFilter` → re-fetch with `filter=active\|all` |
+
+### Per-row actions (via `ProgramCard` callbacks)
+
+| Action | UI | Behavior |
+|--------|-----|----------|
+| **View** | Eye / card click | `window.location.href = /coach/programs/${id}` → **legacy detail page** |
+| **Edit** | Edit icon | `window.location.href = /coach/programs/${id}/edit` → **station** |
+| **Assign** | UserPlus icon | `openAssignModal(programId)` — inline modal in `ProgramsDashboardContent` |
+| **Delete** | Trash icon | Delete modal → `WorkoutTemplateService.deleteProgram(id)` |
+
+**Not on list:** Duplicate (only on `/coach/programs/[id]` detail page via `POST /api/coach/programs/[id]/duplicate`).
+
+### Assign path — FENCE (logic untouched in Phase B)
+
+**Entry:** `openAssignModal` → user selects clients → `submitAssign` → optional replace confirm → `doAssignAndClose`.
+
+**Core logic (do not change in presentation rebuild):**
+
+```text
+WorkoutTemplateService.assignProgramToClients(
+  programId, clientIds, coachId, startDate, notes, progressionMode
+)
+  → per client: supabase.rpc('assign_program_instance', { … })
+```
+
+(`src/lib/workoutTemplateService.ts` L1448–1505)
+
+**Supporting logic (also fenced):**
+
+- `WorkoutTemplateService.getClientsWithActiveProgram(clientIds)` — replace-confirm modal
+- Client list load: direct `supabase.from('clients')` + `profiles` merge in `openAssignModal`
+- Progression mode: `'auto' | 'coach_managed'` passed to RPC
+
+**Delete path (fenced):** `WorkoutTemplateService.deleteProgram` — soft-delete `workout_programs.is_active = false` (L1174–1186).
+
+**Create path (fenced, separate route):** `/coach/programs/create` → `WorkoutTemplateService.createProgram` → redirect to station.
+
+### Presentation/logic tangle note
+
+Assign, replace-confirm, and delete modals are **~300 lines inline** in `ProgramsDashboardContent.tsx` (L462–755) with bordered inputs, blur scrims, and semantic gradient buttons. Phase B can restyle these shells but must not alter `submitAssign` / `doAssignAndClose` / `handleDelete` orchestration or RPC payloads.
+
+---
+
+## PART 4 — Superseded-by-station check
+
+| Stale-audit name | Current codebase | Verdict |
+|------------------|------------------|---------|
+| **EnhancedProgramManager** | No file, no imports | **Absent** — already removed or never landed |
+| **ProgramDetailsModal** | No file, no imports | **Absent** |
+| **ProgramProgressionRulesEditor** | No component; `src/lib/programProgressionService.ts` exists as lib | **No UI component** — station uses progression via spine/RPC |
+| **ProgramTimeline** | `src/components/coach/ProgramTimeline.tsx` | **Orphan** — zero imports in `src/` |
+| **ProgramVolumeCalculator** | `src/components/coach/ProgramVolumeCalculator.tsx` | **Orphan** — zero imports in `src/` |
+| **`/coach/programs/create` flow** | **Still live** — metadata form, not a legacy builder | **Keep** — creates empty master then opens station |
+| **`/coach/programs/[id]` detail page** | **Still live** — week grid schedule viewer | **Legacy presentation** — parallel to station; mockup "View" may map here OR could later deep-link to station read-only. Not station. |
+| **Station rebuild** | `ProgramStationShell`, `ProgramDayEditor`, `WorkoutCanvas`, `ProgramDraftContext` at `/[id]/edit` | **Canonical editor** — list Edit links here correctly |
+
+**Rebuild must not resurrect:** `ProgramTimeline`, `ProgramVolumeCalculator`, or any modal-based program builder. List **Edit** should continue linking to `/coach/programs/[id]/edit` (station).
+
+---
+
+## PART 5 — Mockup target & gap
+
+### `coach-03-programs.html` — open-table grammar
+
+**Header:**
+- Title: **Training Programs** (Archivo Expanded display)
+- Sub: mono line — `{n} programs · {n} active · {n} assignments`
+- Actions: **Refresh** (ghost) + **＋ Create program** (primary CTA with glow)
+
+**Filters:** Active / All chips (mono uppercase, accent when on)
+
+**Table columns (desktop grid):**
+
+| Column | Content |
+|--------|---------|
+| Program | Archivo bold name (`tname`) |
+| Level | Chip (Intermediate, Advanced, Athlete, …) |
+| Length | Mono `13 wks` |
+| Assigned | Mono `6 clients` (accent when >0) or `0 clients` |
+| Actions | View (ghost sm) · Assign (◉+) · Edit (✎) · Delete (🗑) icon buttons |
+
+**Grammar:** Open rows on background, **hairline** row separators — **no grey cards**. JetBrains mono for data; Archivo for names; single `--fc-accent` (#2E7BFF). Rows are full-width within gutters.
+
+**Empty state:** Not illustrated in mockup snippet (table shows 9 sample rows).
+
+### Current → mockup gap
+
+| Dimension | Current | Mockup / system target |
+|-----------|---------|------------------------|
+| **Structure** | 2-up **cards** (desktop) | **Open dense table** — structural change |
+| **Row density** | ~2 cards per viewport height | ~54px rows, eyes-down scan |
+| **Surfaces** | `fc-surface-card`, borders, shadows | Hairlines only; open-by-default |
+| **Typography** | Inter `text-lg` header, gray-400 stats | Archivo h1 + JetBrains mono sub/columns |
+| **Level** | shadcn `Badge` / eyebrow | Mono **chip** (level column) |
+| **Assigned** | Pill inside card | Dedicated column; accent when assigned |
+| **Width** | `data-7xl` | Likely `data-7xl` or `canvas-full` (nutrition workspace uses `data-7xl`; builder uses `canvas-full` — mockup frame is 1360px full main) |
+| **View action** | Goes to legacy `/[id]` detail | Mockup keeps **View** — product decision whether detail page survives Phase B |
+| **Meta dropped** | description on card | Mockup drops description (OK) |
+| **Meta added** | — | Explicit **Level** column (already have `difficulty_level`) |
+| **Particles / blur** | FloatingParticles; assign modals use blur | System law: no particles on data surfaces; no blur scrims |
+| **Filter chips** | Domain-workouts tint | System `chipOn` / `chipOff` (nutrition workspace pattern) |
+
+**Reuse pattern:** `coachNutritionWorkspace.module.css` — `.tableHead`, `.tableRow`, `.th`, `.tname`, `.ghostBtn`, `.primaryCta`, `.chip`, `.pill` — same open-table grammar as `coach-02-nutrition.html`.
+
+---
+
+## PART 6 — Judgment: reskin vs rebuild, reuse, fences
+
+### Verdict: **Structural rebuild** (not a reskin)
+
+Cards → open table changes DOM structure, responsive behavior (desktop table + mobile stack), and action placement. This matches nutrition Phase B (meal plans cards → `CoachMealPlansPanel` table). Presentation-only, but **layout is new**, not token swap on existing cards.
+
+### Reusable as-is (or with styling only)
+
+| Asset | Notes |
+|-------|-------|
+| **`GET /api/coach/programs`** | Returns all fields needed for mockup columns |
+| **`ProgramsDashboardContent` state** | `programs`, `assignmentCountByProgram`, `programFilter`, loading/error |
+| **Assign modal flow** | Client search, date, notes, progression mode, replace confirm — **restyle shell only** |
+| **Delete modal flow** | Confirm checkbox + soft delete — **restyle shell only** |
+| **Links** | Edit → `/coach/programs/[id]/edit` (station); Create → `/coach/programs/create` |
+| **`ProgramCard` action mapping** | Logic reference for View/Assign/Edit/Delete — component likely **replaced** by table row, not reskinned |
+
+### Must fence (logic untouched)
+
+| Fence | Location |
+|-------|----------|
+| `assign_program_instance` RPC via `assignProgramToClients` | `workoutTemplateService.ts` |
+| `getClientsWithActiveProgram` + replace confirm branching | `ProgramsDashboardContent.submitAssign` |
+| `deleteProgram` soft-delete | `workoutTemplateService.ts` |
+| `GET /api/coach/programs` route + `getMasterProgramTotalWeeksBatch` | API + lib |
+| Create program (`createProgram` + redirect) | `/coach/programs/create` — out of list scope but linked |
+
+### Route-consolidation recommendations (future, not Phase B)
+
+1. **`/coach/training/programs`** — docs reference it; **no route exists**. Update docs; hub already points to `/coach/programs`.
+2. **`/coach/programs-workouts`** — **absent**; retire from docs/nav inventories.
+3. **`/coach/programs/[id]` detail vs station** — mockup includes **View** separate from Edit. Detail page is legacy schedule grid; consider whether View → station read-only, detail page demotion, or keep detail for "preview without editor". **Product decision** — flag for follow-up.
+4. **`/coach/programs/new`** — harmless alias; optional merge into create only.
+
+### Tangling risks
+
+| Risk | Mitigation |
+|------|------------|
+| Assign/delete modals embedded in list component | Extract **presentation** subcomponents; keep handlers in parent |
+| `window.location.href` for navigation | Can switch to `router.push` in rebuild (behavior-neutral) |
+| Duplicate only on detail page | Mockup doesn't show duplicate on list — OK to omit on table |
+| Mobile: mockup is table-only | Follow nutrition pattern: `.tableRowDesktop` / `.tableRowMobile` collapse @ `<1024px` |
+
+### Suggested Phase B approach (audit-only recommendation)
+
+1. New presentation module (e.g. `CoachProgramsWorkspace` + `coachProgramsWorkspace.module.css`) mirroring `CoachNutritionWorkspace` / `CoachMealPlansPanel`.
+2. Keep `ProgramsDashboardContent` data/handlers or slim it to a thin container — **fence** assign/delete/create orchestration.
+3. Replace `ProgramCard` grid with open table; borrow nutrition table CSS tokens.
+4. Shell: align with nutrition (`data-7xl`) or builder (`canvas-full`) per product — mockup reads full-width inside training main.
+5. Do **not** import station draft context into list.
+
+---
+
+## Appendix — quick reference
+
+| Question | Answer |
+|----------|--------|
+| Canonical list route? | `/coach/programs` |
+| List component? | `ProgramsDashboardContent` |
+| Table name? | `workout_programs` + `program_assignments` + `training_blocks` |
+| Assign RPC? | `assign_program_instance` |
+| Station edit? | `/coach/programs/[id]/edit` → `ProgramStationShell` |
+| Orphan components? | `ProgramTimeline.tsx`, `ProgramVolumeCalculator.tsx` (zero imports) |
+| Missing routes (docs only)? | `/coach/training/programs`, `/coach/programs-workouts` |

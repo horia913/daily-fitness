@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useMemo } from "react";
 import Link from "next/link";
@@ -23,6 +23,8 @@ type Props = {
   data: ClientAnalyticsData;
   weekDays: string[];
   lastWeekDays: string[];
+  /** When set, only render the volume trend block (merged client overview Performance section). */
+  variant?: "full" | "volumeOnly";
 };
 
 function avgSleep(logs: DailyWellnessLog[]): number | null {
@@ -66,6 +68,7 @@ export default function ClientAnalyticsCoachSections({
   data,
   weekDays,
   lastWeekDays,
+  variant = "full",
 }: Props) {
   const { overview, goals, workout, body, wellness, photos, nutrition, habits } = data;
 
@@ -191,6 +194,87 @@ export default function ClientAnalyticsCoachSections({
 
   const programPct = overview.programProgress?.pct ?? null;
 
+  const volumeTrendSection = (
+    <section className={sec.section}>
+      <div className={sec.sectionHead}>
+        <h2 className={sec.sectionTitle}>Volume</h2>
+        <span className={sec.sectionMeta}>12 weeks</span>
+      </div>
+      {volWeeks.length > 0 ? (
+        <div className="rounded-[11px] border border-[color:var(--fc-divider)] bg-[color:var(--bg-transparent)] px-1 py-2">
+          <div className="flex gap-[3px] items-end h-[90px]">
+            {volWeeks.map((w, idx) => {
+              const v = w.totalVolume;
+              const innerMax = 72;
+              const barPx = v <= 0 ? 4 : 4 + (v / maxVol) * innerMax;
+              const showLabel = topIdx.has(idx) && v > 0;
+              const label = v >= 1000 ? `${(v / 1000).toFixed(1)}t` : `${Math.round(v)}`;
+              return (
+                <div key={w.weekStart} className="flex-1 flex flex-col items-center justify-end h-full gap-0.5 min-w-0">
+                  {showLabel ? (
+                    <span
+                      className="text-[9px] leading-none text-[color:var(--fc-text-quaternary)]"
+                      style={{ fontFamily: "var(--font-geist-mono, ui-monospace)" }}
+                    >
+                      {label}
+                    </span>
+                  ) : (
+                    <span className="h-[10px] shrink-0" />
+                  )}
+                  <div
+                    className="w-full rounded-t-[4px] rounded-b-[1px] min-h-[3px] max-h-[81px]"
+                    style={{
+                      height: `${Math.round(barPx)}px`,
+                      background:
+                        v > 0
+                          ? "linear-gradient(180deg, var(--fc-set-type-straight), rgba(34, 211, 238, 0.4))"
+                          : "rgba(255,255,255,0.04)",
+                    }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-[color:var(--fc-text-subtle)]">No volume data yet.</p>
+      )}
+      <div
+        className="flex justify-between text-[9px] font-mono text-[color:var(--fc-text-quaternary)] px-0.5"
+        style={{ fontFamily: "var(--font-geist-mono, ui-monospace)" }}
+      >
+        <span>
+          {volWeeks[0]
+            ? new Date(volWeeks[0]!.weekStart + "T12:00:00").toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+              })
+            : "â€”"}
+        </span>
+        <span>
+          {volWeeks[Math.floor((volWeeks.length - 1) / 2)]
+            ? new Date(volWeeks[Math.floor((volWeeks.length - 1) / 2)]!.weekStart + "T12:00:00").toLocaleDateString(
+                "en-US",
+                { month: "short", day: "numeric" },
+              )
+            : "â€”"}
+        </span>
+        <span>
+          {volWeeks[volWeeks.length - 1]
+            ? new Date(volWeeks[volWeeks.length - 1]!.weekStart + "T12:00:00").toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+              })
+            : "â€”"}
+        </span>
+      </div>
+    </section>
+  );
+
+  if (variant === "volumeOnly") {
+    return <div className="space-y-3">{volumeTrendSection}</div>;
+  }
+
   return (
     <div className="space-y-3">
       {/* Overview 6 tiles */}
@@ -202,7 +286,7 @@ export default function ClientAnalyticsCoachSections({
               <Target className="w-3.5 h-3.5" strokeWidth={2} />
             </div>
             <div className={`${sec.statTileNum} ${sec.statTileNumCyan}`}>
-              {overview.overallAdherencePct != null ? `${overview.overallAdherencePct}%` : "—"}
+              {overview.overallAdherencePct != null ? `${overview.overallAdherencePct}%` : "â€”"}
             </div>
             <div className={sec.statTileLabel}>Adherence</div>
           </div>
@@ -235,17 +319,17 @@ export default function ClientAnalyticsCoachSections({
             </div>
             <div className={`${sec.statTileNum} ${sec.statTileNumCyan}`}>
               {body.measurements.length === 0 || overview.bodyCompositionTrend.deltaKg == null
-                ? "—"
+                ? "â€”"
                 : overview.bodyCompositionTrend.label}
             </div>
             <div className={sec.statTileLabel}>Body 30d</div>
           </div>
           <div className={sec.statTile}>
-            <div className={`${sec.statTileIcon} bg-[color:var(--fc-accent-lime-soft)] text-[color:var(--fc-accent-lime-2)]`}>
+            <div className={`${sec.statTileIcon} bg-[color:var(--fc-accent-dim)] text-[color:var(--fc-accent)]`}>
               <TrendingUp className="w-3.5 h-3.5" strokeWidth={2} />
             </div>
-            <div className={`${sec.statTileNum} ${sec.statTileNumLime}`}>
-              {programPct != null ? `${programPct}%` : "—"}
+            <div className={`${sec.statTileNum} ${sec.statTileNumAction}`}>
+              {programPct != null ? `${programPct}%` : "â€”"}
             </div>
             <div className={sec.statTileLabel}>Program</div>
           </div>
@@ -262,88 +346,14 @@ export default function ClientAnalyticsCoachSections({
         </div>
       </section>
 
-      {/* Volume trend */}
-      <section className={sec.section}>
-        <div className={sec.sectionHead}>
-          <h2 className={sec.sectionTitle}>Volume trend</h2>
-          <span className={sec.sectionMeta}>12 weeks</span>
-        </div>
-        {volWeeks.length > 0 ? (
-          <div className="rounded-[11px] border border-[color:var(--fc-divider)] bg-[color:var(--fc-glass-soft)] px-1 py-2">
-            <div className="flex gap-[3px] items-end h-[90px]">
-              {volWeeks.map((w, idx) => {
-                const v = w.totalVolume;
-                const innerMax = 72;
-                const barPx = v <= 0 ? 4 : 4 + (v / maxVol) * innerMax;
-                const showLabel = topIdx.has(idx) && v > 0;
-                const label = v >= 1000 ? `${(v / 1000).toFixed(1)}t` : `${Math.round(v)}`;
-                return (
-                  <div key={w.weekStart} className="flex-1 flex flex-col items-center justify-end h-full gap-0.5 min-w-0">
-                    {showLabel ? (
-                      <span
-                        className="text-[9px] leading-none text-[color:var(--fc-text-quaternary)]"
-                        style={{ fontFamily: "var(--font-geist-mono, ui-monospace)" }}
-                      >
-                        {label}
-                      </span>
-                    ) : (
-                      <span className="h-[10px] shrink-0" />
-                    )}
-                    <div
-                      className="w-full rounded-t-[4px] rounded-b-[1px] min-h-[3px] max-h-[81px]"
-                      style={{
-                        height: `${Math.round(barPx)}px`,
-                        background:
-                          v > 0
-                            ? "linear-gradient(180deg, var(--fc-set-type-straight), rgba(79, 227, 232, 0.4))"
-                            : "rgba(255,255,255,0.04)",
-                      }}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ) : (
-          <p className="text-sm text-[color:var(--fc-text-subtle)]">No volume data yet.</p>
-        )}
-        <div
-          className="flex justify-between text-[9px] font-mono text-[color:var(--fc-text-quaternary)] px-0.5"
-          style={{ fontFamily: "var(--font-geist-mono, ui-monospace)" }}
-        >
-          <span>
-            {volWeeks[0]
-              ? new Date(volWeeks[0]!.weekStart + "T12:00:00").toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                })
-              : "—"}
-          </span>
-          <span>
-            {volWeeks[Math.floor((volWeeks.length - 1) / 2)]
-              ? new Date(volWeeks[Math.floor((volWeeks.length - 1) / 2)]!.weekStart + "T12:00:00").toLocaleDateString(
-                  "en-US",
-                  { month: "short", day: "numeric" }
-                )
-              : "—"}
-          </span>
-          <span>
-            {volWeeks[volWeeks.length - 1]
-              ? new Date(volWeeks[volWeeks.length - 1]!.weekStart + "T12:00:00").toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                })
-              : "—"}
-          </span>
-        </div>
-      </section>
+      {volumeTrendSection}
 
       {/* Body composition */}
       <section className={sec.section}>
         <h2 className={sec.sectionTitle}>Body composition</h2>
         {body.measurements.length === 0 ? (
-          <div className="flex items-center gap-3 p-3.5 rounded-xl border border-dashed border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)]">
-            <div className="w-8 h-8 rounded-[10px] bg-[color:var(--fc-glass-highlight)] grid place-items-center shrink-0">
+          <div className="flex items-center gap-3 p-3.5 rounded-xl border border-dashed border-[color:var(--fc-glass-border)] bg-[color:var(--bg-transparent)]">
+            <div className="w-8 h-8 rounded-[10px] bg-transparent grid place-items-center shrink-0">
               <Scale className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
             </div>
             <p className="text-[12.5px] font-medium text-[color:var(--fc-text-primary)] m-0">
@@ -368,7 +378,7 @@ export default function ClientAnalyticsCoachSections({
                       <div key={m.id} className="flex-1 flex flex-col items-center gap-1 min-w-0">
                         <div className="w-full fc-progress-track rounded-t relative flex-1 min-h-[32px] overflow-hidden">
                           <div
-                            className="absolute bottom-0 w-full rounded-t bg-cyan-500/85"
+                            className="absolute bottom-0 w-full rounded-t bg-[color-mix(in_srgb,var(--fc-group-c)_85%,transparent)]"
                             style={{ height: `${h}%` }}
                           />
                         </div>
@@ -385,7 +395,7 @@ export default function ClientAnalyticsCoachSections({
               </div>
               {body.firstMeasurement && body.measurements[0] ? (
                 <p className="text-sm fc-text-subtle mt-2">
-                  Start: {body.firstMeasurement.weight_kg?.toFixed(1)} kg → Current:{" "}
+                  Start: {body.firstMeasurement.weight_kg?.toFixed(1)} kg â†’ Current:{" "}
                   {body.measurements[0]!.weight_kg?.toFixed(1)} kg
                   {body.weightGoal != null ? ` | Goal: ${body.weightGoal} kg` : ""}
                 </p>
@@ -393,7 +403,7 @@ export default function ClientAnalyticsCoachSections({
             </div>
           </div>
         )}
-        <div className="mt-3 p-3 rounded-xl border border-[color:var(--fc-divider)] bg-[color:var(--fc-glass-soft)]">
+        <div className="mt-3 p-3 rounded-xl border border-[color:var(--fc-divider)] bg-[color:var(--bg-transparent)]">
           <h4
             className="m-0 mb-1 text-[13px] font-semibold text-[color:var(--fc-text-primary)]"
             style={{ fontFamily: "var(--f-headline, var(--font-geist-sans))" }}
@@ -405,7 +415,7 @@ export default function ClientAnalyticsCoachSections({
               {photos.slice(0, 10).map((p) => (
                 <div
                   key={p.date}
-                  className="flex-shrink-0 w-24 h-24 rounded-xl bg-[color:var(--fc-glass-highlight)] overflow-hidden border border-[color:var(--fc-glass-border)] relative"
+                  className="flex-shrink-0 w-24 h-24 rounded-xl bg-transparent overflow-hidden border border-[color:var(--fc-glass-border)] relative"
                 >
                   {p.previewUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -434,7 +444,7 @@ export default function ClientAnalyticsCoachSections({
           Wellness trends
         </h3>
         <WellnessTable rows={wellnessRows} />
-        <div className="p-2.5 px-3 rounded-[11px] border border-[color:var(--fc-divider)] bg-[color:var(--fc-glass-soft)]">
+        <div className="p-2.5 px-3 rounded-[11px] border border-[color:var(--fc-divider)] bg-[color:var(--bg-transparent)]">
           <p className="m-0 text-xs font-medium text-[color:var(--fc-text-primary)]" style={{ fontFamily: "var(--font-geist-sans)" }}>
             Check-in consistency (last 3 months)
           </p>
@@ -451,13 +461,13 @@ export default function ClientAnalyticsCoachSections({
       {/* Nutrition compliance summary: card only when goals/plan (no fake 0%); CTA when neither */}
       {nutrition.hasGoalsOrPlan ? (
         <section className={sec.section}>
-          <ComplianceCard pct={nutrition.adherencePct ?? 0} name="Client overview" label="Compliance" />
+          <ComplianceCard pct={nutrition.adherencePct ?? 0} name="Client overview" label="Adherence" />
         </section>
       ) : (
         <section className={sec.section}>
-          <div className="flex flex-wrap items-center justify-between gap-2 p-3.5 rounded-[14px] border border-dashed border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)]">
+          <div className="flex flex-wrap items-center justify-between gap-2 p-3.5 rounded-[14px] border border-dashed border-[color:var(--fc-glass-border)] bg-[color:var(--bg-transparent)]">
             <p className="text-[12.5px] font-medium text-[color:var(--fc-text-primary)] m-0">
-              No nutrition goals set. Set targets to track compliance.
+              No nutrition goals set. Set targets to track adherence.
             </p>
             <button
               type="button"
@@ -487,7 +497,7 @@ export default function ClientAnalyticsCoachSections({
               href={`/coach/clients/${clientId}/progress?section=goals`}
               className="inline-block mt-1 text-[11px] font-semibold text-[color:var(--fc-set-type-straight)]"
             >
-              View goals page →
+              View goals page â†’
             </Link>
           </div>
         ) : (
@@ -500,9 +510,9 @@ export default function ClientAnalyticsCoachSections({
                     {Math.round(Math.min(100, Math.max(0, g.progress_percentage ?? 0)))}%
                   </span>
                 </div>
-                <div className="h-2 w-full rounded-full bg-[color:var(--fc-glass-highlight)] overflow-hidden">
+                <div className="h-2 w-full rounded-full bg-transparent overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-[color:var(--fc-accent-cyan)]"
+                    className="h-full rounded-full bg-[color:var(--fc-accent)]"
                     style={{ width: `${Math.min(100, g.progress_percentage ?? 0)}%` }}
                   />
                 </div>
@@ -512,7 +522,7 @@ export default function ClientAnalyticsCoachSections({
               href={`/coach/clients/${clientId}/progress?section=goals`}
               className="inline-block text-[11px] font-semibold text-[color:var(--fc-set-type-straight)] pt-1"
             >
-              View all →
+              View all â†’
             </Link>
           </div>
         )}
@@ -533,7 +543,7 @@ export default function ClientAnalyticsCoachSections({
                 >
                   <span className="text-sm fc-text-primary">{a.name ?? "Habit"}</span>
                   <span className="text-sm fc-text-subtle">
-                    {comp?.completed ?? 0} / {comp?.total ?? 30} ({pct}%) · Streak: {comp?.streak ?? 0}
+                    {comp?.completed ?? 0} / {comp?.total ?? 30} ({pct}%) Â· Streak: {comp?.streak ?? 0}
                   </span>
                 </li>
               );

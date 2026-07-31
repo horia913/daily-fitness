@@ -25,7 +25,7 @@ export function CheckinHero({
   rightSlot?: React.ReactNode;
 }) {
   return (
-    <div className={cn(s.hero, s.heroGlowCyan)}>
+    <div className={s.hero}>
       <div className={s.heroTop}>
         {onBack ? (
           <button type="button" className={s.heroIconBtn} onClick={onBack} aria-label={backAriaLabel}>
@@ -52,7 +52,7 @@ export function CheckinHero({
   );
 }
 
-export function CheckinLimeAddButton({
+export function CheckinActionAddButton({
   onClick,
   children = "Add",
   className,
@@ -64,13 +64,13 @@ export function CheckinLimeAddButton({
   showDot?: boolean;
 }) {
   return (
-    <button type="button" onClick={onClick} className={cn(s.limePrimaryBtn, "relative", className)}>
+    <button type="button" onClick={onClick} className={cn(s.actionPrimaryBtn, "relative", className)}>
       <Plus className="h-[11px] w-[11px]" strokeWidth={2.5} aria-hidden />
       {children}
       {showDot ? (
         <span
-          className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full ring-2 ring-[color:var(--cs-card)]"
-          style={{ background: "var(--cs-cyan)" }}
+          className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full ring-2 ring-[color:var(--fc-bg-deep)]"
+          style={{ background: "var(--fc-accent)" }}
           aria-hidden
         />
       ) : null}
@@ -83,7 +83,7 @@ const stripeMap = {
   purple: s.stripePurple,
   warning: s.stripeWarning,
   good: s.stripeGood,
-  lime: s.stripeLime,
+  action: s.stripeAction,
 } as const;
 
 export type CheckinStripe = keyof typeof stripeMap;
@@ -173,7 +173,7 @@ export function CheckinPresetGrid({
   );
 }
 
-type ScaleTier = "critical" | "warning" | "warningLite" | "good" | "lime";
+type ScaleTier = "critical" | "warning" | "warningLite" | "good" | "action";
 
 const tierActive: Record<ScaleTier, React.CSSProperties> = {
   critical: {
@@ -187,7 +187,7 @@ const tierActive: Record<ScaleTier, React.CSSProperties> = {
     boxShadow: "inset 0 0 0 1.5px var(--cs-warning)",
   },
   warningLite: {
-    borderColor: "rgba(248,214,122,0.35)",
+    borderColor: "var(--cs-warning-dim)",
     background: "var(--cs-warning-lite-soft)",
     boxShadow: "inset 0 0 0 1.5px var(--cs-warning-lite)",
   },
@@ -196,10 +196,10 @@ const tierActive: Record<ScaleTier, React.CSSProperties> = {
     background: "var(--cs-good-soft)",
     boxShadow: "inset 0 0 0 1.5px var(--cs-good)",
   },
-  lime: {
-    borderColor: "rgba(197,255,74,0.45)",
-    background: "var(--cs-lime-soft)",
-    boxShadow: "inset 0 0 0 1.5px var(--cs-lime)",
+  action: {
+    borderColor: "var(--fc-accent-glow)",
+    background: "var(--fc-accent-dim)",
+    boxShadow: "inset 0 0 0 1.5px var(--fc-accent)",
   },
 };
 
@@ -208,7 +208,7 @@ const tierLabel: Record<ScaleTier, string> = {
   warning: "var(--cs-warning)",
   warningLite: "var(--cs-warning-lite)",
   good: "var(--cs-good)",
-  lime: "var(--cs-lime)",
+  action: "var(--fc-accent)",
 };
 
 export function CheckinScalePills({
@@ -224,7 +224,7 @@ export function CheckinScalePills({
 }) {
   const tiers: ScaleTier[] =
     variant === "sleep"
-      ? ["critical", "warning", "warningLite", "good", "lime"]
+      ? ["critical", "warning", "warningLite", "good", "action"]
       : ["good", "warningLite", "warningLite", "warning", "critical"];
 
   return (

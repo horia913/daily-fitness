@@ -35,7 +35,12 @@ export type AssignmentWeekFields = {
   pause_status: string | null
   paused_at: string | null
   timezone_snapshot: string | null
-  duration_weeks?: number | null
+}
+
+export type ComputeCurrentProgramWeekForAssignmentOptions = {
+  targetYmdOverride?: string
+  /** N from resolver (instance phases) or master block sum — caps calendar week X. */
+  totalWeeksCap?: number | null
 }
 
 export function computeCurrentProgramWeek(args: ComputeCurrentProgramWeekArgs): number {
@@ -62,13 +67,16 @@ export const computeProgramWeekForCalendarYmd = computeCurrentProgramWeek
 export function computeCurrentProgramWeekForAssignment(
   assignment: AssignmentWeekFields,
   clientTimezoneFallback: string,
-  targetYmdOverride?: string
+  options?: string | ComputeCurrentProgramWeekForAssignmentOptions,
 ): { week: number; clamped: boolean } {
+  const opts: ComputeCurrentProgramWeekForAssignmentOptions =
+    typeof options === 'string' ? { targetYmdOverride: options } : (options ?? {})
+
   const tz =
     normalizeClientTimezone(assignment.timezone_snapshot) ||
     normalizeClientTimezone(clientTimezoneFallback) ||
     'UTC'
-  const targetYmd = targetYmdOverride ?? zonedCalendarDateString(new Date(), tz)
+  const targetYmd = opts.targetYmdOverride ?? zonedCalendarDateString(new Date(), tz)
   const raw = computeCurrentProgramWeek({
     assignmentStartDate: assignment.start_date,
     pauseAccumulatedDays: assignment.pause_accumulated_days,
@@ -78,7 +86,11 @@ export function computeCurrentProgramWeekForAssignment(
     clientTimezone: tz,
   })
   const floored = Math.max(1, raw)
-  const cap = assignment.duration_weeks ?? Number.POSITIVE_INFINITY
+  const capRaw = opts.totalWeeksCap
+  const cap =
+    typeof capRaw === 'number' && Number.isFinite(capRaw) && capRaw > 0
+      ? Math.floor(capRaw)
+      : Number.POSITIVE_INFINITY
   if (floored > cap) return { week: cap, clamped: true }
   return { week: floored, clamped: false }
 }

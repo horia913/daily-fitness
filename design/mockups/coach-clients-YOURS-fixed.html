@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<title>Coach — Clients (your card, 4 bugs fixed)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;}
+  :root{
+    --page:#0A0B0D;
+    --line:rgba(255,255,255,.07);
+    --good:#22E56A; --warn:#FFB020; --bad:#FF5A4D; --accent:#2E7BFF; --cyan:#22D3EE;
+    --text:#F0F2F5; --dim:#8B93A1; --subtle:#565D69; --faint:#3A404A;
+    --f-d:'Archivo',sans-serif; --f-b:'Inter',sans-serif; --f-m:'JetBrains Mono',monospace;
+  }
+  body{background:var(--page);color:var(--text);font-family:var(--f-b);-webkit-font-smoothing:antialiased;padding:26px 30px 60px;}
+  .d{font-family:var(--f-d);font-stretch:105%;}
+  svg{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+
+  h1{font-family:var(--f-d);font-size:30px;font-weight:800;letter-spacing:-.02em;}
+  .sub{font-family:var(--f-m);font-size:11px;color:var(--dim);margin-top:6px;}
+  .sub b{color:var(--text);}
+  .head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;}
+  .add{background:var(--accent);color:#fff;border-radius:999px;padding:10px 20px;font-size:12.5px;font-weight:700;letter-spacing:.03em;}
+
+  .search{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:11px;padding:11px 15px;display:flex;gap:10px;align-items:center;color:var(--subtle);font-size:13px;margin-bottom:12px;}
+  .pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+  .pill{font-family:var(--f-m);font-size:10.5px;color:var(--dim);border:1px solid var(--line);border-radius:999px;padding:7px 14px;}
+  .pill.on{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 12%,transparent);}
+  .cnt{font-family:var(--f-m);font-size:11px;color:var(--dim);margin:14px 2px 12px;}
+  .cnt b{color:var(--text);font-size:13px;}
+
+  /* ===== YOUR CARD — wash + rail kept ===== */
+  .list{display:flex;flex-direction:column;gap:12px;}
+  .card{
+    position:relative;
+    border-radius:13px;
+    padding:16px 20px 16px 24px;
+    cursor:pointer;
+    overflow:hidden;
+    display:grid;
+    grid-template-columns: 1fr auto auto;   /* content · score · chevron  → FIX 1 & 4 */
+    align-items:center;
+    gap:26px;
+    border:1px solid transparent;
+  }
+  .card::before{ /* the rail */
+    content:"";position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:3px 0 0 3px;
+  }
+  /* the wash — strong at the rail, gone by ~65% */
+  .card.ok  {background:linear-gradient(90deg, color-mix(in srgb,var(--good) 13%, transparent) 0%, color-mix(in srgb,var(--good) 4%, transparent) 28%, transparent 66%), #0D0F12;}
+  .card.ok::before{background:var(--good);}
+  .card.att {background:linear-gradient(90deg, color-mix(in srgb,var(--bad) 15%, transparent) 0%, color-mix(in srgb,var(--bad) 5%, transparent) 28%, transparent 66%), #0D0F12;}
+  .card.att::before{background:var(--bad);}
+  .card.mon {background:linear-gradient(90deg, color-mix(in srgb,var(--warn) 13%, transparent) 0%, color-mix(in srgb,var(--warn) 4%, transparent) 28%, transparent 66%), #0D0F12;}
+  .card.mon::before{background:var(--warn);}
+  .card.non {background:linear-gradient(90deg, rgba(255,255,255,.05) 0%, rgba(255,255,255,.015) 28%, transparent 66%), #0D0F12;}
+  .card.non::before{background:rgba(255,255,255,.18);}
+  .card:hover{border-color:rgba(255,255,255,.10);}
+
+  /* content column */
+  .main{min-width:0;}
+  .nameRow{display:flex;align-items:center;gap:11px;min-width:0;}
+  .av{width:30px;height:30px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+      font-family:var(--f-m);font-size:10px;font-weight:700;color:#0A0B0D;background:linear-gradient(145deg,#c9d2dd,#8f9aa8);}
+  .nm{font-family:var(--f-d);font-size:17px;font-weight:800;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  /* FIX 2 — ONE status chip */
+  .chip{font-family:var(--f-m);font-size:9.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+        border-radius:999px;padding:4px 10px;display:flex;align-items:center;gap:6px;flex-shrink:0;}
+  .chip i{width:5px;height:5px;border-radius:50%;}
+  .chip.ok{color:var(--good);background:color-mix(in srgb,var(--good) 13%,transparent);} .chip.ok i{background:var(--good);}
+  .chip.att{color:var(--bad);background:color-mix(in srgb,var(--bad) 15%,transparent);} .chip.att i{background:var(--bad);}
+  .chip.mon{color:var(--warn);background:color-mix(in srgb,var(--warn) 14%,transparent);} .chip.mon i{background:var(--warn);}
+  .chip.non{color:var(--subtle);background:rgba(255,255,255,.05);} .chip.non i{background:var(--subtle);}
+
+  .meta{font-family:var(--f-m);font-size:11px;color:var(--dim);margin-top:9px;line-height:1.65;}
+  .meta .flag{color:var(--bad);font-weight:700;letter-spacing:.06em;}
+  .meta .sep{color:var(--faint);margin:0 7px;}
+  .meta b{color:var(--text);font-weight:600;}
+  .meta .warnv{color:var(--warn);} .meta .badv{color:var(--bad);}
+  .meta .mute{color:var(--faint);}
+  .assign{color:var(--accent);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:9.5px;}
+
+  /* FIX 1 — score has its own slot, can't overlap */
+  .score{display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0;width:74px;}
+  .ring{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+        font-family:var(--f-d);font-size:16px;font-weight:800;border:2px solid;}
+  .ring.hi{color:var(--good);border-color:color-mix(in srgb,var(--good) 55%,transparent);}
+  .ring.mid{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 55%,transparent);}
+  .ring.lo{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 55%,transparent);}
+  /* FIX 3 — no data → dash, no invented tier */
+  .ring.none{color:var(--faint);border-color:rgba(255,255,255,.10);border-style:dashed;font-family:var(--f-m);font-size:14px;}
+  .score .lbl{font-family:var(--f-m);font-size:7.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);text-align:center;}
+
+  .right{display:flex;align-items:center;gap:6px;color:var(--faint);flex-shrink:0;}
+  .right svg{width:17px;height:17px;}
+  .kebab{letter-spacing:1px;font-size:15px;}
+
+  .note{margin-top:30px;font-size:12px;line-height:1.85;color:var(--subtle);border-left:2px solid var(--good);padding-left:14px;max-width:900px;}
+  .note b{color:var(--text);}
+</style></head>
+<body>
+
+<div class="head">
+  <div><h1 class="d">Clients</h1><div class="sub"><b>13</b> active · <b>1</b> need attention</div></div>
+  <div class="add">+ ADD</div>
+</div>
+
+<div class="search"><svg viewBox="0 0 24 24" width="15" height="15"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>Search clients…</div>
+<div class="pills">
+  <span class="pill on">All 13</span><span class="pill">Active 13</span><span class="pill">Pending 0</span><span class="pill">Inactive 0</span>
+  <span class="pill">Needs attention</span><span class="pill">Trained today</span><span class="pill">Checked in today</span>
+</div>
+<div class="cnt"><b>13</b> clients</div>
+
+<div class="list">
+
+  <div class="card att">
+    <div class="main">
+      <div class="nameRow">
+        <span class="av">CP</span>
+        <span class="nm d">Client Popescu</span>
+        <span class="chip att"><i></i>Needs attention</span>
+      </div>
+      <div class="meta">
+        <span class="flag">Never checked in</span><span class="sep">·</span>Missed <b>1</b> scheduled session<span class="sep">·</span>Nutrition <span class="badv">0%</span>
+        <br>
+        <b>test nou 1</b><span class="sep">·</span>Week <b>4</b> of 13<span class="sep">·</span>next <b>Day 1 — Lower</b> today<span class="sep">·</span>trained <b>2d ago</b><span class="sep">·</span>check-in <span class="badv">22w ago</span>
+      </div>
+    </div>
+    <div class="score"><div class="ring lo d">0</div><div class="lbl">Score</div></div>
+    <div class="right"><span class="kebab">⋮</span><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></div>
+  </div>
+
+  <div class="card ok">
+    <div class="main">
+      <div class="nameRow">
+        <span class="av">AM</span>
+        <span class="nm d">Andreea Moldovan</span>
+        <span class="chip ok"><i></i>On track</span>
+      </div>
+      <div class="meta">
+        <b>Hypertrophy B2</b><span class="sep">·</span>Week <b>7</b> of 12<span class="sep">·</span>next <b>Push A</b> tomorrow<span class="sep">·</span>trained <b>today</b><span class="sep">·</span>check-in <b>2d ago</b>
+      </div>
+    </div>
+    <div class="score"><div class="ring hi d">86</div><div class="lbl">Score</div></div>
+    <div class="right"><span class="kebab">⋮</span><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></div>
+  </div>
+
+  <div class="card mon">
+    <div class="main">
+      <div class="nameRow">
+        <span class="av">TB</span>
+        <span class="nm d">Tudorel Blidea</span>
+        <span class="chip mon"><i></i>Monitor</span>
+      </div>
+      <div class="meta">
+        <b>Strength A1</b><span class="sep">·</span>Week <b>3</b> of 10<span class="sep">·</span>next <b>Squat day</b> Thu<span class="sep">·</span>trained <span class="warnv">6d ago</span><span class="sep">·</span>check-in <span class="warnv">6d ago</span>
+      </div>
+    </div>
+    <div class="score"><div class="ring mid d">61</div><div class="lbl">Score</div></div>
+    <div class="right"><span class="kebab">⋮</span><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></div>
+  </div>
+
+  <div class="card non">
+    <div class="main">
+      <div class="nameRow">
+        <span class="av">RM</span>
+        <span class="nm d">Roxana Micu</span>
+        <span class="chip non"><i></i>No program</span>
+      </div>
+      <div class="meta">
+        Not assigned <span class="assign">· assign →</span><span class="sep">·</span>trained <span class="mute">never</span><span class="sep">·</span>check-in <span class="warnv">11w ago</span>
+      </div>
+    </div>
+    <div class="score"><div class="ring none">—</div><div class="lbl">No score yet</div></div>
+    <div class="right"><span class="kebab">⋮</span><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></div>
+  </div>
+
+  <div class="card non">
+    <div class="main">
+      <div class="nameRow">
+        <span class="av">LD</span>
+        <span class="nm d">Luminita Dejeu</span>
+        <span class="chip non"><i></i>No program</span>
+      </div>
+      <div class="meta">
+        Not assigned <span class="assign">· assign →</span><span class="sep">·</span>trained <span class="mute">never</span><span class="sep">·</span>check-in <span class="mute">never</span>
+      </div>
+    </div>
+    <div class="score"><div class="ring none">—</div><div class="lbl">No score yet</div></div>
+    <div class="right"><span class="kebab">⋮</span><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></div>
+  </div>
+
+  <div class="card ok">
+    <div class="main">
+      <div class="nameRow">
+        <span class="av">BP</span>
+        <span class="nm d">Bob Persona</span>
+        <span class="chip ok"><i></i>On track</span>
+      </div>
+      <div class="meta">
+        <b>GPP base</b><span class="sep">·</span>Week <b>5</b> of 8<span class="sep">·</span>next <b>Full body C</b> today<span class="sep">·</span>trained <b>1d ago</b><span class="sep">·</span>check-in <b>1d ago</b>
+      </div>
+    </div>
+    <div class="score"><div class="ring hi d">73</div><div class="lbl">Score</div></div>
+    <div class="right"><span class="kebab">⋮</span><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></div>
+  </div>
+
+</div>
+
+<div class="note">
+  <b>Kept exactly as yours:</b> the coloured wash fading left→right, the solid status rail, full-width stacked cards, circular avatar, bold display name, mono meta line, the score ring, kebab + chevron.<br><br>
+  <b>Only these four fixed:</b><br>
+  <b>1.</b> Score ring now sits in its own right-hand slot — it can no longer land on top of the stat text.<br>
+  <b>2.</b> One status chip per card. Was <span style="color:var(--good)">NO PROGRAM</span> <i>and</i> <span style="color:var(--good)">ON TRACK</span> together, which contradict each other.<br>
+  <b>3.</b> No invented scores — a client with no program who never logged shows <span style="color:var(--faint)">—</span> "no score yet", not 100.<br>
+  <b>4.</b> Meta uses the full width instead of stopping a third of the way in — so the assignment (<b>program · week · what's next</b>) fits on the line you already had.
+</div>
+
+</body></html>

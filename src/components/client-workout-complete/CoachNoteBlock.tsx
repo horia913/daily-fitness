@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import styles from "./clientWorkoutCompleteV1.module.css";
+import styles from "./clientWorkoutCompleteV6.module.css";
 
 function initials(first?: string | null): string {
   const t = (first ?? "").trim();

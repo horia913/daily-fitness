@@ -3,7 +3,7 @@
 import { cn } from "@/lib/utils";
 import styles from "./progressSuiteV1.module.css";
 
-type Accent = "muted" | "cyan" | "lime" | "purple" | "warning" | "good";
+type Accent = "muted" | "cyan" | "action" | "purple" | "warning" | "good";
 
 export function PsSectionEyebrow({
   children,
@@ -17,8 +17,8 @@ export function PsSectionEyebrow({
   const accentCls =
     accent === "cyan"
       ? styles.psSectionEyebrowCyan
-      : accent === "lime"
-        ? styles.psSectionEyebrowLime
+      : accent === "action"
+        ? styles.psSectionEyebrowAction
         : accent === "purple"
           ? styles.psSectionEyebrowPurple
           : accent === "warning"

@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DailyFitness — Element Library v2 (Open)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Archivo+Expanded:wght@700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg:#0A0B0D; --surface:#1B1E24; --raised:#22262E;
+    --hairline:rgba(255,255,255,0.07); --border:rgba(255,255,255,0.10);
+    --text:#F7F6F1; --dim:#9B9C90; --mute:#63645B;
+    --accent:#2E7BFF; --accent-dim:rgba(46,123,255,0.16); --accent-glow:rgba(46,123,255,0.30);
+    --ink:#FFFFFF;
+    --good:#22E56A; --good-dim:rgba(34,229,106,0.15);
+    --warn:#FFB020; --warn-dim:rgba(255,176,32,0.15);
+    --bad:#FF5A4D; --bad-dim:rgba(255,90,77,0.15);
+    --track:rgba(255,255,255,0.08);
+  }
+  body { font-family:'Inter',sans-serif; background:#050504; color:var(--text); padding:36px 16px 80px; display:flex; flex-direction:column; align-items:center; }
+  .intro { max-width:640px; width:100%; color:var(--dim); font-size:14px; line-height:1.6; margin-bottom:28px; }
+  .intro h1 { color:var(--text); font-family:'Archivo Expanded','Archivo'; font-weight:800; font-size:24px; letter-spacing:-0.5px; margin-bottom:8px; }
+  .intro strong { color:var(--text); } .intro .blue { color:var(--accent); }
+
+  .lib { width:390px; background:var(--bg); border:1px solid rgba(255,255,255,0.1); border-radius:30px; padding:26px 20px 34px; display:flex; flex-direction:column; gap:30px; }
+
+  .el-label { font-family:'JetBrains Mono'; font-size:10px; font-weight:600; letter-spacing:1.4px; text-transform:uppercase; color:var(--mute); display:flex; align-items:center; gap:8px; margin-bottom:-16px; }
+  .el-label::before { content:''; width:14px; height:1px; background:var(--mute); }
+  .el-label .n { color:var(--accent); }
+
+  /* 01 PAGE HEADER — open (unchanged, was never boxed) */
+  .hdr { display:flex; align-items:center; gap:13px; }
+  .hdr .avatar { width:44px;height:44px;border-radius:13px;flex-shrink:0;background:var(--surface);display:flex;align-items:center;justify-content:center;font-family:'Archivo';font-weight:800;font-size:17px;color:var(--accent); }
+  .hdr .ht { flex:1; }
+  .hdr .ey { font-family:'JetBrains Mono';font-size:9px;font-weight:600;letter-spacing:1.6px;text-transform:uppercase;color:var(--accent);margin-bottom:3px; }
+  .hdr .ti { font-family:'Archivo Expanded','Archivo';font-weight:800;font-size:28px;letter-spacing:-1px;line-height:.95;color:var(--text); }
+  .hdr .hring { width:56px;height:56px;flex-shrink:0;position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer; }
+  .hdr .hring svg { position:absolute;inset:0;transform:rotate(-90deg); }
+  .hdr .hring .arc { filter:drop-shadow(0 0 4px var(--accent-glow)); }
+  .hdr .hring .v { font-family:'Archivo';font-weight:900;font-size:18px;color:var(--text);line-height:1; }
+
+  /* 02 SECTION TITLE — open */
+  .sec { display:flex; align-items:center; justify-content:space-between; }
+  .sec .st { font-family:'Archivo';font-weight:800;font-size:17px;letter-spacing:-0.3px;color:var(--text);display:flex;align-items:center;gap:9px; }
+  .sec .st::before { content:'';width:3px;height:16px;border-radius:2px;background:var(--accent); }
+  .sec .sl { font-family:'JetBrains Mono';font-size:10px;font-weight:600;color:var(--accent);letter-spacing:.6px;text-transform:uppercase;cursor:pointer; }
+
+  /* 03 PRIMARY CTA — filled (buttons keep fills; interaction is contained by nature) */
+  .cta { height:54px;border-radius:15px;background:var(--accent);color:var(--ink);display:flex;align-items:center;justify-content:center;gap:9px;font-family:'Archivo';font-weight:800;font-size:15px;letter-spacing:.3px;text-transform:uppercase;cursor:pointer;box-shadow:0 4px 24px var(--accent-glow); }
+
+  /* 04 SECONDARY — ghost: hairline only, no fill (opened up from v1's raised box) */
+  .btn2 { height:50px;border-radius:15px;background:transparent;border:1px solid var(--border);color:var(--text);display:flex;align-items:center;justify-content:center;font-family:'Archivo';font-weight:700;font-size:14px;letter-spacing:.3px;text-transform:uppercase;cursor:pointer; }
+
+  /* 05 HERO CARD — the ONE contained card per screen (kept, lighter surface) */
+  .card-hero { background:var(--surface);border-radius:19px;padding:19px;position:relative;overflow:hidden;display:flex;flex-direction:column;gap:12px; }
+  .card-hero::before { content:'';position:absolute;top:-45%;right:-18%;width:190px;height:190px;border-radius:50%;background:radial-gradient(circle,var(--accent-glow) 0%,transparent 70%);pointer-events:none;opacity:.8; }
+  .c-label { font-family:'JetBrains Mono';font-size:9px;font-weight:600;letter-spacing:1.6px;text-transform:uppercase;color:var(--dim); }
+  .c-main { display:flex;align-items:baseline;gap:7px; }
+  .c-big { font-family:'Archivo Expanded','Archivo';font-weight:900;font-size:46px;line-height:.9;letter-spacing:-2px;color:var(--text); }
+  .c-unit { font-family:'Archivo';font-weight:700;font-size:18px;color:var(--accent); }
+  .c-sub { font-size:13px;color:var(--dim);font-weight:500; }
+
+  /* 05b OPEN CONTENT BLOCK — no box: hairlines above/below, content on bg */
+  .open-block { border-top:1px solid var(--hairline);border-bottom:1px solid var(--hairline);padding:15px 2px; }
+  .open-block .ob-label { font-family:'JetBrains Mono';font-size:9px;font-weight:600;letter-spacing:1.6px;text-transform:uppercase;color:var(--dim);margin-bottom:7px; }
+  .open-block .ob-text { font-size:14px;color:var(--text);line-height:1.55; }
+
+  /* 06 LIST — OPEN rows: no boxes, hairline separators */
+  .list { }
+  .orow { display:flex;align-items:center;gap:13px;padding:15px 2px;border-bottom:1px solid var(--hairline);cursor:pointer; }
+  .list .orow:first-child { border-top:1px solid var(--hairline); }
+  .orow .n { font-family:'JetBrains Mono';font-weight:700;font-size:13px;color:var(--accent);width:24px; }
+  .orow .b { flex:1; }
+  .orow .t { font-weight:600;font-size:15px;color:var(--text); }
+  .orow .s { font-family:'JetBrains Mono';font-size:10px;color:var(--dim);margin-top:3px;letter-spacing:.4px; }
+  .orow .chev { color:var(--mute);font-size:16px; }
+
+  /* 07 SCORE RING standalone — open */
+  .ringwrap { display:flex;align-items:center;gap:18px; }
+  .ring-md { width:108px;height:108px;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0; }
+  .ring-md svg { position:absolute;inset:0;transform:rotate(-90deg); }
+  .ring-md .arc { filter:drop-shadow(0 0 5px var(--accent-glow)); }
+  .ring-md .v { font-family:'Archivo Expanded','Archivo';font-weight:900;font-size:30px;letter-spacing:-1px;color:var(--text);line-height:1; }
+  .ring-md .tier { font-family:'JetBrains Mono';font-size:8px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--accent);margin-top:3px; }
+  .ringwrap .rc { flex:1; }
+  .ringwrap .rc-t { font-family:'Archivo';font-weight:800;font-size:15px;color:var(--text); }
+  .ringwrap .rc-s { font-size:12px;color:var(--dim);margin-top:4px;line-height:1.5; }
+
+  /* 08 TAB BAR — keeps its surface (a floating bar is inherently a surface) */
+  .tabbar { display:flex;background:var(--surface);border-radius:18px;padding:7px; }
+  .tab { flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0 7px;border-radius:12px;cursor:pointer;color:var(--mute); }
+  .tab .ic { font-size:17px;line-height:1; }
+  .tab .tl { font-family:'JetBrains Mono';font-size:8px;font-weight:600;letter-spacing:.8px;text-transform:uppercase; }
+  .tab.active { background:var(--accent-dim);color:var(--accent); }
+
+  /* 09 INPUT — underline field (opened up from the box) */
+  .field .f-label { font-family:'JetBrains Mono';font-size:9px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:var(--dim);margin-bottom:6px; }
+  .input { display:flex;align-items:baseline;gap:10px;border-bottom:1.5px solid var(--border);padding:6px 2px 10px; }
+  .input input { flex:1;background:none;border:none;outline:none;color:var(--text);font-family:'Archivo';font-size:24px;font-weight:800;letter-spacing:-0.5px; }
+  .input input::placeholder { color:var(--mute); }
+  .input .unit { font-family:'JetBrains Mono';font-size:12px;font-weight:700;color:var(--accent);letter-spacing:.5px; }
+  .input:focus-within { border-bottom-color:var(--accent); }
+
+  /* 10 CHIPS — kept (small tinted pills are fine, they're not boxes) */
+  .chips { display:flex;gap:8px;flex-wrap:wrap; }
+  .chip { display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:9px;font-family:'JetBrains Mono';font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;cursor:pointer; }
+  .chip.accent { background:var(--accent-dim);color:var(--accent); }
+  .chip.neutral { background:var(--surface);color:var(--dim); }
+
+  /* 11 MODAL = FULL TAKEOVER (canonical, per user pick) — shown as a framed demo */
+  .takeover-demo { border-radius:19px;overflow:hidden;border:1px solid var(--border); }
+  .takeover { background:var(--bg);padding:18px 18px 22px;display:flex;flex-direction:column; }
+  .takeover .t-top { display:flex;align-items:center;justify-content:space-between;margin-bottom:16px; }
+  .takeover .t-back { font-family:'JetBrains Mono';font-size:11px;font-weight:700;color:var(--dim);letter-spacing:.5px;text-transform:uppercase; }
+  .takeover .t-x { width:32px;height:32px;border-radius:10px;background:var(--surface);display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:13px; }
+  .takeover .t-hero { display:flex;flex-direction:column;align-items:center;gap:6px;margin-bottom:16px; }
+  .takeover .t-ring { width:118px;height:118px;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center; }
+  .takeover .t-ring svg { position:absolute;inset:0;transform:rotate(-90deg); }
+  .takeover .t-ring .arc { filter:drop-shadow(0 0 6px var(--accent-glow)); }
+  .takeover .t-ring .v { font-family:'Archivo Expanded','Archivo';font-weight:900;font-size:34px;letter-spacing:-2px;line-height:1;color:var(--text); }
+  .takeover .t-ring .tr { font-family:'JetBrains Mono';font-size:8px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--accent);margin-top:3px; }
+  .takeover .t-name { font-family:'Archivo';font-weight:800;font-size:16px;color:var(--text); }
+  .m-row { display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--hairline); }
+  .m-row:last-of-type { border-bottom:none; }
+  .m-k { font-family:'JetBrains Mono';font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--dim); }
+  .m-k .sub { color:var(--mute);text-transform:none;letter-spacing:0; }
+  .m-v { font-family:'Archivo';font-weight:800;font-size:17px;color:var(--text); }
+  .m-bar { height:6px;border-radius:3px;background:var(--track);overflow:hidden;margin:-4px 0 8px; }
+  .m-fill { height:100%;border-radius:3px; }
+  .m-note { font-size:12px;color:var(--dim);line-height:1.55;margin-top:10px; }
+
+  /* 12 STATUS PILLS — kept */
+  .pills { display:flex;gap:8px;flex-wrap:wrap; }
+  .pill { display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:8px;font-family:'JetBrains Mono';font-size:9px;font-weight:700;letter-spacing:.7px;text-transform:uppercase; }
+  .pill .pd { width:6px;height:6px;border-radius:50%;background:currentColor; }
+  .pill.good { background:var(--good-dim);color:var(--good); }
+  .pill.good .pd { box-shadow:0 0 6px var(--good); }
+  .pill.warn { background:var(--warn-dim);color:var(--warn); }
+  .pill.bad { background:var(--bad-dim);color:var(--bad); }
+
+  /* 13 PROGRESS — open (unchanged) */
+  .prog .p-row { display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px; }
+  .prog .p-l { font-family:'JetBrains Mono';font-size:9px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--dim); }
+  .prog .p-v { font-family:'Archivo';font-weight:800;font-size:15px;color:var(--text); }
+  .prog .p-v .p-frac { font-size:11px;color:var(--dim);font-weight:600; }
+  .prog .bar { height:8px;border-radius:4px;background:var(--track);overflow:hidden; }
+  .prog .fill { height:100%;border-radius:4px;background:var(--accent);box-shadow:0 0 10px var(--accent-glow); }
+
+  /* 14 EMPTY STATE — open: centered text, no dashed box */
+  .empty { display:flex;flex-direction:column;align-items:center;text-align:center;gap:9px;padding:26px 20px;border-top:1px solid var(--hairline);border-bottom:1px solid var(--hairline); }
+  .empty .e-ic { width:44px;height:44px;border-radius:14px;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:19px;color:var(--mute); }
+  .empty .e-t { font-family:'Archivo';font-weight:800;font-size:15px;color:var(--text); }
+  .empty .e-s { font-size:12px;color:var(--dim);line-height:1.5;max-width:240px; }
+  .empty .e-a { font-family:'JetBrains Mono';font-size:10px;font-weight:700;color:var(--accent);letter-spacing:.6px;text-transform:uppercase;margin-top:3px;cursor:pointer; }
+
+  .outro { max-width:640px;width:100%;color:var(--mute);font-size:12px;line-height:1.6;margin-top:26px; }
+  .outro strong { color:var(--dim); }
+</style>
+</head>
+<body>
+
+  <div class="intro">
+    <h1>Element Library <span class="blue">v2 — Open</span></h1>
+    <p><strong>The change you spotted, applied everywhere:</strong> content sits directly on the background; structure comes from <strong>whitespace, type hierarchy, and hairline separators</strong> — not a box around everything. Surfaces are <strong>earned</strong>: the hero card (one per screen), <strong>collection cards on roster pages</strong> (Programs / Plans / Clients — Element 16), the floating tab bar, button fills, small chips. <strong>In-context</strong> lists inside a single-item view — exercises in a workout, meals in a plan — stay open rows; content blocks, the modal breakdown, empty states — all open. Where a surface exists it's the lighter #1B1E24 (or the near-black collection card, #0B0C0F). Modal = <strong>full takeover (your pick, C)</strong>.</p>
+  </div>
+
+  <div class="lib">
+
+    <div class="el-label"><span class="n">01</span> Page header — open (avatar · title · ring)</div>
+    <div class="hdr">
+      <div class="avatar">C</div>
+      <div class="ht"><div class="ey">Day 3 · Week 1</div><div class="ti">TRAINING</div></div>
+      <div class="hring">
+        <svg viewBox="0 0 56 56"><circle cx="28" cy="28" r="24" fill="none" stroke="var(--track)" stroke-width="5"/><circle class="arc" cx="28" cy="28" r="24" fill="none" stroke="var(--accent)" stroke-width="5" stroke-dasharray="151" stroke-dashoffset="42" stroke-linecap="round"/></svg>
+        <span class="v">72</span>
+      </div>
+    </div>
+
+    <div class="el-label"><span class="n">02</span> Section title</div>
+    <div class="sec"><div class="st">This Week</div><div class="sl">View all →</div></div>
+
+    <div class="el-label"><span class="n">03</span> Primary CTA — the one glow</div>
+    <div class="cta">▶ Start workout</div>
+
+    <div class="el-label"><span class="n">04</span> Secondary — ghost, hairline only</div>
+    <div class="btn2">View full program</div>
+
+    <div class="el-label"><span class="n">05</span> Hero card — the ONE contained card per screen</div>
+    <div class="card-hero">
+      <div class="c-label">Today's Session</div>
+      <div class="c-main"><span class="c-big">45</span><span class="c-unit">MIN</span></div>
+      <div class="c-sub">Upper Body — Push · 6 exercises</div>
+      <div class="chips"><span class="chip accent">◆ Phase 1 · Hypertrophy</span></div>
+    </div>
+
+    <div class="el-label"><span class="n">05b</span> Open content block — hairlines, no box</div>
+    <div class="open-block">
+      <div class="ob-label">Coach note</div>
+      <div class="ob-text">Focus on bar speed today. If RPE creeps past 8 on squats, cut the last set.</div>
+    </div>
+
+    <div class="el-label"><span class="n">06</span> List — open rows, hairline separators</div>
+    <div class="list">
+      <div class="orow"><span class="n">01</span><div class="b"><div class="t">Upper Body — Push</div><div class="s">6 EXERCISES · 45 MIN</div></div><span class="chev">›</span></div>
+      <div class="orow"><span class="n">02</span><div class="b"><div class="t">Lower Body — Squat</div><div class="s">5 EXERCISES · 50 MIN</div></div><span class="chev">›</span></div>
+      <div class="orow"><span class="n">03</span><div class="b"><div class="t">Conditioning</div><div class="s">4 EXERCISES · 30 MIN</div></div><span class="chev">›</span></div>
+    </div>
+
+    <div class="el-label"><span class="n">07</span> Score ring — standalone md</div>
+    <div class="ringwrap">
+      <div class="ring-md">
+        <svg viewBox="0 0 108 108"><circle cx="54" cy="54" r="47" fill="none" stroke="var(--track)" stroke-width="8"/><circle class="arc" cx="54" cy="54" r="47" fill="none" stroke="var(--accent)" stroke-width="8" stroke-dasharray="295" stroke-dashoffset="83" stroke-linecap="round"/></svg>
+        <span class="v">72</span><span class="tier">Locked in</span>
+      </div>
+      <div class="rc"><div class="rc-t">Athlete Score</div><div class="rc-s">Adherence × execution quality. Updated after every session.</div></div>
+    </div>
+
+    <div class="el-label"><span class="n">08</span> Tab bar — keeps its surface (floating)</div>
+    <div class="tabbar">
+      <div class="tab"><span class="ic">⌂</span><span class="tl">Home</span></div>
+      <div class="tab"><span class="ic">✓</span><span class="tl">Check-in</span></div>
+      <div class="tab active"><span class="ic">▲</span><span class="tl">Train</span></div>
+      <div class="tab"><span class="ic">◐</span><span class="tl">Fuel</span></div>
+      <div class="tab"><span class="ic">●</span><span class="tl">Me</span></div>
+    </div>
+
+    <div class="el-label"><span class="n">09</span> Input — underline field, big value</div>
+    <div class="field">
+      <div class="f-label">Working weight</div>
+      <div class="input"><input value="102.5"><span class="unit">KG</span></div>
+    </div>
+
+    <div class="el-label"><span class="n">10</span> Chips</div>
+    <div class="chips">
+      <span class="chip accent">◆ Phase 1</span>
+      <span class="chip neutral">All</span>
+      <span class="chip neutral">Strength</span>
+      <span class="chip neutral">Conditioning</span>
+    </div>
+
+    <div class="el-label"><span class="n">11</span> Modal — full takeover (canonical)</div>
+    <div class="takeover-demo">
+      <div class="takeover">
+        <div class="t-top"><span class="t-back">‹ Back</span><span class="t-x">✕</span></div>
+        <div class="t-hero">
+          <div class="t-ring">
+            <svg viewBox="0 0 118 118"><circle cx="59" cy="59" r="50" fill="none" stroke="var(--track)" stroke-width="9"/><circle class="arc" cx="59" cy="59" r="50" fill="none" stroke="var(--accent)" stroke-width="9" stroke-dasharray="314" stroke-dashoffset="88" stroke-linecap="round"/></svg>
+            <span class="v">72</span><span class="tr">Locked in</span>
+          </div>
+          <div class="t-name">Athlete Score</div>
+        </div>
+        <div class="m-row"><span class="m-k">Adherence</span><span class="m-v">75%</span></div>
+        <div class="m-bar"><div class="m-fill" style="width:75%;background:var(--accent)"></div></div>
+        <div class="m-row"><span class="m-k">Execution</span><span class="m-v">88%</span></div>
+        <div class="m-bar"><div class="m-fill" style="width:88%;background:var(--good)"></div></div>
+        <div class="m-row"><span class="m-k">Recovery <span class="sub">· wellness</span></span><span class="m-v" style="color:var(--dim)">64</span></div>
+        <div class="m-note">Your score = adherence × execution quality. Recovery is context only.</div>
+      </div>
+    </div>
+
+    <div class="el-label"><span class="n">12</span> Status pills — semantic</div>
+    <div class="pills">
+      <span class="pill good"><span class="pd"></span>Done</span>
+      <span class="pill warn"><span class="pd"></span>Today</span>
+      <span class="pill bad"><span class="pd"></span>Missed</span>
+    </div>
+
+    <div class="el-label"><span class="n">13</span> Progress bar</div>
+    <div class="prog">
+      <div class="p-row"><span class="p-l">This week</span><span class="p-v">50% <span class="p-frac">· 2/4</span></span></div>
+      <div class="bar"><div class="fill" style="width:50%"></div></div>
+    </div>
+
+    <div class="el-label"><span class="n">14</span> Empty state — open, hairlines</div>
+    <div class="empty">
+      <div class="e-ic">＋</div>
+      <div class="e-t">No extra training yet</div>
+      <div class="e-s">One-off workouts your coach assigns outside the program will show up here.</div>
+      <div class="e-a">Ask your coach →</div>
+    </div>
+
+    <div class="el-label"><span class="n">15 / 16</span> Complex elements — own files</div>
+    <div class="open-block">
+      <div class="ob-label">Documented separately</div>
+      <div class="ob-text"><strong>Element 15 — Exercise display</strong> (<code>element-15-exercise-display.html</code>): the one canonical exercise/prescription display, everywhere.<br><strong>Element 16 — Collection card</strong> (<code>element-16-collection-card.html</code>): the roster-page card (Programs / Plans / Clients) — dark surface, hue left-rail + right-glow, optional phase strip. Both are desktop/complex and live in their own files rather than this mobile frame.</div>
+    </div>
+
+  </div>
+
+  <div class="outro">
+    <p><strong>The v2 rules:</strong> open by default — boxes are earned. Surfaces exist on: the hero card (1/screen), <strong>the collection card (roster pages — Programs/Plans/Clients, Element 16)</strong>, the tab bar, button fills, chips, avatar. <strong>In-context sub-lists inside one item</strong> (exercises in a workout, meals in a plan) <strong>stay open rows (Element 06)</strong>; roster pages of top-level entities use collection cards. Everything else sits on the background with hairlines. Where a surface exists it's the lighter #1B1E24 (or the collection card's near-black #0B0C0F). Effects budget unchanged: glow only on primary CTA, ring arcs, live status dots, hero wash — the collection card's rail/glow is ambient, not the CTA glow.</p>
+    <p style="margin-top:14px"><strong>Phase-intensity scale</strong> (structure strips): a fixed training-stress ramp — <span style="color:var(--good);font-weight:700">light / base</span> → <span style="color:var(--warn);font-weight:700">moderate</span> → <span style="color:var(--bad);font-weight:700">hard / peak</span>, with <span style="color:#22D3EE;font-weight:700">deload / recovery</span> set apart. Tokens: <code>--phase-light #22E56A · --phase-mod #FFB020 · --phase-hard #FF5A4D · --phase-deload #22D3EE</code>. Not decorative — the bar reads as intensity at a glance.</p>
+    <p style="margin-top:14px">React by number — this v2 replaces v1 as the kit.</p>
+  </div>
+
+</body>
+</html>

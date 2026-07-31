@@ -23,6 +23,7 @@ interface StepReviewProps {
   onSubmit: () => void;
   submitting: boolean;
   frequencyDays?: number | null;
+  stepLabel?: string;
 }
 
 function formatChange(current: number, previous: number): { text: string; improving: boolean } {
@@ -71,6 +72,7 @@ export function StepReview({
   onSubmit,
   submitting,
   frequencyDays,
+  stepLabel = "Step 3 of 3",
 }: StepReviewProps) {
   const weightChange =
     bodyData.weight_kg != null && previousMeasurement?.weight_kg != null
@@ -87,7 +89,7 @@ export function StepReview({
 
   return (
     <ClientGlassCard className="p-6 sm:p-8">
-      <p className="text-sm fc-text-subtle mb-4">Step 3 of 3</p>
+      <p className="text-sm fc-text-subtle mb-4">{stepLabel}</p>
       <h2 className="text-xl font-bold fc-text-primary mb-6">Notes & review</h2>
 
       <div className="overflow-x-auto mb-6">
@@ -226,7 +228,7 @@ export function StepReview({
             onChange={(e) => setNotesToCoach(e.target.value)}
             placeholder={getFrequencyPlaceholder(frequencyDays)}
             rows={4}
-            className="w-full px-4 py-3 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] fc-text-primary focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)] resize-none"
+            className="w-full px-4 py-3 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] fc-text-primary focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent)] resize-none"
           />
         </div>
       )}

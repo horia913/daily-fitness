@@ -2,33 +2,47 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ChevronDown, ChevronRight, Clock } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
-import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
-import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/lib/supabase";
 import { withTimeout } from "@/lib/withTimeout";
-import WorkoutTemplateService, {
-  type ProgramSchedule,
-} from "@/lib/workoutTemplateService";
 import { WorkoutBlockService } from "@/lib/workoutBlockService";
-import { TrainingBlockService } from "@/lib/trainingBlockService";
+import { getAssignmentSchedule, getCompletedSlots } from "@/lib/programStateService";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { ClientPageShell } from "@/components/client-ui";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { cn } from "@/lib/utils";
-import type { TrainingBlock } from "@/types/trainingBlock";
-import { TRAINING_BLOCK_GOALS } from "@/types/trainingBlock";
+import {
+  loadInstancePhases,
+  type InstancePhaseRow,
+} from "@/lib/programInstance/instanceCanvasLoad";
+import {
+  buildPhaseWeekRanges,
+  clientPhaseChipLabel,
+  clientPhaseSecondaryLabel,
+  formatPhaseWeekSpanLabel,
+} from "@/lib/clientInstancePhaseContext";
+import { isCoachSkipNote } from "@/lib/programInstanceResolver";
 import type { WorkoutSetEntry } from "@/types/workoutSetEntries";
 import { fetchApi } from "@/lib/apiClient";
+import { instanceTotalWeeks } from "@/lib/programInstanceResolver";
+import styles from "./programDetailsV6.module.css";
+
+/** Group hue palette (matches design/mockups/program-details-v6.html: blue · cyan · amber · purple). */
+const GROUP_HUES = [
+  "var(--fc-group-a)",
+  "var(--fc-group-c)",
+  "var(--fc-group-d)",
+  "var(--fc-group-b)",
+];
 
 interface Program {
   id: string;
   name: string;
   description: string;
-  duration_weeks: number;
+  totalWeeks: number;
 }
 
 interface TemplatePreview {
@@ -48,8 +62,6 @@ interface DaySlot {
   templateId: string | null;
   isOptional: boolean;
   scheduleNotes?: string | null;
-  trainingBlockId: string | null;
-  trainingBlock: TrainingBlock | null;
   template: TemplatePreview | null;
   isRest: boolean;
 }
@@ -59,48 +71,12 @@ interface WeekSection {
   days: DaySlot[];
 }
 
-interface BlockSection {
-  block: TrainingBlock | null;
-  displayBlockOrder: number;
+interface PhaseSection {
+  phase: InstancePhaseRow | null;
+  displayPhaseOrder: number;
+  startWeek: number;
+  endWeek: number;
   weeks: WeekSection[];
-}
-
-/** Training-block goal → dot fill (collapsed day row). */
-function goalDotClassForBlock(block: TrainingBlock | null): string {
-  if (!block) return "bg-gray-400";
-  const g = (block.goal || "custom").toLowerCase();
-  const map: Record<string, string> = {
-    hypertrophy: "bg-cyan-400",
-    strength: "bg-amber-400",
-    power: "bg-orange-400",
-    accumulation: "bg-emerald-400",
-    conditioning: "bg-teal-400",
-    sport_specific: "bg-purple-400",
-    deload: "bg-gray-400",
-    peaking: "bg-purple-400",
-    general_fitness: "bg-emerald-400",
-    custom: "bg-gray-400",
-  };
-  return map[g] ?? "bg-gray-400";
-}
-
-/** Matching subtle ring for goal dot (ring-2 ring-{color}-400/20). */
-function goalDotRingClassForBlock(block: TrainingBlock | null): string {
-  if (!block) return "ring-gray-400/20";
-  const g = (block.goal || "custom").toLowerCase();
-  const map: Record<string, string> = {
-    hypertrophy: "ring-cyan-400/20",
-    strength: "ring-amber-400/20",
-    power: "ring-orange-400/20",
-    accumulation: "ring-emerald-400/20",
-    conditioning: "ring-teal-400/20",
-    sport_specific: "ring-purple-400/20",
-    deload: "ring-gray-400/20",
-    peaking: "ring-purple-400/20",
-    general_fitness: "ring-emerald-400/20",
-    custom: "ring-gray-400/20",
-  };
-  return map[g] ?? "ring-gray-400/20";
 }
 
 function difficultyBadgeTextClass(level: string): string {
@@ -157,70 +133,17 @@ function DayRowSubtitle({ day }: { day: DaySlot }) {
   );
 }
 
-function blockHeaderGoalLabel(block: TrainingBlock | null): string {
-  if (!block) return "PROGRAM";
-  if (block.goal === "custom" && block.custom_goal_label) {
-    return block.custom_goal_label.toUpperCase();
-  }
-  return (TRAINING_BLOCK_GOALS[block.goal] || block.goal).toUpperCase();
+function phaseNavStableKey(section: PhaseSection): string {
+  return section.phase?.id ?? `order-${section.displayPhaseOrder}`;
 }
 
-/** Short label for block nav chips (first segment before / or space-heavy trim). */
-function goalAbbrevForNavChip(block: TrainingBlock | null): string {
-  const label = blockHeaderGoalLabel(block);
-  const segment = label.split("/")[0]?.trim() ?? label;
-  return segment.length > 18 ? `${segment.slice(0, 16)}…` : segment;
-}
-
-function blockNavStableKey(section: BlockSection): string {
-  return section.block?.id ?? `order-${section.displayBlockOrder}`;
-}
-
-function sectionNavKeyForWeek(sections: BlockSection[], absoluteWeek: number): string | null {
+function sectionNavKeyForWeek(sections: PhaseSection[], absoluteWeek: number): string | null {
   for (const sec of sections) {
     if (sec.weeks.some((w) => w.weekNumber === absoluteWeek)) {
-      return blockNavStableKey(sec);
+      return phaseNavStableKey(sec);
     }
   }
   return null;
-}
-
-/** Prefer the most common training_block_id in the week (avoids wrong block from .find() order). */
-function dominantTrainingBlockId(rowsInWeek: ProgramSchedule[]): string | null {
-  const counts = new Map<string, number>();
-  for (const r of rowsInWeek) {
-    const tid = r.training_block_id;
-    if (tid == null) continue;
-    const k = String(tid).trim();
-    if (!k) continue;
-    counts.set(k, (counts.get(k) ?? 0) + 1);
-  }
-  if (counts.size === 0) return null;
-  let best: string | null = null;
-  let bestN = -1;
-  for (const [k, n] of counts) {
-    if (n > bestN) {
-      best = k;
-      bestN = n;
-    }
-  }
-  return best;
-}
-
-function inferTrainingBlockIdForWeek(
-  weekNum: number,
-  rowsInWeek: ProgramSchedule[],
-  blocksOrdered: TrainingBlock[],
-): string | null {
-  const fromRows = dominantTrainingBlockId(rowsInWeek);
-  if (fromRows) return fromRows;
-  if (blocksOrdered.length === 0) return null;
-  let acc = 0;
-  for (const b of blocksOrdered) {
-    acc += Math.max(0, Number(b.duration_weeks) || 0);
-    if (weekNum <= acc) return b.id;
-  }
-  return blocksOrdered[blocksOrdered.length - 1]?.id ?? null;
 }
 
 function isRestTemplateName(name: string | null | undefined): boolean {
@@ -282,42 +205,94 @@ function formatExerciseWeightLine(ex: any): string | null {
   return null;
 }
 
-interface ExpandedExerciseRow {
+/** v6 exercise display row: letter badge + group hue + meta + right-aligned rx + technique. */
+interface V6ExerciseRow {
+  key: string;
+  badge: string;
+  hue: string;
   name: string;
-  prescription: string;
+  meta: string;
+  rx: string;
+  oneRm: string | null;
+  tech: string | null;
   notes: string | null;
-  weightLine: string | null;
 }
 
-function collectExpandedExerciseRows(block: WorkoutSetEntry): ExpandedExerciseRow[] {
+/** "3 sets · 12 reps" from the exercise/block prescription. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function setsRepsMeta(block: WorkoutSetEntry, ex: any): string {
+  const sets = ex.sets ?? block.total_sets;
+  const reps = ex.reps ?? block.reps_per_set;
+  const parts: string[] = [];
+  if (sets != null) parts.push(`${sets} ${sets === 1 ? "set" : "sets"}`);
+  if (reps) parts.push(`${reps} reps`);
+  return parts.join(" · ");
+}
+
+/** Amber technique note under the exercise name — only for real techniques (never a set-type chip). */
+function techniqueNote(block: WorkoutSetEntry): string | null {
+  const t = (block.set_type || "").toLowerCase();
+  if (t === "drop_set") {
+    const drops = block.drop_sets?.length ?? 0;
+    return drops > 0 ? `↳ drop set · ${drops} ${drops === 1 ? "drop" : "drops"}` : "↳ drop set";
+  }
+  if (t === "cluster_set") return "↳ cluster set";
+  if (t === "rest_pause") return "↳ rest-pause";
+  if (t === "pre_exhaustion") return "↳ pre-exhaust";
+  return null;
+}
+
+/** Build v6 rows for a block. Grouped blocks (superset/giant) share one hue and read A1 / A2. */
+function buildV6ExerciseRows(block: WorkoutSetEntry, blockIndex: number): V6ExerciseRow[] {
+  const hue = GROUP_HUES[blockIndex % GROUP_HUES.length];
+  const letter = String.fromCharCode(65 + blockIndex);
+  const tech = techniqueNote(block);
   const exercises = block.exercises;
   if (exercises && exercises.length > 0) {
-    const sorted = [...exercises].sort((a, b) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0));
-    return sorted.map((ex) => ({
-      name: ex.exercise?.name || ex.exercise_letter || "Exercise",
-      prescription: formatPrescriptionBadge(block, ex),
-      notes: ex.notes ?? null,
-      weightLine: formatExerciseWeightLine(ex),
-    }));
+    const sorted = [...exercises].sort(
+      (a, b) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0),
+    );
+    const grouped = sorted.length > 1;
+    return sorted.map((ex, i) => {
+      const oneRm = formatExerciseWeightLine(ex);
+      return {
+        key: `${block.id}-${i}`,
+        badge: grouped ? `${letter}${i + 1}` : letter,
+        hue,
+        name: ex.exercise?.name || ex.exercise_letter || "Exercise",
+        meta: setsRepsMeta(block, ex),
+        rx: formatPrescriptionBadge(block, ex),
+        oneRm: oneRm ? oneRm.replace(/^@\s*/, "") : null,
+        tech,
+        notes: ex.notes ?? null,
+      };
+    });
   }
-  const label = block.set_name || block.set_type || "Block";
-  return [{ name: label, prescription: "—", notes: null, weightLine: null }];
+  const label = block.set_name || block.set_type || "Set";
+  return [
+    {
+      key: `${block.id}-0`,
+      badge: letter,
+      hue,
+      name: label,
+      meta: setsRepsMeta(block, {}),
+      rx: formatPrescriptionBadge(block, {}),
+      oneRm: null,
+      tech,
+      notes: null,
+    },
+  ];
 }
 
 function ExpandedDaySkeletonRows() {
   return (
-    <div className="space-y-0" role="status" aria-label="Loading exercises">
-      {[0, 1, 2, 3].map((i) => (
-        <div
-          key={i}
-          className="flex animate-pulse items-center justify-between gap-3 border-b border-[color:var(--fc-glass-border)] py-2 last:border-0"
-        >
-          <div className="min-w-0 flex-1 space-y-1.5">
-            <div className="h-4 w-[55%] rounded bg-[color:var(--fc-glass-border)]" />
-            <div className="h-3 w-[40%] rounded bg-[color:var(--fc-glass-highlight)]" />
-          </div>
-          <div className="shrink-0">
-            <div className="h-6 w-16 rounded-md border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)]" />
+    <div role="status" aria-label="Loading exercises">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className={cn(styles.skRow, "animate-pulse")}>
+          <div className={styles.skBadge} />
+          <div className={styles.skCol}>
+            <div className={styles.skLine} style={{ width: "55%" }} />
+            <div className={styles.skLine} style={{ width: "35%" }} />
           </div>
         </div>
       ))}
@@ -325,168 +300,124 @@ function ExpandedDaySkeletonRows() {
   );
 }
 
-function buildBlockSections(
-  schedule: ProgramSchedule[],
+type AssignmentSlot = Awaited<ReturnType<typeof getAssignmentSchedule>>[number];
+
+function buildPhaseSections(
+  assignmentSlots: AssignmentSlot[],
   templatesMap: Map<string, TemplatePreview>,
-  blocksOrdered: TrainingBlock[],
-  programDurationWeeks?: number | null,
-): BlockSection[] {
-  if (!schedule.length && blocksOrdered.length === 0) return [];
+  phases: InstancePhaseRow[],
+): PhaseSection[] {
+  const phaseRanges = buildPhaseWeekRanges(phases);
+  const maxFromSlots =
+    assignmentSlots.length > 0
+      ? Math.max(...assignmentSlots.map((s) => s.week_number ?? 1), 1)
+      : 1;
+  const sumPhaseWeeks = instanceTotalWeeks(phases);
+  const maxWeek = Math.max(maxFromSlots, sumPhaseWeeks, 1);
 
-  const tbMap = new Map(blocksOrdered.map((b) => [b.id, b]));
-  const attachBlock = (row: ProgramSchedule): TrainingBlock | null => {
-    if (row.training_block) return row.training_block;
-    const id = row.training_block_id;
-    return id ? tbMap.get(id) ?? null : null;
-  };
-
-  const maxFromSchedule =
-    schedule.length > 0 ? Math.max(...schedule.map((s) => s.week_number ?? 1), 1) : 1;
-  const sumBlockWeeks = blocksOrdered.reduce(
-    (acc, b) => acc + Math.max(0, Number(b.duration_weeks) || 0),
-    0,
-  );
-  const maxWeek = Math.max(
-    maxFromSchedule,
-    sumBlockWeeks,
-    programDurationWeeks != null && programDurationWeeks > 0 ? programDurationWeeks : 0,
-    1,
-  );
-
-  const byWeek = new Map<number, ProgramSchedule[]>();
-  for (const row of schedule) {
+  const byWeek = new Map<number, AssignmentSlot[]>();
+  for (const row of assignmentSlots) {
     const w = row.week_number ?? 1;
     if (!byWeek.has(w)) byWeek.set(w, []);
     byWeek.get(w)!.push(row);
   }
 
-  const slotsByBlock = new Map<string | "__none", Map<number, DaySlot[]>>();
-
-  const ensureBucket = (blockKey: string) => {
-    if (!slotsByBlock.has(blockKey)) slotsByBlock.set(blockKey, new Map());
-    return slotsByBlock.get(blockKey)!;
-  };
-
-  for (let w = 1; w <= maxWeek; w++) {
+  const buildWeekDays = (w: number): DaySlot[] => {
     const rows = byWeek.get(w) ?? [];
-    const byDay = new Map<number, ProgramSchedule>();
+    const byDay = new Map<number, AssignmentSlot>();
     for (const r of rows) {
       const d = r.program_day ?? 1;
       byDay.set(d, r);
     }
-    const inferredBlockId = inferTrainingBlockIdForWeek(w, rows, blocksOrdered);
-
+    const days: DaySlot[] = [];
     for (let dayNum = 1; dayNum <= 7; dayNum++) {
       const row = byDay.get(dayNum);
-      const blockId = row?.training_block_id ?? inferredBlockId;
-      const blockKey = blockId || "__none";
-
       if (!row) {
-        const tb = blockId ? tbMap.get(blockId) ?? null : null;
-        const weekMap = ensureBucket(blockKey);
-        if (!weekMap.has(w)) weekMap.set(w, []);
-        weekMap.get(w)!.push({
-          key: String(`rest-${w}-${dayNum}`),
+        days.push({
+          key: `rest-${w}-${dayNum}`,
           scheduleId: null,
           dayNumber: dayNum,
           weekNumber: w,
           templateId: null,
           isOptional: false,
-          trainingBlockId: blockId,
-          trainingBlock: tb,
           template: null,
           isRest: true,
         });
         continue;
       }
-
-      const templateId = row.template_id && String(row.template_id).length > 0 ? row.template_id : null;
+      const templateId =
+        (row.workout_template_id && String(row.workout_template_id).length > 0
+          ? row.workout_template_id
+          : row.program_instance_workout_id) ?? null;
       const tmpl = templateId ? templatesMap.get(templateId) ?? null : null;
-      const tbRow = attachBlock(row);
+      const restByType = row.day_type === "rest";
       const restByTemplate = Boolean(
-        !templateId || (tmpl != null && isRestTemplateName(tmpl.name)),
+        restByType ||
+          !templateId ||
+          (tmpl != null && isRestTemplateName(tmpl.name)),
       );
-
-      const weekMap = ensureBucket(blockKey);
-      if (!weekMap.has(w)) weekMap.set(w, []);
-      const rowIdRaw = row.id as string | number | null | undefined;
-      const slotKey = String(
-        rowIdRaw !== null && rowIdRaw !== undefined && String(rowIdRaw).trim() !== ""
-          ? rowIdRaw
-          : `slot-${w}-${dayNum}`,
-      );
-      weekMap.get(w)!.push({
-        key: slotKey,
-        scheduleId:
-          rowIdRaw !== null && rowIdRaw !== undefined && String(rowIdRaw).trim() !== ""
-            ? String(rowIdRaw)
-            : null,
+      days.push({
+        key: String(row.id),
+        scheduleId: row.id,
         dayNumber: dayNum,
         weekNumber: w,
         templateId,
         isOptional: row.is_optional === true,
-        scheduleNotes: row.notes ?? null,
-        trainingBlockId: blockId,
-        trainingBlock: tbRow ?? (blockId ? tbMap.get(blockId) ?? null : null),
+        scheduleNotes: row.name || undefined,
         template: tmpl,
         isRest: restByTemplate,
       });
     }
-  }
-
-  const orderedBlockIds = blocksOrdered.map((b) => b.id);
-  const seen = new Set<string>();
-  const sections: BlockSection[] = [];
-
-  const pushSection = (block: TrainingBlock | null, blockOrder: number, key: string) => {
-    if (seen.has(key)) return;
-    seen.add(key);
-    const weekMap = slotsByBlock.get(key);
-    if (!weekMap || weekMap.size === 0) return;
-    const weeks: WeekSection[] = Array.from(weekMap.keys())
-      .sort((a, b) => a - b)
-      .map((wn) => ({
-        weekNumber: wn,
-        days: (weekMap.get(wn) || []).sort((a, b) => a.dayNumber - b.dayNumber),
-      }));
-    sections.push({ block, displayBlockOrder: blockOrder, weeks });
+    return days;
   };
 
-  let orderCounter = 0;
-  for (const bid of orderedBlockIds) {
-    orderCounter += 1;
-    pushSection(tbMap.get(bid) ?? null, orderCounter, bid);
-  }
-
-  if (slotsByBlock.has("__none")) {
-    orderCounter += 1;
-    pushSection(null, orderCounter, "__none");
-  }
-
-  for (const key of slotsByBlock.keys()) {
-    if (key !== "__none" && !seen.has(key)) {
-      orderCounter += 1;
-      pushSection(tbMap.get(key) ?? null, orderCounter, key);
+  if (phaseRanges.length === 0) {
+    const weeks: WeekSection[] = [];
+    for (let w = 1; w <= maxWeek; w++) {
+      weeks.push({ weekNumber: w, days: buildWeekDays(w) });
     }
+    if (weeks.length === 0) return [];
+    return [
+      {
+        phase: null,
+        displayPhaseOrder: 1,
+        startWeek: 1,
+        endWeek: maxWeek,
+        weeks,
+      },
+    ];
   }
 
-  return sections;
+  return phaseRanges.map((range, index) => {
+    const weeks: WeekSection[] = [];
+    for (let w = range.startWeek; w <= range.endWeek; w++) {
+      weeks.push({ weekNumber: w, days: buildWeekDays(w) });
+    }
+    return {
+      phase: range.phase,
+      displayPhaseOrder: index + 1,
+      startWeek: range.startWeek,
+      endWeek: range.endWeek,
+      weeks,
+    };
+  });
 }
 
 function ProgramDetailsContent() {
   const params = useParams();
   const router = useRouter();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
-  const { performanceSettings } = useTheme();
   const [program, setProgram] = useState<Program | null>(null);
-  const [blockSections, setBlockSections] = useState<BlockSection[]>([]);
+  const [phaseSections, setPhaseSections] = useState<PhaseSection[]>([]);
+  /** program_day_assignment ids completed by the client (excludes coach-skips). */
+  const [completedDayIds, setCompletedDayIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   /** Absolute program week to expand by default (from /api/client/program-week when program matches). */
   const [clientOutlineWeek, setClientOutlineWeek] = useState<number>(1);
   const [weekLayoutReady, setWeekLayoutReady] = useState(false);
   const [openWeeks, setOpenWeeks] = useState<Record<number, boolean>>({});
-  const [scrollNavBlockKey, setScrollNavBlockKey] = useState<string | null>(null);
+  const [scrollNavPhaseKey, setScrollNavPhaseKey] = useState<string | null>(null);
   const [expandedDayKeys, setExpandedDayKeys] = useState<Set<string>>(new Set());
   const expandedDayKeysRef = useRef(expandedDayKeys);
   expandedDayKeysRef.current = expandedDayKeys;
@@ -515,7 +446,7 @@ function ProgramDetailsContent() {
             .from("program_assignments")
             .select(
               `*,
-              program:workout_programs(id, name, description, duration_weeks)`
+              program:workout_programs(id, name, description)`
             )
             .eq("program_id", programId)
             .eq("client_id", user.id)
@@ -531,59 +462,83 @@ function ProgramDetailsContent() {
             throw new Error("Program not found or not assigned to you");
           }
 
-          const programData = assignmentData.program as any;
+          const programData = assignmentData.program as { id: string; name: string; description?: string };
+          const assignmentId = assignmentData.id as string;
+
+          const [assignmentSlots, phases, completedSlots] = await Promise.all([
+            getAssignmentSchedule(supabase, assignmentId),
+            loadInstancePhases(supabase, assignmentId),
+            getCompletedSlots(supabase, assignmentId),
+          ]);
+
+          setCompletedDayIds(
+            new Set(
+              completedSlots
+                .filter((c) => !isCoachSkipNote(c.notes))
+                .map((c) => c.program_day_assignment_id),
+            ),
+          );
+
+          const derivedTotalWeeks = instanceTotalWeeks(phases);
+
           setProgram({
             id: programData.id,
             name: programData.name,
             description: programData.description || "",
-            duration_weeks: programData.duration_weeks,
+            totalWeeks: derivedTotalWeeks,
           });
 
-          const [scheduleRaw, trainingBlocks] = await Promise.all([
-            WorkoutTemplateService.getProgramSchedule(programId),
-            TrainingBlockService.getTrainingBlocks(programId),
-          ]);
-
-          const tbMap = new Map(trainingBlocks.map((b) => [b.id, b]));
-          const schedule: ProgramSchedule[] = scheduleRaw.map((s) => ({
-            ...s,
-            training_block: s.training_block_id ? tbMap.get(s.training_block_id) ?? null : null,
-          }));
-
-          if (!schedule.length && trainingBlocks.length === 0) {
-            setBlockSections([]);
+          if (!assignmentSlots.length && phases.length === 0) {
+            setPhaseSections([]);
             return;
           }
 
-          const uniqueTemplateIds = Array.from(
-            new Set(
-              schedule
-                .map((s) => s.template_id)
-                .filter((tid) => tid && String(tid).length > 0) as string[],
-            ),
-          );
+          const templateIds = new Set<string>();
+          const instanceWorkoutIds = new Set<string>();
+          for (const s of assignmentSlots) {
+            if (s.workout_template_id) templateIds.add(s.workout_template_id);
+            if (s.program_instance_workout_id) instanceWorkoutIds.add(s.program_instance_workout_id);
+          }
 
           const templatesMap = new Map<string, TemplatePreview>();
-          if (uniqueTemplateIds.length > 0) {
+          if (templateIds.size > 0) {
             const { data: templatesRows } = await supabase
               .from("workout_templates")
               .select("id, name, description, estimated_duration, difficulty_level, category")
-              .in("id", uniqueTemplateIds);
+              .in("id", Array.from(templateIds));
 
             for (const t of templatesRows || []) {
-              templatesMap.set((t as any).id, {
-                id: (t as any).id,
-                name: (t as any).name,
-                description: (t as any).description ?? null,
-                estimated_duration: (t as any).estimated_duration ?? null,
-                difficulty_level: (t as any).difficulty_level ?? null,
-                category: (t as any).category ?? null,
+              templatesMap.set((t as { id: string }).id, {
+                id: (t as { id: string }).id,
+                name: (t as { name: string }).name,
+                description: (t as { description?: string }).description ?? null,
+                estimated_duration: (t as { estimated_duration?: number }).estimated_duration ?? null,
+                difficulty_level: (t as { difficulty_level?: string }).difficulty_level ?? null,
+                category: (t as { category?: string }).category ?? null,
               });
             }
           }
 
-          setBlockSections(
-            buildBlockSections(schedule, templatesMap, trainingBlocks, programData.duration_weeks),
+          if (instanceWorkoutIds.size > 0) {
+            const { data: piwRows } = await supabase
+              .from("program_instance_workouts")
+              .select("id, name, estimated_duration")
+              .in("id", Array.from(instanceWorkoutIds));
+            for (const row of piwRows ?? []) {
+              const r = row as { id: string; name: string; estimated_duration?: number };
+              templatesMap.set(r.id, {
+                id: r.id,
+                name: r.name,
+                description: null,
+                estimated_duration: r.estimated_duration ?? null,
+                difficulty_level: null,
+                category: null,
+              });
+            }
+          }
+
+          setPhaseSections(
+            buildPhaseSections(assignmentSlots, templatesMap, phases),
           );
         })(),
         30000,
@@ -611,7 +566,7 @@ function ProgramDetailsContent() {
   useEffect(() => {
     let cancelled = false;
     setWeekLayoutReady(false);
-    setScrollNavBlockKey(null);
+    setScrollNavPhaseKey(null);
     (async () => {
       try {
         const res = await fetchApi("/api/client/program-week", { credentials: "include" });
@@ -620,7 +575,7 @@ function ProgramDetailsContent() {
         if (cancelled) return;
         const pageProgramId = typeof id === "string" ? id : Array.isArray(id) ? id[0] : null;
         const activePid = data.programId as string | null | undefined;
-        const cw = data.currentUnlockedWeek as number | undefined;
+        const cw = (data.displayWeekNumber ?? data.currentUnlockedWeek) as number | undefined;
         if (pageProgramId && activePid === pageProgramId && typeof cw === "number" && cw >= 1) {
           setClientOutlineWeek(cw);
         } else {
@@ -639,13 +594,13 @@ function ProgramDetailsContent() {
 
   const allWeekNumbers = useMemo(() => {
     const s = new Set<number>();
-    for (const sec of blockSections) {
+    for (const sec of phaseSections) {
       for (const w of sec.weeks) {
         s.add(w.weekNumber);
       }
     }
     return Array.from(s).sort((a, b) => a - b);
-  }, [blockSections]);
+  }, [phaseSections]);
 
   useEffect(() => {
     if (allWeekNumbers.length === 0 || !weekLayoutReady) return;
@@ -660,29 +615,29 @@ function ProgramDetailsContent() {
     setOpenWeeks(initial);
   }, [allWeekNumbers, clientOutlineWeek, weekLayoutReady]);
 
-  const progressNavBlockKey = useMemo(
-    () => sectionNavKeyForWeek(blockSections, clientOutlineWeek),
-    [blockSections, clientOutlineWeek],
+  const progressNavPhaseKey = useMemo(
+    () => sectionNavKeyForWeek(phaseSections, clientOutlineWeek),
+    [phaseSections, clientOutlineWeek],
   );
 
-  const highlightedNavBlockKey =
-    scrollNavBlockKey ??
-    progressNavBlockKey ??
-    (blockSections[0] ? blockNavStableKey(blockSections[0]) : null);
+  const highlightedNavPhaseKey =
+    scrollNavPhaseKey ??
+    progressNavPhaseKey ??
+    (phaseSections[0] ? phaseNavStableKey(phaseSections[0]) : null);
 
-  const blockNavVisibilityRef = useRef<Map<string, { ratio: number; top: number }>>(new Map());
-
-  useEffect(() => {
-    blockNavVisibilityRef.current.clear();
-  }, [blockSections]);
+  const phaseNavVisibilityRef = useRef<Map<string, { ratio: number; top: number }>>(new Map());
 
   useEffect(() => {
-    if (typeof window === "undefined" || blockSections.length === 0) return;
+    phaseNavVisibilityRef.current.clear();
+  }, [phaseSections]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || phaseSections.length === 0) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        const vis = blockNavVisibilityRef.current;
+        const vis = phaseNavVisibilityRef.current;
         for (const e of entries) {
-          const key = (e.target as HTMLElement).dataset.blockNavKey;
+          const key = (e.target as HTMLElement).dataset.phaseNavKey;
           if (!key) continue;
           if (e.isIntersecting && e.intersectionRatio > 0) {
             vis.set(key, {
@@ -703,7 +658,7 @@ function ProgramDetailsContent() {
             bestKey = key;
           }
         }
-        if (bestKey) setScrollNavBlockKey(bestKey);
+        if (bestKey) setScrollNavPhaseKey(bestKey);
       },
       {
         root: null,
@@ -712,7 +667,7 @@ function ProgramDetailsContent() {
       },
     );
     const raf = requestAnimationFrame(() => {
-      document.querySelectorAll<HTMLElement>("[data-block-nav-key]").forEach((el) => {
+      document.querySelectorAll<HTMLElement>("[data-phase-nav-key]").forEach((el) => {
         observer.observe(el);
       });
     });
@@ -720,11 +675,11 @@ function ProgramDetailsContent() {
       cancelAnimationFrame(raf);
       observer.disconnect();
     };
-  }, [blockSections]);
+  }, [phaseSections]);
 
   const totalWorkoutSlots = useMemo(() => {
     let n = 0;
-    for (const sec of blockSections) {
+    for (const sec of phaseSections) {
       for (const w of sec.weeks) {
         for (const d of w.days) {
           if (!d.isRest && d.templateId) n += 1;
@@ -732,12 +687,13 @@ function ProgramDetailsContent() {
       }
     }
     return n;
-  }, [blockSections]);
+  }, [phaseSections]);
 
   const weekCountStat = useMemo(() => {
-    if (allWeekNumbers.length === 0) return program?.duration_weeks ?? 0;
-    return Math.max(...allWeekNumbers, program?.duration_weeks ?? 0);
-  }, [allWeekNumbers, program?.duration_weeks]);
+    if (program?.totalWeeks && program.totalWeeks > 0) return program.totalWeeks;
+    if (allWeekNumbers.length === 0) return 0;
+    return Math.max(...allWeekNumbers);
+  }, [allWeekNumbers, program?.totalWeeks]);
 
   const workoutsPerWeekDisplay =
     program && weekCountStat > 0
@@ -784,8 +740,7 @@ function ProgramDetailsContent() {
   if (loading) {
     return (
       <AnimatedBackground>
-        <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
-          {performanceSettings.floatingParticles && <FloatingParticles />}
+        <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
           <PageSkeleton variant="dashboard" />
         </ClientPageShell>
       </AnimatedBackground>
@@ -795,8 +750,7 @@ function ProgramDetailsContent() {
   if (error || !program) {
     return (
       <AnimatedBackground>
-        {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden w-full">
+        <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden w-full">
           <div className="w-full space-y-3">
             <ErrorBanner
               title={error ? "Couldn't load program" : "Program not found"}
@@ -820,73 +774,74 @@ function ProgramDetailsContent() {
 
   return (
     <AnimatedBackground>
-      {performanceSettings.floatingParticles && <FloatingParticles />}
-      <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
-        <div className="flex items-center gap-3 mb-4">
+      <ClientPageShell
+        className={cn(
+          "max-w-lg lg:max-w-3xl mx-auto px-4 pt-6 overflow-x-hidden",
+          styles.page,
+        )}
+      >
+        {/* Header */}
+        <div className={styles.hd}>
           <button
             type="button"
             onClick={() => router.push("/client/train")}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[color:var(--fc-glass-border)] fc-text-primary hover:bg-[color:var(--fc-glass-highlight)]"
+            className={styles.back}
             aria-label="Back to training"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
           </button>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-bold fc-text-primary tracking-tight mb-1 break-words">{program.name}</h1>
-            <p className="text-sm fc-text-dim">
-              <span className="tabular-nums">{program.duration_weeks}</span> weeks ·{" "}
-              <span className="tabular-nums">{weekCountStat}</span> weeks ·{" "}
-              <span className="tabular-nums">{workoutsPerWeekDisplay}</span> workouts/week
+          <div className={styles.hdMain}>
+            <h1 className={styles.title}>{program.name}</h1>
+            <p className={styles.subtitle}>
+              {weekCountStat} {weekCountStat === 1 ? "week" : "weeks"} ·{" "}
+              {workoutsPerWeekDisplay} workouts/week
             </p>
           </div>
         </div>
 
-        <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3 mb-4">
-          <div className="flex items-center justify-between gap-1">
-            <div className="flex-1 min-w-0 text-center">
-              <p className="text-base font-semibold fc-text-primary tabular-nums">{weekCountStat}</p>
-              <p className="text-[10px] uppercase tracking-wider fc-text-dim mt-0.5">Weeks</p>
-            </div>
-            <div className="w-px h-8 bg-[color:var(--fc-glass-border)] shrink-0" aria-hidden />
-            <div className="flex-1 min-w-0 text-center">
-              <p className="text-base font-semibold fc-text-primary tabular-nums">{workoutsPerWeekDisplay}</p>
-              <p className="text-[10px] uppercase tracking-wider fc-text-dim mt-0.5">
-                Workouts/wk
-              </p>
-            </div>
-            <div className="w-px h-8 bg-[color:var(--fc-glass-border)] shrink-0" aria-hidden />
-            <div className="flex-1 min-w-0 text-center">
-              <p className="text-base font-semibold fc-text-primary tabular-nums">{totalWorkoutSlots}</p>
-              <p className="text-[10px] uppercase tracking-wider fc-text-dim mt-0.5">
-                Total workouts
-              </p>
-            </div>
+        {/* Stats strip */}
+        <div className={styles.stats}>
+          <div className={styles.stat}>
+            <div className={styles.statNum}>{weekCountStat}</div>
+            <div className={styles.statLbl}>Weeks</div>
+          </div>
+          <div className={styles.stat}>
+            <div className={styles.statNum}>{workoutsPerWeekDisplay}</div>
+            <div className={styles.statLbl}>Per week</div>
+          </div>
+          <div className={styles.stat}>
+            <div className={styles.statNum}>{totalWorkoutSlots}</div>
+            <div className={styles.statLbl}>Workouts</div>
           </div>
         </div>
 
-        {blockSections.length > 0 ? (
-          <div className="sticky top-0 z-10 -mx-4 border-b border-[color:var(--fc-glass-border)] bg-transparent px-4 py-1.5">
-            <div className="flex gap-1.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {blockSections.map((section) => {
-                const navKey = blockNavStableKey(section);
-                const active = highlightedNavBlockKey === navKey;
+        {/* Phase chips */}
+        {phaseSections.length > 0 ? (
+          <div className={styles.chipsBar}>
+            <div className={styles.chips}>
+              {phaseSections.map((section) => {
+                const navKey = phaseNavStableKey(section);
+                const active = highlightedNavPhaseKey === navKey;
+                const chip =
+                  clientPhaseChipLabel(section.phase) ??
+                  `Phase ${section.displayPhaseOrder}`;
                 return (
                   <button
                     key={navKey}
                     type="button"
                     onClick={() => {
-                      const safe = typeof CSS !== "undefined" && "escape" in CSS ? CSS.escape(navKey) : navKey;
-                      const el = document.querySelector<HTMLElement>(`[data-block-nav-key="${safe}"]`);
+                      const safe =
+                        typeof CSS !== "undefined" && "escape" in CSS
+                          ? CSS.escape(navKey)
+                          : navKey;
+                      const el = document.querySelector<HTMLElement>(
+                        `[data-phase-nav-key="${safe}"]`,
+                      );
                       el?.scrollIntoView({ behavior: "smooth", block: "start" });
                     }}
-                    className={cn(
-                      "shrink-0 appearance-none rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase leading-none tracking-wider shadow-none ring-0 outline-none transition-colors",
-                      active
-                        ? "border-[color-mix(in_srgb,var(--fc-accent-cyan)_30%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent-cyan)_10%,transparent)] text-[color:var(--fc-accent-cyan)]"
-                        : "border-[color:var(--fc-glass-border)] fc-glass-soft fc-text-dim",
-                    )}
+                    className={cn(styles.chip, active && styles.chipOn)}
                   >
-                    BLOCK {section.displayBlockOrder} · {goalAbbrevForNavChip(section.block)}
+                    {chip}
                   </button>
                 );
               })}
@@ -895,259 +850,290 @@ function ProgramDetailsContent() {
         ) : null}
 
         {program.description ? (
-          <p className="mb-4 text-sm fc-text-dim leading-relaxed line-clamp-4">{program.description}</p>
+          <p className={styles.description}>{program.description}</p>
         ) : null}
 
-        {blockSections.length === 0 ? (
-          <p className="text-center text-sm fc-text-dim py-8">No schedule for this program yet.</p>
+        {phaseSections.length === 0 ? (
+          <p className={styles.emptyState}>No schedule for this program yet.</p>
         ) : (
-          <div className="mb-6">
-            {blockSections.map((section, secIdx) => {
-              const weeksRange =
-                section.weeks.length > 0
-                  ? `${Math.min(...section.weeks.map((w) => w.weekNumber))}–${Math.max(...section.weeks.map((w) => w.weekNumber))}`
-                  : "—";
-              const durW = section.block?.duration_weeks ?? "—";
-              const goalLine = blockHeaderGoalLabel(section.block);
-
-              const navKey = blockNavStableKey(section);
+          <div>
+            {phaseSections.map((section, secIdx) => {
+              const spanLabel = section.phase
+                ? formatPhaseWeekSpanLabel(
+                    section.phase,
+                    section.startWeek,
+                    section.endWeek,
+                  )
+                : `Weeks ${section.startWeek}–${section.endWeek}`;
+              const isCurrentPhase =
+                clientOutlineWeek >= section.startWeek &&
+                clientOutlineWeek <= section.endWeek;
+              const navKey = phaseNavStableKey(section);
+              const secondaryLabel = clientPhaseSecondaryLabel(section.phase);
               return (
                 <section
-                  key={`sec-${section.displayBlockOrder}-${secIdx}`}
-                  data-block-nav-key={navKey}
-                  className={cn(secIdx === 0 ? "mt-0" : "mt-6", "mb-2 scroll-mt-16")}
+                  key={`sec-${section.displayPhaseOrder}-${secIdx}`}
+                  data-phase-nav-key={navKey}
+                  className={styles.phaseSection}
                 >
-                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/80">
-                    BLOCK {section.displayBlockOrder} · {goalLine}
-                  </p>
-                  {section.block?.name ? (
-                    <p className="text-sm font-semibold fc-text-primary mt-0.5">{section.block.name}</p>
-                  ) : (
-                    <p className="text-sm font-semibold fc-text-primary mt-0.5">Program block</p>
-                  )}
-                  <p className="text-xs fc-text-dim mt-0.5">
-                    Weeks {weeksRange} · {durW} weeks
-                  </p>
-                  {section.block?.notes ? (
-                    <p className="text-xs fc-text-dim italic mt-1">{section.block.notes}</p>
+                  <div className={styles.phaseHead}>
+                    <span className={styles.phaseLbl}>{spanLabel}</span>
+                    {isCurrentPhase ? (
+                      <span className={styles.herePill}>You are here</span>
+                    ) : null}
+                  </div>
+                  {secondaryLabel ? (
+                    <p className={styles.phaseSecondary}>{secondaryLabel}</p>
+                  ) : null}
+                  {section.phase?.notes ? (
+                    <p className={styles.phaseNotes}>{section.phase.notes}</p>
                   ) : null}
 
-                  {section.weeks.map(({ weekNumber, days }) => {
-                    const weekOpen = openWeeks[weekNumber] === true;
-                    return (
-                      <div
-                        key={`w-${weekNumber}`}
-                        className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4 mb-3 mt-3"
-                      >
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setOpenWeeks((prev) => ({
-                              ...prev,
-                              [weekNumber]: !prev[weekNumber],
-                            }))
-                          }
-                          className="flex w-full items-center justify-between gap-2 text-left"
-                          aria-expanded={weekOpen}
-                        >
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--fc-accent-cyan)]/80 mb-0">
-                            WEEK {weekNumber}
-                          </span>
-                          <ChevronDown
-                            className={cn(
-                              "h-4 w-4 shrink-0 fc-text-dim transition-transform",
-                              weekOpen && "rotate-180",
-                            )}
-                          />
-                        </button>
+                  <div style={{ marginTop: 12 }}>
+                    {section.weeks.map(({ weekNumber, days }) => {
+                      const weekOpen = openWeeks[weekNumber] === true;
+                      const isCurrentWeek = weekNumber === clientOutlineWeek;
+                      const workoutDays = days.filter(
+                        (d) => !d.isRest && d.templateId,
+                      );
+                      const workoutCount = workoutDays.length;
+                      const completedInWeek = workoutDays.filter(
+                        (d) => d.scheduleId && completedDayIds.has(d.scheduleId),
+                      ).length;
+                      const weekAllDone =
+                        workoutCount > 0 && completedInWeek === workoutCount;
+                      return (
+                        <div key={`w-${weekNumber}`} className={styles.week}>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOpenWeeks((prev) => ({
+                                ...prev,
+                                [weekNumber]: !prev[weekNumber],
+                              }))
+                            }
+                            className={styles.weekHead}
+                            aria-expanded={weekOpen}
+                          >
+                            <span className={styles.weekName}>Week {weekNumber}</span>
+                            {isCurrentWeek ? (
+                              <span className={styles.weekCurrent}>· Current</span>
+                            ) : null}
+                            <span
+                              className={cn(
+                                styles.weekCount,
+                                weekAllDone && styles.weekCountDone,
+                              )}
+                            >
+                              {workoutCount === 0
+                                ? "Rest week"
+                                : `${completedInWeek}/${workoutCount} done`}
+                            </span>
+                            <ChevronDown
+                              className={cn(
+                                styles.weekChev,
+                                weekOpen && styles.weekChevOpen,
+                              )}
+                              aria-hidden
+                            />
+                          </button>
 
-                        {weekOpen ? (
-                          <div className="mt-2">
-                            {days.map((day) => {
-                              if (day.isRest) {
-                                return (
-                                  <div
-                                    key={day.key}
-                                    className="flex items-center gap-4 py-3.5 border-b border-[color:var(--fc-glass-border)] last:border-0"
-                                  >
-                                    <div className="flex w-12 shrink-0 items-center justify-center">
-                                      <span className="text-2xl font-light text-gray-700/60 tabular-nums leading-none">
-                                        —
-                                      </span>
+                          {weekOpen ? (
+                            <div className={styles.weekBody}>
+                              {days.map((day) => {
+                                if (day.isRest) {
+                                  return (
+                                    <div key={day.key} className={styles.day}>
+                                      <div className={styles.rest}>
+                                        <span className={styles.restDash}>—</span>
+                                        Rest day
+                                      </div>
                                     </div>
-                                    <div className="min-w-0 flex-1">
-                                      <p className="text-base font-medium italic fc-text-dim">Rest day</p>
-                                    </div>
-                                  </div>
-                                );
-                              }
-
-                              const expanded = expandedDayKeys.has(String(day.key));
-                              const dayLoadKey = dayExerciseCacheKey(day);
-                              const isLoadingBlocks =
-                                !!day.templateId && loadingTemplates.has(dayLoadKey);
-                              const cachedBlocks = blocksCache.get(dayLoadKey);
-
-                              const workoutName = day.template?.name ?? "Workout";
-                              const durationStr =
-                                day.template?.estimated_duration != null &&
-                                day.template.estimated_duration > 0
-                                  ? `${day.template.estimated_duration} min`
-                                  : "—";
-
-                              const activateDayRow = () => {
-                                if (!openWeeks[weekNumber]) {
-                                  setOpenWeeks((p) => ({ ...p, [weekNumber]: true }));
+                                  );
                                 }
-                                void toggleDayExpand(day);
-                              };
 
-                              return (
-                                <div
-                                  key={day.key}
-                                  className="border-b border-[color:var(--fc-glass-border)] last:border-0"
-                                >
-                                  <div
-                                    role="button"
-                                    tabIndex={0}
-                                    aria-expanded={expanded}
-                                    className="flex w-full cursor-pointer items-start gap-4 py-3.5 text-left transition-colors hover:bg-[color:var(--fc-glass-highlight)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--fc-accent-cyan)]/35 focus-visible:ring-offset-0"
-                                    onClick={activateDayRow}
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter" || e.key === " ") {
-                                        e.preventDefault();
-                                        activateDayRow();
-                                      }
-                                    }}
-                                  >
-                                    <div className="flex w-12 shrink-0 flex-col items-center gap-1 pt-0.5">
-                                      <span className="text-2xl font-bold leading-none tracking-tight fc-text-primary tabular-nums">
+                                const expanded = expandedDayKeys.has(
+                                  String(day.key),
+                                );
+                                const dayLoadKey = dayExerciseCacheKey(day);
+                                const isLoadingBlocks =
+                                  !!day.templateId &&
+                                  loadingTemplates.has(dayLoadKey);
+                                const cachedBlocks = blocksCache.get(dayLoadKey);
+                                const isDone =
+                                  !!day.scheduleId &&
+                                  completedDayIds.has(day.scheduleId);
+                                /* Missed = not done, non-optional, and its week is behind the current week. */
+                                const isMissed =
+                                  !isDone &&
+                                  !day.isOptional &&
+                                  weekNumber < clientOutlineWeek;
+
+                                const workoutName =
+                                  day.template?.name ?? "Workout";
+                                const durationStr =
+                                  day.template?.estimated_duration != null &&
+                                  day.template.estimated_duration > 0
+                                    ? `${day.template.estimated_duration} min`
+                                    : null;
+
+                                const activateDayRow = () => {
+                                  void toggleDayExpand(day);
+                                };
+
+                                return (
+                                  <div key={day.key} className={styles.day}>
+                                    <div
+                                      role="button"
+                                      tabIndex={0}
+                                      aria-expanded={expanded}
+                                      className={styles.dayRow}
+                                      onClick={activateDayRow}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter" || e.key === " ") {
+                                          e.preventDefault();
+                                          activateDayRow();
+                                        }
+                                      }}
+                                    >
+                                      <span className={styles.dayIdx}>
                                         {String(day.dayNumber).padStart(2, "0")}
                                       </span>
-                                      <span
+                                      <div className={styles.dayMain}>
+                                        <div className={styles.dayName}>
+                                          {workoutName}
+                                        </div>
+                                        {durationStr ? (
+                                          <span className={styles.dur}>
+                                            {durationStr}
+                                          </span>
+                                        ) : null}
+                                        <div className={styles.daySub}>
+                                          <DayRowSubtitle day={day} />
+                                        </div>
+                                      </div>
+                                      <Check
                                         className={cn(
-                                          "h-2.5 w-2.5 shrink-0 rounded-full ring-2",
-                                          goalDotClassForBlock(day.trainingBlock),
-                                          goalDotRingClassForBlock(day.trainingBlock),
+                                          styles.dayCheck,
+                                          isDone
+                                            ? styles.checkDone
+                                            : isMissed
+                                              ? styles.checkMissed
+                                              : styles.checkUpcoming,
+                                        )}
+                                        strokeWidth={isDone || isMissed ? 2.5 : 2}
+                                        aria-label={
+                                          isDone
+                                            ? "Completed"
+                                            : isMissed
+                                              ? "Missed"
+                                              : "Not done yet"
+                                        }
+                                      />
+                                      <ChevronDown
+                                        className={cn(
+                                          styles.dayChev,
+                                          expanded && styles.weekChevOpen,
                                         )}
                                         aria-hidden
                                       />
                                     </div>
-                                    <div className="flex min-w-0 flex-1 flex-col gap-1">
-                                      <div className="flex items-baseline justify-between gap-2">
-                                        <span className="truncate text-base font-semibold tracking-tight fc-text-primary">
-                                          {workoutName}
-                                        </span>
-                                        <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[color:var(--fc-glass-border)] fc-glass-soft px-2 py-0.5 text-[11px] font-medium tabular-nums fc-text-dim">
-                                          <Clock className="h-2.5 w-2.5 shrink-0 opacity-70" aria-hidden />
-                                          {durationStr}
-                                        </span>
-                                      </div>
-                                      <DayRowSubtitle day={day} />
-                                    </div>
-                                    <div className="ml-1 flex shrink-0 items-start justify-center pt-1.5">
-                                      {expanded ? (
-                                        <ChevronDown className="h-4 w-4 fc-text-dim" aria-hidden />
-                                      ) : (
-                                        <ChevronRight className="h-4 w-4 fc-text-dim" aria-hidden />
-                                      )}
-                                    </div>
-                                  </div>
 
-                                  {expanded && day.templateId ? (
-                                    <div className="mb-2 mt-2 pl-[3.75rem]">
-                                      <div className="ml-6 border-l border-[color:var(--fc-glass-border)] pl-4">
-                                        {isLoadingBlocks || cachedBlocks === undefined ? (
+                                    {expanded && day.templateId ? (
+                                      <div className={styles.exWrap}>
+                                        {isLoadingBlocks ||
+                                        cachedBlocks === undefined ? (
                                           <ExpandedDaySkeletonRows />
                                         ) : cachedBlocks.length === 0 ? (
-                                          <p className="py-3 text-xs italic fc-text-dim">
-                                            No exercises configured for this workout
+                                          <p className={styles.exEmpty}>
+                                            No exercises configured for this
+                                            workout
                                           </p>
                                         ) : (
                                           [...cachedBlocks]
-                                            .sort((a, b) => (a.set_order ?? 0) - (b.set_order ?? 0))
-                                            .map((blk, bi) => (
-                                              <div key={blk.id} className={cn(bi > 0 && "mt-3")}>
-                                                <div className="mb-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                                                  <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/70">
-                                                    {blk.set_name?.trim() ||
-                                                      `Block ${blk.set_order ?? bi + 1}`}
-                                                  </span>
-                                                  {blk.set_type ? (
-                                                    <span className="inline-block rounded border border-[color:var(--fc-glass-border)] fc-glass-soft px-1.5 py-0.5 text-[9px] uppercase fc-text-dim">
-                                                      {(blk.set_type || "").replace(/_/g, " ")}
-                                                    </span>
+                                            .sort(
+                                              (a, b) =>
+                                                (a.set_order ?? 0) -
+                                                (b.set_order ?? 0),
+                                            )
+                                            .flatMap((blk, bi) =>
+                                              buildV6ExerciseRows(blk, bi),
+                                            )
+                                            .map((row) => (
+                                              <div
+                                                key={row.key}
+                                                className={styles.ex}
+                                              >
+                                                <span
+                                                  className={styles.badge}
+                                                  style={{ ["--hue" as string]: row.hue }}
+                                                >
+                                                  {row.badge}
+                                                </span>
+                                                <div className={styles.exMain}>
+                                                  <div className={styles.exName}>
+                                                    {row.name}
+                                                  </div>
+                                                  {row.meta ? (
+                                                    <div className={styles.exMeta}>
+                                                      {row.meta}
+                                                    </div>
+                                                  ) : null}
+                                                  {row.tech ? (
+                                                    <div className={styles.tech}>
+                                                      {row.tech}
+                                                    </div>
+                                                  ) : null}
+                                                  {row.notes ? (
+                                                    <div className={styles.exNote}>
+                                                      {row.notes}
+                                                    </div>
                                                   ) : null}
                                                 </div>
-                                                {blk.set_notes ? (
-                                                  <p className="mb-2 text-xs italic fc-text-subtle">
-                                                    {blk.set_notes}
-                                                  </p>
-                                                ) : null}
-                                                <div>
-                                                  {collectExpandedExerciseRows(blk).map((row, ri) => (
-                                                    <div
-                                                      key={`${blk.id}-${ri}`}
-                                                      className="flex items-center justify-between gap-3 border-b border-[color:var(--fc-glass-border)] py-2 last:border-0"
-                                                    >
-                                                      <div className="min-w-0 flex-1">
-                                                        <p className="text-sm tracking-tight fc-text-primary">
-                                                          {row.name}
-                                                        </p>
-                                                        {row.notes ? (
-                                                          <p className="mt-0.5 line-clamp-1 text-[11px] italic fc-text-dim">
-                                                            {row.notes}
-                                                          </p>
-                                                        ) : null}
-                                                      </div>
-                                                      <div className="flex shrink-0 flex-col items-end">
-                                                        <span className="inline-flex items-center rounded-md border border-[color:var(--fc-glass-border)] fc-glass-soft px-2 py-0.5 text-[11px] font-medium tabular-nums fc-text-dim">
-                                                          {row.prescription}
-                                                        </span>
-                                                        {row.weightLine ? (
-                                                          <span className="mt-0.5 text-right text-[10px] tabular-nums fc-text-dim">
-                                                            {row.weightLine}
-                                                          </span>
-                                                        ) : null}
-                                                      </div>
+                                                <div className={styles.exRight}>
+                                                  <div className={styles.exRx}>
+                                                    {row.rx}
+                                                  </div>
+                                                  {row.oneRm ? (
+                                                    <div className={styles.ex1rm}>
+                                                      {row.oneRm}
                                                     </div>
-                                                  ))}
+                                                  ) : null}
                                                 </div>
                                               </div>
                                             ))
                                         )}
                                       </div>
-                                    </div>
-                                  ) : null}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
+                                    ) : null}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </section>
               );
             })}
           </div>
         )}
 
-        <div className="flex flex-col gap-2 mt-6">
+        <div className={styles.actions}>
           <button
             type="button"
             onClick={() => router.push("/client/train")}
             className="fc-btn fc-btn-primary fc-press flex h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-base font-semibold"
           >
             Go to Training
-            <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
           </button>
           <button
             type="button"
             onClick={() => router.back()}
             className="fc-btn fc-btn-ghost fc-press h-11 w-full rounded-xl text-sm font-medium"
           >
-            Back to Program
+            Back
           </button>
         </div>
       </ClientPageShell>

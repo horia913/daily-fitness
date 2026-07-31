@@ -22,8 +22,11 @@ interface ClientPageShellProps {
   children: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
-  /** v4 atmospheric role; default `info`. Type is {@link AtmosphericVariant} in `AtmosphericBackdrop.tsx`. */
-  backdrop?: AtmosphericVariant;
+  /**
+   * v4 atmospheric role; default `info`.
+   * Pass `"none"` (or `false` / `null`) to skip the halo — flat shell only.
+   */
+  backdrop?: AtmosphericVariant | "none" | false | null;
 }
 
 export function ClientPageShell({
@@ -32,15 +35,24 @@ export function ClientPageShell({
   style,
   backdrop = "info",
 }: ClientPageShellProps) {
+  const showBackdrop =
+    backdrop != null && backdrop !== false && backdrop !== "none";
+
   return (
     <div
       style={style}
       className={cn(
-        "relative z-10 mx-auto w-full max-w-3xl fc-page min-w-0 overflow-x-hidden",
+        "relative z-10 mx-auto w-full max-w-lg lg:max-w-3xl fc-page min-w-0 overflow-x-hidden",
         className
       )}
     >
-      <AtmosphericBackdrop variant={backdrop} absolute className="z-0" />
+      {showBackdrop ? (
+        <AtmosphericBackdrop
+          variant={backdrop as AtmosphericVariant}
+          absolute
+          className="z-0"
+        />
+      ) : null}
       <div className="relative z-10 min-w-0">{children}</div>
     </div>
   );

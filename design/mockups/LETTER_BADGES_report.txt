@@ -1,0 +1,52 @@
+EXERCISE LETTER BADGES (replace hue dots + fix hardcoded A)
+Date: 2026-07-19
+
+1. Files modified / created
+Created:
+- src/components/client/workout-execution/groupLetterBadges.ts
+
+Modified:
+- src/components/client/workout-execution/ExecGroupList.tsx
+- src/components/client/workout-execution/execGroupList.module.css
+- src/components/client/workout-execution/execGroupListHelpers.ts
+- src/components/client/workout-execution/live-card/liveCard.module.css
+  (.badge / .gxbadge: min-width 22px, auto width for multi-char)
+- src/components/client/workout-execution/live-card/index.ts
+- src/components/client/workout-execution/blocks/SupersetExecutor.tsx
+- src/components/client/workout-execution/blocks/GiantSetExecutor.tsx
+- src/components/client/workout-execution/blocks/AmrapExecutor.tsx
+
+2. Letter derivation
+- Source: **group index in the workout** (0 → A, 1 → B, …) via
+  `groupIndexToLetter` / `formatGroupedExerciseBadge` in
+  `groupLetterBadges.ts`.
+- Exercise order within the group: `exercise_order` when set, else 1-based
+  index → `A1`, `B2`, etc.
+- DB `exercise_letter` exists on the type but is typically a within-block
+  slot (or null), not a workout-position letter — **not used** as the
+  prefix, so two supersets don’t both become A1/A2.
+
+3. Hardcoded `A` prefix — yes, present and fixed
+- Was: `return \`A${exerciseOrder ?? index + 1}\`` in Superset, Giant, Amrap,
+  plus helpers / round summaries.
+- Now: prefix = `groupIndexToLetter(currentSetEntryIndex)` /
+  list `index` for ExecGroupList.
+
+4. Grouped header badge
+- Shows the **range**: `A1–A2` (en-dash), not bare `A`.
+- Solo header badge: bare group letter `A`.
+- Grouped header **name** is the type only (`Superset` / `Giant Set`) so the
+  range isn’t duplicated beside the badge.
+
+5. Sizing / 375px
+- Badge: ~22px tall, min-width 22px, horizontal padding for ranges
+  (same grammar as live-card `.badge` / `.gxbadge`).
+- Header row unchanged aside from replacing the 7px dot; set count / ✓s
+  remain flex-shrink: 0.
+
+6. Untouched
+- Logging, advance fix, tap-to-jump, rest timer, pre-start gate,
+  per-set resolution, group ordering.
+
+7. tsc
+- `node node_modules/typescript/bin/tsc --noEmit` → exit 0.

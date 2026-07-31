@@ -68,9 +68,9 @@
   font-weight: 700;
   padding: 2px 7px;
   border-radius: 6px;
-  background: var(--cyan-soft);
-  border: 1px solid var(--cyan-dim);
-  color: var(--cyan);
+  background: var(--fc-accent-dim);
+  border: 1px solid var(--fc-accent-glow);
+  color: var(--fc-accent);
 }
 
 .stepEyebrow {
@@ -117,8 +117,8 @@
 }
 
 .stepTextarea:focus {
-  border-color: var(--cyan-dim);
-  box-shadow: 0 0 0 1px var(--cyan-soft);
+  border-color: var(--fc-accent-glow);
+  box-shadow: 0 0 0 1px var(--fc-accent-dim);
 }
 
 .addStepBtn {
@@ -126,7 +126,7 @@
   background: transparent;
   border: 1px dashed var(--line);
   border-radius: 11px;
-  color: var(--cyan);
+  color: var(--fc-accent);
   font-family: var(--f-body);
   font-size: 12px;
   font-weight: 600;
@@ -138,6 +138,6 @@
 }
 
 .addStepBtn:hover {
-  border-color: var(--cyan);
-  background: var(--cyan-soft);
+  border-color: var(--fc-accent);
+  background: var(--fc-accent-dim);
 }

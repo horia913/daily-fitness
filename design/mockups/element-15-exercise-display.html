@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Element 15 — Exercise Display (canonical) + Train applied</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Archivo+Expanded:wght@700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root {
+    --bg:#0A0B0D; --surface:#1B1E24; --raised:#22262E;
+    --hairline:rgba(255,255,255,0.07); --border:rgba(255,255,255,0.10);
+    --text:#F7F6F1; --dim:#9B9C90; --mute:#63645B;
+    --accent:#2E7BFF; --accent-dim:rgba(46,123,255,0.16); --accent-glow:rgba(46,123,255,0.30);
+    --good:#22E56A; --good-dim:rgba(34,229,106,0.15);
+    --warn:#FFB020; --warn-dim:rgba(255,176,32,0.15);
+    --bad:#FF5A4D; --bad-dim:rgba(255,90,77,0.15);
+    --track:rgba(255,255,255,0.08);
+    /* group badge hue sequence (identity only — the ONE sanctioned multi-hue) */
+    --gA:#2E7BFF; --gA-dim:rgba(46,123,255,0.18);
+    --gB:#9D6BFF; --gB-dim:rgba(157,107,255,0.18);
+    --gC:#22D3EE; --gC-dim:rgba(34,211,238,0.18);
+    --gD:#FFB020; --gD-dim:rgba(255,176,32,0.18);
+  }
+  body { font-family:'Inter',sans-serif; background:#050504; color:var(--text); padding:36px 16px 80px; display:flex; flex-direction:column; align-items:center; gap:24px; }
+  .intro { max-width:640px; width:100%; color:var(--dim); font-size:14px; line-height:1.6; }
+  .intro h1 { color:var(--text); font-family:'Archivo Expanded','Archivo'; font-weight:800; font-size:24px; letter-spacing:-0.5px; margin-bottom:8px; }
+  .intro strong { color:var(--text); } .intro .blue { color:var(--accent); }
+
+  .panel { width:390px; background:var(--bg); border:1px solid rgba(255,255,255,0.1); border-radius:30px; padding:26px 20px 30px; display:flex; flex-direction:column; gap:24px; }
+  .el-label { font-family:'JetBrains Mono'; font-size:10px; font-weight:600; letter-spacing:1.4px; text-transform:uppercase; color:var(--mute); display:flex; align-items:center; gap:8px; margin-bottom:-14px; }
+  .el-label::before { content:''; width:14px; height:1px; background:var(--mute); }
+  .el-label .n { color:var(--accent); }
+
+  /* ============ ELEMENT 15 — EXERCISE DISPLAY (canonical) ============ */
+  .badge {
+    min-width:22px; height:22px; padding:0 5px; border-radius:6px; flex-shrink:0;
+    display:inline-flex; align-items:center; justify-content:center;
+    font-family:'JetBrains Mono'; font-weight:700; font-size:10.5px; letter-spacing:.3px;
+  }
+  .bA { background:var(--gA-dim); color:var(--gA); }
+  .bB { background:var(--gB-dim); color:var(--gB); }
+  .bC { background:var(--gC-dim); color:var(--gC); }
+  .bD { background:var(--gD-dim); color:var(--gD); }
+
+  .grp-head { display:flex; align-items:center; gap:9px; padding:4px 0 8px; }
+  .grp-head .gmeta { font-family:'JetBrains Mono'; font-size:11px; color:var(--dim); letter-spacing:.4px; }
+
+  .grp { position:relative; }
+  .grp.multi { padding-left:12px; }
+  .grp.multi::before { content:''; position:absolute; left:0; top:30px; bottom:8px; width:2px; border-radius:1px; }
+  .grp.multi.hA::before { background:var(--gA-dim); }
+  .grp.multi.hB::before { background:var(--gB-dim); }
+
+  .ex { display:flex; align-items:flex-start; gap:10px; padding:10px 0; border-bottom:1px solid var(--hairline); }
+  .grp .ex:last-of-type { border-bottom:none; }
+  .ex .exb { flex:1; min-width:0; }
+  .ex .exname { font-family:'Inter'; font-weight:600; font-size:15px; color:var(--text); letter-spacing:-0.1px; }
+  .ex .exrx { font-family:'JetBrains Mono'; font-size:11px; font-weight:500; color:var(--dim); letter-spacing:.3px; margin-top:4px; line-height:1.5; }
+  .ex .exrx b { color:var(--text); font-weight:600; }
+  .ex .exrx .sep { color:var(--mute); padding:0 2px; }
+
+  /* ============ TRAIN pieces ============ */
+  .hdr { display:flex; align-items:center; gap:13px; }
+  .hdr .avatar { width:44px;height:44px;border-radius:13px;flex-shrink:0;background:var(--surface);display:flex;align-items:center;justify-content:center;font-family:'Archivo';font-weight:800;font-size:17px;color:var(--accent); }
+  .hdr .ht { flex:1; }
+  .hdr .ey { font-family:'JetBrains Mono';font-size:9px;font-weight:600;letter-spacing:1.6px;text-transform:uppercase;color:var(--accent);margin-bottom:3px; }
+  .hdr .ti { font-family:'Archivo Expanded','Archivo';font-weight:800;font-size:28px;letter-spacing:-1px;line-height:.95;color:var(--text); }
+  .hdr .hring { width:56px;height:56px;flex-shrink:0;position:relative;display:flex;align-items:center;justify-content:center; }
+  .hdr .hring svg { position:absolute;inset:0;transform:rotate(-90deg); }
+  .hdr .hring .arc { filter:drop-shadow(0 0 4px var(--accent-glow)); }
+  .hdr .hring .v { font-family:'Archivo';font-weight:900;font-size:18px;color:var(--text);line-height:1; }
+
+  .sec { display:flex; align-items:center; justify-content:space-between; }
+  .sec .st { font-family:'Archivo';font-weight:800;font-size:17px;letter-spacing:-0.3px;color:var(--text);display:flex;align-items:center;gap:9px; }
+  .sec .st::before { content:'';width:3px;height:16px;border-radius:2px;background:var(--accent); }
+
+  .xrow { border-bottom:1px solid var(--hairline); }
+  .list .xrow:first-child { border-top:1px solid var(--hairline); }
+  .xrow .row-head { display:flex;align-items:center;gap:13px;padding:15px 2px;cursor:pointer; }
+  .xrow .n { font-family:'JetBrains Mono';font-weight:700;font-size:13px;width:24px; }
+  .xrow .b { flex:1; }
+  .xrow .t { font-weight:600;font-size:15px;color:var(--text); }
+  .xrow .t.dimmed { color:var(--dim); font-weight:500; font-style:italic; }
+  .xrow .s { font-family:'JetBrains Mono';font-size:10px;color:var(--dim);margin-top:3px;letter-spacing:.4px; }
+  .xrow .chev { color:var(--mute);font-size:13px;transition:transform .18s ease; width:14px; text-align:center; }
+  .xrow.open .chev { transform:rotate(90deg); color:var(--accent); }
+  .pill { display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:8px;font-family:'JetBrains Mono';font-size:9px;font-weight:700;letter-spacing:.7px;text-transform:uppercase; }
+  .pill .pd { width:6px;height:6px;border-radius:50%;background:currentColor; }
+  .pill.good { background:var(--good-dim);color:var(--good); }
+  .pill.warn { background:var(--warn-dim);color:var(--warn); }
+  .pill.warn .pd { box-shadow:0 0 6px var(--warn); }
+  .pill.mute { background:var(--surface);color:var(--mute); }
+  .xrow .xbody { max-height:0; overflow:hidden; transition:max-height .25s ease; }
+  .xrow.open .xbody { max-height:700px; }
+  .xrow .xinner { margin:2px 0 16px 37px; display:flex; flex-direction:column; gap:6px; }
+  .xrow .xlink { font-family:'JetBrains Mono'; font-size:10px; font-weight:700; color:var(--accent); letter-spacing:.6px; text-transform:uppercase; margin-top:10px; cursor:pointer; }
+
+  .outro { max-width:640px;width:100%;color:var(--mute);font-size:12px;line-height:1.6; }
+  .outro strong { color:var(--dim); }
+</style>
+</head>
+<body>
+
+  <div class="intro">
+    <h1>Element 15 — <span class="blue">Exercise Display</span> (canonical)</h1>
+    <p><strong>Codified from the Station canvas.</strong> This is now THE way an exercise renders, app-wide: letter badge (group hue) · bold name · mono prescription line with <strong>·</strong>-separated segments and per-set reps (<code>12/6/6</code>). Multi-exercise protocols get a group header (<code>superset · 3 rounds · rest 2:00</code>) + a tinted left rule + A1/A2 badges. Below: the element itself, then the Train week-expansion rebuilt with it.</p>
+  </div>
+
+  <!-- ============ THE ELEMENT, ISOLATED ============ -->
+  <div class="panel">
+    <div class="el-label"><span class="n">15a</span> Multi-exercise group (superset)</div>
+    <div>
+      <div class="grp-head"><span class="badge bA">A</span><span class="gmeta">superset · 3 rounds · rest 2:00</span></div>
+      <div class="grp multi hA">
+        <div class="ex">
+          <span class="badge bA">A1</span>
+          <div class="exb">
+            <div class="exname">Leg Press Wide Stance</div>
+            <div class="exrx"><b>3 × 12/6/6</b><span class="sep">·</span>75% 1RM<span class="sep">·</span>RIR 10<span class="sep">·</span>rest 2:00</div>
+          </div>
+        </div>
+        <div class="ex">
+          <span class="badge bA">A2</span>
+          <div class="exb">
+            <div class="exname">Bulgarian Split Squat</div>
+            <div class="exrx"><b>3 × 6/6/6</b><span class="sep">·</span>70% 1RM<span class="sep">·</span>RIR 8<span class="sep">·</span>rest 2:00</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="el-label"><span class="n">15b</span> Single-exercise groups</div>
+    <div>
+      <div class="ex">
+        <span class="badge bB">B</span>
+        <div class="exb">
+          <div class="exname">Romanian Deadlift</div>
+          <div class="exrx"><b>4 × 12/12/12/12</b><span class="sep">·</span>60% 1RM<span class="sep">·</span>RIR 8<span class="sep">·</span>rest 1:00</div>
+        </div>
+      </div>
+      <div class="ex">
+        <span class="badge bC">C</span>
+        <div class="exb">
+          <div class="exname">Cable Glute Kickback</div>
+          <div class="exrx"><b>2 × 10/10</b><span class="sep">·</span>80% 1RM</div>
+        </div>
+      </div>
+      <div class="ex" style="border-bottom:none;">
+        <span class="badge bD">D</span>
+        <div class="exb">
+          <div class="exname">Jump Rope</div>
+          <div class="exrx"><b>4 × 30/30/30/30</b><span class="sep">·</span>rest 1:00</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="el-label"><span class="n">15c</span> Technique / time segments (as authored)</div>
+    <div>
+      <div class="ex">
+        <span class="badge bA">A3</span>
+        <div class="exb">
+          <div class="exname">Box Squat (learn tempo)</div>
+          <div class="exrx"><b>3 × 3/3/3</b><span class="sep">·</span>RIR 5<span class="sep">·</span>4s ECC / 1s pause<span class="sep">·</span>rest 3:00</div>
+        </div>
+      </div>
+      <div class="ex" style="border-bottom:none;">
+        <span class="badge bC">C</span>
+        <div class="exb">
+          <div class="exname">Copenhagen Adductor Iso</div>
+          <div class="exrx"><b>2 × 15s/side / 15s/side</b><span class="sep">·</span>Isometric<span class="sep">·</span>rest 1:00</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="intro" style="margin-top:4px;">
+    <h1 style="font-size:18px;">Applied — <span class="blue">Train week expansion</span></h1>
+    <p>Same element, read-only context. Tap day 02 (open) / 01 to toggle.</p>
+  </div>
+
+  <!-- ============ APPLIED: TRAIN LIST ============ -->
+  <div class="panel">
+    <div class="hdr">
+      <div class="avatar">C</div>
+      <div class="ht"><div class="ey">Week 1 of 13 · Phase 1</div><div class="ti">TRAINING</div></div>
+      <div class="hring">
+        <svg viewBox="0 0 56 56"><circle cx="28" cy="28" r="24" fill="none" stroke="var(--track)" stroke-width="5"/><circle class="arc" cx="28" cy="28" r="24" fill="none" stroke="var(--accent)" stroke-width="5" stroke-dasharray="151" stroke-dashoffset="42" stroke-linecap="round"/></svg>
+        <span class="v">72</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="sec"><div class="st">This Week</div></div>
+      <div class="list" style="margin-top:6px;">
+
+        <div class="xrow" id="x1">
+          <div class="row-head" onclick="tog('x1')">
+            <span class="n" style="color:var(--good)">01</span>
+            <div class="b"><div class="t">Andreea test — Day 1</div><div class="s">60 MIN · 5 EXERCISES</div></div>
+            <span class="pill good"><span class="pd"></span>Done</span>
+            <span class="chev">›</span>
+          </div>
+          <div class="xbody">
+            <div class="xinner">
+              <div class="grp-head" style="padding-top:0;"><span class="badge bA">A</span><span class="gmeta">superset · 3 rounds · rest 2:00</span></div>
+              <div class="grp multi hA">
+                <div class="ex">
+                  <span class="badge bA">A1</span>
+                  <div class="exb"><div class="exname">Leg Press Wide Stance</div>
+                  <div class="exrx"><b>3 × 12/6/6</b><span class="sep">·</span>75% 1RM<span class="sep">·</span>RIR 10<span class="sep">·</span>rest 2:00</div></div>
+                </div>
+                <div class="ex">
+                  <span class="badge bA">A2</span>
+                  <div class="exb"><div class="exname">Bulgarian Split Squat</div>
+                  <div class="exrx"><b>3 × 6/6/6</b><span class="sep">·</span>70% 1RM<span class="sep">·</span>RIR 8<span class="sep">·</span>rest 2:00</div></div>
+                </div>
+              </div>
+              <div class="ex">
+                <span class="badge bB">B</span>
+                <div class="exb"><div class="exname">Romanian Deadlift</div>
+                <div class="exrx"><b>4 × 12/12/12/12</b><span class="sep">·</span>60% 1RM<span class="sep">·</span>RIR 8<span class="sep">·</span>rest 1:00</div></div>
+              </div>
+              <div class="ex">
+                <span class="badge bC">C</span>
+                <div class="exb"><div class="exname">Cable Glute Kickback</div>
+                <div class="exrx"><b>2 × 10/10</b><span class="sep">·</span>80% 1RM</div></div>
+              </div>
+              <div class="ex" style="border-bottom:none;">
+                <span class="badge bD">D</span>
+                <div class="exb"><div class="exname">Jump Rope</div>
+                <div class="exrx"><b>4 × 30/30/30/30</b><span class="sep">·</span>rest 1:00</div></div>
+              </div>
+              <div class="xlink">Open workout →</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="xrow open" id="x2">
+          <div class="row-head" onclick="tog('x2')">
+            <span class="n" style="color:var(--warn)">02</span>
+            <div class="b"><div class="t">Day 5: Lower 2</div><div class="s">40 MIN · 5 EXERCISES</div></div>
+            <span class="pill warn"><span class="pd"></span>Today</span>
+            <span class="chev">›</span>
+          </div>
+          <div class="xbody">
+            <div class="xinner">
+              <div class="grp-head" style="padding-top:0;"><span class="badge bA">A</span><span class="gmeta">giant set · 3 rounds</span></div>
+              <div class="grp multi hA">
+                <div class="ex">
+                  <span class="badge bA">A1</span>
+                  <div class="exb"><div class="exname">CMJ (OVR Jump)</div>
+                  <div class="exrx"><b>3 × 5/3/3</b><span class="sep">·</span>5 kg<span class="sep">·</span>Explosive</div></div>
+                </div>
+                <div class="ex">
+                  <span class="badge bA">A2</span>
+                  <div class="exb"><div class="exname">Clean-Grip DL to Mid-Thigh</div>
+                  <div class="exrx"><b>3 × 4/4/4</b><span class="sep">·</span>Controlled<span class="sep">·</span>rest 2:00</div></div>
+                </div>
+                <div class="ex">
+                  <span class="badge bA">A3</span>
+                  <div class="exb"><div class="exname">Box Squat (learn tempo)</div>
+                  <div class="exrx"><b>3 × 3/3/3</b><span class="sep">·</span>RIR 5<span class="sep">·</span>4s ECC / 1s pause<span class="sep">·</span>rest 3:00</div></div>
+                </div>
+              </div>
+              <div class="ex">
+                <span class="badge bB">B</span>
+                <div class="exb"><div class="exname">Calf Raise (ecc focus)</div>
+                <div class="exrx"><b>3 × 12/12/12</b><span class="sep">·</span>3 sec lower<span class="sep">·</span>rest 1:30</div></div>
+              </div>
+              <div class="ex" style="border-bottom:none;">
+                <span class="badge bC">C</span>
+                <div class="exb"><div class="exname">Copenhagen Adductor Iso</div>
+                <div class="exrx"><b>2 × 15s/side / 15s/side</b><span class="sep">·</span>Isometric<span class="sep">·</span>rest 1:00</div></div>
+              </div>
+              <div class="xlink">Open workout →</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="xrow">
+          <div class="row-head" style="cursor:default;">
+            <span class="n" style="color:var(--mute)">03</span>
+            <div class="b"><div class="t dimmed">Rest day</div></div>
+            <span class="pill mute">Rest</span>
+            <span class="chev" style="opacity:0;">›</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="outro">
+    <p><strong>The system rule this adds:</strong> group-badge hues (A/B/C/D…) are the ONE sanctioned multi-hue — a fixed identity sequence used ONLY on badges + the group's left rule, everywhere (coach edit, client preview, live workout, review). The prescription line is verbatim-consistent with the Station: <b>sets × per-set-reps</b> · load · RIR · technique · rest, mono, dot-separated. Same element later gains context add-ons: editing affordances (Station), logging state (live), prescribed-vs-actual (review) — but the READING never changes.</p>
+  </div>
+
+  <script>
+    function tog(id){
+      const el = document.getElementById(id);
+      const wasOpen = el.classList.contains('open');
+      document.querySelectorAll('.xrow.open').forEach(r=>r.classList.remove('open'));
+      if(!wasOpen) el.classList.add('open');
+    }
+  </script>
+
+</body>
+</html>

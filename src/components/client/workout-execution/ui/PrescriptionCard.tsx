@@ -213,7 +213,7 @@ export function PrescriptionCard({
         <div className="relative mb-3.5 flex justify-between gap-3">
           <div className="min-w-0 flex-1">
             <Eyebrow
-              tone="lime"
+              tone="action"
               density="default"
               className="!mb-2 !text-[10.5px] !font-bold !tracking-[0.14em]"
             >
@@ -268,7 +268,7 @@ export function PrescriptionCard({
           <Eyebrow
             tone="cyan"
             density="section"
-            className="relative !mb-3 !text-[9.5px] !font-bold !tracking-[0.16em] !text-cyan-300/95"
+            className="relative !mb-3 !text-[9.5px] !font-bold !tracking-[0.16em] !text-[color-mix(in_srgb,var(--fc-group-c)_95%,white)]"
           >
             Your target today
           </Eyebrow>
@@ -333,11 +333,11 @@ export function PrescriptionCard({
       {hasNotesRegion ? (
         <>
           <RxDivider className="mt-5" />
-          <div className="relative rounded-r-[10px] border-l-2 border-cyan-400/80 bg-cyan-500/[0.05] py-2.5 pl-3.5 pr-3">
+          <div className="relative rounded-r-[10px] border-l-2 border-[color-mix(in_srgb,var(--fc-group-c)_80%,transparent)] bg-[color-mix(in_srgb,var(--fc-group-c)_0.05,transparent)] py-2.5 pl-3.5 pr-3">
             <Eyebrow
               tone="cyan"
               density="section"
-              className="!mb-1 !text-[9.5px] !font-bold !tracking-[0.16em] !text-cyan-300"
+              className="!mb-1 !text-[9.5px] !font-bold !tracking-[0.16em] !text-[color-mix(in_srgb,var(--fc-group-c)_70%,white)]"
             >
               Coach notes
             </Eyebrow>
@@ -347,7 +347,7 @@ export function PrescriptionCard({
               </p>
             ) : null}
             {hasCoachNotes && hasFormCues ? (
-              <div className="my-2 h-px bg-cyan-500/25" aria-hidden />
+              <div className="my-2 h-px bg-[color-mix(in_srgb,var(--fc-group-c)_25%,transparent)]" aria-hidden />
             ) : null}
             {hasFormCues ? (
               <>
@@ -376,16 +376,16 @@ export function PrescriptionCard({
             className="relative -mx-5 -mb-5 mt-[18px] rounded-b-[28px] border-t border-[color:var(--fc-glass-border)] px-5 pb-5 pt-[18px]"
             style={{
               background: `
-                radial-gradient(ellipse 80% 60% at 100% 100%, rgba(197,255,74,0.07), transparent 65%),
-                radial-gradient(ellipse 60% 50% at 0% 0%, rgba(127,232,154,0.05), transparent 65%)
+                radial-gradient(ellipse 80% 60% at 100% 100%, color-mix(in srgb, var(--fc-accent) 6%, transparent), transparent 65%),
+                radial-gradient(ellipse 60% 50% at 0% 0%, color-mix(in srgb, var(--fc-accent) 4%, transparent), transparent 65%)
               `,
             }}
           >
-            <div className="mb-3.5 flex items-center justify-between gap-2">
+            <div className="mb-2 flex items-center justify-between gap-2">
               <Eyebrow
-                tone="lime"
+                tone="cyan"
                 density="section"
-                className="!mb-0 !text-[9.5px] !font-bold !tracking-[0.16em] !text-[var(--fc-accent-lime)]"
+                className="!mb-0 !text-[9px] !font-semibold !tracking-[0.14em] !text-[var(--fc-text-dim)]"
               >
                 Log set
               </Eyebrow>

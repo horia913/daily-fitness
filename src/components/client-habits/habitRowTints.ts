@@ -12,7 +12,7 @@ export function rowTintClass(template: HabitTemplateRow, manualLike: boolean): s
     case 'nutrition':
       return styles.tintGood
     case 'movement':
-      return styles.tintLime
+      return styles.tintAction
     case 'sleep_recovery':
       return styles.tintPurple
     case 'mindfulness':
@@ -30,7 +30,7 @@ export function categoryHeadTintClass(category: string): string {
     case 'nutrition':
       return styles.tintGood
     case 'movement':
-      return styles.tintLime
+      return styles.tintAction
     case 'sleep_recovery':
       return styles.tintPurple
     case 'mindfulness':

@@ -86,8 +86,8 @@ export function VolumeTrendChart({
     <div className={cn("fc-card-shell p-6", className)}>
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 shadow-[0_10px_20px_rgba(139,92,246,0.25)]">
-            <TrendingUp className="h-6 w-6 text-white" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-[color:var(--fc-hairline)] bg-[color:color-mix(in_srgb,var(--fc-group-a)_14%,transparent)]">
+            <TrendingUp className="h-6 w-6 text-[color:var(--fc-group-a)]" />
           </div>
           <div>
             <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
@@ -168,10 +168,9 @@ export function VolumeTrendChart({
                     y1={y}
                     x2={width - padding.right}
                     y2={y}
-                    stroke="currentColor"
+                    stroke="var(--fc-hairline)"
                     strokeWidth="1"
-                    strokeOpacity="0.1"
-                    className="text-[color:var(--fc-text-dim)]"
+                    strokeOpacity="1"
                   />
                 );
               })}
@@ -186,7 +185,7 @@ export function VolumeTrendChart({
                     x={padding.left - 8}
                     y={y + 4}
                     textAnchor="end"
-                    className="text-xs fill-[color:var(--fc-text-dim)]"
+                    className="font-[family-name:var(--f-mono)] text-xs fill-[color:var(--fc-text-subtle)]"
                   >
                     {formatVolume(value)}
                   </text>
@@ -261,7 +260,7 @@ export function VolumeTrendChart({
                         strokeWidth="2"
                         strokeOpacity="0.3"
                         rx="6"
-                        className="text-[color:var(--fc-accent-purple)]"
+                        className="text-[color:var(--fc-group-a)]"
                       />
                     )}
                   </g>
@@ -271,12 +270,12 @@ export function VolumeTrendChart({
               {/* Gradient definitions */}
               <defs>
                 <linearGradient id="volumeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="rgb(139, 92, 246)" stopOpacity="0.8" />
-                  <stop offset="100%" stopColor="rgb(99, 102, 241)" stopOpacity="0.6" />
+                  <stop offset="0%" stopColor="var(--fc-group-a)" stopOpacity="0.85" />
+                  <stop offset="100%" stopColor="var(--fc-group-a)" stopOpacity="0.45" />
                 </linearGradient>
                 <linearGradient id="volumeGradientCurrent" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="rgb(168, 85, 247)" stopOpacity="1" />
-                  <stop offset="100%" stopColor="rgb(139, 92, 246)" stopOpacity="0.9" />
+                  <stop offset="0%" stopColor="var(--fc-group-a)" stopOpacity="1" />
+                  <stop offset="100%" stopColor="var(--fc-group-a)" stopOpacity="0.7" />
                 </linearGradient>
               </defs>
 
@@ -291,7 +290,7 @@ export function VolumeTrendChart({
                     x={x}
                     y={height - padding.bottom + 16}
                     textAnchor="middle"
-                    className="text-xs fill-[color:var(--fc-text-dim)]"
+                    className="font-[family-name:var(--f-mono)] text-xs fill-[color:var(--fc-text-subtle)]"
                   >
                     {formatWeekLabel(week.weekStart)}
                   </text>

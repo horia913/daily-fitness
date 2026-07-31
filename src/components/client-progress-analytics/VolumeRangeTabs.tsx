@@ -4,7 +4,7 @@ import React from "react";
 import v6 from "./progressAnalyticsV6.module.css";
 import { cn } from "@/lib/utils";
 
-export type VolumeWindowWeeks = 8 | 12 | 26;
+export type VolumeWindowWeeks = 4 | 8 | 12 | 26;
 
 const OPTIONS: { value: VolumeWindowWeeks; label: string }[] = [
   { value: 8, label: "8W" },

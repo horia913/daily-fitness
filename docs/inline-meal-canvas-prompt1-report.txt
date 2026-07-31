@@ -1,0 +1,179 @@
+# INLINE MEAL CANVAS — PROMPT 1 REPORT
+**Date:** 2026-07-04
+
+---
+
+## 1. Files created / modified / unmounted
+
+### Created
+- `src/types/mealPlanDraft.ts` — draft state types
+- `src/contexts/MealPlanDraftContext.tsx` — baseline + workingCopy + dirty + commit + localStorage
+- `src/lib/mealPlans/mealPlanDraftUtils.ts` — clone, dirty check, recompute totals, temp ids
+- `src/lib/mealPlans/mealPlanDraftStorage.ts` — localStorage crash recovery
+- `src/lib/mealPlans/mealPlanDraftMutations.ts` — in-memory tree mutations
+- `src/lib/mealPlans/loadMealPlanDraftBaseline.ts` — load tree with food macro data for draft
+- `src/lib/mealPlans/commitMealPlanTree.ts` — FK-safe persist orchestrator
+- `src/components/meal-display/MealListEditor.tsx` — inline editing on P4 display
+- `src/components/meal-display/InlineFoodSearch.tsx` — ported exercise-search UX for foods
+- `src/components/meal-display/MealPlanSaveButton.tsx` — Save CTA (only glow)
+- `src/components/meal-display/MealPlanDraftResumeDialog.tsx` — localStorage resume prompt
+
+### Modified
+- `src/lib/mealPlanService.ts` — added `createMeal`, `updateMeal`, `deleteMeal`
+- `src/app/coach/nutrition/meal-plans/[id]/page.tsx` — draft provider, unmounted modals
+- `src/components/meal-display/CoachPlanBuilderView.tsx` — Save header, MealListEditor, draft props
+- `src/components/meal-display/mealDisplay.module.css` — inline editing + Save styles
+- `src/components/meal-display/loadPlanBuilderMeals.ts` — generic `computePlanTotalsFromMeals`
+- `src/components/meal-display/index.ts` — new exports
+
+### Unmounted (not deleted)
+- `MealCreator` — removed from builder page
+- `MealOptionEditor` — removed from builder page (Dialog wrapper also removed)
+
+### Untouched (as required)
+- `MealPlanMetadataModal` — header pencil
+- `MealPlanAssignmentModal` — Assign ghost
+- `MealCreator.tsx`, `MealOptionEditor.tsx`, `MealForm.tsx`, `MealPlanBuilder.tsx` — still on disk
+- Client surfaces, generator, legacy paths
+
+---
+
+## 2. Draft + commit design
+
+### Mirror of ProgramDraftContext
+| Concern | Program station | Meal plan draft |
+|--------|-----------------|-----------------|
+| State | `baseline` + `workingCopy` | Same |
+| Dirty | structural/json compare | `mealPlanDraftsEqual` on normalized tree |
+| localStorage | 500ms debounce | Same (`mealPlanDraftStorage`) |
+| Resume prompt | `resumePrompt` dialog | `MealPlanDraftResumeDialog` |
+| Save states | idle/dirty/saving/saved/error | Same |
+| Nav guard | beforeunload + LeaveConfirmDialog | Same (back link to nutrition) |
+| DB writes | explicit `commit()` | `commitMealPlanTree()` |
+
+### Commit operation order
+1. **Delete** meals present in baseline but absent from workingCopy (real ids only)
+2. For each meal in workingCopy **by array position** (`order_index = index`):
+   - **New meal** (`temp-*`) → `createMeal` (meal + default option) → backfill meal id + first option id
+   - **Existing meal** → `updateMeal` if name/type/order changed
+   - **Delete** removed options (real ids)
+   - For each option by position:
+     - **New option** → `createMealOption` → backfill option id → `updateMealOption` order if needed
+     - **Existing option** → `updateMealOption` name/order
+     - **Delete** removed foods
+     - **New food** → `addFoodToOption` → backfill food item id
+     - **Changed food** → `updateFoodInOption` qty/unit
+
+### Temp id → real id backfill
+- Temp prefix: `temp-{uuid}`
+- During commit, `draft` is a **clone** of workingCopy; successful creates **mutate ids in place** on `draft`
+- On partial failure: `result.state` returned with backfilled ids; context calls `setWorkingCopyState(result.state)` — retry only creates rows still carrying `temp-*` ids
+
+### Retry safety
+- Backfilled rows become updates/deletes on retry (idempotent)
+- Only remaining `temp-*` rows trigger inserts
+- Failed commit keeps `saveState: error` and workingCopy dirty
+
+### order_index
+Written from **array position** on create (`createMeal`) and update (`updateMeal` / `updateMealOption`) for every commit.
+
+---
+
+## 3. Write functions reused + new createMeal
+
+### Reused (unchanged signatures)
+- `MealPlanService.createMealOption(mealId, name)`
+- `MealPlanService.updateMealOption(optionId, updates)`
+- `MealPlanService.deleteMealOption(optionId)`
+- `MealPlanService.addFoodToOption(mealId, optionId, foodId, quantity, unit)`
+- `MealPlanService.updateFoodInOption(foodItemId, updates)`
+- `MealPlanService.removeFoodFromOption(foodItemId)`
+- `MealPlanService.searchFoods(query)` — inline food search
+
+### New
+```ts
+static async createMeal(
+  mealPlanId: string,
+  data: { name: string; meal_type: string; order_index: number },
+): Promise<{
+  meal: { id: string; name: string; meal_type: string; order_index: number };
+  defaultOption: MealOption;
+}>
+
+static async updateMeal(
+  mealId: string,
+  updates: Partial<{ name: string; meal_type: string; order_index: number }>,
+): Promise<void>
+
+static async deleteMeal(mealId: string): Promise<boolean>
+```
+
+`createMeal` inserts `meals` row **and** first `meal_options` row (`Option 1`, `order_index: 0`) — options-first.
+
+---
+
+## 4. Self-check outputs
+
+### 4a. Read-state preservation (collapsed / non-editing)
+
+| Element | Status |
+|--------|--------|
+| Meal-type badge 22px / 6px radius / hues A–D | **Preserved** — still `.badge` + hue classes |
+| Meal name Inter 600 15px | **Preserved when collapsed** — `.mname` unchanged |
+| Mono macro line bold kcal · P · C · F · N options | **Preserved** — `.mrx` unchanged |
+| Option group chrome sub-badge + tinted left rule | **Preserved** — `.opt` / `.optHue*` |
+| Food rows name + mono qty + mono macros + hairlines | **Preserved** — qty is borderless input when expanded only |
+| Chevron rotate + accent when open | **Preserved** — `.mrowOpen .chev` |
+| **Moved intentionally** | Collapsed row: ✎ removed (edit on expand). Expanded: name/type become inline inputs. Food qty becomes inline input. EDIT OPTION → link removed (inline option name). |
+
+### 4b. New-elements conformance
+
+| Element | Token(s) | Design-law |
+|--------|----------|------------|
+| Save button | `--fc-accent`, `--fc-accent-glow`, `--f-display` | **Only glow on page** when dirty/error |
+| Save idle | `--fc-surface-card`, `--fc-glass-border` | Ghost/surface, no glow |
+| ＋ Add meal row | `--fc-text-dim`, `--fc-accent` hover, `--f-mono` | Ghost link row, no glow |
+| Inline name input | `--font-body`, `--fc-hairline` underline | Borderless/underline |
+| Meal-type select | `--f-mono`, `--fc-hairline` underline | Borderless |
+| ＋ Add option / ＋ Add food | `--fc-accent`, `--f-mono` | Ghost accent links |
+| Inline food search | `--fc-hairline`, `--fc-surface-card`, `--f-mono` | Borderless input + dropdown |
+| Inline qty input | `--f-mono`, `--fc-hairline` underline | PrescriptionTable-style |
+| Remove ✕ / 🗑 | `--fc-text-subtle`, `--fc-status-warning` hover | Ghost icons |
+| Assign | `--fc-glass-border` ghost | Unchanged, no glow |
+
+**Confirm: Save is the only glow** — `.primaryCta` removed from header; `.saveBtnDirty` is sole `box-shadow: var(--fc-accent-glow)`.
+
+---
+
+## 5. Header pencil / Assign — draft protection
+
+- `loadMealsTree` / draft reload **removed** from metadata and assign success handlers
+- `onUpdated` on `MealPlanMetadataModal` → `setMealPlan(updated)` only (name, targets, active, notes)
+- Assignment complete → `loadAssignedCount()` only
+- Macro strip reads `mealPlan` targets from page state + `workingCopy` meals for computed — targets update live without resetting tree
+
+---
+
+## 6. Options-first fix
+
+- `addMealToDraft` inserts meal with **one default option** (`Option 1`) immediately
+- `createMeal` on commit creates DB meal **and** `meal_options` row together
+- Foods attach via `meal_option_id` on commit — P4 `loadPlanBuilderMeals` / draft loader only map option-scoped items
+- New inline meal shows **0 kcal, 1 option, 0 foods** correctly before Save; after Save + reload, structure persists with option
+
+---
+
+## 7. Stop-and-report items
+
+**None.** All controls map to existing write functions + the three new meal wrappers.
+
+---
+
+## 8. tsc result
+
+`npx tsc --noEmit` → **exit 0** (clean)
+
+---
+
+## DEFER confirmed not built
+- Custom food inline, recent/favorites, keyboard shortcuts, drag reorder, orphan file deletion, transactional RPC

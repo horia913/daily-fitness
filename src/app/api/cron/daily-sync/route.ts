@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runDailyGoalSync } from '@/lib/scheduledJobs'
-import { calculateAthleteScore } from '@/lib/athleteScoreService'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+import { runScheduledAthleteScoreJob } from '@/lib/scheduledAthleteScoreJob'
 
 /**
  * Daily Goal Sync Cron Job
@@ -33,39 +29,14 @@ export async function GET(req: NextRequest) {
     // Run daily goal sync first
     await runDailyGoalSync()
 
-    // Then calculate athlete scores for all active clients
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
-    
-    const { data: clients, error: clientsError } = await supabaseAdmin
-      .from('profiles')
-      .select('id')
-      .eq('role', 'client')
-
-    if (clientsError) {
-      console.error('[daily-sync] Error fetching clients for athlete scores:', clientsError)
-    } else if (clients && clients.length > 0) {
-      let successCount = 0
-      let errorCount = 0
-
-      for (const client of clients) {
-        try {
-          const r = await calculateAthleteScore(client.id, supabaseAdmin);
-          if ("skipped" in r && r.skipped) {
-            continue;
-          }
-          successCount++;
-        } catch (error) {
-          console.error(`[daily-sync] Error calculating athlete score for client ${client.id}:`, error);
-          errorCount++;
-        }
-      }
-
-      console.log(`[daily-sync] Athlete scores calculated: ${successCount} successful, ${errorCount} errors`)
-    }
+    // Then calculate athlete scores for active roster clients (idempotent per UTC day)
+    const scoreResult = await runScheduledAthleteScoreJob()
+    console.log('[daily-sync] Athlete score job done', scoreResult)
 
     return NextResponse.json({ 
       success: true, 
-      message: 'Daily goal sync and athlete score calculation completed' 
+      message: 'Daily goal sync and athlete score calculation completed',
+      scoreResult,
     })
   } catch (error) {
     console.error('Daily sync error:', error)

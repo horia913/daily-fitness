@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -193,7 +193,7 @@ function statusLabel(status: string): string {
 }
 
 function formatNumber(value: number | null): string {
-  if (value == null) return "—";
+  if (value == null) return "â€”";
   const rounded = Math.round(value * 100) / 100;
   return Number.isInteger(rounded) ? String(rounded) : String(rounded);
 }
@@ -329,7 +329,7 @@ export default function ClientGoalsView({
         className={
           layoutVariant === "coachV6"
             ? `${sec.section} animate-pulse h-24`
-            : "fc-card-shell p-8 text-center fc-text-dim"
+            : "rounded-[18px] border border-[color:rgba(255,255,255,0.08)] bg-transparent p-8 text-center fc-text-dim"
         }
       >
         {layoutVariant === "coachV6" ? "" : "Loading goals..."}
@@ -345,7 +345,7 @@ export default function ClientGoalsView({
             <div>
               <span className={sec.eyebrow}>Client goals</span>
               <h2 className={sec.sectionTitle}>
-                {activeGoals.length} active goals · avg {averageProgress}%
+                {activeGoals.length} active goals Â· avg {averageProgress}%
               </h2>
             </div>
             <select
@@ -353,7 +353,7 @@ export default function ClientGoalsView({
               onChange={(e) =>
                 setStatusFilter(e.target.value as GoalStatusFilter)
               }
-              className="w-full sm:w-48 rounded-[11px] border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)] px-3 py-2 text-sm fc-text-primary"
+              className="w-full sm:w-48 rounded-[11px] border border-[color:var(--fc-glass-border)] bg-[color:var(--bg-transparent)] px-3 py-2 text-sm fc-text-primary"
             >
               <option value="active">Active</option>
               <option value="completed">Completed</option>
@@ -424,14 +424,14 @@ export default function ClientGoalsView({
                   const currentStr =
                     goal.current_value != null
                       ? `${formatNumber(goal.current_value)}${unit}`
-                      : "—";
+                      : "â€”";
                   const targetStr =
                     goal.target_value != null
                       ? `${formatNumber(goal.target_value)}${unit}`
                       : null;
                   const foot =
                     deadline != null
-                      ? `${source.label} · ${deadline.text.replace(/^Deadline:?\s*/i, "")}`
+                      ? `${source.label} Â· ${deadline.text.replace(/^Deadline:?\s*/i, "")}`
                       : source.label;
                   const pri =
                     (goal.priority ?? "low").charAt(0).toUpperCase() +
@@ -462,14 +462,14 @@ export default function ClientGoalsView({
 
   return (
     <div className="space-y-4">
-      <section className="rounded-xl border border-[color:var(--fc-glass-border)] p-4 fc-glass-soft">
+      <section className="rounded-xl border border-[color:var(--fc-glass-border)] p-4 bg-transparent">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-wider fc-text-subtle">
               Client goals
             </p>
             <h3 className="text-lg font-semibold fc-text-primary">
-              {clientName || "Client"} · {activeGoals.length} active goals
+              {clientName || "Client"} Â· {activeGoals.length} active goals
             </h3>
             <p className="text-sm fc-text-dim">
               Average progress: {averageProgress}%
@@ -485,7 +485,7 @@ export default function ClientGoalsView({
               onChange={(e) =>
                 setStatusFilter(e.target.value as GoalStatusFilter)
               }
-              className="w-full rounded-lg border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface)] px-3 py-2 text-sm fc-text-primary"
+              className="w-full rounded-lg border border-[color:var(--fc-glass-border)] bg-transparent px-3 py-2 text-sm fc-text-primary"
             >
               <option value="all">All goals</option>
               <option value="active">Active</option>
@@ -523,7 +523,7 @@ export default function ClientGoalsView({
         return (
           <section
             key={pillar.id}
-            className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4"
+            className="rounded-xl border border-[color:var(--fc-glass-border)] bg-transparent p-4"
           >
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-sm font-semibold uppercase tracking-wider fc-text-primary">
@@ -552,14 +552,14 @@ export default function ClientGoalsView({
                   return (
                     <article
                       key={goal.id}
-                      className="rounded-lg border border-[color:var(--fc-glass-border)] p-3 bg-[color:var(--fc-glass-highlight)]"
+                      className="rounded-lg border border-[color:var(--fc-glass-border)] p-3 bg-transparent"
                     >
                       <h5 className="text-base font-semibold fc-text-primary mb-2">
                         {goal.title}
                       </h5>
 
                       <div className="flex flex-wrap gap-2 mb-3">
-                        <span className="px-2 py-1 rounded-full border text-xs fc-text-subtle border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface)]">
+                        <span className="px-2 py-1 rounded-full border text-xs fc-text-subtle border-[color:var(--fc-glass-border)] bg-transparent">
                           {categoryLabel(goal.category)}
                         </span>
                         <span
@@ -577,7 +577,7 @@ export default function ClientGoalsView({
 
                       <div className="h-2 rounded-full bg-[color:var(--fc-glass-border)] overflow-hidden">
                         <div
-                          className="h-full bg-gradient-to-r from-cyan-500 to-blue-500"
+                          className="h-full bg-gradient-to-r from-[color:var(--fc-group-c)] to-blue-500"
                           style={{ width: `${progress}%` }}
                         />
                       </div>

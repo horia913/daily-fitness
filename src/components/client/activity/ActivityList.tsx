@@ -37,7 +37,7 @@ const CATEGORY_LABEL: Record<ActivityCategory, string> = {
 function categoryPillClass(cat: ActivityCategory): string {
   switch (cat) {
     case "cardio":
-      return "bg-[color-mix(in_srgb,var(--fc-accent-cyan)_20%,transparent)] text-[color:var(--fc-accent-cyan)] border-[color-mix(in_srgb,var(--fc-accent-cyan)_30%,transparent)]";
+      return "bg-[color-mix(in_srgb,var(--fc-accent)_20%,transparent)] text-[color:var(--fc-accent)] border-[color-mix(in_srgb,var(--fc-accent)_30%,transparent)]";
     case "strength":
       return "bg-[color-mix(in_srgb,var(--fc-status-warning)_20%,transparent)] text-[color:var(--fc-status-warning)] border-[color-mix(in_srgb,var(--fc-status-warning)_30%,transparent)]";
     case "flexibility":
@@ -141,7 +141,7 @@ function ActivityRow({
             <button
               type="button"
               onClick={() => onEdit(activity)}
-              className="p-1.5 rounded-lg hover:bg-[color-mix(in_srgb,var(--fc-accent-cyan)_10%,transparent)] transition-colors"
+              className="p-1.5 rounded-lg hover:bg-[color-mix(in_srgb,var(--fc-accent)_10%,transparent)] transition-colors"
               aria-label={`Edit ${displayName}`}
             >
               <Pencil className="w-3.5 h-3.5 fc-text-dim" aria-hidden />

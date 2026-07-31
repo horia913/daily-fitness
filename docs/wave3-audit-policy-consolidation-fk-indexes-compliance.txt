@@ -1,0 +1,575 @@
+================================================================================
+WAVE 3 AUDIT (READ-ONLY) — Policy consolidation + FK indexes + compliance filter
+================================================================================
+Date: 2026-07-11
+Method: Live Supabase MCP (pg_policies, pg_get_functiondef, get_advisors) + src/ grep.
+No SQL applied. No code changes.
+
+================================================================================
+PART 1 — TARGET SHORTLIST
+================================================================================
+
+1.1 Advisors summary (get_advisors performance, post-Wave-1/2)
+--------------------------------------------------------------------------------
+  unindexed_foreign_keys:        38
+  multiple_permissive_policies:  694
+  unused_index:                  197
+  duplicate_index:               20
+  auth_db_connections_absolute:  1
+
+694 multi-policy lints are NOT all Wave 3 scope — only hot direct-read/write
+tables with >2 permissive policies per command are in scope here.
+
+1.2 Row counts (pg_stat_user_tables, live)
+--------------------------------------------------------------------------------
+  workout_set_entries           ~1,671
+  workout_set_entry_exercises   ~1,801
+  program_day_assignments       ~92
+  workout_sessions              ~7
+  meal_plan_assignments         ~1
+  daily_wellness_logs           ~0
+  progress_photos               ~0
+
+1.3 Wave 3 IN-SCOPE tables (stacked + hot direct path)
+--------------------------------------------------------------------------------
+
+| Table                      | Stacked cmd        | Policy count | Rows  | Verdict        |
+|----------------------------|--------------------|--------------|-------|----------------|
+| workout_set_entries        | SELECT             | 3 permissive | 1,671 | WAVE 3 PRIMARY |
+| workout_set_entry_exercises| SELECT             | 3 permissive | 1,801 | WAVE 3 PRIMARY |
+| meal_plan_assignments      | SELECT             | 4 permissive | 1     | WAVE 3 PRIMARY |
+| meal_plan_assignments      | ALL                | 3 permissive | 1     | WAVE 3 PRIMARY |
+
+Total primary targets: 3 tables (4 consolidation units).
+
+1.4 Candidates checked — OUT of Wave 3 stacking scope
+--------------------------------------------------------------------------------
+
+| Table                   | Policies (permissive)     | Hot direct path? | Why excluded        |
+|-------------------------|---------------------------|------------------|---------------------|
+| workout_sessions        | ALL + SELECT (2 each cmd) | YES (start/complete) | ≤2 policies/cmd  |
+| program_day_assignments | ALL + SELECT (2)          | YES (train spine)    | ≤2 policies/cmd  |
+| daily_wellness_logs     | 2 ALL + 1 SELECT          | YES (habits)         | ALL cmd only 2   |
+| progress_photos         | ALL + SELECT (2)          | YES (photos page)    | ≤2 policies/cmd  |
+
+Note: workout_sessions.program_assignment_id FK is unindexed (advisor) — index in
+Part 4 even though RLS consolidation is not required.
+
+1.5 Deferred — stacked, hot enrichment path, same pattern (Wave 3B batch)
+--------------------------------------------------------------------------------
+These have 3 permissive SELECT policies each and are read via
+WorkoutSetEntryService.buildBlocksForTemplates → queryTableInChunks (chunk=50):
+
+  workout_set_prescriptions, workout_drop_sets, workout_cluster_sets,
+  workout_rest_pause_sets, workout_time_protocols
+
+Consolidation should mirror workout_set_entries/exercises join pattern once
+primary tables are done. Not in Wave 3 primary shortlist to limit blast radius.
+
+1.6 Not hot / orphaned — do NOT constrain Wave 3 design
+--------------------------------------------------------------------------------
+  OptimizedWorkoutTemplates.tsx — ORPHANED (no import in src/app or routes;
+    only self-definition). Direct .from(workout_set_entries) at :144 — Wave 4.
+  ComplianceSnapshot.tsx — ORPHANED (not mounted; coach/compliance redirects
+    to /coach/insights). RPC caller exists in code but no live route.
+
+================================================================================
+PART 1A — FULL pg_policies: workout_set_entries
+================================================================================
+
+Policy: Coaches can manage workout set entries
+  cmd: ALL | roles: {public}
+  qual: template_id IN (SELECT id FROM workout_templates WHERE coach_id = auth.uid())
+  with_check: null
+
+Policy: Coaches can delete set entries from their templates
+  cmd: DELETE | roles: {public}
+  qual: EXISTS (workout_templates wt WHERE wt.id = template_id AND wt.coach_id = auth.uid())
+
+Policy: Coaches can insert set entries into their templates
+  cmd: INSERT | roles: {public}
+  with_check: EXISTS (workout_templates wt WHERE wt.id = template_id AND wt.coach_id = auth.uid())
+
+Policy: Clients can read assigned workout set entries
+  cmd: SELECT | roles: {authenticated}
+  qual: template_id IN (SELECT workout_template_id FROM workout_assignments
+         WHERE client_id = auth.uid())
+
+Policy: Clients can view set entries in assigned workouts
+  cmd: SELECT | roles: {public}
+  qual: OR of:
+    (1) EXISTS wa JOIN wt — client assigned template
+    (2) EXISTS program_assignments pa JOIN program_schedule ps — active program
+    (3) EXISTS workout_templates wt — coach owns template
+    (4) is_admin(auth.uid())
+
+Policy: Coaches can view set entries in their templates
+  cmd: SELECT | roles: {public}
+  qual: EXISTS (workout_templates wt WHERE wt.id = template_id AND wt.coach_id = auth.uid())
+
+Policy: Coaches can update set entries in their templates
+  cmd: UPDATE | roles: {public}
+  qual + with_check: EXISTS (workout_templates wt ... coach_id = auth.uid())
+
+EFFECTIVE SELECT STACK: 3 named SELECT + ALL coach policy also evaluates on SELECT
+→ up to 4 permissive policy evaluations per row (historical 57014 mechanism).
+
+================================================================================
+PART 1B — FULL pg_policies: workout_set_entry_exercises
+================================================================================
+
+Policy: Coaches can delete exercises from their set entries
+  cmd: DELETE | qual: EXISTS (workout_set_entries wb JOIN workout_templates wt
+        ON wb.template_id = wt.id WHERE wb.id = set_entry_id AND wt.coach_id = auth.uid())
+
+Policy: Coaches can insert exercises into their set entries
+  cmd: INSERT | with_check: same join as DELETE
+
+Policy: Clients can view exercises in assigned workouts
+  cmd: SELECT | qual: EXISTS (wb JOIN wt JOIN workout_assignments wa ... client_id = auth.uid())
+
+Policy: Clients can view set entry exercises via active program
+  cmd: SELECT | qual: EXISTS (wb JOIN program_assignments pa JOIN program_schedule ps
+        ON ps.template_id = wb.template_id ... pa.client_id = auth.uid() AND pa.status = active)
+
+Policy: Coaches can view exercises in their set entries
+  cmd: SELECT | qual: EXISTS (wb JOIN wt ... coach_id = auth.uid())
+
+Policy: Coaches can update exercises in their set entries
+  cmd: UPDATE | qual + with_check: same as coach SELECT
+
+SELECT stack: 3 permissive SELECT policies per row.
+
+================================================================================
+PART 1C — FULL pg_policies: meal_plan_assignments (stacked)
+================================================================================
+
+SELECT (4 — 3 are exact/near duplicates):
+  Clients can read their own assignments
+    qual: client_id = auth.uid()
+  Clients can view their own assignments
+    qual: auth.uid() = client_id          [duplicate of above]
+  Clients can view their own meal plan assignments
+    qual: client_id = auth.uid()        [duplicate of above]
+  meal_plan_assignments_select
+    qual: client_id = auth.uid()
+      OR EXISTS (clients WHERE client_id = meal_plan_assignments.client_id
+                 AND coach_id = auth.uid())
+      OR admin profile
+
+ALL (3 — 2 exact duplicates):
+  Coaches can manage assignments for their clients — qual: auth.uid() = coach_id
+  Coaches can manage their meal plan assignments — qual: coach_id = auth.uid()
+  Coaches can manage their own assignments — qual: coach_id = auth.uid()
+
+Plus per-cmd: meal_plan_assignments_insert, _update, _delete (coach OR admin).
+
+================================================================================
+PART 2 — REAL ACCESS PATTERNS (direct .from, by table)
+================================================================================
+
+Legend:
+  HOT = user-facing train/start/details or coach editor on critical path
+  RPC-BYPASS = get_workout_canvas / get_instance_workout_canvas / get_workout_blocks
+  ADMIN = API route using supabaseAdmin (RLS bypass)
+
+--- workout_set_entries ---
+
+| Op     | Session   | Path | Hot? | File:line |
+|--------|-----------|------|------|-----------|
+| SELECT | client    | getWorkoutBlocks(template_id) — legacy assignment/details | HOT | workoutSetEntryService.ts:398-402 |
+| SELECT | client    | getWorkoutBlocksForTemplates .in(template_id) batched | HOT | workoutSetEntryService.ts:462-466 |
+| SELECT | coach     | workoutTemplateService template load/edit | HOT | workoutTemplateService.ts:291,626 |
+| SELECT | coach     | saveWorkoutTemplate / copyWorkout | HOT | saveWorkoutTemplate.ts:50; copyWorkout.ts:54 |
+| SELECT | coach     | programs/stationDayWorkout | MED | stationDayWorkout.ts:46 |
+| SELECT | coach     | useWorkoutData hook | MED | useWorkoutData.ts:98 |
+| SELECT | coach API | coachClientSummaryServer prescribed ref | ADMIN | coachClientSummaryServer.ts:135,235,389 |
+| SELECT | —         | OptimizedWorkoutTemplates | ORPHAN | OptimizedWorkoutTemplates.tsx:144 |
+| INSERT | coach     | createWorkoutBlock | HOT | workoutSetEntryService.ts:327 |
+| UPDATE | coach     | updateWorkoutBlock | HOT | workoutSetEntryService.ts:835 |
+| DELETE | coach     | delete flows via child cascade | HOT | workoutSetEntryService.ts (child tables) |
+
+RPC-BYPASS (RLS not applied on read):
+  client/workouts/[id]/start — instance path: loadWorkoutBlocksByContentId →
+    get_instance_workout_canvas (start/page.tsx ~1890-1964)
+  client/workouts/[id]/start — legacy assignment: get_workout_blocks RPC
+    (start/page.tsx:1948-1957) — Wave 2B guarded DEFINER
+  client train expand + instance details: loadInstanceWorkoutForCanvas
+    (loadDayCanvas.ts:27; details/page.tsx instance branch)
+  coach canvas: loadWorkoutForCanvas → get_workout_canvas (canvasLoad.ts:37)
+
+Instance-keyed spine slots often never hit workout_set_entries on client HOT path;
+legacy standalone assignments and coach template editing still do.
+
+--- workout_set_entry_exercises ---
+
+| Op     | Session | Path | Hot? | File:line |
+|--------|---------|------|------|-----------|
+| SELECT | client/coach | buildBlocksForTemplates queryTableInChunks chunk=50 | HOT | workoutSetEntryService.ts:208-212, 181-188 |
+| SELECT | coach   | workoutTemplateService slot load | HOT | workoutTemplateService.ts:380,674,781 |
+| SELECT | coach   | enrichWorkoutBlocksPrescribedRir | MED | enrichWorkoutBlocksPrescribedRir.ts:123 |
+| SELECT | coach   | copyWorkout / saveWorkoutTemplate | HOT | copyWorkout.ts:75; saveWorkoutTemplate.ts:59 |
+| INSERT | coach   | addExerciseToBlock / persistGroupModelSlots | HOT | workoutSetEntryService.ts:564,935 |
+| DELETE | coach   | deleteAllChildTablesSequential | HOT | workoutSetEntryService.ts:866+ |
+
+Chunking: QUERY_CHUNK_SIZE = 50 (workoutSetEntryService.ts:106). Each chunk =
+separate RLS evaluation batch on set_entry_id IN (...).
+
+--- meal_plan_assignments ---
+
+| Op     | Session | Path | Hot? | File:line |
+|--------|---------|------|------|-----------|
+| SELECT | client  | nutrition meals page, progress nutrition | HOT | client/nutrition/meals/[id]/page.tsx:162,252 |
+| SELECT | client  | clientAnalyticsService active plan check | MED | clientAnalyticsService.ts:201 |
+| SELECT | coach   | fetchCoachAssignments, fetchNutritionWorkspaceData | HOT | fetchCoachAssignments.ts:35; fetchNutritionWorkspaceData.ts:18,57 |
+| SELECT | coach   | ClientMealsView, meal plan pages, dashboard | HOT | ClientMealsView.tsx (multiple); coach/nutrition/meal-plans/[id]/page.tsx:128 |
+| SELECT | coach API | clients route, summary, analytics | ADMIN/MIX | api/coach/clients/route.ts:44; summary/route.ts:206 |
+| INSERT/UPDATE | coach | mealPlanService, ClientMealsView assign | HOT | mealPlanService.ts:490,518,527 |
+
+================================================================================
+PART 3 — CONSOLIDATION DESIGN
+================================================================================
+
+3.1 workout_set_entries
+--------------------------------------------------------------------------------
+
+MAPPING (existing → grant → needed by):
+
+| Existing policy | Grants | Needed by | Action |
+|-----------------|--------|-----------|--------|
+| Clients can read assigned... | client SELECT via wa.template_id | Subset of merged client branch | DROP (duplicate) |
+| Clients can view set entries... | client wa+program+coach+admin SELECT | Client train/legacy blocks; coach read own templates; admin | KEEP merged into ONE SELECT |
+| Coaches can view set entries... | coach SELECT own templates | Coach template editor | DROP (duplicate of coach branch in merged SELECT) |
+| Coaches can manage... (ALL) | coach ALL on own templates | Coach CRUD | MERGE with per-cmd coach policies |
+| Coaches insert/update/delete | coach I/U/D own templates | saveWorkoutTemplate, WorkoutSetEntryService | MERGE into one coach write policy |
+
+PROPOSED MINIMAL SET (≤1 permissive per cmd for authenticated/public as today):
+
+-- SELECT: wse_select_authenticated (roles: authenticated, public — match current app JWT usage)
+CREATE POLICY wse_select_authenticated ON workout_set_entries
+  FOR SELECT TO public
+  USING (
+    EXISTS (
+      SELECT 1 FROM workout_templates wt
+      WHERE wt.id = workout_set_entries.template_id
+        AND wt.coach_id = (SELECT auth.uid())
+    )
+    OR EXISTS (
+      SELECT 1 FROM workout_assignments wa
+      WHERE wa.workout_template_id = workout_set_entries.template_id
+        AND wa.client_id = (SELECT auth.uid())
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM program_assignments pa
+      JOIN program_schedule ps ON ps.program_id = pa.program_id
+      WHERE pa.client_id = (SELECT auth.uid())
+        AND pa.status = 'active'
+        AND ps.template_id = workout_set_entries.template_id
+    )
+    OR (SELECT is_admin((SELECT auth.uid())))
+  );
+
+-- WRITE (coach template owner): single ALL policy OR keep INSERT/UPDATE/DELETE with identical expr
+CREATE POLICY wse_coach_manage ON workout_set_entries
+  FOR ALL TO public
+  USING (
+    EXISTS (
+      SELECT 1 FROM workout_templates wt
+      WHERE wt.id = workout_set_entries.template_id
+        AND wt.coach_id = (SELECT auth.uid())
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM workout_templates wt
+      WHERE wt.id = workout_set_entries.template_id
+        AND wt.coach_id = (SELECT auth.uid())
+    )
+  );
+
+DROP after create: all 7 existing policies on workout_set_entries.
+
+COVERAGE PROOF:
+  - Client assignment read: branch 2 (was policies 1+2 subset)
+  - Client active program read: branch 3 (was policy 2)
+  - Coach read+write own templates: branches 1 + write policy (was policies 3+ALL+IU/D)
+  - Admin read: branch 4 (was policy 2 only on "Clients can view...")
+  - No code path found requiring grant outside these branches (conservative: preserved all)
+
+GAP NOTE (not a regression from consolidation): instance-keyed program slots do NOT
+use workout_set_entries on client hot path today; program_schedule branch covers
+master-template program reads only. Instance content uses get_instance_workout_canvas
+(separate from this table). No new branch required for Wave 3 unless product
+re-expands direct master-table reads for instance ids.
+
+INDEXES this policy depends on (already exist on live DB):
+  workout_set_entries.template_id — idx_set_entries_template, idx_wse_template, ...
+  workout_templates.coach_id — idx_workout_templates_coach_id
+  workout_assignments — idx_workout_assignments_client_template (client_id, workout_template_id)
+  program_assignments.client_id — idx_program_assignments_client_id
+  program_schedule.template_id — ix_program_schedule_template
+  program_schedule.program_id — idx_program_schedule_program
+
+Optional additive index (low cost): program_assignments (client_id, status) WHERE status='active'
+— partial unique uq_one_active_program_per_client exists on client_id WHERE active.
+
+3.2 workout_set_entry_exercises
+--------------------------------------------------------------------------------
+
+MAPPING:
+
+| Existing | Grants | Needed by | Action |
+|----------|--------|-----------|--------|
+| Clients can view exercises in assigned workouts | client SELECT via wa | buildBlocks HOT | MERGE |
+| Clients can view ... via active program | client SELECT via pa+ps | buildBlocks HOT | MERGE |
+| Coaches can view exercises in their set entries | coach SELECT | coach editor | MERGE |
+| Coaches insert/update/delete | coach I/U/D | addExerciseToBlock, persist | MERGE to one ALL |
+
+PROPOSED:
+
+CREATE POLICY wsee_select_authenticated ON workout_set_entry_exercises
+  FOR SELECT TO public
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM workout_set_entries wb
+      JOIN workout_templates wt ON wt.id = wb.template_id
+      WHERE wb.id = workout_set_entry_exercises.set_entry_id
+        AND wt.coach_id = (SELECT auth.uid())
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM workout_set_entries wb
+      JOIN workout_assignments wa ON wa.workout_template_id = wb.template_id
+      WHERE wb.id = workout_set_entry_exercises.set_entry_id
+        AND wa.client_id = (SELECT auth.uid())
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM workout_set_entries wb
+      JOIN program_assignments pa ON pa.client_id = (SELECT auth.uid()) AND pa.status = 'active'
+      JOIN program_schedule ps ON ps.program_id = pa.program_id AND ps.template_id = wb.template_id
+      WHERE wb.id = workout_set_entry_exercises.set_entry_id
+    )
+  );
+
+CREATE POLICY wsee_coach_manage ON workout_set_entry_exercises
+  FOR ALL TO public
+  USING (
+    EXISTS (
+      SELECT 1 FROM workout_set_entries wb
+      JOIN workout_templates wt ON wt.id = wb.template_id
+      WHERE wb.id = workout_set_entry_exercises.set_entry_id
+        AND wt.coach_id = (SELECT auth.uid())
+    )
+  )
+  WITH CHECK (same);
+
+DROP: all 6 existing policies.
+
+COVERAGE: all three SELECT grants preserved; coach write preserved. No is_admin
+branch on exercises today — intentionally NOT added (parity with current).
+
+INDEXES (exist):
+  workout_set_entry_exercises.set_entry_id — idx_wse_exercises_set_entry_id (multiple)
+  workout_set_entries.template_id — see above
+  (join chain same as wse_select)
+
+3.3 meal_plan_assignments
+--------------------------------------------------------------------------------
+
+MAPPING:
+
+| Existing | Grants | Needed by | Action |
+|----------|--------|-----------|--------|
+| Clients can read/view (×3) | client_id = auth.uid() | client nutrition pages | DROP ×3 (duplicate) |
+| meal_plan_assignments_select | client OR coach-of-client OR admin | client + coach views | KEEP as sole SELECT (rename optional) |
+| Coaches can manage (×3 ALL) | coach_id = auth.uid() | coach assign flows | DROP ×2 duplicates |
+| meal_plan_assignments_insert/update/delete | coach OR admin | coach + admin CRUD | MERGE into one ALL or keep 3 with same expr |
+
+PROPOSED:
+
+-- SELECT: keep meal_plan_assignments_select expression (already minimal merged set)
+-- DROP only: Clients can read/view their own (3 duplicates)
+
+-- WRITE: single policy
+CREATE POLICY mpa_coach_admin_manage ON meal_plan_assignments
+  FOR ALL TO public
+  USING (
+    coach_id = (SELECT auth.uid())
+    OR EXISTS (
+      SELECT 1 FROM profiles
+      WHERE profiles.id = (SELECT auth.uid()) AND profiles.role = 'admin'
+    )
+  )
+  WITH CHECK (same);
+
+DROP: 3× ALL coach duplicates + meal_plan_assignments_insert/_update/_delete
+(if ALL covers all cmds; verify no policy needs INSERT-only public anon — none found).
+
+COVERAGE: client self-read (branch 1), coach roster read (clients join), admin,
+coach write, admin write — all preserved.
+
+INDEXES (exist):
+  idx_meal_plan_assignments_client_id
+  idx_meal_plan_assignments_coach_id
+  clients (coach_id, client_id) — clients_coach_id_client_id_key, idx_clients_coach_client_status
+
+================================================================================
+PART 4 — FK INDEXES (advisor unindexed_foreign_keys, 38 total)
+================================================================================
+
+Ready for CREATE INDEX IF NOT EXISTS — full list:
+
+  achievements.goal_id                    → achievements_goal_id_fkey
+  achievements.workout_id                 → achievements_workout_id_fkey
+  booked_sessions.cancelled_by            → booked_sessions_cancelled_by_fkey
+  challenge_scoring_categories.exercise_id  → challenge_scoring_categories_exercise_id_fkey
+  challenge_video_submissions.reviewed_by   → challenge_video_submissions_reviewed_by_fkey
+  challenge_video_submissions.scoring_category_id → challenge_video_submissions_scoring_category_id_fkey
+  challenges.created_by                   → challenges_created_by_fkey
+  challenges.program_id                   → challenges_program_id_fkey
+  check_in_configs.client_id              → check_in_configs_client_id_fkey
+  client_daily_plan_selection.meal_plan_assignment_id → client_daily_plan_selection_meal_plan_assignment_id_fkey
+  client_meal_overrides.created_by        → client_meal_overrides_created_by_fkey
+  client_meal_overrides.meal_id           → client_meal_overrides_meal_id_fkey
+  client_meal_overrides.meal_option_id    → client_meal_overrides_meal_option_id_fkey
+  client_meal_overrides.original_food_item_id → client_meal_overrides_original_food_item_id_fkey
+  client_meal_overrides.replacement_food_id → client_meal_overrides_replacement_food_id_fkey
+  client_workout_block_exercises.client_id → client_workout_block_exercises_client_id_fkey  [SKIP — orphan]
+  client_workout_block_exercises.exercise_id → client_workout_block_exercises_exercise_id_fkey [SKIP — orphan]
+  invite_codes.used_by                    → invite_codes_used_by_fkey
+  meal_completions.meal_option_id         → meal_completions_meal_option_id_fkey
+  meal_templates.created_by               → meal_templates_created_by_fkey
+  personal_records.exercise_id            → personal_records_exercise_id_fkey
+  program_day_assignments.program_day_id  → program_day_assignments_program_day_id_fkey  [PRIORITY — hot table]
+  program_day_completions.completed_by    → program_day_completions_completed_by_fkey1
+  program_days.workout_template_id        → program_days_workout_template_id_fkey  [SKIP — legacy/deprecation]
+  program_instance_set_entry_exercises.exercise_id → program_instance_set_entry_exercises_exercise_id_fkey
+  program_progression_rules.compound_exercise_id → program_progression_rules_compound_exercise_id_fkey
+  program_progression_rules.second_exercise_id → program_progression_rules_second_exercise_id_fkey
+  program_progression_rules.training_block_id → program_progression_rules_training_block_id_fkey
+  program_schedule.training_block_id      → program_schedule_training_block_id_fkey
+  program_week_time_override.set_by       → program_week_time_override_set_by_fkey
+  workout_endurance_sets.exercise_id      → workout_endurance_sets_exercise_id_fkey  [PRIORITY — buildBlocks child]
+  workout_exercise_assignments.exercise_id → workout_exercise_assignments_exercise_id_fkey  [SKIP — legacy tree]
+  workout_exercise_logs.exercise_id       → workout_exercise_logs_exercise_id_fkey
+  workout_exercise_logs.workout_exercise_assignment_id → workout_exercise_logs_workout_exercise_assignment_id_fkey
+  workout_programs.coach_id               → workout_programs_coach_id_fkey  [SKIP — phantom programs path]
+  workout_sessions.program_assignment_id  → workout_sessions_program_assignment_id_fkey  [PRIORITY — start path]
+  workout_set_entry_completions.program_instance_set_entry_id → workout_set_entry_completions_program_instance_set_entry_i_fkey  [PRIORITY — live start]
+  workout_speed_sets.exercise_id          → workout_speed_sets_exercise_id_fkey  [PRIORITY — buildBlocks child]
+
+WAVE 3 PRIORITY (policy + hot path alignment):
+  1. workout_sessions(program_assignment_id) — start-from-progress filters
+  2. program_day_assignments(program_day_id) — spine joins (legacy FK column)
+  3. workout_endurance_sets(exercise_id), workout_speed_sets(exercise_id) — enrichment
+  4. workout_set_entry_completions(program_instance_set_entry_id) — instance complete
+  5. client_daily_plan_selection(meal_plan_assignment_id) — nutrition selection
+
+SKIP (Wave 4 / orphan per full-database-audit-live-db-x-code.txt):
+  client_workout_block_exercises.*, program_days.*, workout_programs.coach_id,
+  workout_exercise_assignments.exercise_id
+
+DDL template:
+  CREATE INDEX IF NOT EXISTS idx_<table>_<column>
+    ON public.<table> (<column>);
+
+================================================================================
+PART 5 — COMPLIANCE RPC ROSTER FILTER
+================================================================================
+
+5.1 Live functions (pg_get_functiondef, 2026-07-11)
+--------------------------------------------------------------------------------
+
+Both functions:
+  - SECURITY DEFINER, search_path public, extensions
+  - Guard: auth.uid() IS NULL → 'Not authenticated'
+  - Guard: coach_id_param IS DISTINCT FROM auth.uid() → 'not authorized'
+  - Internal query: NO join to clients.coach_id — roster leak risk
+
+get_client_compliance_scores(coach_id_param):
+  - Reads legacy table `sessions` (NOT workout_sessions)
+  - Final FROM profiles p ... WHERE p.role = 'client' AND (EXISTS sessions/wa activity)
+  - Returns ANY active client profile matching activity predicates globally
+
+get_client_compliance_scores_simple(coach_id_param):
+  - FROM profiles p LEFT JOIN sessions ws LEFT JOIN workout_assignments wa
+  - WHERE p.role = 'client' AND wa.created_at >= seven_days_ago
+  - Same missing roster filter
+
+5.2 Required fix (internal WHERE / JOIN — for SQL author)
+--------------------------------------------------------------------------------
+
+Add roster constraint using coach_id_param (equals auth.uid() after guard):
+
+Option A — final SELECT (scores):
+  AND EXISTS (
+    SELECT 1 FROM clients c
+    WHERE c.client_id = p.id
+      AND c.coach_id = coach_id_param
+  )
+
+Option B — INNER JOIN (simple):
+  JOIN clients c ON c.client_id = p.id AND c.coach_id = coach_id_param
+
+Apply to BOTH functions at the outermost client grain (profiles p).
+
+5.3 Caller impact
+--------------------------------------------------------------------------------
+  ComplianceSnapshot.tsx:111-119 — rpc(..., { coach_id_param: user.id })
+  - Component is ORPHANED (not imported by any route; /coach/compliance redirects).
+  - When re-mounted on Insights, only roster narrows — shape unchanged.
+  - No client-side filter changes required.
+
+Separate debt (out of Wave 3 policy scope): functions query `sessions` table while
+app spine uses workout_sessions / program_day_completions — scores may be stale/wrong
+even after roster fix.
+
+================================================================================
+PART 6 — FREEBIES (exact-duplicate policies, zero-risk drops)
+================================================================================
+
+Confirmed exact qual duplicates (same cmd, same with_check):
+
+meal_plan_assignments SELECT:
+  - "Clients can read their own assignments" = "Clients can view their own meal plan assignments"
+  - "Coaches can manage their meal plan assignments" = "Coaches can manage their own assignments"
+
+meal_plan_assignments ALL:
+  - Three policies with qual coach_id = auth.uid() (wording differs, expression same)
+
+Reference data (low traffic, optional Wave 3 cleanup):
+  muscle_groups: Anyone can read = Authenticated users can read (qual true)
+  progression_guidelines, rp_volume_landmarks, volume_guidelines — same pattern
+  coaches_public: anon_can_read_active_coaches = authenticated_can_read_active_coaches
+
+workout_set_entries:
+  - "Coaches can view set entries in their templates" is strict subset of merged SELECT
+    coach branch — drop on consolidation, not a standalone freebie before merge.
+
+================================================================================
+WAVE 3 EXECUTION ORDER (recommendation for SQL author)
+================================================================================
+
+1. CREATE new merged policies (wse_select, wse_coach_manage, wsee_*, mpa cleanup)
+2. VERIFY with coach + client test JWT on HOT queries (set_entries by template_id,
+   set_entry_exercises by set_entry_id IN chunk)
+3. DROP superseded policies (including exact duplicates on meal_plan_assignments)
+4. CREATE priority FK indexes (Part 4)
+5. Patch compliance RPCs with clients roster EXISTS (separate migration)
+6. Wave 3B: satellite prescription tables (same SELECT merge template)
+
+================================================================================
+FENCES CONFIRMED
+================================================================================
+
+[✓] Read-only audit — no SQL applied
+[✓] get_workout_blocks guard unchanged (start legacy path still RPC)
+[✓] Instance canvas paths unaffected (DEFINER bypass)
+[✓] OptimizedWorkoutTemplates / ComplianceSnapshot flagged orphaned — not design constraints
+
+================================================================================
+END OF REPORT
+================================================================================

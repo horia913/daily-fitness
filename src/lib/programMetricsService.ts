@@ -17,6 +17,7 @@ import {
   getProgramScheduleSlotsForAssignment,
   getCompletedSlots,
 } from './programStateService'
+import { isCoachSkipNote } from './programInstanceResolver'
 
 export interface ProgramMetrics {
   program_assignment_id: string
@@ -62,13 +63,18 @@ export async function getProgramMetrics(
     ])
 
     const total_workouts = slots.length
-    const completed_workouts = completedSlots.length
+    // Real completions only (coach-skip is not a completion) for the % bar.
+    const completed_workouts = completedSlots.filter(c => !isCoachSkipNote(c.notes)).length
 
-    // 3. Find next uncompleted slot to determine current position
-    const completedScheduleIds = new Set(completedSlots.map(c => c.program_schedule_id))
+    // 3. Find next uncompleted slot (instance-keyed; coach-skips are dealt-with)
+    const completedKeys = new Set(
+      completedSlots.map(c => c.program_day_assignment_id).filter((id): id is string => !!id),
+    )
     const nextSlot =
-      slots.find((slot) => slot.id != null && !completedScheduleIds.has(slot.id)) ?? null
-    const isCompleted = nextSlot === null && completed_workouts > 0
+      slots.find(
+        (slot) => slot.program_day_assignment_id != null && !completedKeys.has(slot.program_day_assignment_id),
+      ) ?? null
+    const isCompleted = nextSlot === null && completedSlots.length > 0
 
     // 4. Calculate current position (1-based for display)
     let current_day_number: number | null = null
@@ -77,12 +83,13 @@ export async function getProgramMetrics(
 
     if (nextSlot) {
       // Count total days up to and including next slot's position
-      const idx = slots.findIndex(s => s.id === nextSlot.id)
+      const idx = slots.findIndex(s => s.program_day_assignment_id === nextSlot.program_day_assignment_id)
       current_day_number = idx + 1  // 1-based overall position
 
       current_week_number = nextSlot.week_number
       const slotsInWeek = slots.filter(s => s.week_number === nextSlot.week_number)
-      current_day_in_week = slotsInWeek.findIndex(s => s.id === nextSlot.id) + 1
+      current_day_in_week =
+        slotsInWeek.findIndex(s => s.program_day_assignment_id === nextSlot.program_day_assignment_id) + 1
     } else if (isCompleted) {
       current_day_number = total_workouts + 1 // Past the last day
       const lastSlot = slots[slots.length - 1]

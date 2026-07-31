@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
+import { useQuery } from "@tanstack/react-query";
 import { AthleteScoreRing } from "@/components/client-ui";
 import { fetchApi } from "@/lib/apiClient";
 import type { CoachAthleteScoreBundle } from "@/types/coachAthleteScore";
@@ -11,7 +12,7 @@ import {
 } from "@/lib/coachAthleteScoreUi";
 import { tierForAthleteScoreRow } from "@/lib/clientDashboardPageData";
 
-function ScorePill({ label, value }: { label: string; value: number | null }) {
+function ScorePill({ label, value, hint }: { label: string; value: number | null; hint?: string }) {
   const missing = value == null;
   return (
     <div
@@ -23,40 +24,42 @@ function ScorePill({ label, value }: { label: string; value: number | null }) {
       >
         {missing ? "—" : Math.round(value)}
       </p>
+      {hint ? <p className="mt-1 text-[10px] text-muted-foreground leading-snug">{hint}</p> : null}
     </div>
   );
 }
 
-export function CoachAthleteScoreHero({ clientId }: { clientId: string }) {
-  const [bundle, setBundle] = useState<CoachAthleteScoreBundle | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+async function fetchAthleteScoreBundle(
+  clientId: string,
+): Promise<CoachAthleteScoreBundle> {
+  const res = await fetchApi(`/api/coach/clients/${clientId}/athlete-score`);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body?.error ?? `Failed to load score (${res.status})`);
+  }
+  return body as CoachAthleteScoreBundle;
+}
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetchApi(`/api/coach/clients/${clientId}/athlete-score`);
-        const body = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          throw new Error(body?.error ?? `Failed to load score (${res.status})`);
-        }
-        if (!cancelled) setBundle(body as CoachAthleteScoreBundle);
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Failed to load athlete score");
-          setBundle(null);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [clientId]);
+export function CoachAthleteScoreHero({
+  clientId,
+  onOpenBreakdown,
+}: {
+  clientId: string;
+  onOpenBreakdown?: () => void;
+}) {
+  const scoreQuery = useQuery({
+    queryKey: ["coach-client", clientId, "athlete-score"],
+    queryFn: () => fetchAthleteScoreBundle(clientId),
+    enabled: !!clientId,
+  });
+
+  const loading = scoreQuery.isLoading;
+  const error = scoreQuery.isError
+    ? scoreQuery.error instanceof Error
+      ? scoreQuery.error.message
+      : "Failed to load athlete score"
+    : null;
+  const bundle = scoreQuery.data ?? null;
 
   if (loading) {
     return (
@@ -79,6 +82,9 @@ export function CoachAthleteScoreHero({ clientId }: { clientId: string }) {
   const showPlaceholder = !hasScore;
   const tierKey = scoreRow ? tierForAthleteScoreRow(scoreRow) : null;
 
+  const adherence = scoreRow?.training_completion_score ?? null;
+  const execution = scoreRow?.training_execution_score ?? null;
+
   const windowLabel = noProgram
     ? "No program assigned"
     : hasScore && scoreRow.window_start && scoreRow.window_end
@@ -92,7 +98,7 @@ export function CoachAthleteScoreHero({ clientId }: { clientId: string }) {
           Athlete score
         </p>
         <div className="text-right">
-          <p className="text-xs text-muted-foreground">This week</p>
+          <p className="text-xs text-muted-foreground">Rolling 14 days</p>
           <p className="text-sm text-muted-foreground mt-0.5">{windowLabel}</p>
         </div>
       </div>
@@ -116,24 +122,37 @@ export function CoachAthleteScoreHero({ clientId }: { clientId: string }) {
           ) : (
             <p className="text-lg text-muted-foreground">No score yet</p>
           )}
+          {hasScore && adherence != null ? (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Adherence {Math.round(adherence)}
+              {execution != null ? (
+                <>
+                  {" "}
+                  × execution quality ({Math.round(execution)}%)
+                </>
+              ) : (
+                " · execution pending"
+              )}
+            </p>
+          ) : null}
         </div>
       </div>
 
       <div className="mt-6 flex flex-wrap gap-2">
-        <ScorePill label="Training" value={scoreRow?.training_score ?? null} />
-        <ScorePill label="Recovery" value={scoreRow?.recovery_score ?? null} />
-        <ScorePill label="Nutrition" value={scoreRow?.nutrition_score ?? null} />
-        <ScorePill label="Extras" value={scoreRow?.extras_score ?? null} />
+        <ScorePill label="Adherence" value={adherence} />
+        <ScorePill
+          label="Execution"
+          value={execution}
+          hint={execution == null ? "Shows after logged sets" : undefined}
+        />
       </div>
 
-      {hasScore && !noProgram ? (
+      {hasScore && !noProgram && onOpenBreakdown ? (
         <div className="mt-4 text-right">
           <button
             type="button"
-            onClick={() => {
-              window.location.href = `/coach/clients/${clientId}/stats`;
-            }}
-            className="text-sm text-[color:var(--fc-accent-cyan)] hover:underline"
+            onClick={onOpenBreakdown}
+            className="text-sm text-[color:var(--fc-accent)] hover:underline"
           >
             Open full breakdown →
           </button>

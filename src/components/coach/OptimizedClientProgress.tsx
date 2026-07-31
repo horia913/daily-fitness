@@ -168,7 +168,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
   const [loading, setLoading] = useState(true)
   const [selectedClient, setSelectedClient] = useState<string>('')
   const [selectedPeriod, setSelectedPeriod] = useState<'7d' | '30d' | '90d' | '1y' | 'all'>('30d')
-  const [activeTab, setActiveTab] = useState<'overview' | 'weight' | 'strength' | 'compliance' | 'photos'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'weight' | 'strength' | 'adherence' | 'photos'>('overview')
   const [expandedCharts, setExpandedCharts] = useState<Set<string>>(new Set())
 
   // Fetch real client data from Supabase
@@ -513,7 +513,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
       <div className={`p-4 sm:p-6 ${theme.background} relative overflow-hidden`}>
         {/* Floating background elements */}
         <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-[color:var(--fc-accent-cyan)]/10 rounded-full blur-3xl"></div>
+          <div className="absolute -top-10 -right-10 w-40 h-40 bg-[color:var(--fc-accent)]/10 rounded-full blur-3xl"></div>
           <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-[color:var(--fc-accent-purple)]/10 rounded-full blur-3xl"></div>
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-[color:var(--fc-domain-meals)]/10 rounded-full blur-2xl"></div>
         </div>
@@ -565,7 +565,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
                       {clients.map(client => (
                         <SelectItem key={client.id} value={client.id}>
                           <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-[color:var(--fc-accent-cyan)] text-white text-xs font-semibold flex items-center justify-center">
+                            <div className="w-6 h-6 rounded-full bg-[color:var(--fc-accent)] text-white text-xs font-semibold flex items-center justify-center">
                               {client.first_name[0]}{client.last_name[0]}
                             </div>
                             {client.first_name} {client.last_name}
@@ -607,7 +607,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
               <Card className="fc-card-shell">
                 <CardContent className="p-3 sm:p-4 md:p-6">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
-                    <div className="w-16 h-16 rounded-2xl bg-[color:var(--fc-accent-cyan)]/20 text-[color:var(--fc-accent-cyan)] flex items-center justify-center text-xl font-bold">
+                    <div className="w-16 h-16 rounded-2xl bg-[color:var(--fc-accent)]/20 text-[color:var(--fc-accent)] flex items-center justify-center text-xl font-bold">
                       {clientProgressData.client.first_name[0]}{clientProgressData.client.last_name[0]}
                     </div>
                     <div className="flex-1 space-y-2">
@@ -644,7 +644,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
                           </Badge>
                         )}
                         <Badge variant="outline" className="text-xs rounded-lg">
-                          {(clientProgressData.wellness?.sevenDayCompliance ?? 0)}% compliance
+                          {(clientProgressData.wellness?.sevenDayCompliance ?? 0)}% adherence
                         </Badge>
                         <div className="flex items-center gap-1 text-xs text-[color:var(--fc-text-subtle)]">
                           <span>⚡</span>
@@ -753,7 +753,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
                 </CardContent>
               </Card>
 
-              {/* Overall Compliance */}
+              {/* Overall Adherence */}
               <Card className="fc-card-shell hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
                 <CardContent className="p-3 sm:p-6">
                   <div className="flex items-center gap-2 sm:gap-4">
@@ -762,7 +762,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
                     </div>
                     <div className="min-w-0">
                       <p className="text-lg sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">{clientProgressData.overallCompliance}%</p>
-                      <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Compliance</p>
+                      <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Adherence</p>
                       <div className="flex items-center gap-1 mt-1">
                         {getTrendIcon(clientProgressData.complianceChange)}
                         <span className={`text-xs ${getTrendColor(clientProgressData.complianceChange)}`}>
@@ -805,35 +805,35 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
               <TabsList className="flex w-full fc-card-shell p-1 min-h-[56px] overflow-hidden">
                 <TabsTrigger 
                   value="overview" 
-                  className="data-[state=active]:bg-[color:var(--fc-accent-cyan)] data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:text-[color:var(--fc-text-dim)] rounded-md px-2 py-3 text-xs font-semibold transition-all duration-200 flex-1 flex items-center justify-center min-h-[48px] touch-manipulation cursor-pointer select-none hover:bg-[color:var(--fc-glass-soft)] hover:text-[color:var(--fc-text-primary)]"
+                  className="data-[state=active]:bg-[color:var(--fc-accent)] data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:text-[color:var(--fc-text-dim)] rounded-md px-2 py-3 text-xs font-semibold transition-all duration-200 flex-1 flex items-center justify-center min-h-[48px] touch-manipulation cursor-pointer select-none hover:bg-[color:var(--fc-glass-soft)] hover:text-[color:var(--fc-text-primary)]"
                 >
                   <BarChart3 className="w-4 h-4 mr-1" />
                   <span className="text-[10px] sm:text-xs">Overview</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="weight" 
-                  className="data-[state=active]:bg-[color:var(--fc-accent-cyan)] data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:text-[color:var(--fc-text-dim)] rounded-md px-2 py-3 text-xs font-semibold transition-all duration-200 flex-1 flex items-center justify-center min-h-[48px] touch-manipulation cursor-pointer select-none hover:bg-[color:var(--fc-glass-soft)] hover:text-[color:var(--fc-text-primary)]"
+                  className="data-[state=active]:bg-[color:var(--fc-accent)] data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:text-[color:var(--fc-text-dim)] rounded-md px-2 py-3 text-xs font-semibold transition-all duration-200 flex-1 flex items-center justify-center min-h-[48px] touch-manipulation cursor-pointer select-none hover:bg-[color:var(--fc-glass-soft)] hover:text-[color:var(--fc-text-primary)]"
                 >
                   <Scale className="w-4 h-4 mr-1" />
                   <span className="text-[10px] sm:text-xs">Weight</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="strength" 
-                  className="data-[state=active]:bg-[color:var(--fc-accent-cyan)] data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:text-[color:var(--fc-text-dim)] rounded-md px-2 py-3 text-xs font-semibold transition-all duration-200 flex-1 flex items-center justify-center min-h-[48px] touch-manipulation cursor-pointer select-none hover:bg-[color:var(--fc-glass-soft)] hover:text-[color:var(--fc-text-primary)]"
+                  className="data-[state=active]:bg-[color:var(--fc-accent)] data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:text-[color:var(--fc-text-dim)] rounded-md px-2 py-3 text-xs font-semibold transition-all duration-200 flex-1 flex items-center justify-center min-h-[48px] touch-manipulation cursor-pointer select-none hover:bg-[color:var(--fc-glass-soft)] hover:text-[color:var(--fc-text-primary)]"
                 >
                   <Activity className="w-4 h-4 mr-1" />
                   <span className="text-[10px] sm:text-xs">Strength</span>
                 </TabsTrigger>
                 <TabsTrigger 
-                  value="compliance" 
-                  className="data-[state=active]:bg-[color:var(--fc-accent-cyan)] data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:text-[color:var(--fc-text-dim)] rounded-md px-2 py-3 text-xs font-semibold transition-all duration-200 flex-1 flex items-center justify-center min-h-[48px] touch-manipulation cursor-pointer select-none hover:bg-[color:var(--fc-glass-soft)] hover:text-[color:var(--fc-text-primary)]"
+                  value="adherence" 
+                  className="data-[state=active]:bg-[color:var(--fc-accent)] data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:text-[color:var(--fc-text-dim)] rounded-md px-2 py-3 text-xs font-semibold transition-all duration-200 flex-1 flex items-center justify-center min-h-[48px] touch-manipulation cursor-pointer select-none hover:bg-[color:var(--fc-glass-soft)] hover:text-[color:var(--fc-text-primary)]"
                 >
                   <CheckCircle className="w-4 h-4 mr-1" />
-                  <span className="text-[10px] sm:text-xs">Compliance</span>
+                  <span className="text-[10px] sm:text-xs">Adherence</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="photos" 
-                  className="data-[state=active]:bg-[color:var(--fc-accent-cyan)] data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:text-[color:var(--fc-text-dim)] rounded-md px-2 py-3 text-xs font-semibold transition-all duration-200 flex-1 flex items-center justify-center min-h-[48px] touch-manipulation cursor-pointer select-none hover:bg-[color:var(--fc-glass-soft)] hover:text-[color:var(--fc-text-primary)]"
+                  className="data-[state=active]:bg-[color:var(--fc-accent)] data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:text-[color:var(--fc-text-dim)] rounded-md px-2 py-3 text-xs font-semibold transition-all duration-200 flex-1 flex items-center justify-center min-h-[48px] touch-manipulation cursor-pointer select-none hover:bg-[color:var(--fc-glass-soft)] hover:text-[color:var(--fc-text-primary)]"
                 >
                   <Camera className="w-4 h-4 mr-1" />
                   <span className="text-[10px] sm:text-xs">Photos</span>
@@ -990,15 +990,15 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
                 </Card>
               </TabsContent>
 
-              {/* Compliance Tab */}
-              <TabsContent value="compliance" className="space-y-6">
+              {/* Adherence Tab */}
+              <TabsContent value="adherence" className="space-y-6">
                 <Card className="fc-card-shell">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
                       <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
                         <CheckCircle className="w-5 h-5 text-[color:var(--fc-accent-purple)]" />
                       </div>
-                      Compliance Breakdown
+                      Adherence Breakdown
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -1091,7 +1091,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
               <CardContent className="text-center py-12 sm:py-16">
                 <div className="relative">
                   <User className="w-16 h-16 sm:w-20 sm:h-20 text-[color:var(--fc-text-subtle)] mx-auto mb-6" />
-                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-[color:var(--fc-accent-cyan)] rounded-full flex items-center justify-center">
+                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-[color:var(--fc-accent)] rounded-full flex items-center justify-center">
                     <Search className="w-3 h-3 text-white" />
                   </div>
                 </div>

@@ -14,15 +14,18 @@ export default function ClientCheckInsPage() {
   const { clientName } = useCoachClient();
 
   return (
-    <div className="space-y-6">
-      <div className="fc-card-shell p-6 sm:p-10">
+    <div className="flex flex-col gap-4">
+      <div className="rounded-[18px] border border-[color:rgba(255,255,255,0.08)] bg-transparent p-6 sm:p-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent-cyan)] shrink-0">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-accent)]/20 text-[color:var(--fc-accent)] shrink-0">
               <ClipboardCheck className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+              <h1
+                className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]"
+                style={{ fontFamily: "var(--f-headline, var(--font-geist-sans))" }}
+              >
                 Check-ins
               </h1>
               <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
@@ -34,19 +37,21 @@ export default function ClientCheckInsPage() {
         </div>
       </div>
 
-      <section className="rounded-xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)] p-4">
-        <h2 className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-[color:var(--fc-accent-cyan)] opacity-80">
-          Daily wellness (last 14 days)
-        </h2>
-        <ClientProgressWellnessSection clientId={clientId} coachId={null} />
-      </section>
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:gap-4">
+        <section className="rounded-[18px] border border-[color:rgba(255,255,255,0.08)] bg-transparent p-4 min-w-0">
+          <h2 className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--fc-accent)]">
+            Daily wellness (last 14 days)
+          </h2>
+          <ClientProgressWellnessSection clientId={clientId} coachId={null} />
+        </section>
 
-      <section className="rounded-xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)] p-4">
-        <h2 className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-[color:var(--fc-accent-cyan)] opacity-80">
-          Scheduled check-ins
-        </h2>
-        <ClientProgressBodySection clientId={clientId} />
-      </section>
+        <section className="rounded-[18px] border border-[color:rgba(255,255,255,0.08)] bg-transparent p-4 min-w-0">
+          <h2 className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--fc-accent)]">
+            Scheduled check-ins
+          </h2>
+          <ClientProgressBodySection clientId={clientId} />
+        </section>
+      </div>
     </div>
   );
 }

@@ -3,7 +3,7 @@
   align-items: center;
   gap: 12px;
   padding: 14px;
-  background: var(--fc-glass-soft);
+  background: transparent;
   border: 1px solid var(--fc-glass-border);
   border-radius: 13px;
 }
@@ -15,7 +15,7 @@
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  font-family: var(--f-headline, var(--font-geist-sans));
+  font-family: var(--f-headline);
   font-weight: 700;
   font-size: 18px;
   color: var(--fc-ink);
@@ -25,12 +25,12 @@
   background: linear-gradient(
     135deg,
     var(--fc-set-type-straight),
-    color-mix(in srgb, var(--fc-accent-lime-2) 55%, var(--fc-set-type-straight))
+    color-mix(in srgb, var(--fc-accent) 55%, var(--fc-set-type-straight))
   );
 }
 
-.avatarLime {
-  background: linear-gradient(135deg, var(--fc-accent-lime), var(--fc-set-type-straight));
+.avatarAction {
+  background: linear-gradient(135deg, var(--fc-accent), var(--fc-accent));
 }
 
 .avatarPurple {
@@ -51,7 +51,7 @@
 }
 
 .name {
-  font-family: var(--f-headline, var(--font-geist-sans));
+  font-family: var(--f-headline);
   font-weight: 600;
   font-size: 15px;
   color: var(--fc-text-primary);
@@ -69,7 +69,7 @@
   height: 36px;
   border-radius: 10px;
   border: 1px solid var(--fc-glass-border);
-  background: var(--fc-surface-card);
+  background: transparent;
   color: var(--fc-set-type-straight);
   display: grid;
   place-items: center;

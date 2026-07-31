@@ -15,25 +15,25 @@
   gap: 5px;
   padding: 6px 10px;
   border-radius: 10px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--fc-glass-border);
   background: transparent;
-  color: var(--t2);
+  color: var(--fc-text-dim);
   font-size: 11px;
   font-weight: 500;
-  font-family: var(--font-geist-sans, Geist, sans-serif);
+  font-family: var(--font-body);
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
 
 .utilityBtn:hover {
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--t1);
+  background: var(--fc-surface-sunken);
+  color: var(--fc-text-primary);
 }
 
 .rangeTabsWrap {
   display: flex;
-  background: var(--card-2);
-  border: 1px solid var(--line);
+  background: var(--fc-bg-deep);
+  border: 1px solid var(--fc-glass-border);
   border-radius: 11px;
   padding: 3px;
   gap: 2px;
@@ -45,8 +45,8 @@
   padding: 7px 4px;
   border: none;
   background: transparent;
-  color: var(--t3);
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  color: var(--fc-text-subtle);
+  font-family: var(--f-mono);
   font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -60,13 +60,13 @@
 }
 
 .rangeTab[data-active="true"] {
-  background: var(--cyan-soft);
-  color: var(--cyan);
-  box-shadow: inset 0 0 0 1px var(--cyan-dim);
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
+  box-shadow: inset 0 0 0 1px var(--fc-accent-glow);
 }
 
 .rangeTabPurple[data-active="true"] {
-  background: var(--purple-soft);
+  background: rgba(167, 139, 250, 0.12);
   color: var(--purple);
   box-shadow: inset 0 0 0 1px var(--purple-dim);
 }
@@ -79,8 +79,8 @@
 }
 
 .statPair {
-  background: var(--card);
-  border: 1px solid var(--line);
+  background: var(--fc-surface-card);
+  border: 1px solid var(--fc-glass-border);
   border-radius: 14px;
   padding: 11px;
   display: flex;
@@ -106,35 +106,36 @@
 }
 
 .eyebrowMono {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 8.5px;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--t3);
+  color: var(--fc-text-subtle);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .statNum {
-  font-family: var(--f-display, "Big Shoulders Display", sans-serif);
+  font-family: var(--f-display);
+  font-stretch: 125%;
   font-weight: 700;
   font-size: 22px;
   line-height: 1;
-  color: var(--t1);
+  color: var(--fc-text-primary);
 }
 
 .statSub {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 9px;
-  color: var(--t3);
+  color: var(--fc-text-subtle);
 }
 
 .sectionCard {
   border-radius: 18px;
-  border: 1px solid var(--line);
-  background: var(--card);
+  border: 1px solid var(--fc-glass-border);
+  background: var(--fc-surface-card);
   padding: 13px;
   display: flex;
   flex-direction: column;
@@ -165,25 +166,25 @@
 }
 
 .sectionTitle {
-  font-family: var(--f-headline, "Bricolage Grotesque", sans-serif);
+  font-family: var(--f-headline);
   font-weight: 700;
   font-size: 15px;
-  color: var(--t1);
+  color: var(--fc-text-primary);
   line-height: 1.15;
 }
 
 .sectionMeta {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 9px;
   letter-spacing: 0.06em;
-  color: var(--t4);
+  color: var(--fc-text-quaternary);
   margin-top: 2px;
 }
 
 .sectionDesc {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 10px;
-  color: var(--t3);
+  color: var(--fc-text-subtle);
   margin-top: 4px;
 }
 
@@ -195,16 +196,17 @@
 }
 
 .pairedLabel {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--t3);
+  color: var(--fc-text-subtle);
 }
 
 .pairedNum {
-  font-family: var(--f-display, "Big Shoulders Display", sans-serif);
+  font-family: var(--f-display);
+  font-stretch: 125%;
   font-weight: 700;
   font-size: 24px;
   line-height: 1.1;
@@ -212,9 +214,9 @@
 }
 
 .pairedSub {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 9px;
-  color: var(--t4);
+  color: var(--fc-text-quaternary);
   margin-top: 4px;
 }
 
@@ -224,8 +226,8 @@
   height: 70px;
   align-items: flex-end;
   padding: 8px 4px;
-  background: var(--card-2);
-  border: 1px solid var(--line-2);
+  background: var(--fc-bg-deep);
+  border: 1px solid var(--fc-hairline);
   border-radius: 11px;
 }
 
@@ -237,7 +239,7 @@
 }
 
 .barEmpty {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
 }
 
 .axisRow {
@@ -248,9 +250,9 @@
 }
 
 .axisLabel {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 9px;
-  color: var(--t4);
+  color: var(--fc-text-quaternary);
 }
 
 .deltaPill {
@@ -259,14 +261,15 @@
   gap: 3px;
   padding: 3px 7px;
   border-radius: 999px;
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 9.5px;
   font-weight: 600;
   letter-spacing: 0.04em;
 }
 
 .headlineVol {
-  font-family: var(--f-display, "Big Shoulders Display", sans-serif);
+  font-family: var(--f-display);
+  font-stretch: 125%;
   font-weight: 700;
   font-size: 36px;
   line-height: 1;
@@ -277,35 +280,36 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 6px;
   padding-top: 6px;
-  border-top: 1px solid var(--line-2);
+  border-top: 1px solid var(--fc-hairline);
 }
 
 .footerLabel {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 8.5px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--t3);
+  color: var(--fc-text-subtle);
 }
 
 .footerNum {
-  font-family: var(--f-display, "Big Shoulders Display", sans-serif);
+  font-family: var(--f-display);
+  font-stretch: 125%;
   font-weight: 700;
   font-size: 18px;
-  color: var(--t1);
+  color: var(--fc-text-primary);
   margin-top: 2px;
 }
 
 .footerUnit {
-  font-family: var(--font-geist-sans, Geist, sans-serif);
+  font-family: var(--font-body);
   font-size: 10px;
   font-weight: 500;
-  color: var(--t3);
+  color: var(--fc-text-subtle);
 }
 
 .shimmer {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--fc-surface-sunken);
   border-radius: 14px;
   position: relative;
   overflow: hidden;
@@ -318,7 +322,7 @@
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(255, 255, 255, 0.06),
+    var(--fc-hairline),
     transparent
   );
   animation: paShimmer 1.4s ease-in-out infinite;
@@ -334,7 +338,7 @@
 }
 
 .peakLabel {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 8.5px;
   color: var(--purple);
   text-align: center;
@@ -360,8 +364,8 @@
 }
 
 .gainCard {
-  background: var(--card-2);
-  border: 1px solid var(--line-2);
+  background: var(--fc-bg-deep);
+  border: 1px solid var(--fc-hairline);
   border-radius: 13px;
   padding: 11px;
   display: flex;
@@ -371,8 +375,8 @@
 
 .gainRangeTabs {
   display: flex;
-  background: var(--card-3);
-  border: 1px solid var(--line-2);
+  background: var(--fc-bg-deep);
+  border: 1px solid var(--fc-hairline);
   border-radius: 9px;
   padding: 2px;
   gap: 2px;
@@ -384,8 +388,8 @@
   border: none;
   border-radius: 7px;
   background: transparent;
-  color: var(--t3);
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  color: var(--fc-text-subtle);
+  font-family: var(--f-mono);
   font-size: 9.5px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -393,9 +397,9 @@
 }
 
 .gainRangeTab[data-active="true"] {
-  background: var(--cyan-soft);
-  color: var(--cyan);
-  box-shadow: inset 0 0 0 1px var(--cyan-dim);
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
+  box-shadow: inset 0 0 0 1px var(--fc-accent-glow);
 }
 
 .trendPill {
@@ -405,45 +409,45 @@
   gap: 3px;
   padding: 2px 6px;
   border-radius: 999px;
-  background: var(--good-soft);
-  color: var(--good);
-  border: 1px solid rgba(52, 211, 153, 0.25);
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  background: color-mix(in srgb, var(--fc-status-success) 12%, transparent);
+  color: var(--fc-status-success);
+  border: 1px solid color-mix(in srgb, var(--fc-status-success) 25%, transparent);
+  font-family: var(--f-mono);
   font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.04em;
 }
 
 .trendPillNeg {
-  background: var(--critical-soft);
-  color: var(--critical);
-  border-color: rgba(255, 90, 95, 0.25);
+  background: color-mix(in srgb, var(--fc-status-error) 12%, transparent);
+  color: var(--fc-status-error);
+  border-color: color-mix(in srgb, var(--fc-status-error) 25%, transparent);
 }
 
 .miniChartBox {
-  background: var(--card-3);
-  border: 1px solid var(--line-2);
+  background: var(--fc-bg-deep);
+  border: 1px solid var(--fc-hairline);
   border-radius: 9px;
   padding: 6px;
   height: 60px;
 }
 
 .accordion {
-  background: var(--card-2);
-  border: 1px solid var(--line-2);
+  background: var(--fc-bg-deep);
+  border: 1px solid var(--fc-hairline);
   border-radius: 12px;
   overflow: hidden;
   cursor: pointer;
 }
 
 .accordionOpen {
-  background: rgba(79, 227, 232, 0.03);
-  border-color: var(--cyan-dim);
+  background: color-mix(in srgb, var(--fc-accent) 3%, transparent);
+  border-color: var(--fc-accent-glow);
 }
 
 .sparkRow {
-  background: var(--card-2);
-  border: 1px solid var(--line-2);
+  background: var(--fc-bg-deep);
+  border: 1px solid var(--fc-hairline);
   border-radius: 12px;
   padding: 10px;
   display: flex;
@@ -468,10 +472,10 @@
   border-radius: 14px;
   background: linear-gradient(
     135deg,
-    rgba(245, 194, 66, 0.06),
-    rgba(245, 194, 66, 0.02)
+    color-mix(in srgb, var(--fc-status-warning) 6%, transparent),
+    color-mix(in srgb, var(--fc-status-warning) 2%, transparent)
   );
-  border: 1px solid rgba(245, 194, 66, 0.18);
+  border: 1px solid color-mix(in srgb, var(--fc-status-warning) 18%, transparent);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -482,8 +486,8 @@
   align-items: center;
   gap: 7px;
   padding: 9px 11px;
-  background: var(--card-2);
-  border: 1px solid var(--line-2);
+  background: var(--fc-bg-deep);
+  border: 1px solid var(--fc-hairline);
   border-radius: 11px;
 }
 
@@ -492,10 +496,10 @@
   min-width: 0;
   border: none;
   background: transparent;
-  color: var(--t1);
+  color: var(--fc-text-primary);
   font-size: 12px;
   font-weight: 500;
-  font-family: var(--font-geist-sans, Geist, sans-serif);
+  font-family: var(--font-body);
   outline: none;
 }
 

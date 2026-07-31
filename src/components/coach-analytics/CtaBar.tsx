@@ -18,13 +18,13 @@ export function CtaBar({
     <div
       className="flex items-center gap-2.5 rounded-[14px] border p-3"
       style={{
-        borderColor: 'var(--cyan-dim)',
-        background: 'linear-gradient(90deg, var(--cyan-soft), transparent)',
+        borderColor: 'var(--fc-accent-glow)',
+        background: 'linear-gradient(90deg, var(--fc-accent-dim), transparent)',
       }}
     >
       <div
         className="flex size-[30px] shrink-0 items-center justify-center rounded-[9px]"
-        style={{ background: 'var(--cyan-soft)', color: 'var(--cyan)' }}
+        style={{ background: 'var(--fc-accent-dim)', color: 'var(--fc-accent)' }}
       >
         <TrendingUp className="size-[13px]" strokeWidth={2} aria-hidden />
       </div>
@@ -39,7 +39,7 @@ export function CtaBar({
       <Link
         href={href}
         className="inline-flex shrink-0 items-center gap-0.5 text-[10px] font-medium"
-        style={{ fontFamily: 'var(--f-mono, "Geist Mono", monospace)', color: 'var(--cyan)' }}
+        style={{ fontFamily: 'var(--f-mono, "Geist Mono", monospace)', color: 'var(--fc-accent)' }}
       >
         {linkLabel}
         <ChevronRight className="size-2.5" aria-hidden />

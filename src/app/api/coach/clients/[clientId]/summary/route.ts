@@ -10,7 +10,12 @@ import { validateApiAuth, createUnauthorizedResponse, createForbiddenResponse } 
 import { handleApiError } from '@/lib/apiErrorHandler';
 import { fetchProgramWorkoutCounters } from '@/lib/clientDashboardService';
 import { getClientMetrics, type ClientMetrics } from '@/lib/coachDashboardService';
-import { computeClientAttention, type ClientRosterStatus } from '@/lib/coachClientAttention';
+import type { ClientRosterStatus } from '@/lib/coachClientAttention';
+import {
+  classifyCoachClientAttention,
+  fetchCoachAttentionSignalsBatch,
+  coachAttentionVerdictToUiPayload,
+} from '@/lib/coachAttention';
 import {
   buildTodayWorkoutSummary,
   buildNextScheduledWorkout,
@@ -23,9 +28,12 @@ import {
   zonedCalendarDateString,
   zonedDayInclusiveUtcBounds,
   mondayYmdOfZonedWeekContaining,
-  computeCurrentProgramWeekForAssignment,
   normalizeClientTimezone,
 } from '@/lib/programWeekCalendar';
+import {
+  loadInstanceWeekInputs,
+  resolveInstanceProgramWeek,
+} from '@/lib/programInstanceResolver';
 
 async function assertCoachHasClient(
   coachId: string,
@@ -131,7 +139,7 @@ export async function GET(
 
     const profileResult = await supabaseAdmin
       .from('profiles')
-      .select('id, email, first_name, last_name, avatar_url, created_at, timezone')
+      .select('id, email, first_name, last_name, avatar_url, phone, created_at, timezone')
       .eq('id', clientId)
       .single();
 
@@ -193,7 +201,7 @@ export async function GET(
       getClientMetrics([clientId], supabaseAdmin),
       supabaseAdmin
         .from('program_assignments')
-        .select('id, program_id, name, duration_weeks, start_date, timezone_snapshot, pause_status, paused_at, pause_accumulated_days')
+        .select('id, program_id, name, start_date, timezone_snapshot, pause_status, paused_at, pause_accumulated_days')
         .eq('client_id', clientId)
         .eq('status', 'active')
         .order('updated_at', { ascending: false })
@@ -316,14 +324,55 @@ export async function GET(
       trainedToday: trainedTodayZoned,
       checkedInToday: checkedInTodayZoned,
     };
-    const attention = computeClientAttention(rosterStatus, metrics);
+
+    const attentionSignals = await fetchCoachAttentionSignalsBatch(
+      supabaseAdmin,
+      [clientId],
+      new Map([
+        [
+          clientId,
+          {
+            timezone:
+              (profile as { timezone?: string | null }).timezone ?? null,
+          },
+        ],
+      ]),
+    );
+    const verdict = classifyCoachClientAttention(
+      attentionSignals.get(clientId) ?? {
+        hasActiveAssignment: false,
+        assignmentPaused: false,
+        missedScheduledDaysLast7: 0,
+        daysSinceLastSession: null,
+        hadScheduledWorkInWindow: false,
+        executionPct: null,
+        sleepTrend: null,
+        stressTrend: null,
+        sorenessTrend: null,
+        highStressRecent: false,
+        hasMealPlan: false,
+        nutritionAdherencePct: null,
+        daysSinceLastCheckIn: null,
+        prsLast7Days: 0,
+        priorWeekMissedEntirely: false,
+        currentWeekBehindSchedule: false,
+      },
+    );
+    const rosterOverride =
+      rosterStatus === 'pending' || rosterStatus === 'inactive'
+        ? rosterStatus
+        : null;
+    const attention = coachAttentionVerdictToUiPayload(verdict, rosterOverride);
+    if (rosterStatus === 'at-risk' && !attention.reasons.includes('Flagged at-risk (adherence)')) {
+      attention.reasons = ['Flagged at-risk (adherence)', ...attention.reasons];
+      if (attention.level === 'good') attention.level = 'warning';
+    }
 
     const pa = programAssignRes.data as {
       id: string;
       program_id: string;
       name: string | null;
       start_date?: string | null;
-      duration_weeks: number | null;
       timezone_snapshot?: string | null;
       pause_status?: string | null;
       paused_at?: string | null;
@@ -344,23 +393,24 @@ export async function GET(
       programProgressPercent: number | null;
     } | null = null;
 
+    // Canonical Week X of N (N = sum of instance phases, X in client tz). Loaded
+    // once and reused for the weekly-review planned counts below.
+    let instanceWeekInputs: Awaited<ReturnType<typeof loadInstanceWeekInputs>> = null;
     if (pa) {
       const [{ data: wp }] = await Promise.all([
         supabaseAdmin.from('workout_programs').select('name').eq('id', pa.program_id).maybeSingle(),
       ]);
       const nm = (pa.name && pa.name.trim()) || wp?.name || 'Program';
-      const cw = computeCurrentProgramWeekForAssignment(
-        {
-          start_date: pa.start_date ?? null,
-          pause_accumulated_days: pa.pause_accumulated_days ?? 0,
-          pause_status: pa.pause_status ?? null,
-          paused_at: pa.paused_at ?? null,
-          timezone_snapshot: pa.timezone_snapshot ?? null,
-          duration_weeks: pa.duration_weeks ?? metrics.programDurationWeeks ?? null,
-        },
-        clientTz
-      ).week;
-      const dw = pa.duration_weeks ?? metrics.programDurationWeeks;
+      if (!instanceWeekInputs) instanceWeekInputs = await loadInstanceWeekInputs(supabaseAdmin, pa.id);
+      const cwRes = instanceWeekInputs
+        ? resolveInstanceProgramWeek(
+            instanceWeekInputs.assignment,
+            instanceWeekInputs.phases,
+            instanceWeekInputs.clientTz,
+          )
+        : null;
+      const cw = cwRes?.currentWeek ?? 1;
+      const dw = cwRes?.totalWeeks ?? null;
       let programProgressPercent: number | null = null;
       if (
         cw != null &&
@@ -435,35 +485,29 @@ export async function GET(
     let plannedCurrentWeek = 0;
     let plannedPreviousWeek = 0;
     if (pa?.program_id) {
-      const currentProgramWeek = computeCurrentProgramWeekForAssignment(
-        {
-          start_date: pa.start_date ?? null,
-          pause_accumulated_days: pa.pause_accumulated_days ?? 0,
-          pause_status: pa.pause_status ?? null,
-          paused_at: pa.paused_at ?? null,
-          timezone_snapshot: pa.timezone_snapshot ?? null,
-          duration_weeks: pa.duration_weeks ?? null,
-        },
-        clientTz,
-        currentWeekStart
-      ).week;
-      const previousProgramWeek = computeCurrentProgramWeekForAssignment(
-        {
-          start_date: pa.start_date ?? null,
-          pause_accumulated_days: pa.pause_accumulated_days ?? 0,
-          pause_status: pa.pause_status ?? null,
-          paused_at: pa.paused_at ?? null,
-          timezone_snapshot: pa.timezone_snapshot ?? null,
-          duration_weeks: pa.duration_weeks ?? null,
-        },
-        clientTz,
-        previousWeekStart
-      ).week;
+      if (!instanceWeekInputs) instanceWeekInputs = await loadInstanceWeekInputs(supabaseAdmin, pa.id);
+      const currentProgramWeek = instanceWeekInputs
+        ? resolveInstanceProgramWeek(
+            instanceWeekInputs.assignment,
+            instanceWeekInputs.phases,
+            instanceWeekInputs.clientTz,
+            currentWeekStart,
+          ).currentWeek
+        : 1;
+      const previousProgramWeek = instanceWeekInputs
+        ? resolveInstanceProgramWeek(
+            instanceWeekInputs.assignment,
+            instanceWeekInputs.phases,
+            instanceWeekInputs.clientTz,
+            previousWeekStart,
+          ).currentWeek
+        : 1;
+      // Planned counts from the per-client instance schedule.
       const weekNumbers = [...new Set([currentProgramWeek, previousProgramWeek])];
       const scheduleRes = await supabaseAdmin
-        .from('program_schedule')
+        .from('program_day_assignments')
         .select('week_number')
-        .eq('program_id', pa.program_id)
+        .eq('program_assignment_id', pa.id)
         .in('week_number', weekNumbers);
       const scheduleRows = (scheduleRes.data ?? []) as Array<{ week_number: number }>;
       for (const row of scheduleRows) {
@@ -730,6 +774,13 @@ export async function GET(
     const subExpiring = metrics.subscriptionExpiringSoon === true;
     const subEnd = metrics.subscriptionEndDate ?? null;
 
+    const { data: noteRow } = await supabaseAdmin
+      .from('coach_client_notes')
+      .select('note')
+      .eq('coach_id', coachId)
+      .eq('client_id', clientId)
+      .maybeSingle();
+
     return NextResponse.json({
       profile: {
         id: profile.id,
@@ -750,7 +801,11 @@ export async function GET(
         reasons: attention.reasons,
       },
       trainedToday: trainedTodayZoned,
-      phone: null,
+      phone: profile.phone ?? null,
+      standingNote:
+        typeof noteRow?.note === 'string' && noteRow.note.trim()
+          ? noteRow.note.trim()
+          : null,
       todayWorkout,
       nextScheduledWorkout,
       latestCheckIn,

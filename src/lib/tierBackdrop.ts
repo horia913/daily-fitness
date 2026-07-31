@@ -9,7 +9,7 @@
  *
  * Tier → variant mapping:
  *   beast_mode (≥90)  → "achievement"  (gold halo)
- *   locked_in  (≥75)  → "action-top"   (lime halo)
+ *   locked_in  (≥75)  → "action-top"   (action halo)
  *   showing_up (≥55)  → "info"         (cyan halo)
  *   slipping   (≥35)  → "warning"      (amber halo)
  *   benched    (<35)  → "error"        (red halo)

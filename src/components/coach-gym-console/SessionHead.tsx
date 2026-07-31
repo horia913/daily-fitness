@@ -41,7 +41,6 @@ export function SessionHead({
         <div className={styles.avatar} style={{ background: avatarGradient(clientId) }}>
           {initials(clientName)}
         </div>
-        <span className={styles.liveDotAvatar} aria-hidden />
       </div>
       <div className={styles.meta}>
         <div className={styles.clientName}>{clientName}</div>

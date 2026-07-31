@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Coach — Plan Builder (nutrition Station)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root {
+    --bg:#0A0B0D; --surface:#1B1E24; --raised:#22262E;
+    --hairline:rgba(255,255,255,0.07); --border:rgba(255,255,255,0.10);
+    --text:#F7F6F1; --dim:#9B9C90; --mute:#63645B;
+    --accent:#2E7BFF; --accent-dim:rgba(46,123,255,0.16); --accent-glow:rgba(46,123,255,0.30);
+    --good:#22E56A; --good-dim:rgba(34,229,106,0.15);
+    --warn:#FFB020; --warn-dim:rgba(255,176,32,0.15);
+    --bad:#FF5A4D; --bad-dim:rgba(255,90,77,0.15);
+    --track:rgba(255,255,255,0.08);
+    --gA:#2E7BFF; --gA-dim:rgba(46,123,255,0.18);
+    --gB:#9D6BFF; --gB-dim:rgba(157,107,255,0.18);
+    --gC:#22D3EE; --gC-dim:rgba(34,211,238,0.18);
+    --gD:#FFB020; --gD-dim:rgba(255,176,32,0.18);
+  }
+  body { font-family:'Inter',sans-serif; background:#050504; color:var(--text); padding:28px 12px 60px; display:flex; flex-direction:column; align-items:center; gap:14px; }
+  .note { max-width:1360px; width:100%; color:var(--dim); font-size:13px; line-height:1.55; }
+  .note b { color:var(--text); }
+  .frame { width:1360px; background:var(--bg); border:1px solid rgba(255,255,255,0.1); border-radius:18px; overflow:hidden; display:flex; min-height:820px; }
+  .sidebar { width:188px; flex-shrink:0; background:#0D0F13; border-right:1px solid var(--hairline); padding:20px 12px; display:flex; flex-direction:column; gap:3px; }
+  .logo { font-family:'Archivo'; font-stretch:125%; font-weight:900; font-size:15px; letter-spacing:-0.5px; padding:0 10px 18px; }
+  .ni { display:flex; align-items:center; gap:9px; padding:9px 10px; border-radius:10px; color:var(--dim); font-size:13px; font-weight:600; }
+  .ni.on { background:var(--accent-dim); color:var(--accent); }
+  .ni .ic { width:16px; text-align:center; font-size:13px; }
+  .coach { margin-top:auto; display:flex; align-items:center; gap:8px; padding:8px 10px; color:var(--mute); font-size:12px; }
+  .coach .cav { width:26px; height:26px; border-radius:8px; background:var(--raised); display:flex; align-items:center; justify-content:center; font-family:'Archivo'; font-weight:800; font-size:11px; color:var(--accent); }
+  .main { flex:1; padding:24px 32px 40px; overflow:auto; }
+
+  .mono { font-family:'JetBrains Mono'; }
+  .back { font-family:'JetBrains Mono'; font-size:10px; font-weight:700; color:var(--dim); letter-spacing:.5px; text-transform:uppercase; }
+  .h1 { font-family:'Archivo'; font-stretch:125%; font-weight:800; font-size:26px; letter-spacing:-1px; }
+  .pencil { width:30px;height:30px;border-radius:9px;background:var(--surface);display:inline-flex;align-items:center;justify-content:center;color:var(--dim);font-size:12px;cursor:pointer; }
+  .pill { display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:7px;font-family:'JetBrains Mono';font-size:8.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase; }
+  .pill .pd { width:5px;height:5px;border-radius:50%;background:currentColor; }
+  .pill.good { background:var(--good-dim);color:var(--good); }
+  .cta { height:40px;padding:0 16px;border-radius:12px;background:var(--accent);color:#fff;display:inline-flex;align-items:center;gap:7px;font-family:'Archivo';font-weight:800;font-size:12px;letter-spacing:.3px;text-transform:uppercase;box-shadow:0 4px 20px var(--accent-glow);cursor:pointer;white-space:nowrap; }
+  .ghost { height:40px;padding:0 14px;border-radius:12px;background:transparent;border:1px solid var(--border);color:var(--text);display:inline-flex;align-items:center;gap:7px;font-family:'Archivo';font-weight:700;font-size:12px;letter-spacing:.3px;text-transform:uppercase;cursor:pointer;white-space:nowrap; }
+  .icb { height:30px;width:32px;border-radius:9px;background:transparent;border:1px solid var(--border);color:var(--dim);display:inline-flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer; }
+
+  /* targets vs computed strip — open */
+  .macros { display:grid; grid-template-columns:repeat(4,1fr) auto; border-top:1px solid var(--hairline); border-bottom:1px solid var(--hairline); margin:20px 0 24px; }
+  .mc { padding:14px 0 13px 22px; border-left:1px solid var(--hairline); }
+  .mc:first-child { border-left:none; padding-left:2px; }
+  .mc .l { font-family:'JetBrains Mono'; font-size:8.5px; font-weight:600; letter-spacing:.9px; text-transform:uppercase; color:var(--dim); }
+  .mc .v { font-family:'Archivo'; font-stretch:125%; font-weight:900; font-size:24px; letter-spacing:-1px; line-height:1; margin-top:6px; }
+  .mc .v .of { font-size:12px; color:var(--mute); font-weight:700; letter-spacing:0; font-stretch:100%; }
+  .mc .d { font-family:'JetBrains Mono'; font-size:9px; font-weight:700; margin-top:5px; }
+  .legendC { padding:14px 2px 13px 22px; border-left:1px solid var(--hairline); display:flex; flex-direction:column; justify-content:center; gap:4px; }
+  .legendC .lg { font-family:'JetBrains Mono'; font-size:8.5px; color:var(--mute); letter-spacing:.5px; }
+
+  .sect { font-family:'Archivo'; font-weight:800; font-size:14px; display:flex; align-items:center; gap:8px; }
+  .sect::before { content:''; width:3px; height:13px; border-radius:2px; background:var(--accent); }
+
+  /* canonical MEAL display — Element 15 sibling */
+  .badge { min-width:22px; height:22px; padding:0 6px; border-radius:6px; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; font-family:'JetBrains Mono'; font-weight:700; font-size:10px; }
+  .bA { background:var(--gA-dim); color:var(--gA); }
+  .bB { background:var(--gB-dim); color:var(--gB); }
+  .bC { background:var(--gC-dim); color:var(--gC); }
+  .bD { background:var(--gD-dim); color:var(--gD); }
+  .mrow { border-bottom:1px solid var(--hairline); }
+  .mlist .mrow:first-child { border-top:1px solid var(--hairline); margin-top:12px; }
+  .mrow .mhead { display:flex; align-items:center; gap:12px; padding:14px 2px; cursor:pointer; }
+  .mrow .mb { flex:1; min-width:0; }
+  .mrow .mname { font-family:'Inter'; font-weight:600; font-size:15px; color:var(--text); }
+  .mrow .mrx { font-family:'JetBrains Mono'; font-size:11px; font-weight:500; color:var(--dim); letter-spacing:.3px; margin-top:4px; }
+  .mrow .mrx b { color:var(--text); font-weight:600; }
+  .mrow .mrx .sep { color:var(--mute); padding:0 3px; }
+  .mrow .chev { color:var(--mute); font-size:13px; transition:transform .18s ease; width:14px; text-align:center; }
+  .mrow.open .chev { transform:rotate(90deg); color:var(--accent); }
+  .mrow .mbody { max-height:0; overflow:hidden; transition:max-height .22s ease; }
+  .mrow.open .mbody { max-height:900px; }
+  .mrow .minner { margin:0 0 16px 34px; }
+
+  /* options = group chrome */
+  .opt { position:relative; padding-left:12px; margin-bottom:12px; }
+  .opt::before { content:''; position:absolute; left:0; top:6px; bottom:4px; width:2px; border-radius:1px; }
+  .opt.hA::before { background:var(--gA-dim); } .opt.hB::before { background:var(--gB-dim); }
+  .opt .ohead { display:flex; align-items:center; gap:9px; padding:2px 0 7px; }
+  .opt .ometa { font-family:'JetBrains Mono'; font-size:10.5px; color:var(--dim); letter-spacing:.3px; }
+  .opt .ometa b { color:var(--text); font-weight:600; }
+  .opt .oedit { margin-left:auto; font-family:'JetBrains Mono'; font-size:9px; font-weight:700; color:var(--accent); letter-spacing:.5px; text-transform:uppercase; cursor:pointer; }
+  .food { display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:6px 0; border-bottom:1px solid var(--hairline); }
+  .opt .food:last-child { border-bottom:none; }
+  .food .fn { font-size:13px; font-weight:500; color:var(--text); }
+  .food .fn .fq { font-family:'JetBrains Mono'; font-size:10px; color:var(--dim); margin-left:8px; }
+  .food .fm { font-family:'JetBrains Mono'; font-size:10px; color:var(--dim); white-space:nowrap; }
+  .mact { display:flex; gap:6px; align-items:center; }
+  .addfood { font-family:'JetBrains Mono'; font-size:9.5px; font-weight:700; color:var(--accent); letter-spacing:.5px; text-transform:uppercase; padding:8px 0 0; cursor:pointer; }
+
+  .notes { border-top:1px solid var(--hairline); border-bottom:1px solid var(--hairline); padding:14px 2px; margin-top:24px; }
+  .notes .nl { font-family:'JetBrains Mono'; font-size:9px; font-weight:600; letter-spacing:1.4px; text-transform:uppercase; color:var(--dim); margin-bottom:6px; }
+  .notes .nt { font-size:13.5px; color:var(--text); line-height:1.5; }
+</style></head>
+<body>
+
+<div class="note"><b>Coach — Plan Builder (P4 spec, nutrition's Station).</b> One display grammar app-wide: <b>badge · name · mono data line</b> — the canonical meal display is Element 15's sibling. Meal-type badges reuse the sanctioned hue sequence (B/L/D/S → A/B/C/D hues); options render as group chrome (tinted left rule + sub-rows). Top strip = <b>computed-from-meals vs targets</b> with delta coloring — the builder's core feedback loop. Meals expand (one open); MealCreator / MealOptionEditor modals reused as-is. Add meal = the page's one glow. Click meal rows to try.</div>
+
+<div class="frame">
+  <div class="sidebar">
+    <div class="logo">DailyFitness</div>
+    <div class="ni"><span class="ic">⌂</span>Home</div>
+    <div class="ni"><span class="ic">◉</span>Clients</div>
+    <div class="ni"><span class="ic">▲</span>Training</div>
+    <div class="ni on"><span class="ic">◐</span>Nutrition</div>
+    <div class="ni"><span class="ic">▥</span>Insights</div>
+    <div class="coach"><span class="cav">N</span>Coach</div>
+  </div>
+  <div class="main">
+
+    <div class="back">‹ Nutrition</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span class="h1">Lean Mass 2800</span>
+        <span class="pencil">✎</span>
+        <span class="pill good"><span class="pd"></span>Active</span>
+        <span class="mono" style="font-size:10px;color:var(--mute);">3 CLIENTS ASSIGNED</span>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <div class="ghost">◉+ Assign</div>
+        <div class="cta">＋ Add meal</div>
+      </div>
+    </div>
+
+    <!-- computed vs target strip -->
+    <div class="macros">
+      <div class="mc"><div class="l">Calories</div><div class="v">2,742 <span class="of">/ 2,800</span></div><div class="d" style="color:var(--good)">−58 · ON TARGET</div></div>
+      <div class="mc"><div class="l">Protein</div><div class="v">204<span class="of">g / 200</span></div><div class="d" style="color:var(--good)">+4G · ON TARGET</div></div>
+      <div class="mc"><div class="l">Carbs</div><div class="v">296<span class="of">g / 320</span></div><div class="d" style="color:var(--warn)">−24G · UNDER</div></div>
+      <div class="mc"><div class="l">Fat</div><div class="v">88<span class="of">g / 85</span></div><div class="d" style="color:var(--good)">+3G · ON TARGET</div></div>
+      <div class="legendC"><span class="lg">COMPUTED FROM MEALS / TARGET</span><span class="lg">±5% KCAL · ±8G MACROS = ON TARGET</span></div>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <span class="sect">Meals · 4</span>
+      <span class="mono" style="font-size:9.5px;color:var(--mute);letter-spacing:.5px;">EXPAND A MEAL TO EDIT OPTIONS &amp; FOODS</span>
+    </div>
+
+    <div class="mlist">
+
+      <!-- BREAKFAST — open, two options -->
+      <div class="mrow open" id="m1">
+        <div class="mhead" onclick="tog('m1')">
+          <span class="badge bA">B</span>
+          <div class="mb">
+            <div class="mname">Oats + Whey</div>
+            <div class="mrx"><b>612 kcal</b><span class="sep">·</span>P 44<span class="sep">·</span>C 78<span class="sep">·</span>F 14<span class="sep">·</span>2 options</div>
+          </div>
+          <div class="mact"><span class="icb">✎</span><span class="icb">🗑</span></div>
+          <span class="chev">›</span>
+        </div>
+        <div class="mbody"><div class="minner">
+          <div class="opt hA">
+            <div class="ohead"><span class="badge bA">B1</span><span class="ometa"><b>Standard</b><span class="sep" style="color:var(--mute);padding:0 3px;">·</span>612 kcal · P 44 · C 78 · F 14</span><span class="oedit">Edit option →</span></div>
+            <div class="food"><span class="fn">Rolled oats<span class="fq">90 g</span></span><span class="fm">342 kcal · P 12 · C 60 · F 6</span></div>
+            <div class="food"><span class="fn">Whey isolate<span class="fq">35 g</span></span><span class="fm">130 kcal · P 30 · C 2 · F 1</span></div>
+            <div class="food"><span class="fn">Blueberries<span class="fq">100 g</span></span><span class="fm">57 kcal · P 1 · C 14 · F 0</span></div>
+            <div class="food"><span class="fn">Almond butter<span class="fq">12 g</span></span><span class="fm">83 kcal · P 1 · C 2 · F 7</span></div>
+          </div>
+          <div class="opt hB">
+            <div class="ohead"><span class="badge bB">B2</span><span class="ometa"><b>Quick shake</b><span class="sep" style="color:var(--mute);padding:0 3px;">·</span>598 kcal · P 46 · C 70 · F 13</span><span class="oedit">Edit option →</span></div>
+            <div class="food"><span class="fn">Whey isolate<span class="fq">40 g</span></span><span class="fm">148 kcal · P 34 · C 2 · F 1</span></div>
+            <div class="food"><span class="fn">Banana<span class="fq">1 medium</span></span><span class="fm">105 kcal · P 1 · C 27 · F 0</span></div>
+            <div class="food"><span class="fn">Oat milk<span class="fq">300 ml</span></span><span class="fm">135 kcal · P 3 · C 20 · F 5</span></div>
+          </div>
+          <div class="addfood">＋ Add option</div>
+        </div></div>
+      </div>
+
+      <!-- LUNCH -->
+      <div class="mrow" id="m2">
+        <div class="mhead" onclick="tog('m2')">
+          <span class="badge bB">L</span>
+          <div class="mb">
+            <div class="mname">Chicken &amp; Rice</div>
+            <div class="mrx"><b>818 kcal</b><span class="sep">·</span>P 62<span class="sep">·</span>C 96<span class="sep">·</span>F 20<span class="sep">·</span>1 option</div>
+          </div>
+          <div class="mact"><span class="icb">✎</span><span class="icb">🗑</span></div>
+          <span class="chev">›</span>
+        </div>
+        <div class="mbody"><div class="minner">
+          <div class="opt hA">
+            <div class="ohead"><span class="badge bA">L1</span><span class="ometa"><b>Default</b></span><span class="oedit">Edit option →</span></div>
+            <div class="food"><span class="fn">Chicken breast<span class="fq">220 g</span></span><span class="fm">363 kcal · P 68 · C 0 · F 8</span></div>
+            <div class="food"><span class="fn">Jasmine rice (cooked)<span class="fq">280 g</span></span><span class="fm">364 kcal · P 7 · C 79 · F 1</span></div>
+            <div class="food"><span class="fn">Olive oil<span class="fq">10 ml</span></span><span class="fm">88 kcal · P 0 · C 0 · F 10</span></div>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- DINNER -->
+      <div class="mrow" id="m3">
+        <div class="mhead" onclick="tog('m3')">
+          <span class="badge bC">D</span>
+          <div class="mb">
+            <div class="mname">Salmon Bowl</div>
+            <div class="mrx"><b>742 kcal</b><span class="sep">·</span>P 58<span class="sep">·</span>C 72<span class="sep">·</span>F 26<span class="sep">·</span>1 option</div>
+          </div>
+          <div class="mact"><span class="icb">✎</span><span class="icb">🗑</span></div>
+          <span class="chev">›</span>
+        </div>
+        <div class="mbody"><div class="minner">
+          <div class="opt hA">
+            <div class="ohead"><span class="badge bA">D1</span><span class="ometa"><b>Default</b></span><span class="oedit">Edit option →</span></div>
+            <div class="food"><span class="fn">Salmon fillet<span class="fq">200 g</span></span><span class="fm">412 kcal · P 40 · C 0 · F 26</span></div>
+            <div class="food"><span class="fn">Sweet potato<span class="fq">300 g</span></span><span class="fm">258 kcal · P 5 · C 60 · F 0</span></div>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- SNACK -->
+      <div class="mrow" id="m4">
+        <div class="mhead" onclick="tog('m4')">
+          <span class="badge bD">S</span>
+          <div class="mb">
+            <div class="mname">Greek Yogurt + Honey</div>
+            <div class="mrx"><b>570 kcal</b><span class="sep">·</span>P 40<span class="sep">·</span>C 50<span class="sep">·</span>F 28<span class="sep">·</span>1 option</div>
+          </div>
+          <div class="mact"><span class="icb">✎</span><span class="icb">🗑</span></div>
+          <span class="chev">›</span>
+        </div>
+        <div class="mbody"><div class="minner">
+          <div class="opt hA">
+            <div class="ohead"><span class="badge bA">S1</span><span class="ometa"><b>Default</b></span><span class="oedit">Edit option →</span></div>
+            <div class="food"><span class="fn">Greek yogurt 5%<span class="fq">300 g</span></span><span class="fm">360 kcal · P 27 · C 12 · F 15</span></div>
+            <div class="food"><span class="fn">Honey<span class="fq">20 g</span></span><span class="fm">61 kcal · P 0 · C 17 · F 0</span></div>
+            <div class="food"><span class="fn">Walnuts<span class="fq">20 g</span></span><span class="fm">131 kcal · P 3 · C 3 · F 13</span></div>
+          </div>
+        </div></div>
+      </div>
+
+    </div>
+
+    <div class="notes">
+      <div class="nl">Plan notes</div>
+      <div class="nt">Protein anchored at every meal. Carbs bias pre/post training days — swap rice up 60g on doubles.</div>
+    </div>
+
+  </div>
+</div>
+
+<div class="note" style="color:var(--mute);font-size:12px;">
+<b style="color:var(--dim)">Spec notes for P4:</b> meal-type badge hues B/L/D/S → group hues A/B/C/D (same sanctioned sequence). The macro strip's ON TARGET / UNDER / OVER thresholds shown in the legend (±5% kcal, ±8g macros) — tune if you want. Meal ✎ opens MealOptionEditor, ＋ Add meal opens MealCreator, ✎ pencil = the P3 metadata modal, Assign = the existing modal — all four reused as-is. One meal open at a time. Legacy meal_plan_items plans render a slim "legacy format" notice + read-only list. Below 1024 everything stacks.
+</div>
+
+<script>
+function tog(id){
+  const el = document.getElementById(id);
+  const was = el.classList.contains('open');
+  document.querySelectorAll('.mrow.open').forEach(r=>r.classList.remove('open'));
+  if(!was) el.classList.add('open');
+}
+</script>
+</body></html>

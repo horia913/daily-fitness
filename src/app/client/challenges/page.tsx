@@ -135,7 +135,7 @@ function ChallengesPageContent() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
+          <ClientPageShell className="max-w-lg lg:max-w-3xl px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
             <PageSkeleton variant="dashboard" />
           </ClientPageShell>
         </AnimatedBackground>
@@ -148,7 +148,7 @@ function ChallengesPageContent() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
+          <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
             <GlassCard elevation={2} className="fc-card-shell p-4 text-center">
               <p className="text-sm text-[color:var(--fc-text-dim)] mb-3">{loadError}</p>
               <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadChallenges(); }} className="fc-btn fc-btn-primary h-10 text-sm">
@@ -165,7 +165,7 @@ function ChallengesPageContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <ClientPageShell className="max-w-lg px-4 pb-[var(--fc-bottom-safe-area)] pt-6 space-y-4">
+      <ClientPageShell className="max-w-lg lg:max-w-3xl px-4 pb-[var(--fc-bottom-safe-area)] pt-6 space-y-4">
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <nav className="flex items-center gap-2 text-xs fc-text-subtle mb-1 font-mono">
@@ -230,7 +230,7 @@ function ChallengesPageContent() {
                 )}
               >
                 Invited
-                <span className="w-5 h-5 rounded-full bg-[color:var(--fc-accent-cyan)] text-white text-[10px] flex items-center justify-center font-bold">
+                <span className="w-5 h-5 rounded-full bg-[color:var(--fc-accent)] text-white text-[10px] flex items-center justify-center font-bold">
                   {invitedChallenges.length}
                 </span>
               </button>
@@ -258,9 +258,11 @@ function ChallengesPageContent() {
                 ? "No Past Challenges"
                 : activeTab === "invited"
                   ? "No Invitations"
-                  : activeTab === "my" ? "No Active Challenges" : "No Challenges Available"}
+                  : activeTab === "my"
+                    ? "No Active Challenges"
+                    : "No Challenges Available"}
             </h2>
-            <p className="text-sm text-[color:var(--fc-text-dim)]">
+            <p className="text-sm text-[color:var(--fc-text-dim)] mb-4">
               {activeTab === "history"
                 ? "Completed challenges will appear here."
                 : activeTab === "invited"
@@ -269,30 +271,35 @@ function ChallengesPageContent() {
                     ? "Join a challenge to start competing."
                     : "Check back later for new challenges."}
             </p>
+            {activeTab !== "all" ? (
+              <Button
+                type="button"
+                className="fc-btn fc-btn-primary h-10 px-4 text-sm"
+                onClick={() => setActiveTab("all")}
+              >
+                Browse all
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                className="fc-btn fc-btn-secondary h-10 px-4 text-sm"
+                onClick={() => router.push("/client/train")}
+              >
+                Go to Train
+              </Button>
+            )}
           </GlassCard>
         ) : (
           <div className="flex w-full flex-col gap-3">
-            <ChallengeCard
-              key={displayedChallenges[0].id}
-              challenge={displayedChallenges[0]}
-              isParticipating={myChallenges.includes(displayedChallenges[0].id)}
-              onJoin={handleJoinClick}
-              onView={handleView}
-            />
-            {displayedChallenges.length > 1 && (
-              <div className="flex flex-col divide-y divide-[color:var(--fc-glass-border)] border-y border-[color:var(--fc-glass-border)]">
-                {displayedChallenges.slice(1).map((challenge) => (
-                  <ChallengeCard
-                    key={challenge.id}
-                    challenge={challenge}
-                    dense
-                    isParticipating={myChallenges.includes(challenge.id)}
-                    onJoin={handleJoinClick}
-                    onView={handleView}
-                  />
-                ))}
-              </div>
-            )}
+            {displayedChallenges.map((challenge) => (
+              <ChallengeCard
+                key={challenge.id}
+                challenge={challenge}
+                isParticipating={myChallenges.includes(challenge.id)}
+                onJoin={handleJoinClick}
+                onView={handleView}
+              />
+            ))}
           </div>
         )}
       </ClientPageShell>

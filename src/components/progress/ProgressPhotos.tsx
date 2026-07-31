@@ -37,7 +37,7 @@ interface ProgressPhoto {
   id: string
   url: string
   date: string
-  bodyweight?: number
+  weight_kg?: number
   notes?: string
   tags?: string[]
   isFavorite?: boolean
@@ -428,10 +428,10 @@ function PhotoCard({
             )}
           </div>
           
-          {photo.bodyweight && (
+          {photo.weight_kg && (
             <div className="flex items-center gap-2 mb-2">
               <Weight className="w-4 h-4" />
-              <span className="text-sm font-medium">{photo.bodyweight}kg</span>
+              <span className="text-sm font-medium">{photo.weight_kg}kg</span>
             </div>
           )}
           
@@ -581,11 +581,11 @@ function TimelinePhotoCard({
 
           {/* Stats */}
           <div className="flex items-center gap-4 mb-3">
-            {photo.bodyweight && (
+            {photo.weight_kg && (
               <div className="flex items-center gap-2">
                 <Weight className="w-4 h-4 fc-text-subtle" />
                 <span className="text-sm font-medium fc-text-dim">
-                  {photo.bodyweight}kg
+                  {photo.weight_kg}kg
                 </span>
               </div>
             )}
@@ -742,11 +742,11 @@ function ComparisonModal({
                   {Math.floor((new Date(afterPhoto.date).getTime() - new Date(beforePhoto.date).getTime()) / (1000 * 60 * 60 * 24))} days apart
                 </span>
               </div>
-              {beforePhoto.bodyweight && afterPhoto.bodyweight && (
+              {beforePhoto.weight_kg && afterPhoto.weight_kg && (
                 <div className="flex items-center gap-2">
                   <Weight className="w-4 h-4" />
                   <span className="text-sm">
-                    {afterPhoto.bodyweight - beforePhoto.bodyweight > 0 ? '+' : ''}{afterPhoto.bodyweight - beforePhoto.bodyweight}kg change
+                    {afterPhoto.weight_kg - beforePhoto.weight_kg > 0 ? '+' : ''}{afterPhoto.weight_kg - beforePhoto.weight_kg}kg change
                   </span>
                 </div>
               )}

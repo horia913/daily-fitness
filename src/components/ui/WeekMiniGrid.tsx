@@ -44,7 +44,7 @@ export interface WeekMiniGridProps {
 export function WeekMiniGrid({
   days,
   mode = "binary",
-  accent = "var(--fc-accent-cyan)",
+  accent = "var(--fc-accent)",
   className,
   ariaLabel = "Last 7 days",
 }: WeekMiniGridProps) {

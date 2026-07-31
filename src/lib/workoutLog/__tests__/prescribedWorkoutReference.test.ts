@@ -1,6 +1,7 @@
 import {
   buildPrescribedWorkoutReference,
   formatPrescribedStrengthLine,
+  type PrescriptionProtocolBundle,
 } from "@/lib/workoutLog/prescribedWorkoutReference";
 import type { WorkoutLogBlock, WorkoutLogSet } from "@/types/workoutLog";
 
@@ -63,11 +64,14 @@ function baseSet(overrides: Partial<WorkoutLogSet>): WorkoutLogSet {
   };
 }
 
-const emptyBundleExtras = {
-  timeProtocols: [] as const,
-  dropSets: [] as const,
-  clusterSets: [] as const,
-  restPauseSets: [] as const,
+const emptyBundleExtras: Pick<
+  PrescriptionProtocolBundle,
+  "timeProtocols" | "dropSets" | "clusterSets" | "restPauseSets"
+> = {
+  timeProtocols: [],
+  dropSets: [],
+  clusterSets: [],
+  restPauseSets: [],
 };
 
 describe("formatPrescribedStrengthLine", () => {

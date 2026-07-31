@@ -6,48 +6,78 @@ import {
   Play,
   Pause,
   RotateCcw,
-  Clock,
-  Target,
-  Flame,
   Pencil,
+  ChevronLeft,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
-import {
-  BaseBlockExecutorLayout,
-  formatTime,
-} from "../BaseBlockExecutor";
-import { LargeInput } from "../ui/LargeInput";
-import logPairStyles from "../ui/logWeightRepsPair.module.css";
-import { BaseBlockExecutorProps } from "../types";
-import { LoggedSet } from "@/types/workoutBlocks";
+import { formatTime } from "../BaseBlockExecutor";
+import { BaseSetEntryExecutorProps } from "../types";
+import { useWorkoutExecutionChrome } from "../WorkoutExecutionChromeContext";
+import { NavigationControls } from "../ui/NavigationControls";
+import { LastSessionSetsSection } from "../ui/LastSessionSetsSection";
+import { ProgressionNudge } from "../ui/ProgressionNudge";
+import { LoggedSet } from "@/types/workoutSetEntries";
 import { LoggedSetsList, type LoggedSetRow } from "../ui/LoggedSetsList";
 import { useUpdateSetRpe } from "../hooks/useUpdateSetRpe";
-import { appendTargetEffortItem } from "../appendTargetEffortItem";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
 import { fetchApi } from "@/lib/apiClient";
 import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
 import { parseWeightKgInput } from "@/lib/parseWeightKgInput";
-import type {
-  PrescriptionItem,
-  PrescriptionItemTone,
-} from "../ui/PrescriptionCard";
-import { LogSetButton } from "../ui/LogSetButton";
 import { parseRepsTarget } from "@/lib/workout/parseRepsTarget";
+import { resolveSetPrescriptionTargets } from "../ui/set-rows/resolveSetPrescriptionTargets";
+import { formatGroupedExerciseBadge } from "../groupLetterBadges";
+import {
+  LiveCard,
+  LiveCardGroupedExercise,
+  LiveCardNote,
+  LiveCardLog,
+  LiveCardLogField,
+  LiveCardLogButton,
+  LiveCardGlue,
+  effortFromPrescribedRir,
+  groupIndexToHue,
+  type LiveCardTarget,
+} from "../live-card";
+
+function targetsToLiveCardTarget(
+  targets: ReturnType<typeof resolveSetPrescriptionTargets>,
+): LiveCardTarget {
+  if (targets.weight_kg != null) {
+    return {
+      kind: "reps_weight",
+      reps: targets.reps ?? "—",
+      weight: targets.weight_kg,
+    };
+  }
+  return {
+    kind: "reps_only",
+    reps: targets.reps ?? "—",
+    unit: "reps",
+  };
+}
+
+function groupExerciseBadge(
+  groupIndex: number,
+  exerciseOrder: number | undefined,
+  index: number,
+): string {
+  return formatGroupedExerciseBadge(groupIndex, exerciseOrder, index);
+}
 
 export function AmrapExecutor({
-  block,
-  onBlockComplete,
-  onNextBlock,
+  liveSetEntry,
+  onSetEntryComplete,
+  onNextSetEntry,
   e1rmMap = {},
   onE1rmUpdate,
   lastPerformedWeightByExerciseId = {},
   lastSessionWeightByExerciseId = {},
   sessionId,
   assignmentId,
-  allBlocks = [],
-  currentBlockIndex = 0,
-  onBlockChange,
+  allSetEntries = [],
+  currentSetEntryIndex = 0,
+  onSetEntryChange,
   currentExerciseIndex = 0,
   onExerciseIndexChange,
   logSetToDatabase,
@@ -64,11 +94,11 @@ export function AmrapExecutor({
   onSetLogUpsert,
   onSetEditSaved,
   loggedSets,
-}: BaseBlockExecutorProps) {
+}: BaseSetEntryExecutorProps) {
   const { addToast } = useToast();
-  const currentExercise = block.block.exercises?.[currentExerciseIndex];
+  const currentExercise = liveSetEntry.setEntry.exercises?.[currentExerciseIndex];
   const totalSets = 1;
-  const completedSets = block.completedSets ?? 0;
+  const completedSets = liveSetEntry.completedSets ?? 0;
 
   /** Parent-owned logged sets; single source of truth. Persists across block navigation. */
   const loggedSetsList = loggedSets ?? [];
@@ -101,10 +131,10 @@ export function AmrapExecutor({
       if (idx === -1) return;
       const oldEntry = list[idx];
       const newEntry = { ...oldEntry, id: set_log_id };
-      onSetLogUpsert?.(block.block.id, newEntry, { replaceId: oldEntry.id });
+      onSetLogUpsert?.(liveSetEntry.setEntry.id, newEntry, { replaceId: oldEntry.id });
     });
     return () => {};
-  }, [registerSetLogIdResolved, onSetLogUpsert, block.block.id]);
+  }, [registerSetLogIdResolved, onSetLogUpsert, liveSetEntry.setEntry.id]);
   useEffect(() => {
     if (viewingSetIndex > loggedSetsList.length)
       setViewingSetIndex(loggedSetsList.length);
@@ -123,16 +153,16 @@ export function AmrapExecutor({
 
   const isViewingLoggedSet = viewingSetIndex >= 1;
   const timeProtocol =
-    block.block.time_protocols?.find(
+    liveSetEntry.setEntry.time_protocols?.find(
       (tp: any) =>
         tp.protocol_type === "amrap" &&
         (tp.exercise_id === currentExercise?.exercise_id ||
           !currentExercise?.exercise_id),
-    ) || block.block.time_protocols?.[0];
+    ) || liveSetEntry.setEntry.time_protocols?.[0];
 
   const durationSeconds = timeProtocol?.total_duration_minutes
     ? timeProtocol.total_duration_minutes * 60
-    : block.block.duration_seconds || 600;
+    : liveSetEntry.setEntry.duration_seconds || 600;
   const targetReps = timeProtocol?.target_reps;
   const targetRepsParsed = parseRepsTarget(targetReps);
 
@@ -213,35 +243,8 @@ export function AmrapExecutor({
     };
   }, [isActive, timeRemaining, isPaused]);
 
-  const durationMinutesDisplay = Math.floor(durationSeconds / 60);
-  const prescriptionItems: PrescriptionItem[] = [
-    {
-      icon: Clock,
-      label: "Duration",
-      value: durationMinutesDisplay,
-      unit: "min",
-    },
-  ];
-
-  if (
-    targetReps != null &&
-    (typeof targetReps !== "string" || targetReps !== "")
-  ) {
-    prescriptionItems.push({
-      icon: Target,
-      label: "Target reps",
-      value: targetReps,
-    });
-  }
-
-  appendTargetEffortItem(
-    prescriptionItems,
-    currentExercise ? (currentExercise as { rir?: unknown }).rir : undefined,
-    Flame,
-  );
-
   const instructions =
-    currentExercise?.notes || block.block.set_notes || undefined;
+    currentExercise?.notes || liveSetEntry.setEntry.set_notes || undefined;
 
   const handleStartTimer = () => {
     setIsActive(true);
@@ -282,7 +285,7 @@ export function AmrapExecutor({
       if (process.env.NODE_ENV !== "production") {
         console.log("[SAVE EDITS guard]", {
           executor: "AmrapExecutor",
-          blockTypeFromUI: block.block.set_type,
+          blockTypeFromUI: liveSetEntry.setEntry.set_type,
           editingSetId,
           isSavingEdit,
           timestamp: Date.now(),
@@ -300,7 +303,7 @@ export function AmrapExecutor({
     if (isNaN(repsNum) || repsNum <= 0) return;
     setIsSavingEdit(true);
     try {
-      const payload = buildSetEditPatchPayload(block.block.set_type, {
+      const payload = buildSetEditPatchPayload(liveSetEntry.setEntry.set_type, {
         exercise_id: currentExercise?.exercise_id ?? undefined,
         weight: !isNaN(weightNum) && weightNum >= 0 ? weightNum : undefined,
         amrap_total_reps: repsNum,
@@ -309,7 +312,7 @@ export function AmrapExecutor({
         console.log("[SAVE EDITS]", {
           executor: "AmrapExecutor",
           setId: editingSetId,
-          blockTypeFromUI: block.block.set_type,
+          blockTypeFromUI: liveSetEntry.setEntry.set_type,
           payloadKeys: Object.keys(payload),
         });
       }
@@ -324,13 +327,13 @@ export function AmrapExecutor({
           id: editingSetId,
           exercise_id:
             current?.exercise_id ?? currentExercise?.exercise_id ?? "",
-          set_entry_id: block.block.id,
+          set_entry_id: liveSetEntry.setEntry.id,
           set_number: current?.set_number ?? 1,
           weight_kg: weightNum,
           reps_completed: repsNum,
           completed_at: current?.completed_at ?? new Date(),
         };
-        onSetEditSaved?.(block.block.id, updatedEntry);
+        onSetEditSaved?.(liveSetEntry.setEntry.id, updatedEntry);
         setEditingSetId(null);
         setEditDraft(null);
         addToast({ title: "Set updated", variant: "success", duration: 2000 });
@@ -446,13 +449,13 @@ export function AmrapExecutor({
         const newEntry: LoggedSet = {
           id: setLogId,
           exercise_id: currentExercise.exercise_id,
-          set_entry_id: block.block.id,
+          set_entry_id: liveSetEntry.setEntry.id,
           set_number: 1,
           weight_kg: weightNum,
           reps_completed: repsNum,
           completed_at: new Date(),
         } as LoggedSet;
-        onSetLogUpsert?.(block.block.id, newEntry);
+        onSetLogUpsert?.(liveSetEntry.setEntry.id, newEntry);
 
         if (result.e1rm && onE1rmUpdate) {
           onE1rmUpdate(currentExercise.exercise_id, result.e1rm);
@@ -465,7 +468,7 @@ export function AmrapExecutor({
           duration: 2000,
         });
 
-        onBlockComplete(block.block.id, [...loggedSetsList, newEntry]);
+        onSetEntryComplete(liveSetEntry.setEntry.id, [...loggedSetsList, newEntry]);
       } else {
         addToast({
           title: "Failed to Save",
@@ -480,7 +483,7 @@ export function AmrapExecutor({
   };
 
   const updateSetRpe = useUpdateSetRpe({
-    blockId: block.block.id,
+    setEntryId: liveSetEntry.setEntry.id,
     onSetLogUpsert,
   });
   const loggedSetRows: LoggedSetRow[] = loggedSetsList.map((setEntry) => {
@@ -514,145 +517,11 @@ export function AmrapExecutor({
       <LoggedSetsList rows={loggedSetRows} />
     ) : null;
 
-  const loggingInputs = (
-    <div className="space-y-4">
-      {/* Inline Timer */}
-      <div
-        className="rounded-xl p-5 text-center"
-        style={
-          timerHasEnded
-            ? {
-                background:
-                  "color-mix(in srgb, var(--fc-status-success) 8%, var(--fc-surface-card))",
-                border:
-                  "2px solid color-mix(in srgb, var(--fc-status-success) 25%, transparent)",
-              }
-            : {
-                background:
-                  "color-mix(in srgb, var(--fc-accent-cyan) 8%, var(--fc-surface-card))",
-                border:
-                  "2px solid color-mix(in srgb, var(--fc-accent-cyan) 25%, transparent)",
-              }
-        }
-      >
-        <div
-          className="text-5xl font-bold mb-3"
-          style={{
-            color: timerHasEnded
-              ? "var(--fc-status-success)"
-              : "var(--fc-accent-cyan)",
-          }}
-        >
-          {formatTime(timeRemaining)}
-        </div>
-        {timerHasEnded && (
-          <div
-            className="text-lg font-semibold mb-3"
-            style={{ color: "var(--fc-status-success)" }}
-          >
-            ⏱️ Time's Up!
-          </div>
-        )}
-        <div className="flex items-center justify-center gap-3 mb-2">
-          {!isActive && timeRemaining === durationSeconds && (
-            <Button
-              onClick={handleStartTimer}
-              className="bg-green-600 hover:bg-green-700 text-white"
-            >
-              <Play className="w-4 h-4 mr-2" />
-              Start Timer
-            </Button>
-          )}
-          {isActive && !timerHasEnded && (
-            <>
-              <Button onClick={handlePauseResume} variant="outline">
-                {isPaused ? (
-                  <>
-                    <Play className="w-4 h-4 mr-2" />
-                    Resume
-                  </>
-                ) : (
-                  <>
-                    <Pause className="w-4 h-4 mr-2" />
-                    Pause
-                  </>
-                )}
-              </Button>
-              <Button onClick={handleResetTimer} variant="outline">
-                <RotateCcw className="w-4 h-4 mr-2" />
-                Reset
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Weight and Reps Input */}
-      <div
-        className="p-4 rounded-xl"
-        style={{ background: "var(--fc-surface-sunken)" }}
-      >
-        <div className={`${logPairStyles.pair} ${logPairStyles.pairGapLg}`}>
-          <div className="space-y-2">
-            <LargeInput
-              label="Weight"
-              value={weight}
-              onChange={(val) => {
-                setIsWeightPristine(false);
-                setWeight(val);
-              }}
-              placeholder="0"
-              step="0.5"
-              unit="kg"
-              showStepper
-              stepAmount={2.5}
-              />
-            {suggested_weight != null && suggested_weight > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setWeight(String(suggested_weight));
-                  setIsWeightPristine(false);
-                }}
-                className="text-xs font-medium hover:underline"
-                style={{ color: "var(--fc-accent-cyan)" }}
-              >
-                {loadPercentage != null
-                  ? `${loadPercentage}% → ${suggested_weight} kg`
-                  : `Suggested: ${suggested_weight} kg`}{" "}
-                (tap to apply)
-              </button>
-            )}
-          </div>
-          <LargeInput
-            label="Total Reps"
-            hint={targetRepsParsed.displayHint ?? undefined}
-            value={reps}
-            onChange={(v) => {
-              setIsWeightPristine(false);
-              setReps(v);
-            }}
-            placeholder="0"
-            step="1"
-            showStepper
-            stepAmount={1}
-          />
-        </div>
-      </div>
-    </div>
-  );
-
   // Validate inputs for button state
-  // Check if inputs are valid numbers AND greater than 0
-  // Be very explicit about what constitutes valid input
   const weightStr = String(weight || "").trim();
   const repsStr = String(reps || "").trim();
-
-  // Parse the values
   const weightNum = weightStr ? parseWeightKgInput(weightStr) : NaN;
   const repsNum = repsStr ? parseInt(repsStr, 10) : NaN;
-
-  // Both must be valid numbers AND greater than 0
   const isValidInput =
     weightStr !== "" &&
     repsStr !== "" &&
@@ -662,88 +531,231 @@ export function AmrapExecutor({
     isFinite(repsNum) &&
     weightNum > 0 &&
     repsNum > 0;
-
-  // Check if exercise ID exists
   const hasExerciseId = !!currentExercise?.exercise_id;
-
-  // Determine if button should be disabled
   const logReadyAmrap = isValidInput && hasExerciseId && !isLoggingSet;
 
+  const exercises = liveSetEntry.setEntry.exercises || [];
+
+  const nudgeWeight = (delta: number) => {
+    const cur = parseWeightKgInput(weight || "0");
+    const next = Math.max(0, (isNaN(cur) ? 0 : cur) + delta);
+    setIsWeightPristine(false);
+    setWeight(String(Math.round(next * 2) / 2));
+  };
+  const nudgeReps = (delta: number) => {
+    const cur = parseInt(reps || "0", 10);
+    const next = Math.max(0, (isNaN(cur) ? 0 : cur) + delta);
+    setIsWeightPristine(false);
+    setReps(String(next));
+  };
+
+  const chrome = useWorkoutExecutionChrome();
+  const hideCompactBack = chrome?.hideCompactBack ?? false;
+  const totalSetEntries = allSetEntries.length || 1;
+  const canGoPrevious = currentSetEntryIndex > 0;
+  const canGoNext = currentSetEntryIndex < totalSetEntries - 1;
+  const previousPerf =
+    exerciseId && previousPerformanceMap
+      ? (previousPerformanceMap.get(exerciseId) ?? null)
+      : null;
+
   const isEditMode = !!editingSetId && !!editDraft;
-  const logButton = (
-    <div className="space-y-2">
-      {allowSetEditDelete && isEditMode ? (
-        <div className="flex gap-2 w-full">
-          <Button
-            variant="outline"
-            onClick={handleCancelEdit}
-            className="flex-1 h-12 text-base font-semibold rounded-xl"
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSaveEdit}
-            disabled={
-              isSavingEdit ||
-              !editDraft ||
-              editDraft.reps.trim() === "" ||
-              isNaN(parseInt(editDraft.reps, 10)) ||
-              parseInt(editDraft.reps, 10) <= 0
-            }
-            variant="fc-primary"
-            className="flex-1 h-12 text-base font-bold uppercase tracking-wider rounded-xl"
-          >
-            {isSavingEdit ? "Saving…" : "Save edits"}
-          </Button>
-        </div>
-      ) : (
-        <LogSetButton
-          onClick={handleLogSet}
-          ready={logReadyAmrap}
-          loading={isLoggingSet}
-          label="Log set"
-        />
-      )}
-    </div>
-  );
+  const fmt = formatTimeProp ?? formatTime;
+
+  /** Clock: live in-executor countdown (timeRemaining). */
+  const glueClock = fmt(timeRemaining);
 
   return (
-    <BaseBlockExecutorLayout
-      {...{
-        block,
-        onBlockComplete,
-        onNextBlock,
-        e1rmMap,
-        onE1rmUpdate,
-        sessionId,
-        assignmentId,
-        allBlocks,
-        currentBlockIndex,
-        onBlockChange,
-        currentExerciseIndex,
-        onExerciseIndexChange,
-        logSetToDatabase,
-        formatTime: formatTimeProp,
-        calculateSuggestedWeight,
-        onVideoClick,
-        onAlternativesClick,
-              onRestTimerClick,
-        onWorkoutBack,
-        previousPerformanceMap,
-      }}
-      exerciseName={currentExercise?.exercise?.name || "Exercise"}
-      prescriptionItems={prescriptionItems}
-      instructions={instructions}
-      currentSet={1}
-      totalSets={1}
-      progressLabel="Set"
-      loggingInputs={loggingInputs}
-      logButton={logButton}
-      showNavigation={true}
-      currentExercise={currentExercise}
-      showRestTimer={false}
-      progressionSuggestion={progressionSuggestion}
-      aboveStickyContent={aboveStickyContent}
-    />
+    <>
+      <div className="flex flex-col border-b border-white/5">
+        <div className="flex flex-col gap-3 px-0 pb-2 pt-1 sm:px-1">
+          {onWorkoutBack && !hideCompactBack ? (
+            <button
+              type="button"
+              onClick={onWorkoutBack}
+              className="-ml-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/10 hover:text-white active:scale-95"
+              aria-label="Back"
+            >
+              <ChevronLeft className="h-5 w-5" aria-hidden />
+            </button>
+          ) : null}
+
+          <LiveCard
+            hue={groupIndexToHue(currentSetEntryIndex)}
+            heading="Round"
+            status={timerHasEnded ? "complete" : "logging"}
+            statusLabel={
+              timerHasEnded ? "● Time's up" : "● In progress"
+            }
+          >
+            {exercises.map((ex, i) => {
+              const t = resolveSetPrescriptionTargets(
+                ex,
+                1,
+                liveSetEntry.setEntry.reps_per_set,
+              );
+              const loggedValue =
+                t.weight_kg != null
+                  ? `${t.reps ?? "—"} reps · ${t.weight_kg}kg`
+                  : `${t.reps ?? "—"} reps`;
+              return (
+                <LiveCardGroupedExercise
+                  key={ex.exercise_id ?? `amrap-ex-${i}`}
+                  badge={groupExerciseBadge(
+                    currentSetEntryIndex,
+                    ex.exercise_order,
+                    i,
+                  )}
+                  name={ex.exercise?.name || `Exercise ${i + 1}`}
+                  target={targetsToLiveCardTarget(t)}
+                  effort={effortFromPrescribedRir(t.rir)}
+                  logged
+                  loggedValue={loggedValue}
+                />
+              );
+            })}
+            {instructions ? (
+              <LiveCardNote>{instructions}</LiveCardNote>
+            ) : null}
+            <LiveCardLog>
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  {!isActive && timeRemaining === durationSeconds ? (
+                    <Button
+                      onClick={handleStartTimer}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      <Play className="w-4 h-4 mr-2" />
+                      Start Timer
+                    </Button>
+                  ) : null}
+                  {isActive && !timerHasEnded ? (
+                    <>
+                      <Button onClick={handlePauseResume} variant="outline">
+                        {isPaused ? (
+                          <>
+                            <Play className="w-4 h-4 mr-2" />
+                            Resume
+                          </>
+                        ) : (
+                          <>
+                            <Pause className="w-4 h-4 mr-2" />
+                            Pause
+                          </>
+                        )}
+                      </Button>
+                      <Button onClick={handleResetTimer} variant="outline">
+                        <RotateCcw className="w-4 h-4 mr-2" />
+                        Reset
+                      </Button>
+                    </>
+                  ) : null}
+                </div>
+
+                <LiveCardLogField
+                  label="Weight"
+                  value={editDraft ? editDraft.weight : weight}
+                  onChange={(val) => {
+                    if (editDraft)
+                      setEditDraft((d) => (d ? { ...d, weight: val } : null));
+                    else {
+                      setIsWeightPristine(false);
+                      setWeight(val);
+                    }
+                  }}
+                  onIncrement={() => nudgeWeight(2.5)}
+                  onDecrement={() => nudgeWeight(-2.5)}
+                />
+                <LiveCardLogField
+                  label="Total reps"
+                  value={editDraft ? editDraft.reps : reps}
+                  onChange={(val) => {
+                    if (editDraft)
+                      setEditDraft((d) => (d ? { ...d, reps: val } : null));
+                    else {
+                      setIsWeightPristine(false);
+                      setReps(val);
+                    }
+                  }}
+                  onIncrement={() => nudgeReps(1)}
+                  onDecrement={() => nudgeReps(-1)}
+                />
+                <LiveCardLogButton
+                  disabled={
+                    isEditMode
+                      ? isSavingEdit ||
+                        !editDraft ||
+                        editDraft.reps.trim() === "" ||
+                        isNaN(parseInt(editDraft.reps, 10)) ||
+                        parseInt(editDraft.reps, 10) <= 0
+                      : !logReadyAmrap
+                  }
+                  onClick={() => {
+                    if (isEditMode) void handleSaveEdit();
+                    else void handleLogSet();
+                  }}
+                />
+                {isEditMode ? (
+                  <Button variant="outline" onClick={handleCancelEdit}>
+                    Cancel edit
+                  </Button>
+                ) : null}
+                {!isEditMode &&
+                suggested_weight != null &&
+                suggested_weight > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWeight(String(suggested_weight));
+                      setIsWeightPristine(false);
+                    }}
+                    className="text-xs font-medium hover:underline text-left"
+                    style={{ color: "var(--fc-accent)" }}
+                  >
+                    {loadPercentage != null
+                      ? `${loadPercentage}% → ${suggested_weight} kg`
+                      : `Suggested: ${suggested_weight} kg`}{" "}
+                    (tap to apply)
+                  </button>
+                ) : null}
+              </div>
+            </LiveCardLog>
+            <LiveCardGlue timer={glueClock}>
+              ↻ &nbsp;as many rounds as possible
+            </LiveCardGlue>
+          </LiveCard>
+
+          {previousPerf?.lastWorkout != null || progressionSuggestion ? (
+            <div className="mx-4">
+              <ProgressionNudge
+                suggestion={progressionSuggestion}
+                previousPerformance={previousPerf}
+                showPreviousSession={false}
+              />
+            </div>
+          ) : null}
+
+          {aboveStickyContent}
+
+          <NavigationControls
+            currentBlock={currentSetEntryIndex + 1}
+            totalBlocks={totalSetEntries}
+            onPrevious={() => {
+              if (onSetEntryChange && canGoPrevious) {
+                onSetEntryChange(currentSetEntryIndex - 1);
+              }
+            }}
+            onNext={() => {
+              if (onSetEntryChange && canGoNext) {
+                onSetEntryChange(currentSetEntryIndex + 1);
+              }
+            }}
+            canGoPrevious={canGoPrevious}
+            canGoNext={canGoNext}
+          />
+        </div>
+        <LastSessionSetsSection lastWorkout={previousPerf?.lastWorkout ?? null} />
+      </div>
+    </>
   );
 }

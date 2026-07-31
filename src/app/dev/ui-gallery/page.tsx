@@ -20,6 +20,10 @@ import {
   Timer,
   Weight,
   User,
+  Eye,
+  UserPlus,
+  Edit,
+  Trash2,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 
@@ -91,6 +95,41 @@ import { HeroWorkoutCard } from "@/components/client/HeroWorkoutCard";
 import { SetProgressIndicator } from "@/components/client/workout-execution/ui/ProgressIndicator";
 import { PrescriptionCard } from "@/components/client/workout-execution/ui/PrescriptionCard";
 import { InstructionsBox } from "@/components/client/workout-execution/ui/InstructionsBox";
+import {
+  LiveCard,
+  LiveCardExerciseName,
+  LiveCardPrimary,
+  LiveCardStats,
+  LiveCardTechnique,
+  LiveCardLog,
+  LiveCardLogField,
+  LiveCardLogButton,
+  LiveCardGroupedExercise,
+  LiveCardGlue,
+  formatDropTechniqueBody,
+  effortFromPrescribedRir,
+} from "@/components/client/workout-execution/live-card";
+import { ExerciseDisplay, ExerciseGroupDisplay } from "@/components/exercise-display";
+import {
+  CollectionCard,
+  CollectionCardAssignedStat,
+  CollectionCardIconAction,
+  CollectionCardMetaChip,
+  CollectionCardMetaSep,
+  CollectionCardMetaText,
+  CollectionCardMetaValue,
+  CollectionCardStack,
+  COLLECTION_HUES,
+} from "@/components/ui/CollectionCard";
+import {
+  compactSupersetExercise,
+  emomGroup,
+  giantSetGroup,
+  isometricGroup,
+  straightSetGroup,
+  supersetGroup,
+  tabataGroup,
+} from "@/components/exercise-display/gallerySamples";
 
 function GallerySection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -211,7 +250,7 @@ export default function UiGalleryPage() {
 
       <div className="relative z-10 mx-auto w-full max-w-[1300px] px-4 pb-20 pt-10 md:px-6 lg:px-8">
         <header className="mb-8 rounded-2xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface-card)]/80 p-6 backdrop-blur-[var(--fc-blur-card)]">
-          <p className="text-xs uppercase tracking-[0.18em] text-[var(--fc-accent-lime)]">Developer route</p>
+          <p className="text-xs uppercase tracking-[0.18em] text-[var(--fc-accent)]">Developer route</p>
           <h1
             className="mt-2 fc-text-primary"
             style={{
@@ -304,13 +343,13 @@ export default function UiGalleryPage() {
                   Elevated (elevation 4) + stronger blur (24px)
                 </GlassCard>
                 <GlassCard tone="warning">Warning tone</GlassCard>
-                <GlassCard borderColor="var(--fc-accent-cyan)">Custom border color</GlassCard>
+                <GlassCard borderColor="var(--fc-accent)">Custom border color</GlassCard>
               </div>
             </PreviewCard>
             <PreviewCard name="ClientGlassCard" path="components/client-ui/GlassCard.tsx">
               <div className="grid gap-2">
                 <ClientGlassCard>Default client shell</ClientGlassCard>
-                <ClientGlassCard className="bg-[color:color-mix(in_srgb,var(--fc-accent-cyan)_10%,transparent)]">bg-* custom class</ClientGlassCard>
+                <ClientGlassCard className="bg-[color:color-mix(in_srgb,var(--fc-accent)_10%,transparent)]">bg-* custom class</ClientGlassCard>
                 {(["neutral", "success", "error", "warning", "info"] as const).map((tone) => (
                   <ClientGlassCard key={tone} tone={tone}>{tone} tone</ClientGlassCard>
                 ))}
@@ -374,7 +413,7 @@ export default function UiGalleryPage() {
             <PreviewCard name="MealPlanCard / ProgramCard / WorkoutTemplateCard" path="components/features/*">
               <div className="space-y-3">
                 <MealPlanCard mealPlan={{ id: "mp-1", name: "Sample Lean Bulk Plan", meal_count: 4, usage_count: 12, target_calories: 2450, target_protein: 180, target_carbs: 250, target_fat: 75, generated_config: { mode: "sample" } } as any} onEdit={() => undefined} onDelete={() => undefined} onAssign={() => undefined} />
-                <ProgramCard program={{ id: "p-1", name: "12-Week Strength Base", description: "Progressive overload with deload weeks.", coach_id: "coach-1", difficulty_level: "intermediate", duration_weeks: 12, target_audience: "General", category: "Strength", is_active: true, created_at: "2026-04-01", updated_at: "2026-04-27" }} onEdit={() => undefined} onOpenDetails={() => undefined} onAssign={() => undefined} onDelete={() => undefined} assignmentCount={8} />
+                <ProgramCard program={{ id: "p-1", name: "12-Week Strength Base", description: "Progressive overload with deload weeks.", coach_id: "coach-1", difficulty_level: "intermediate", totalWeeks: 12, target_audience: "General", is_active: true, created_at: "2026-04-01", updated_at: "2026-04-27" }} onEdit={() => undefined} onOpenDetails={() => undefined} onAssign={() => undefined} onDelete={() => undefined} assignmentCount={8} />
                 <WorkoutTemplateCard template={{ id: "wt-1", name: "Upper Power A", category: "workouts", exercises: [{ exercise: { name: "Bench Press", category: "Chest" } }, { exercise: { name: "Row", category: "Back" } }], exercise_count: 6, estimated_duration: 55 } as any} onEdit={() => undefined} onOpenDetails={() => undefined} onDelete={() => undefined} onDuplicate={() => undefined} onAssign={() => undefined} />
               </div>
             </PreviewCard>
@@ -610,6 +649,73 @@ export default function UiGalleryPage() {
                 <InstructionsBox instructions="Complete warm-up sets before your first working set. Focus on controlled tempo." />
               </div>
             </PreviewCard>
+            <PreviewCard
+              name="LiveCard v6 — Straight / Drop / Superset"
+              path="components/client/workout-execution/live-card/*"
+              note="Canonical mockup: design/mockups/execution-screen-v6-CANONICAL.html"
+            >
+              <div className="space-y-4 max-w-[390px]">
+                <LiveCard hue="a" heading="Set 1 of 3" status="logging">
+                  <LiveCardExerciseName name="Leg Press Wide Stance" />
+                  <LiveCardPrimary
+                    target={{ kind: "reps_only", reps: 6, unit: "reps" }}
+                    effort={effortFromPrescribedRir(10)}
+                  />
+                  <LiveCardStats rest="2:00" tempo="3010" last="6 × 7.5" />
+                  <LiveCardLog
+                    fields={
+                      <>
+                        <LiveCardLogField label="Weight" value="7.5" />
+                        <LiveCardLogField label="Reps" value="6" />
+                      </>
+                    }
+                  />
+                </LiveCard>
+                <LiveCard hue="a" heading="Set 2 of 4" status="logging">
+                  <LiveCardExerciseName name="Barbell Back Squat" />
+                  <LiveCardPrimary
+                    target={{ kind: "reps_weight", reps: 4, weight: 105 }}
+                    effort={effortFromPrescribedRir(8)}
+                  />
+                  <LiveCardStats rest="3:00" tempo="20X0" last="4 × 102.5" />
+                  <LiveCardTechnique title="Drop set">
+                    {formatDropTechniqueBody(20)}
+                  </LiveCardTechnique>
+                  <LiveCardLog
+                    fields={
+                      <>
+                        <LiveCardLogField label="Weight" value="105" />
+                        <LiveCardLogField label="Reps" value="4" />
+                      </>
+                    }
+                  />
+                </LiveCard>
+                <LiveCard hue="b" heading="Set 2 of 4" status="logging">
+                  <LiveCardGroupedExercise
+                    badge="A1"
+                    name="Back Squat"
+                    target={{ kind: "reps_weight", reps: 4, weight: 105 }}
+                    effort={effortFromPrescribedRir(8)}
+                    logSlot={
+                      <>
+                        <LiveCardLogField label="Weight" value="105" />
+                        <LiveCardLogField label="Reps" value="4" />
+                        <LiveCardLogButton />
+                      </>
+                    }
+                  />
+                  <LiveCardGroupedExercise
+                    badge="A2"
+                    name="Romanian Deadlift"
+                    target={{ kind: "reps_weight", reps: 8, weight: 68 }}
+                    effort={effortFromPrescribedRir(7)}
+                    logged
+                    loggedValue="8 × 68 kg"
+                  />
+                  <LiveCardGlue>↓ &nbsp;back to back · rest 2:00 after A2</LiveCardGlue>
+                </LiveCard>
+              </div>
+            </PreviewCard>
           </div>
         </GallerySection>
 
@@ -649,7 +755,7 @@ export default function UiGalleryPage() {
               <div className="flex flex-wrap items-center gap-3">
                 <button className="relative grid h-9 w-9 place-items-center rounded-lg border border-[color:var(--fc-glass-border)]">
                   <Bell className="h-4 w-4" />
-                  <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-[var(--fc-accent-lime)]" />
+                  <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-[var(--fc-accent)]" />
                 </button>
                 <button className="grid h-9 w-9 place-items-center rounded-lg border border-[color:var(--fc-glass-border)]">
                   <Bell className="h-4 w-4 fc-text-dim" />
@@ -668,11 +774,11 @@ export default function UiGalleryPage() {
                     </button>
                     <button className="relative grid h-10 w-10 place-items-center rounded-full border border-[color:var(--fc-glass-border)]">
                       <Bell className="h-4 w-4" />
-                      <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[var(--fc-accent-lime)]" />
+                      <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[var(--fc-accent)]" />
                     </button>
                   </div>
                 </div>
-                <button className="ml-auto grid h-14 w-14 place-items-center rounded-full bg-[var(--fc-accent-lime)] text-black shadow-[0_12px_30px_-10px_var(--fc-accent-lime-glow)]">
+                <button className="ml-auto grid h-14 w-14 place-items-center rounded-full bg-[var(--fc-accent)] text-black shadow-[0_12px_30px_-10px_var(--fc-accent-glow)]">
                   <Plus className="h-5 w-5" />
                 </button>
               </div>
@@ -715,34 +821,35 @@ export default function UiGalleryPage() {
                   alwaysVisible
                   components={[
                     {
-                      label: "Training",
-                      value: 82,
+                      label: "Adherence",
+                      value: 75,
                       delta: 3,
-                      subRows: [
-                        { label: "Completion", value: 90 },
-                        { label: "Execution", value: 70 },
-                      ],
+                      hint: "Program workouts completed this week",
                     },
                     {
-                      label: "Recovery",
-                      value: 71,
-                      delta: -2,
-                      subRows: [
-                        { label: "Sleep", value: 68 },
-                        { label: "Steps", value: 78 },
-                      ],
+                      label: "Execution",
+                      value: 82,
+                      delta: 5,
+                      hint: "Scales adherence (30–100% factor)",
                     },
-                    { label: "Nutrition", value: 40, delta: 5 },
-                    { label: "Extras", value: 0, delta: 0, hint: "Log activities to boost your score." },
+                    {
+                      label: "Training",
+                      value: 78,
+                      delta: -2,
+                      hint: "Combined training score from completion and execution",
+                    },
                   ]}
                 />
                 <ScoreBreakdown
                   alwaysVisible
                   components={[
-                    { label: "Training", value: 60, delta: -2 },
-                    { label: "Recovery", value: null, delta: 0 },
-                    { label: "Nutrition", value: 0, hint: "off" },
-                    { label: "Extras", value: 22 },
+                    { label: "Adherence", value: 0, delta: -25 },
+                    { label: "Execution", value: null, hint: "Shows after logged sets" },
+                    {
+                      label: "Training",
+                      value: 21,
+                      hint: "Combined training score from completion and execution",
+                    },
                   ]}
                 />
               </div>
@@ -803,14 +910,14 @@ export default function UiGalleryPage() {
                 </div>
                 <div className="space-y-2">
                   <p className="text-xs fc-text-subtle">WorkoutProgressBar samples</p>
-                  <div className="h-1.5 rounded bg-[color:var(--fc-surface-sunken)]"><div className="h-full w-0 rounded bg-[var(--fc-accent-cyan)]" /></div>
-                  <div className="h-1.5 rounded bg-[color:var(--fc-surface-sunken)]"><div className="h-full w-1/2 rounded bg-[var(--fc-accent-cyan)]" /></div>
-                  <div className="h-1.5 rounded bg-[color:var(--fc-surface-sunken)]"><div className="h-full w-full rounded bg-[var(--fc-accent-cyan)]" /></div>
+                  <div className="h-1.5 rounded bg-[color:var(--fc-surface-sunken)]"><div className="h-full w-0 rounded bg-[var(--fc-accent)]" /></div>
+                  <div className="h-1.5 rounded bg-[color:var(--fc-surface-sunken)]"><div className="h-full w-1/2 rounded bg-[var(--fc-accent)]" /></div>
+                  <div className="h-1.5 rounded bg-[color:var(--fc-surface-sunken)]"><div className="h-full w-full rounded bg-[var(--fc-accent)]" /></div>
                 </div>
                 <div className="rounded-lg border border-[color:var(--fc-glass-border)] p-2">
                   <p className="text-xs fc-text-subtle">RestTimerBar (mock)</p>
                   <div className="mt-2 h-2 rounded bg-[color:var(--fc-surface-sunken)]">
-                    <div className="h-full w-2/3 rounded bg-[var(--fc-accent-cyan)]" />
+                    <div className="h-full w-2/3 rounded bg-[var(--fc-accent)]" />
                   </div>
                   <p className="mt-1 text-xs fc-text-dim">Rest: 1:30 · Last set 100kg x 8</p>
                 </div>
@@ -845,7 +952,8 @@ export default function UiGalleryPage() {
                   todayWeekday={1}
                   selectedScheduleId="s2"
                   selectedRestWeekday={null}
-                  onDaySelect={() => undefined}
+                  onDayStart={() => undefined}
+                  onDayPreview={() => undefined}
                 />
                 <WeeklyStrip
                   weekStart={weekStart}
@@ -860,8 +968,8 @@ export default function UiGalleryPage() {
             </PreviewCard>
             <PreviewCard name="Pulse dot / Notification dot" path="inline pattern">
               <div className="flex items-center gap-4 text-sm">
-                <span className="inline-flex items-center gap-2"><span className="h-2 w-2 animate-pulse rounded-full bg-[var(--fc-accent-lime)]" /> Pulse (lime)</span>
-                <span className="inline-flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-[var(--fc-accent-lime)]" /> Notification dot</span>
+                <span className="inline-flex items-center gap-2"><span className="h-2 w-2 animate-pulse rounded-full bg-[var(--fc-accent)]" /> Pulse (action)</span>
+                <span className="inline-flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-[var(--fc-accent)]" /> Notification dot</span>
               </div>
             </PreviewCard>
             <PreviewCard name="TargetProgressBar" path="components/ui/TargetProgressBar.tsx">
@@ -950,7 +1058,7 @@ export default function UiGalleryPage() {
               <div className="space-y-3">
                 <div className="rounded-lg border border-[color:var(--fc-glass-border)] p-2 text-xs fc-text-dim">Header mock: avatar + bell row</div>
                 <div className="rounded-lg border border-[color:var(--fc-glass-border)] p-2 text-xs fc-text-dim">BottomNav mock: 5 items (Home/Check-in/Train/Fuel/Me)</div>
-                <div className="rounded-lg border border-[color:var(--fc-glass-border)] p-2 text-xs fc-text-dim">AnalyticsNav mock: Overview/Compliance/Progress/Reports</div>
+                <div className="rounded-lg border border-[color:var(--fc-glass-border)] p-2 text-xs fc-text-dim">AnalyticsNav mock: Insights/Reports</div>
                 <div className="rounded-lg border border-[color:var(--fc-glass-border)] p-2 text-xs fc-text-dim">CoachClientTabBar mock: Overview/Training/Stats/Nutrition/Check-ins/Profile</div>
                 <NavigationControls currentBlock={1} totalBlocks={4} onPrevious={() => undefined} onNext={() => undefined} />
               </div>
@@ -963,7 +1071,7 @@ export default function UiGalleryPage() {
                 </button>
                 <div className="grid grid-cols-4 gap-1">
                   {[1, 2, 3, 4].map((segment) => (
-                    <div key={segment} className={`h-1.5 rounded-full ${segment === 1 ? "bg-[var(--fc-accent-cyan)]" : "bg-[color:var(--fc-glass-border)]"}`} />
+                    <div key={segment} className={`h-1.5 rounded-full ${segment === 1 ? "bg-[var(--fc-accent)]" : "bg-[color:var(--fc-glass-border)]"}`} />
                   ))}
                 </div>
               </div>
@@ -973,7 +1081,7 @@ export default function UiGalleryPage() {
                 <div className="grid h-10 w-10 place-items-center rounded-full bg-[var(--fc-surface-sunken)] text-xs font-semibold">CN</div>
                 <div className="flex items-center gap-2">
                   <button className="grid h-10 w-10 place-items-center rounded-full border border-[color:var(--fc-glass-border)]"><CircleCheck className="h-4 w-4" /></button>
-                  <button className="relative grid h-10 w-10 place-items-center rounded-full border border-[color:var(--fc-glass-border)]"><Bell className="h-4 w-4" /><span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[var(--fc-accent-lime)]" /></button>
+                  <button className="relative grid h-10 w-10 place-items-center rounded-full border border-[color:var(--fc-glass-border)]"><Bell className="h-4 w-4" /><span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[var(--fc-accent)]" /></button>
                 </div>
               </div>
             </PreviewCard>
@@ -993,12 +1101,12 @@ export default function UiGalleryPage() {
             </PreviewCard>
             <PreviewCard name="Greeting block pattern" path="inline pattern">
               <div className="space-y-1">
-                <p className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-[var(--fc-accent-lime)]">
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--fc-accent-lime)]" />
+                <p className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-[var(--fc-accent)]">
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--fc-accent)]" />
                   Ready to move
                 </p>
                 <h3 className="text-3xl font-semibold fc-text-primary" style={{ fontFamily: "var(--font-bricolage-grotesque, var(--font-body))" }}>
-                  Hello, <span className="bg-gradient-to-r from-cyan-300 to-lime-300 bg-clip-text text-transparent">Client Name</span>
+                  Hello, <span className="bg-gradient-to-r from-[color-mix(in_srgb,var(--fc-group-c)_70%,white)] to-[color:var(--mastered)] bg-clip-text text-transparent">Client Name</span>
                 </h3>
                 <p className="text-sm fc-text-dim">Today · Apr 27</p>
               </div>
@@ -1007,8 +1115,8 @@ export default function UiGalleryPage() {
               <h3 className="text-[32px] font-semibold fc-text-primary" style={{ fontFamily: "var(--font-bricolage-grotesque, var(--font-body))" }}>Page Title Example</h3>
               <hr className="border-[color:var(--fc-glass-border)]" />
               <div className="flex flex-wrap gap-2 text-[10px] uppercase tracking-[0.15em] font-semibold">
-                <span className="text-[var(--fc-accent-lime)]">Eyebrow lime</span>
-                <span className="text-[var(--fc-accent-cyan)]">Eyebrow cyan</span>
+                <span className="text-[var(--fc-accent)]">Eyebrow action</span>
+                <span className="text-[var(--fc-accent)]">Eyebrow cyan</span>
                 <span className="text-[var(--fc-status-warning)]">Eyebrow gold</span>
                 <span className="fc-text-dim">Eyebrow dim</span>
               </div>
@@ -1025,7 +1133,7 @@ export default function UiGalleryPage() {
                 <h3 className="text-3xl">H3 Heading</h3>
               </div>
             </PreviewCard>
-            <PreviewCard name="Display numerals (Big Shoulders Display)" path="tokenized typography">
+            <PreviewCard name="Display numerals (var(--f-display))" path="tokenized typography">
               <div className="space-y-1" style={{ fontFamily: "var(--font-big-shoulders-display, var(--font-body))", lineHeight: 1 }}>
                 <p style={{ fontSize: 96 }}>96</p>
                 <p style={{ fontSize: 48 }}>48</p>
@@ -1086,6 +1194,152 @@ export default function UiGalleryPage() {
               </p>
             </PreviewCard>
           </div>
+        </GallerySection>
+
+        <GallerySection title="Element 15 — Exercise Display">
+          <p className="text-sm fc-text-dim max-w-3xl">
+            Canonical exercise + prescription readout (Station canvas grammar). Mapper consumes{" "}
+            <code className="font-mono text-xs">CanvasExercise</code> +{" "}
+            <code className="font-mono text-xs">CanvasGroup</code> from{" "}
+            <code className="font-mono text-xs">get_workout_canvas</code> /{" "}
+            <code className="font-mono text-xs">get_instance_workout_canvas</code>.
+          </p>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <PreviewCard name="(a) Straight set — list" path="exercise-display/ExerciseDisplay">
+              <ExerciseGroupDisplay {...straightSetGroup} size="list" />
+            </PreviewCard>
+            <PreviewCard name="(a) Straight set — executor" path="size=executor">
+              <ExerciseGroupDisplay {...straightSetGroup} size="executor" />
+            </PreviewCard>
+            <PreviewCard name="(b) Superset" path="exercise-display/ExerciseGroupDisplay">
+              <ExerciseGroupDisplay {...supersetGroup} />
+            </PreviewCard>
+            <PreviewCard name="(c) Giant set — BW + technique" path="3-slot group">
+              <ExerciseGroupDisplay {...giantSetGroup} />
+            </PreviewCard>
+            <PreviewCard name="(d) Isometric per-side" path="measurement=time">
+              <ExerciseGroupDisplay {...isometricGroup} />
+            </PreviewCard>
+            <PreviewCard name="(e) EMOM" path="rounds_driver=interval">
+              <ExerciseGroupDisplay {...emomGroup} />
+            </PreviewCard>
+            <PreviewCard name="(e) Tabata" path="all time slots">
+              <ExerciseGroupDisplay {...tabataGroup} />
+            </PreviewCard>
+            <PreviewCard name="(f) Compact mode in round context" path="compact prop">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--fc-text-subtle)] mb-2">
+                5 rounds · rest 1:30
+              </p>
+              <ExerciseGroupDisplay {...compactSupersetExercise} compact />
+            </PreviewCard>
+          </div>
+        </GallerySection>
+
+        <GallerySection title="Element 16 — Collection Card">
+          <p className="text-sm fc-text-dim max-w-3xl">
+            Governed roster card for Programs, Plans, and Clients collection pages. Spec:{" "}
+            <code className="font-mono text-xs">design/mockups/element-16-collection-card.html</code>
+          </p>
+          <PreviewCard name="CollectionCard" path="components/ui/CollectionCard.tsx">
+            <CollectionCardStack>
+              <CollectionCard
+                hue={COLLECTION_HUES.a}
+                name="Hypertrophy Base"
+                status="active"
+                meta={
+                  <>
+                    <CollectionCardMetaChip>Intermediate</CollectionCardMetaChip>
+                    <CollectionCardMetaSep />
+                    <CollectionCardMetaText>
+                      <CollectionCardMetaValue>12</CollectionCardMetaValue> wks
+                    </CollectionCardMetaText>
+                    <CollectionCardMetaSep />
+                    <CollectionCardMetaText>Fixed</CollectionCardMetaText>
+                    <CollectionCardMetaSep />
+                    <CollectionCardMetaText>4 days / wk</CollectionCardMetaText>
+                  </>
+                }
+                structure={[
+                  { label: "Foundation", duration: "4 weeks", flex: 4, phase: "light" },
+                  { label: "Hypertrophy", duration: "5 weeks", flex: 5, phase: "moderate" },
+                  { label: "Peak", duration: "3 weeks", flex: 3, phase: "hard" },
+                  { label: "Deload", duration: "2 weeks", flex: 2, phase: "deload" },
+                ]}
+                rightStat={
+                  <CollectionCardAssignedStat
+                    count={8}
+                    avatars={[
+                      { initials: "AP", background: COLLECTION_HUES.a },
+                      { initials: "MK", background: COLLECTION_HUES.b },
+                      { initials: "RD", background: COLLECTION_HUES.c },
+                    ]}
+                  />
+                }
+                actions={
+                  <>
+                    <CollectionCardIconAction icon={<Eye className="h-[15px] w-[15px]" />} label="View" />
+                    <CollectionCardIconAction icon={<UserPlus className="h-[15px] w-[15px]" />} label="Assign" />
+                    <CollectionCardIconAction icon={<Edit className="h-[15px] w-[15px]" />} label="Edit" />
+                    <CollectionCardIconAction icon={<Trash2 className="h-[15px] w-[15px]" />} label="Delete" variant="danger" />
+                  </>
+                }
+              />
+              <CollectionCard
+                hue={COLLECTION_HUES.d}
+                name="Peaking Block"
+                status="active"
+                meta={
+                  <>
+                    <CollectionCardMetaChip>Advanced</CollectionCardMetaChip>
+                    <CollectionCardMetaSep />
+                    <CollectionCardMetaText>
+                      <CollectionCardMetaValue>4</CollectionCardMetaValue> wks
+                    </CollectionCardMetaText>
+                    <CollectionCardMetaSep />
+                    <CollectionCardMetaText>Fixed</CollectionCardMetaText>
+                    <CollectionCardMetaSep />
+                    <CollectionCardMetaText>4 days / wk</CollectionCardMetaText>
+                  </>
+                }
+                rightStat={<CollectionCardAssignedStat count={0} />}
+                actions={
+                  <>
+                    <CollectionCardIconAction icon={<Eye className="h-[15px] w-[15px]" />} label="View" />
+                    <CollectionCardIconAction icon={<UserPlus className="h-[15px] w-[15px]" />} label="Assign" />
+                    <CollectionCardIconAction icon={<Edit className="h-[15px] w-[15px]" />} label="Edit" />
+                    <CollectionCardIconAction icon={<Trash2 className="h-[15px] w-[15px]" />} label="Delete" variant="danger" />
+                  </>
+                }
+              />
+              <CollectionCard
+                hue={COLLECTION_HUES.a}
+                name="Old Cut Program"
+                status="inactive"
+                meta={
+                  <>
+                    <CollectionCardMetaChip>Intermediate</CollectionCardMetaChip>
+                    <CollectionCardMetaSep />
+                    <CollectionCardMetaText>
+                      <CollectionCardMetaValue>10</CollectionCardMetaValue> wks
+                    </CollectionCardMetaText>
+                    <CollectionCardMetaSep />
+                    <CollectionCardMetaText>Fixed</CollectionCardMetaText>
+                    <CollectionCardMetaSep />
+                    <CollectionCardMetaText>5 days / wk</CollectionCardMetaText>
+                  </>
+                }
+                rightStat={<CollectionCardAssignedStat count={0} />}
+                actions={
+                  <>
+                    <CollectionCardIconAction icon={<Eye className="h-[15px] w-[15px]" />} label="View" />
+                    <CollectionCardIconAction icon={<UserPlus className="h-[15px] w-[15px]" />} label="Assign" />
+                    <CollectionCardIconAction icon={<Edit className="h-[15px] w-[15px]" />} label="Edit" />
+                    <CollectionCardIconAction icon={<Trash2 className="h-[15px] w-[15px]" />} label="Delete" variant="danger" />
+                  </>
+                }
+              />
+            </CollectionCardStack>
+          </PreviewCard>
         </GallerySection>
 
         <GallerySection title="10. MEDIA / MISC">

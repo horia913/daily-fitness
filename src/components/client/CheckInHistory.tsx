@@ -216,10 +216,10 @@ export function CheckInHistory({
                     background: "var(--cs-good-soft)",
                   }
                 : {
-                    color: isToday ? "var(--cs-cyan)" : "var(--cs-t4)",
-                    borderColor: isToday ? "var(--cs-cyan)" : "var(--cs-line-2)",
+                    color: isToday ? "var(--fc-accent)" : "var(--cs-t4)",
+                    borderColor: isToday ? "var(--fc-accent)" : "var(--cs-line-2)",
                     background: "var(--cs-card-2)",
-                    boxShadow: isToday ? "0 0 0 2px var(--cs-cyan-soft), inset 0 0 0 1px var(--cs-cyan-dim)" : undefined,
+                    boxShadow: isToday ? "0 0 0 2px var(--fc-accent-dim), inset 0 0 0 1px var(--fc-accent-glow)" : undefined,
                   }
           }
         >
@@ -252,7 +252,7 @@ export function CheckInHistory({
         <div className="relative z-[1]">
           <p
             className={cn(checkinSuiteStyles.fontMono, "text-[10px] font-semibold uppercase tracking-[0.16em] mb-2")}
-            style={{ color: "var(--cs-cyan)" }}
+            style={{ color: "var(--fc-accent)" }}
           >
             History & stats
           </p>
@@ -285,7 +285,7 @@ export function CheckInHistory({
               <span className={cn(checkinSuiteStyles.fontMono, "text-[9px] uppercase tracking-[0.1em]")} style={{ color: "var(--cs-t3)" }}>
                 Personal best
               </span>
-              <p className={cn(checkinSuiteStyles.fontDisplay, "text-xl font-bold")} style={{ color: "var(--cs-lime)" }}>
+              <p className={cn(checkinSuiteStyles.fontDisplay, "text-xl font-bold")} style={{ color: "var(--fc-accent)" }}>
                 {bestStreak}{" "}
                 <span className={cn(checkinSuiteStyles.fontBody, "text-[10px] font-normal")} style={{ color: "var(--cs-t3)" }}>
                   {bestStreak === 1 ? "day" : "days"}
@@ -302,7 +302,7 @@ export function CheckInHistory({
               <span className={cn(checkinSuiteStyles.fontMono, "text-[9px] uppercase tracking-[0.1em]")} style={{ color: "var(--cs-t3)" }}>
                 This month
               </span>
-              <p className={cn(checkinSuiteStyles.fontDisplay, "text-xl font-bold")} style={{ color: "var(--cs-cyan)" }}>
+              <p className={cn(checkinSuiteStyles.fontDisplay, "text-xl font-bold")} style={{ color: "var(--fc-accent)" }}>
                 {monthlyStats?.loggedDays || 0}
                 <span className={cn(checkinSuiteStyles.fontBody, "text-[13px] font-normal")} style={{ color: "var(--cs-t3)" }}>
                   {" "}
@@ -344,9 +344,9 @@ export function CheckInHistory({
               }}
               className={cn(checkinSuiteStyles.fontMono, "px-2.5 py-1 rounded-lg border text-[9.5px] font-semibold uppercase tracking-[0.08em]")}
               style={{
-                background: "var(--cs-cyan-soft)",
-                borderColor: "var(--cs-cyan-dim)",
-                color: "var(--cs-cyan)",
+                background: "var(--fc-accent-dim)",
+                borderColor: "var(--fc-accent-glow)",
+                color: "var(--fc-accent)",
               }}
             >
               Today

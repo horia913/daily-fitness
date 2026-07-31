@@ -1,0 +1,95 @@
+# INLINE MEAL CANVAS — PROMPT 3: GREP-FIRST ORPHAN CLEANUP
+**Date:** 2026-07-05
+
+---
+
+## 1. Per-candidate table
+
+| Candidate | Grep result | Action |
+|-----------|-------------|--------|
+| **MealCreator** (`src/components/coach/MealCreator.tsx`) | Zero live imports/JSX in `src/`. References only in docs, audits, mockups. P1 unmounted from builder. | **Deleted** |
+| **MealOptionEditor** (`src/components/coach/MealOptionEditor.tsx`) | Zero live imports/JSX in `src/`. P2 inline create-food uses `foodCatalogForm` + `InlineCreateFoodForm`, not this modal. | **Deleted** |
+| **MealPlanCard** (`src/components/features/nutrition/MealPlanCard.tsx`) | Live import + JSX in `src/app/dev/ui-gallery/page.tsx` (L62 import, L384–386 preview). No production route imports. | **Skipped** — still referenced by ui-gallery |
+| **MealForm** (`src/components/MealForm.tsx`) | Only import: `MealPlanBuilder.tsx` (also orphan). No route/page imports. | **Deleted** (with MealPlanBuilder) |
+| **MealPlanBuilder** (`src/components/MealPlanBuilder.tsx`) | Zero imports from any route/page. `/coach/meals` route does not exist. `MealPlanBuilderContent` on builder page is a **local function**, not this component. | **Deleted** |
+| **OptimizedFoodDatabase** (`src/components/coach/OptimizedFoodDatabase.tsx`) | Zero live imports. `/coach/nutrition/foods` redirects to workspace tab. Comment-only mention in `fetchCoachFoods.ts`. | **Deleted** |
+| **OptimizedNutritionAssignments** (`src/components/coach/OptimizedNutritionAssignments.tsx`) | Zero live imports. `/coach/nutrition/assignments` redirects to workspace tab. Comment-only mention in `fetchCoachAssignments.ts`. | **Deleted** |
+
+---
+
+## 2. Files deleted
+
+```
+src/components/coach/MealCreator.tsx
+src/components/coach/MealOptionEditor.tsx
+src/components/MealForm.tsx
+src/components/MealPlanBuilder.tsx
+src/components/coach/OptimizedFoodDatabase.tsx
+src/components/coach/OptimizedNutritionAssignments.tsx
+```
+
+### Barrel-export lines removed
+
+**None.** Grep of all `index.ts` / `index.tsx` files found no barrel re-exports for any deleted candidate. No barrel edits required.
+
+---
+
+## 3. Skipped candidates (still referenced)
+
+| Candidate | Referencing file(s) | Notes |
+|-----------|---------------------|-------|
+| **MealPlanCard** | `src/app/dev/ui-gallery/page.tsx` | Dev gallery preview only — not used by production nutrition workspace (tables rebuild). Remove gallery import/preview in a separate ui-gallery cleanup if desired. |
+
+**MealForm / MealPlanBuilder:** Both were fully unreferenced by live routes (legacy `/coach/meals` route absent). Deleted together; no skip needed.
+
+---
+
+## 4. Optimized* components — discovery summary
+
+| Component | Path | Nutrition-related? | Live refs? | Action |
+|-----------|------|------------------|------------|--------|
+| OptimizedFoodDatabase | `src/components/coach/OptimizedFoodDatabase.tsx` | Yes | No (orphaned after workspace tables) | **Deleted** |
+| OptimizedNutritionAssignments | `src/components/coach/OptimizedNutritionAssignments.tsx` | Yes | No (orphaned after workspace tables) | **Deleted** |
+| OptimizedWorkoutTemplates | `src/components/coach/OptimizedWorkoutTemplates.tsx` | No | Yes (workouts) | **Out of scope — skipped** |
+| OptimizedExerciseLibrary | `src/components/coach/OptimizedExerciseLibrary.tsx` | No | Yes (exercises) | **Out of scope — skipped** |
+| OptimizedClientProgress | `src/components/coach/OptimizedClientProgress.tsx` | No | Yes | **Out of scope — skipped** |
+| OptimizedAnalyticsOverview | `src/components/coach/OptimizedAnalyticsOverview.tsx` | No | Yes | **Out of scope — skipped** |
+| OptimizedDetailedReports | `src/components/coach/OptimizedDetailedReports.tsx` | No | Yes | **Out of scope — skipped** |
+| OptimizedComplianceDashboard | `src/components/coach/OptimizedComplianceDashboard.tsx` | No | Yes | **Out of scope — skipped** |
+| optimized-image | `src/components/ui/optimized-image.tsx` | No (UI primitive) | Yes | **Out of scope — skipped** |
+
+Comment-only references to deleted Optimized* components remain in:
+- `src/components/coach/nutrition/fetchCoachFoods.ts` (JSDoc mentions OptimizedFoodDatabase)
+- `src/components/coach/nutrition/fetchCoachAssignments.ts` (JSDoc mentions OptimizedNutritionAssignments)
+
+These are documentation comments, not imports — left intact (no behavior change).
+
+---
+
+## 5. Explicitly preserved (not touched)
+
+- `MealPlanMetadataModal`, `MealPlanAssignmentModal` — still live
+- P1/P2 inline canvas stack: `MealPlanDraftContext`, `CoachPlanBuilderView`, `MealListEditor`, `InlineFoodSearch`, `InlineCreateFoodForm`, `foodCatalogForm`, recents/keyboard helpers
+- Client-side (`ClientMealsView`, etc.) and generator — untouched
+- Phase D stragglers (canvasTokens, inline-hex, ui-gallery sections beyond MealPlanCard skip, etc.) — untouched
+
+---
+
+## 6. TypeScript check
+
+```
+npx tsc --noEmit
+Exit code: 0
+```
+
+No type errors after deletions — confirms nothing in the live dependency graph referenced the removed files.
+
+---
+
+## 7. Sanity check note
+
+No behavior change expected. Nutrition workspace (`/coach/nutrition`) uses `CoachNutritionWorkspace` tables; plan builder (`/coach/nutrition/meal-plans/[id]`) uses inline canvas from P1/P2. Deleted components were unmounted/orphaned prior to this cleanup.
+
+**Follow-up (optional):** Remove `MealPlanCard` from `ui-gallery/page.tsx` and delete the card component in a dedicated gallery/straggler pass.
+
+**Parked:** drag-to-reorder meals/options/foods.

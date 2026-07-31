@@ -3,8 +3,9 @@
   overflow: hidden;
   border-radius: 18px;
   padding: 14px;
-  border: 1px solid var(--fc-glass-border);
-  background: var(--fc-surface-card);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  min-width: 0;
 }
 
 .activeCard::before {
@@ -17,7 +18,7 @@
   background: linear-gradient(
     90deg,
     var(--fc-set-type-straight),
-    var(--fc-accent-lime-2)
+    var(--fc-accent)
   );
 }
 
@@ -34,7 +35,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 11px;
   color: var(--fc-text-subtle);
 }
@@ -51,8 +52,8 @@
 }
 
 .dayPill {
-  background: var(--fc-glass-soft);
-  border: 1px solid var(--fc-divider);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
   padding: 7px 4px;
   display: flex;
@@ -63,11 +64,11 @@
 
 .dayPillToday {
   border: 1px solid var(--fc-set-type-straight);
-  background: color-mix(in srgb, var(--fc-set-type-straight) 4%, transparent);
+  background: color-mix(in srgb, var(--fc-set-type-straight) 8%, transparent);
 }
 
 .dayLabel {
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 9px;
   text-transform: uppercase;
   color: var(--fc-text-subtle);
@@ -86,7 +87,8 @@
 }
 
 .iconEmpty {
-  background: rgba(255, 255, 255, 0.04);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--fc-text-quaternary);
 }
 
@@ -100,9 +102,9 @@
   color: var(--fc-effort-easy);
 }
 
-.actionGrid3 {
+.actionGrid2 {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 6px;
   margin-top: 10px;
 }
@@ -114,7 +116,7 @@
   gap: 6px;
   padding: 9px 6px;
   border-radius: 11px;
-  border: 1px solid var(--fc-glass-border);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   background: transparent;
   font-size: 11.5px;
   font-weight: 500;
@@ -128,10 +130,11 @@
 }
 
 .section {
-  background: var(--fc-surface-card);
-  border: 1px solid var(--fc-glass-border);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 18px;
   padding: 14px;
+  min-width: 0;
 }
 
 .sectionHead {
@@ -144,7 +147,7 @@
 }
 
 .eyebrowCyan {
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -178,28 +181,30 @@
 
 .programRow {
   padding: 8px 10px;
-  border: 1px solid var(--fc-divider);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 11px;
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 6px;
   cursor: pointer;
+  background: transparent;
   transition: background 0.15s ease;
 }
 
 .programRow:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .groupHead {
   padding: 8px 10px;
-  background: var(--fc-glass-soft);
-  border: 1px solid var(--fc-divider);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 11px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   margin-bottom: 6px;
 }
 
@@ -211,29 +216,31 @@
   min-width: 0;
 }
 
-.countPill {
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
-  font-size: 10px;
-  color: var(--fc-text-subtle);
-  background: rgba(255, 255, 255, 0.04);
-  padding: 2px 7px;
-  border-radius: 999px;
-  flex-shrink: 0;
-}
-
 .groupRow {
   padding: 8px 10px;
-  border: 1px solid var(--fc-divider);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 11px;
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 6px;
   cursor: pointer;
+  background: transparent;
+}
+
+.countPill {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  color: var(--fc-text-subtle);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 2px 7px;
+  border-radius: 999px;
+  flex-shrink: 0;
 }
 
 .badge {
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 8.5px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -254,8 +261,30 @@
 }
 
 .badgeAssigned {
-  background: rgba(255, 255, 255, 0.05);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.14);
   color: var(--fc-text-subtle);
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.deskPair {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (min-width: 1024px) {
+  .deskPair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    align-items: start;
+  }
 }
 
 .bottomGrid {
@@ -272,9 +301,9 @@
   gap: 8px;
   padding: 11px 14px;
   border-radius: 13px;
-  border: 1px solid var(--fc-glass-border);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   background: transparent;
-  font-family: var(--font-geist-sans, ui-sans-serif);
+  font-family: var(--font-body);
   font-weight: 600;
   font-size: 12.5px;
   color: var(--fc-text-primary);
@@ -289,15 +318,15 @@
   padding: 11px 14px;
   border-radius: 13px;
   border: none;
-  font-family: var(--font-geist-sans, ui-sans-serif);
+  font-family: var(--font-body);
   font-weight: 600;
   font-size: 12.5px;
   color: var(--fc-ink);
   cursor: pointer;
   background: linear-gradient(
     135deg,
-    var(--fc-set-type-straight),
-    color-mix(in srgb, var(--fc-set-type-straight) 72%, var(--fc-glass-soft))
+    var(--fc-accent),
+    color-mix(in srgb, var(--fc-accent) 75%, #0a3a40)
   );
 }
 

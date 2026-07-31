@@ -1,0 +1,85 @@
+REFINE (v2) — compact card / RPE word / max-loaded fit
+Date: 2026-07-17
+Scope: presentation only. No logging/write-path, DB, or git changes.
+tsc: 0 errors
+
+--------------------------------------------------------------------------------
+1. Files modified
+--------------------------------------------------------------------------------
+Live card core
+  src/components/client/workout-execution/live-card/liveCard.module.css
+  src/components/client/workout-execution/live-card/LiveCard.tsx
+  src/components/client/workout-execution/live-card/LiveCardPrimary.tsx
+  src/components/client/workout-execution/live-card/LiveCardTechnique.tsx  (+ LiveCardNote)
+  src/components/client/workout-execution/live-card/LiveCardGroupedExercise.tsx
+  src/components/client/workout-execution/live-card/formatLiveCard.ts
+  src/components/client/workout-execution/live-card/index.ts
+
+Shared UI
+  src/components/client/workout-execution/ui/ExerciseActionButtons.tsx
+  src/components/client/workout-execution/ui/LoggedEffortInline.tsx  (new)
+  src/components/client/workout-execution/ui/LoggedSetsList.tsx
+  src/components/client/workout-execution/ui/set-rows/setUnitRow.module.css
+  src/components/client/workout-execution/BaseBlockExecutor.tsx
+
+Block executors
+  StraightSet, DropSet, GiantSet, Superset, ClusterSet, RestPause,
+  Emom, Amrap, ForTime, TimedSet, Tabata, SpeedWork, Endurance
+
+--------------------------------------------------------------------------------
+2. Log / swap / fit + previous-session removal
+--------------------------------------------------------------------------------
+- Log fields: steppers ~22×14, value 19px, ✓ button 50px; two fields + ✓ stay
+  one row (flex, min-width:0) for 375px.
+- Swap: ghost ~15px icon in ~26px hit area at end of exercise-name row
+  (LiveCardExerciseName endSlot). Action still wired via onAlternativesClick.
+  Default ExerciseActionButtons variant is ghost; filled kept for legacy use.
+- Previous-session block: ProgressionNudge showPreviousSession={false} on all
+  live-card executors + BaseBlockExecutor. Last stat still shows last set;
+  date folded in when lastWorkout.date exists (formatLiveLast + formatLiveLastDate).
+
+--------------------------------------------------------------------------------
+3. RPE-word placement + mapping/colours
+--------------------------------------------------------------------------------
+- New LoggedEffortInline: ` · RPE N · Hard` with word coloured by tier.
+- Mapping: workoutEffortLabels → rpeToEffortTier / clientEffortLabelFromStoredRpe
+- Colours: --fc-effort-easy|medium|hard|max (same as effort primary stat)
+- Placed on: done .srow summaries (straight/drop/giant/superset) and
+  LoggedSetsList titles when row.rpe is set.
+
+--------------------------------------------------------------------------------
+4. Load % + coach-note slots
+--------------------------------------------------------------------------------
+- Load %: LiveCardPrimary loadPct → small `· 75%` suffix on Target when
+  exercise.load_percentage > 0. Absolute weight remains primary.
+- Coach note: LiveCardNote slot below technique. Shown when
+  currentExercise.notes / set_notes exist — these are already client-facing
+  in the execution path (not coach-only). Wired across live-card executors.
+- Technique slot unchanged (drop / cluster / rest-pause formatters).
+
+--------------------------------------------------------------------------------
+5. Giant-set trim
+--------------------------------------------------------------------------------
+- LiveCardGroupedExercise stays Target|Effort + optional note + log per exercise.
+- No per-exercise 3-stat strip; tempo/last as compact gxHint when present.
+- Shared rest remains in LiveCardGlue.
+- loadPct + note passed per exercise on giant + superset.
+
+--------------------------------------------------------------------------------
+6. Max-loaded 375px fit
+--------------------------------------------------------------------------------
+- Layout matches card-max-loaded-375.html slot schema:
+  name+swap · Target(+%)|Effort · Rest·Tempo·Last · Technique · Note · Log · srows
+- Horizontal overflow guarded via flex min-width:0, compact log, tighter gx padding.
+- Visual confirm recommended in DevTools iPhone SE (375) on a fully prescribed
+  straight/drop set and a 3-exercise giant.
+
+--------------------------------------------------------------------------------
+7. Wired vs deferred
+--------------------------------------------------------------------------------
+All four items wired in this pass (1+2+3+4). No escape-hatch stop.
+
+--------------------------------------------------------------------------------
+8. tsc result
+--------------------------------------------------------------------------------
+npx tsc --noEmit → exit 0 (0 errors)

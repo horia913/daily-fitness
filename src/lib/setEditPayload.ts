@@ -4,12 +4,6 @@
  * Mirrors server whitelist in src/app/api/sets/[id]/route.ts.
  * App set_type (e.g. drop_set, pre_exhaustion, for_time) is normalized to API names.
  */
-const BLOCK_TYPE_TO_API: Record<string, string> = {
-  drop_set: 'dropset',
-  pre_exhaustion: 'preexhaust',
-  for_time: 'fortime',
-};
-
 const WHITELIST: Record<string, Set<string>> = {
   straight_set: new Set(['weight', 'reps', 'set_number', 'rpe']),
   superset: new Set([
@@ -24,7 +18,7 @@ const WHITELIST: Record<string, Set<string>> = {
   ]),
   giant_set: new Set(['round_number', 'giant_set_exercises', 'rpe']),
   amrap: new Set(['exercise_id', 'weight', 'amrap_total_reps', 'amrap_duration_seconds', 'amrap_target_reps', 'rpe']),
-  dropset: new Set([
+  drop_set: new Set([
     'set_number',
     'dropset_initial_weight',
     'dropset_initial_reps',
@@ -47,7 +41,7 @@ const WHITELIST: Record<string, Set<string>> = {
     'max_rest_pauses',
     'rpe',
   ]),
-  preexhaust: new Set([
+  pre_exhaustion: new Set([
     'set_number',
     'preexhaust_isolation_exercise_id',
     'preexhaust_isolation_weight',
@@ -59,7 +53,7 @@ const WHITELIST: Record<string, Set<string>> = {
   ]),
   emom: new Set(['exercise_id', 'weight', 'emom_minute_number', 'emom_total_reps_this_min', 'emom_total_duration_sec', 'rpe']),
   tabata: new Set(['exercise_id', 'tabata_rounds_completed', 'tabata_total_duration_sec', 'rpe']),
-  fortime: new Set([
+  for_time: new Set([
     'exercise_id',
     'weight',
     'fortime_total_reps',
@@ -78,8 +72,7 @@ export function buildSetEditPatchPayload(
   blockType: string,
   editDraft: Record<string, unknown>
 ): Record<string, unknown> {
-  const apiBlockType = BLOCK_TYPE_TO_API[blockType] ?? blockType
-  const allowed = WHITELIST[apiBlockType] ?? WHITELIST.straight_set
+  const allowed = WHITELIST[blockType] ?? WHITELIST.straight_set
   const payload: Record<string, unknown> = {}
   for (const key of Object.keys(editDraft)) {
     if (!allowed.has(key)) continue

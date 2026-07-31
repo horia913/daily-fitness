@@ -67,7 +67,7 @@ export function WeeklyBarChart({
                         height: `${hPct}%`,
                         background:
                           variant === "cyan"
-                            ? "linear-gradient(180deg, var(--cyan), rgba(79,227,232,0.4))"
+                            ? "linear-gradient(180deg, var(--fc-accent), rgba(34, 211, 238, 0.4))"
                             : "linear-gradient(180deg, var(--purple), rgba(167,139,250,0.4))",
                       }
                 }

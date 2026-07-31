@@ -20,18 +20,18 @@ export function GoalCompletionSection({
     <SectionCard>
       <SectionHead
         icon={Target}
-        iconClassName="bg-[rgba(79,227,232,0.12)] text-[var(--cyan)]"
+        iconClassName="bg-[color:var(--fc-group-c-soft)] text-[var(--fc-accent)]"
         title="Goal completion"
       />
       {total === 0 ? (
         <EmptyStateBlock
           icon={Target}
           title="No goals set yet"
-          description="Set targets in your profile to track progress."
+          description="Set targets on your Goals page to track progress."
           actions={[
             {
-              label: "Open profile",
-              onClick: () => router.push("/client/profile"),
+              label: "Open goals",
+              onClick: () => router.push("/client/goals"),
               variant: "primary",
             },
           ]}
@@ -40,11 +40,11 @@ export function GoalCompletionSection({
         <div className="flex flex-col gap-3">
           <GoalCompletionRing completed={completed} total={total} />
           <Link
-            href="/client/profile"
-            className="text-center text-[10px] font-medium text-[var(--cyan)] underline-offset-2 hover:underline"
+            href="/client/goals"
+            className="text-center text-[10px] font-medium text-[var(--fc-accent)] underline-offset-2 hover:underline"
             style={{ fontFamily: 'var(--f-mono, "Geist Mono", monospace)' }}
           >
-            Manage goals in profile
+            Manage goals
           </Link>
         </div>
       )}

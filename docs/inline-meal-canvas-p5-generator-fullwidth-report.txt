@@ -1,0 +1,70 @@
+# P5 FOLLOW-UP — GENERATOR WIZARD: FULL-WIDTH + FILL FORM STEPS
+**Date:** 2026-07-05
+
+---
+
+## 1. Files changed
+
+- `src/app/coach/nutrition/generator/page.tsx` — shell variant, step 1 band layout, step 2 food-search columns
+- `src/app/coach/nutrition/generator/generator.module.css` — removed `formCol` cap; added `formCanvas`, `configBand`, `manualMacroGrid`, `foodSearchCols`
+
+**Logic fence:** `mealPlanGeneratorService.ts`, API route, `fetchApi`, and all handler orchestration **untouched**.
+
+---
+
+## 2. Shell variant + form cap
+
+| Change | Before | After |
+|--------|--------|-------|
+| `CoachPageShell` | `widthVariant="data-7xl"` | `widthVariant="canvas-full"` |
+| Form wrapper | `gen.formCol` (max-width 36rem) | `gen.formCanvas` (width 100%, no cap) |
+
+Page gutters unchanged — `gen.page` matches builder padding (20px → 28px @ 640px → 32px @ 1024px).
+
+---
+
+## 3. Step 1 & Step 2 layout
+
+### Step 1 — Targets
+
+**`configBand` grid** (≥640px): plan name in `2fr` column; daily calories, meals/day, and options/meal each in `minmax(7rem, 11rem)` columns — distributed across one horizontal band, no single field stretched edge-to-edge.
+
+**Macros band** (`macroBand`): full-width section below config band.
+- Auto mode: mono readout line spans the band.
+- Manual mode: **`manualMacroGrid`** — 4 columns @ ≥1024px, 2 @ tablet, 1 @ mobile.
+
+### Step 2 — Food Rules
+
+- **Dietary restrictions:** `presetGrid` flex-wrap — chips fill full canvas width.
+- **Meal styles:** existing `styleGrid` — 4 columns @ ≥1024px (Breakfast · Lunch · Dinner · Snack in a row).
+- **Exclude + Required:** merged into one section with **`foodSearchCols`** — two equal columns @ ≥1024px, stacked @ `<1024px`.
+
+No individual inputs span the full canvas; numeric/select columns use constrained `minmax` widths.
+
+---
+
+## 4. Step 3 — Review at full width
+
+Step 3 uses `gen.formCanvas` (same as steps 1–2). `PlanMacroStrip` and builder meal rows inherit full canvas width — macro strip 2×2 + legend collapse from `mealDisplay.module.css` `@media (max-width: 1023px)` unchanged. No logic or markup changes to review handlers.
+
+---
+
+## 5. Responsive collapse (`<1024px`)
+
+| Layout | ≥1024px | `<1024px` |
+|--------|---------|-----------|
+| `configBand` | 4 columns (name + 3 numerics) | 2 columns; plan name full width |
+| `configBand` | — | `<640px`: single column |
+| `manualMacroGrid` | 4 columns | 2 columns → 1 column |
+| `styleGrid` | 4 columns | 2 columns → 1 column |
+| `foodSearchCols` | 2 columns (exclude \| required) | 1 column stacked |
+| Macro strip | 4 + legend | 2×2 + legend below (builder CSS) |
+
+---
+
+## 6. TypeScript check
+
+```
+npx tsc --noEmit
+Exit code: 0
+```

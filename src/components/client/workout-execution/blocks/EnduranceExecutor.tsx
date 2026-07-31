@@ -1,20 +1,37 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Route, Activity, Heart, Clock, Flame } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
-import { BaseBlockExecutorLayout } from "../BaseBlockExecutor";
 import { LargeInput } from "../ui/LargeInput";
-import logPairStyles from "../ui/logWeightRepsPair.module.css";
-import { BaseBlockExecutorProps } from "../types";
-import type { PrescriptionItem } from "../ui/PrescriptionCard";
-import { LogSetButton } from "../ui/LogSetButton";
-import { LoggedSet } from "@/types/workoutBlocks";
+import { BaseSetEntryExecutorProps } from "../types";
+import { useWorkoutExecutionChrome } from "../WorkoutExecutionChromeContext";
+import { NavigationControls } from "../ui/NavigationControls";
+import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
+import { LastSessionSetsSection } from "../ui/LastSessionSetsSection";
+import { ProgressionNudge } from "../ui/ProgressionNudge";
+import { LoggedSet } from "@/types/workoutSetEntries";
 import { LoggedSetsList, type LoggedSetRow } from "../ui/LoggedSetsList";
 import { useUpdateSetRpe } from "../hooks/useUpdateSetRpe";
-import { appendTargetEffortItem } from "../appendTargetEffortItem";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import { formatPaceMinSecPerKm } from "@/lib/enduranceFormUtils";
+import { resolveSetPrescriptionTargets } from "../ui/set-rows/resolveSetPrescriptionTargets";
+import {
+  LiveCard,
+  LiveCardExerciseName,
+  LiveCardPrimary,
+  LiveCardStats,
+  LiveCardNote,
+  LiveCardLog,
+  LiveCardLogDistanceTime,
+  LiveCardLogButton,
+  effortFromPrescribedRir,
+  formatLiveRest,
+  resolveRestSeconds,
+  formatLiveLastDistance,
+  groupIndexToHue,
+  type LiveCardTarget,
+} from "../live-card";
 
 function parseMmssToSeconds(raw: string): number | null {
   const s = raw.trim();
@@ -34,15 +51,20 @@ function parseMmssToSeconds(raw: string): number | null {
   return null;
 }
 
+function metersToLogDistance(meters: number): string {
+  if (meters >= 1000) return String(Number((meters / 1000).toFixed(2)));
+  return String(Math.round(meters));
+}
+
 export function EnduranceExecutor({
-  block,
-  onBlockComplete,
-  onNextBlock,
+  liveSetEntry,
+  onSetEntryComplete,
+  onNextSetEntry,
   sessionId,
   assignmentId,
-  allBlocks = [],
-  currentBlockIndex = 0,
-  onBlockChange,
+  allSetEntries = [],
+  currentSetEntryIndex = 0,
+  onSetEntryChange,
   currentExerciseIndex = 0,
   onExerciseIndexChange,
   logSetToDatabase,
@@ -58,31 +80,42 @@ export function EnduranceExecutor({
   loggedSets: loggedSetsProp,
   onWorkoutBack,
   previousPerformanceMap,
-}: BaseBlockExecutorProps) {
+}: BaseSetEntryExecutorProps) {
   const { addToast } = useToast();
-  const currentExercise = block.block.exercises?.[currentExerciseIndex];
+  const currentExercise = liveSetEntry.setEntry.exercises?.[currentExerciseIndex];
   const loggedSetsList = loggedSetsProp ?? [];
 
   const exOrder = currentExercise?.exercise_order ?? 1;
   const endRow =
     (currentExercise as any)?.endurance_sets?.[0] ||
-    block.block.endurance_sets?.find(
+    liveSetEntry.setEntry.endurance_sets?.find(
       (e: any) =>
         e.exercise_id === currentExercise?.exercise_id &&
         (e.exercise_order ?? 1) === exOrder,
     ) ||
-    block.block.endurance_sets?.[0];
+    liveSetEntry.setEntry.endurance_sets?.[0];
 
-  const targetDistM = endRow?.target_distance_meters ?? 0;
-  const targetTimeSec = endRow?.target_time_seconds ?? null;
-  const targetPaceSec = endRow?.target_pace_seconds_per_km ?? null;
-  const hrZone = endRow?.hr_zone ?? null;
-  const hrPct =
-    endRow?.target_hr_pct ??
-    (endRow as { hr_percentage?: number | null })?.hr_percentage ??
+  const targets = resolveSetPrescriptionTargets(
+    currentExercise,
+    1,
+    liveSetEntry.setEntry.reps_per_set,
+  );
+  const targetDistM =
+    targets.distance_meters ?? endRow?.target_distance_meters ?? 0;
+  const targetTimeSec =
+    targets.work_seconds ?? endRow?.target_time_seconds ?? null;
+  const targetPaceSec =
+    endRow?.target_pace_seconds_per_km ??
+    (currentExercise as { target_pace_seconds_per_km?: number | null } | undefined)
+      ?.target_pace_seconds_per_km ??
     null;
+  const restSec = resolveRestSeconds(
+    currentExercise?.rest_seconds,
+    liveSetEntry.setEntry.rest_seconds,
+  );
 
-  const [distanceKmStr, setDistanceKmStr] = useState("");
+  const distanceUsesKm = targetDistM >= 1000;
+  const [distanceStr, setDistanceStr] = useState("");
   const [timeMmss, setTimeMmss] = useState("");
   const [hrAvg, setHrAvg] = useState("");
   const [isLoggingSet, setIsLoggingSet] = useState(false);
@@ -101,17 +134,17 @@ export function EnduranceExecutor({
       if (idx === -1) return;
       const oldEntry = list[idx];
       const newEntry = { ...oldEntry, id: set_log_id };
-      onSetLogUpsert?.(block.block.id, newEntry, { replaceId: oldEntry.id });
+      onSetLogUpsert?.(liveSetEntry.setEntry.id, newEntry, { replaceId: oldEntry.id });
     });
     return () => {};
-  }, [registerSetLogIdResolved, onSetLogUpsert, block.block.id]);
+  }, [registerSetLogIdResolved, onSetLogUpsert, liveSetEntry.setEntry.id]);
 
   const completed = loggedSetsList.length >= 1;
 
   useEffect(() => {
     if (completed) return;
     if (targetDistM > 0) {
-      setDistanceKmStr(String(Number((targetDistM / 1000).toFixed(2))));
+      setDistanceStr(metersToLogDistance(targetDistM));
     }
     if (targetTimeSec != null && targetTimeSec > 0) {
       setTimeMmss(formatTimeProp(targetTimeSec));
@@ -119,79 +152,40 @@ export function EnduranceExecutor({
   }, [completed, targetDistM, targetTimeSec, formatTimeProp]);
 
   const actualPaceSec = useMemo(() => {
-    const km = parseFloat(distanceKmStr);
+    const raw = parseFloat(distanceStr);
     const t = parseMmssToSeconds(timeMmss);
-    if (!Number.isFinite(km) || km <= 0 || t == null || t <= 0) return null;
+    if (!Number.isFinite(raw) || raw <= 0 || t == null || t <= 0) return null;
+    const km = distanceUsesKm || targetDistM >= 1000 ? raw : raw / 1000;
+    if (km <= 0) return null;
     return t / km;
-  }, [distanceKmStr, timeMmss]);
-
-  const prescriptionItems: PrescriptionItem[] = [];
-  if (targetDistM > 0) {
-    prescriptionItems.push({
-      icon: Route,
-      label: "Distance",
-      value: Number((targetDistM / 1000).toFixed(2)),
-      unit: "km",
-    });
-  }
-  if (targetPaceSec != null && targetPaceSec > 0) {
-    prescriptionItems.push({
-      icon: Activity,
-      label: "Pace",
-      value: formatPaceMinSecPerKm(targetPaceSec),
-    });
-  }
-  if (hrZone != null) {
-    prescriptionItems.push({
-      icon: Heart,
-      label: "Zone",
-      value: `Zone ${hrZone}`,
-    });
-  } else if (hrPct != null) {
-    prescriptionItems.push({
-      icon: Heart,
-      label: "HR",
-      value: hrPct,
-      unit: "% max",
-    });
-  }
-  if (targetTimeSec != null && targetTimeSec > 0) {
-    prescriptionItems.push({
-      icon: Clock,
-      label: "Target time",
-      value: formatTimeProp(targetTimeSec),
-    });
-  }
-  appendTargetEffortItem(
-    prescriptionItems,
-    currentExercise ? (currentExercise as { rir?: unknown }).rir : undefined,
-    Flame,
-  );
+  }, [distanceStr, timeMmss, distanceUsesKm, targetDistM]);
 
   const instructions =
     currentExercise?.notes ||
-    block.block.set_notes ||
+    liveSetEntry.setEntry.set_notes ||
     endRow?.notes ||
     undefined;
 
-  const kmPreview = parseFloat(distanceKmStr);
+  const distPreview = parseFloat(distanceStr);
   const tPreview = parseMmssToSeconds(timeMmss);
   const enduranceLogReady =
     !isLoggingSet &&
     !completed &&
-    Number.isFinite(kmPreview) &&
-    kmPreview > 0 &&
+    Number.isFinite(distPreview) &&
+    distPreview > 0 &&
     tPreview != null &&
     tPreview > 0;
 
   const handleLog = async () => {
     if (!currentExercise?.exercise_id || isLoggingSet || completed) return;
-    const km = parseFloat(distanceKmStr);
+    const raw = parseFloat(distanceStr);
     const t = parseMmssToSeconds(timeMmss);
-    if (!Number.isFinite(km) || km <= 0) {
+    if (!Number.isFinite(raw) || raw <= 0) {
       addToast({
         title: "Distance required",
-        description: "Enter actual distance in km",
+        description: distanceUsesKm
+          ? "Enter actual distance in km"
+          : "Enter actual distance in metres",
         variant: "destructive",
       });
       return;
@@ -204,7 +198,9 @@ export function EnduranceExecutor({
       });
       return;
     }
-    const distM = km * 1000;
+    const distM =
+      distanceUsesKm || targetDistM >= 1000 ? raw * 1000 : raw;
+    const km = distM / 1000;
     const hrNum =
       hrAvg.trim() === "" ? undefined : parseFloat(String(hrAvg).trim());
     const speedKmh = km / (t / 3600);
@@ -229,7 +225,7 @@ export function EnduranceExecutor({
         const loggedSet: LoggedSet = {
           id: result.set_log_id || `temp-end-${Date.now()}`,
           exercise_id: currentExercise.exercise_id,
-          set_entry_id: block.block.id,
+          set_entry_id: liveSetEntry.setEntry.id,
           set_number: 1,
           actual_distance_meters: distM,
           actual_time_seconds: t,
@@ -239,8 +235,8 @@ export function EnduranceExecutor({
             : {}),
           completed_at: new Date(),
         } as LoggedSet;
-        onSetLogUpsert?.(block.block.id, loggedSet);
-        onBlockComplete(block.block.id, [loggedSet]);
+        onSetLogUpsert?.(liveSetEntry.setEntry.id, loggedSet);
+        onSetEntryComplete(liveSetEntry.setEntry.id, [loggedSet]);
       } else {
         addToast({ title: "Could not log", variant: "destructive" });
       }
@@ -249,10 +245,8 @@ export function EnduranceExecutor({
     }
   };
 
-  const exerciseName = currentExercise?.exercise?.name || "Endurance";
-
   const updateSetRpe = useUpdateSetRpe({
-    blockId: block.block.id,
+    setEntryId: liveSetEntry.setEntry.id,
     onSetLogUpsert,
   });
   const loggedSetRows: LoggedSetRow[] = loggedSetsList.map((entry) => {
@@ -274,97 +268,171 @@ export function EnduranceExecutor({
   const aboveStickyContent =
     loggedSetRows.length > 0 ? <LoggedSetsList rows={loggedSetRows} /> : null;
 
+  const activeEffort = effortFromPrescribedRir(targets.rir);
+  const liveTarget: LiveCardTarget =
+    targetDistM > 0
+      ? {
+          kind: "distance",
+          meters:
+            targetDistM >= 1000
+              ? Number((targetDistM / 1000).toFixed(2))
+              : Math.round(targetDistM),
+          unit: targetDistM >= 1000 ? "km" : "metres",
+        }
+      : { kind: "distance", meters: "—", unit: "metres" };
+  const paceLabel =
+    targetPaceSec != null && targetPaceSec > 0
+      ? formatPaceMinSecPerKm(targetPaceSec)
+      : null;
+  const lastLabel = formatLiveLastDistance(
+    loggedSetsList[0]?.actual_distance_meters ??
+      (previousPerformanceMap && currentExercise?.exercise_id
+        ? (
+            previousPerformanceMap.get(currentExercise.exercise_id)?.lastWorkout
+              ?.setDetails?.[0] as { actual_distance_meters?: number } | undefined
+          )?.actual_distance_meters
+        : null),
+  );
+
+  const chrome = useWorkoutExecutionChrome();
+  const hideCompactBack = chrome?.hideCompactBack ?? false;
+  const totalSetEntries = allSetEntries.length || 1;
+  const canGoPrevious = currentSetEntryIndex > 0;
+  const canGoNext = currentSetEntryIndex < totalSetEntries - 1;
+  const prevPerf =
+    currentExercise?.exercise_id && previousPerformanceMap
+      ? (previousPerformanceMap.get(currentExercise.exercise_id) ?? null)
+      : null;
+
+  const nudgeDist = (delta: number) => {
+    const cur = parseFloat(distanceStr || "0");
+    const step = distanceUsesKm ? 0.01 : 1;
+    const next = Math.max(0, (isNaN(cur) ? 0 : cur) + delta * step);
+    setDistanceStr(
+      distanceUsesKm ? String(Number(next.toFixed(2))) : String(Math.round(next)),
+    );
+  };
+
   return (
-    <BaseBlockExecutorLayout
-      block={block}
-      exerciseName={exerciseName}
-      prescriptionItems={prescriptionItems}
-      instructions={instructions}
-      onVideoClick={onVideoClick}
-      onAlternativesClick={onAlternativesClick}
-      onRestTimerClick={onRestTimerClick}
-      progressionSuggestion={progressionSuggestion}
-      onBlockComplete={onBlockComplete}
-      onNextBlock={onNextBlock}
-      allBlocks={allBlocks}
-      currentBlockIndex={currentBlockIndex}
-      onBlockChange={onBlockChange}
-      currentExerciseIndex={currentExerciseIndex}
-      onExerciseIndexChange={onExerciseIndexChange}
-      sessionId={sessionId}
-      assignmentId={assignmentId}
-      logSetToDatabase={logSetToDatabase}
-      calculateSuggestedWeight={calculateSuggestedWeight}
-      formatTime={formatTimeProp}
-      loggingInputs={
-        <div className="space-y-4">
-          {!completed && (
-            <>
-              <div className={`w-full min-w-0 ${logPairStyles.pair}`}>
-                <div className="flex min-h-0 min-w-0 flex-col">
+    <>
+      <div className="flex flex-col border-b border-white/5">
+        <div className="flex flex-col gap-3 px-0 pb-2 pt-1 sm:px-1">
+          {onWorkoutBack && !hideCompactBack ? (
+            <button
+              type="button"
+              onClick={onWorkoutBack}
+              className="-ml-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/10 hover:text-white active:scale-95"
+              aria-label="Back"
+            >
+              <ChevronLeft className="h-5 w-5" aria-hidden />
+            </button>
+          ) : null}
+
+          <LiveCard
+            hue={groupIndexToHue(currentSetEntryIndex)}
+            heading={completed ? "Done" : "Set 1 of 1"}
+            status={completed ? "complete" : "logging"}
+          >
+            <div>
+              <LiveCardExerciseName
+                name={currentExercise?.exercise?.name || "Endurance"}
+                endSlot={
+                  currentExercise ? (
+                    <ExerciseActionButtons
+                      exercise={currentExercise}
+                      onVideoClick={onVideoClick}
+                      onAlternativesClick={onAlternativesClick}
+                    />
+                  ) : undefined
+                }
+              />
+            </div>
+            <LiveCardPrimary target={liveTarget} effort={activeEffort} />
+            <LiveCardStats
+              rest={formatLiveRest(restSec)}
+              tempo={paceLabel}
+              last={lastLabel}
+              middleLabel="Pace"
+            />
+            {instructions ? (
+              <LiveCardNote>{instructions}</LiveCardNote>
+            ) : null}
+            <LiveCardLog>
+              {!completed ? (
+                <div className="flex flex-col gap-3">
+
+                  <LiveCardLogDistanceTime
+                    distance={distanceStr}
+                    time={timeMmss}
+                    distanceLabel={distanceUsesKm ? "Distance (km)" : "Distance"}
+                    timeLabel="Time"
+                    onDistanceChange={setDistanceStr}
+                    onTimeChange={setTimeMmss}
+                    onDistanceIncrement={() => nudgeDist(1)}
+                    onDistanceDecrement={() => nudgeDist(-1)}
+                    disabled={isLoggingSet}
+                  />
+                  <LiveCardLogButton
+                    disabled={!enduranceLogReady}
+                    onClick={() => void handleLog()}
+                  />
+                  {actualPaceSec != null ? (
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">
+                      Pace: {formatPaceMinSecPerKm(actualPaceSec)}
+                    </p>
+                  ) : null}
                   <LargeInput
-                    label="Distance"
-                    unit="km"
+                    label="Avg HR"
+                    unit="bpm"
                     inputType="decimal"
-                    value={distanceKmStr}
-                    onChange={setDistanceKmStr}
-                    placeholder="0"
+                    value={hrAvg}
+                    onChange={setHrAvg}
+                    placeholder="—"
                     min="0"
-                    step="0.01"
                     showStepper
-                    stepAmount={0.01}
-                    hint="Actual distance in km"
+                    stepAmount={1}
+                    hint="Optional average heart rate"
                   />
                 </div>
-                <div className="flex min-h-0 min-w-0 flex-col">
-                  <LargeInput
-                    label="Duration"
-                    type="text"
-                    value={timeMmss}
-                    onChange={setTimeMmss}
-                    placeholder="28:30"
-                    hint="mm:ss or seconds"
-                    showStepper={false}
-                  />
-                </div>
-              </div>
-              {actualPaceSec != null && (
-                <p className="text-sm text-muted-foreground">
-                  Pace: {formatPaceMinSecPerKm(actualPaceSec)}
+              ) : (
+                <p className="text-sm text-[color:var(--fc-status-success)]">
+                  Effort logged
                 </p>
               )}
-              <div className="w-full min-w-0">
-                <LargeInput
-                  label="Avg HR"
-                  unit="bpm"
-                  inputType="decimal"
-                  value={hrAvg}
-                  onChange={setHrAvg}
-                  placeholder="—"
-                  min="0"
-                  showStepper
-                  stepAmount={1}
-                  hint="Optional average heart rate"
-                />
-              </div>
-            </>
-          )}
+            </LiveCardLog>
+          </LiveCard>
+
+          {progressionSuggestion || prevPerf?.lastWorkout ? (
+            <div className="mx-4">
+              <ProgressionNudge
+                suggestion={progressionSuggestion}
+                previousPerformance={prevPerf}
+                showPreviousSession={false}
+              />
+            </div>
+          ) : null}
+
+          {aboveStickyContent}
+
+          <NavigationControls
+            currentBlock={currentSetEntryIndex + 1}
+            totalBlocks={totalSetEntries}
+            onPrevious={() => {
+              if (onSetEntryChange && canGoPrevious) {
+                onSetEntryChange(currentSetEntryIndex - 1);
+              }
+            }}
+            onNext={() => {
+              if (onSetEntryChange && canGoNext) {
+                onSetEntryChange(currentSetEntryIndex + 1);
+              }
+            }}
+            canGoPrevious={canGoPrevious}
+            canGoNext={canGoNext}
+          />
         </div>
-      }
-      logButton={
-        <LogSetButton
-          onClick={handleLog}
-          ready={enduranceLogReady}
-          loading={isLoggingSet}
-          label={completed ? "Logged" : "Log effort"}
-        />
-      }
-      aboveStickyContent={aboveStickyContent}
-      currentSet={1}
-      totalSets={1}
-      currentExercise={currentExercise as any}
-      onWorkoutBack={onWorkoutBack}
-      previousPerformanceMap={previousPerformanceMap}
-    />
+        <LastSessionSetsSection lastWorkout={prevPerf?.lastWorkout ?? null} />
+      </div>
+    </>
   );
 }

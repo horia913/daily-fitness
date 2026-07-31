@@ -169,30 +169,6 @@ export class DatabaseService {
     }
   }
 
-  static async updateProfile(userId: string, updates: Partial<Profile>): Promise<Profile | null> {
-    try {
-      // Ensure user is authenticated before updating profile
-      await ensureAuthenticated()
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .update({ ...updates, updated_at: new Date().toISOString() })
-        .eq('id', userId)
-        .select()
-        .single()
-
-      if (error) {
-        console.error('Error updating profile:', error)
-        return null
-      }
-
-      return data
-    } catch (error) {
-      console.error('Unexpected error updating profile:', error)
-      return null
-    }
-  }
-
   // Client functions (for coaches)
   static async getClients(coachId: string): Promise<Client[]> {
     try {
@@ -285,6 +261,7 @@ export class DatabaseService {
         .eq('client_id', clientId)
         .eq('scheduled_date', today)
         .eq('status', 'assigned')
+        .is('program_assignment_id', null)
         .order('created_at', { ascending: false })
         .limit(1)
 
@@ -318,6 +295,7 @@ export class DatabaseService {
         .select('status')
         .eq('client_id', clientId)
         .gte('scheduled_date', startOfWeekStr)
+        .is('program_assignment_id', null)
 
       if (error) {
         console.error('Error fetching workout stats:', error)

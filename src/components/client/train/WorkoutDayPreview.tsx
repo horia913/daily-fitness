@@ -175,7 +175,7 @@ export function WorkoutDayPreview({
           .from("workout_logs")
           .select("id")
           .eq("client_id", clientId)
-          .eq("program_schedule_id", scheduleId)
+          .eq("program_day_assignment_id", scheduleId)
           .not("completed_at", "is", null)
           .order("completed_at", { ascending: false })
           .limit(1)
@@ -203,7 +203,7 @@ export function WorkoutDayPreview({
   const cardClass = cn(
     "rounded-xl overflow-hidden transition-colors",
     "bg-[color:var(--fc-glass-base)] backdrop-blur-none shadow-lg",
-    (status === "today" || status === "upcoming") && "border-l-2 border-cyan-500",
+    (status === "today" || status === "upcoming") && "border-l-2 border-[color:var(--fc-group-c)]",
     status === "completed" && "border-l-4 border-emerald-500/80",
     status === "missed" && "border-l-4 border-amber-500/80",
     status === "upcoming" && "ring-1 ring-white/5",
@@ -342,8 +342,8 @@ export function WorkoutDayPreview({
       )}
       {status === "completed" && workoutLogId && (
         <a
-          href={`/client/progress/workout-logs/${workoutLogId}`}
-          className="inline-flex items-center gap-1.5 text-sm text-[color:var(--fc-accent-cyan)] hover:underline mt-3"
+          href={`/client/progress/workout-logs/${workoutLogId}?from=train`}
+          className="inline-flex items-center gap-1.5 text-sm text-[color:var(--fc-accent)] hover:underline mt-3"
         >
           <FileText className="w-4 h-4" />
           View Log
@@ -357,7 +357,7 @@ export function WorkoutDayPreview({
             onClick={() => scheduleId && onStartWorkout(scheduleId)}
             disabled={isStartingThis}
             variant="fc-primary"
-            className="w-full h-12 rounded-xl font-bold uppercase tracking-wider shadow-lg shadow-cyan-500/25"
+            className="w-full h-12 rounded-xl font-bold uppercase tracking-wider shadow-lg shadow-[0_0_24px_color-mix(in_srgb,var(--fc-group-c)_25%,transparent)]"
           >
             {isStartingThis ? (
               <>
@@ -417,7 +417,7 @@ export function WorkoutDayPreview({
 function StatusBadge({ status }: { status: PreviewDayStatus }) {
   if (status === "rest") return null;
   const config = {
-    today: { label: "Today", className: "bg-[color:var(--fc-accent-cyan)]/20 text-[color:var(--fc-accent-cyan)]" },
+    today: { label: "Today", className: "bg-[color:var(--fc-accent)]/20 text-[color:var(--fc-accent)]" },
     completed: { label: "Completed", className: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
     missed: { label: "Missed", className: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
     upcoming: { label: "Upcoming", className: "bg-[color:var(--fc-glass-highlight)] fc-text-dim" },

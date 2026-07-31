@@ -114,7 +114,7 @@ export async function getProgressStats(clientId: string): Promise<ProgressStats>
       getTotalWorkouts(clientId),
       fetchPersonalRecords(clientId), // Use same function as dashboard for consistency
       getLeaderboardRank(clientId),
-      getTotalAthletes(),
+      getTotalAthletes(clientId),
       AchievementService.getUnlockedAchievementsCount(clientId),
       AchievementService.getAchievementsInProgressCount(clientId),
       BodyMetricsService.getClientMetrics(clientId),
@@ -244,32 +244,27 @@ async function getBestLeaderboardRank(clientId: string): Promise<number | null> 
 }
 
 /**
- * Get total athletes count (total unique clients in leaderboard entries)
+ * Get total athletes count on this client's coach roster leaderboard.
  */
-async function getTotalAthletes(): Promise<number> {
+async function getTotalAthletes(clientId: string): Promise<number> {
   try {
-    const { count, error } = await supabase
+    const { resolveViewerCoachId } = await import('./leaderboardService')
+    const coachId = await resolveViewerCoachId(clientId)
+    if (!coachId) return 0
+
+    const { data, error } = await supabase
       .from('leaderboard_entries')
-      .select('client_id', { count: 'exact', head: true })
+      .select('client_id')
+      .eq('coach_id', coachId)
+      .limit(10000)
 
     if (error) {
       console.error('Error fetching total athletes:', error)
       return 0
     }
 
-    // Get distinct count of clients
-    const { data, error: distinctError } = await supabase
-      .from('leaderboard_entries')
-      .select('client_id')
-      .limit(10000) // Large limit to get all entries
-
-    if (distinctError) {
-      console.error('Error fetching distinct athletes:', distinctError)
-      return count ?? 0
-    }
-
-    const uniqueClients = new Set(data?.map(entry => entry.client_id) || [])
-    return uniqueClients.size
+    const unique = new Set((data || []).map((r) => r.client_id))
+    return unique.size
   } catch (error) {
     console.error('Error in getTotalAthletes:', error)
     return 0

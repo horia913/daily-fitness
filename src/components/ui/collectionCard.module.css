@@ -1,0 +1,510 @@
+/* Element 16 — Collection card (design/mockups/element-16-collection-card.html) */
+
+.card {
+  position: relative;
+  display: flex;
+  gap: 20px;
+  background: var(--fc-collection-card);
+  border: 1px solid var(--fc-collection-card-border);
+  border-radius: var(--fc-radius-md);
+  padding: 20px 22px 18px 26px;
+  overflow: hidden;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--collection-hue, var(--fc-accent));
+  z-index: 3;
+}
+
+.card::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 46%;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(
+    120% 90% at 100% 50%,
+    color-mix(in srgb, var(--collection-hue, var(--fc-accent)) 32%, transparent),
+    transparent 62%
+  );
+}
+
+.card:hover {
+  background: var(--fc-collection-card-raised);
+  border-color: var(--fc-glass-border-strong);
+}
+
+.card.inactive {
+  opacity: 0.58;
+  --collection-hue: var(--fc-text-subtle);
+}
+
+.card.inactive::after {
+  opacity: 0.4;
+}
+
+/** Client list roster — exact mockup box model (coach-04-clients-card-mockup.html) */
+.cardClientRoster {
+  padding: 20px 22px 18px 26px;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.cardClientRoster .body {
+  flex: 0 1 auto;
+  gap: 11px;
+}
+
+.cardClientRoster .toprow {
+  flex-wrap: nowrap;
+}
+
+.cardClientRoster .name {
+  font-size: 18px;
+}
+
+.cardClientRoster .side {
+  justify-content: space-between;
+  gap: 14px;
+  align-self: flex-start;
+}
+
+.cardClientRoster .iconBtn {
+  min-height: 32px;
+  min-width: 32px;
+  height: 32px;
+  width: 32px;
+}
+
+/** Clients roster — whisper glow on bright attention hues */
+.card.glowSubtle::after {
+  width: 30%;
+  background: radial-gradient(
+    120% 90% at 100% 50%,
+    color-mix(in srgb, var(--collection-hue, var(--fc-accent)) 14%, transparent),
+    transparent 72%
+  );
+}
+
+/* Desk: full-width content + fixed score lane + actions lane */
+@media (min-width: 1024px) {
+  .cardClientRoster {
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+    gap: 14px;
+  }
+
+  .cardClientRoster .body {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .cardClientRoster .side {
+    width: auto;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    align-self: center;
+  }
+
+  .cardClientRoster .side > :first-child {
+    width: 74px;
+    min-width: 74px;
+    flex: 0 0 74px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .cardClientRoster .side > .actions {
+    flex: 0 0 auto;
+  }
+}
+
+/* Wide: one horizontal line — identity | reasons | score + chevron */
+@media (min-width: 1280px) {
+  .cardClientRoster {
+    padding-top: 14px;
+    padding-bottom: 14px;
+  }
+
+  .cardClientRoster .meta,
+  .cardClientRoster .metaIndented {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding-left: 0;
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+}
+
+.cardCompact {
+  padding: 16px 18px 14px 22px;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.cardCompact .body {
+  gap: 8px;
+}
+
+.cardCompact .name {
+  font-size: 18px;
+}
+
+.sideCompact {
+  justify-content: flex-start;
+  gap: 10px;
+  min-height: 0;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  position: relative;
+  z-index: 2;
+}
+
+.toprow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.name {
+  font-family: var(--f-display);
+  font-stretch: 125%;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--fc-text-primary);
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: 999px;
+}
+
+.statusDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+
+.statusActive {
+  color: var(--phase-light);
+  background: color-mix(in srgb, var(--phase-light) 10%, transparent);
+}
+
+.statusActive .statusDot {
+  background: var(--phase-light);
+}
+
+.statusInactive {
+  color: var(--fc-text-dim);
+  background: color-mix(in srgb, var(--fc-text-primary) 5%, transparent);
+}
+
+.statusInactive .statusDot {
+  background: var(--fc-text-dim);
+}
+
+.leadAvatar {
+  flex-shrink: 0;
+  display: inline-flex;
+}
+
+.metaIndented {
+  padding-left: 42px;
+}
+
+.statusToneGood {
+  color: var(--fc-status-success);
+  background: color-mix(in srgb, var(--fc-status-success) 10%, transparent);
+}
+
+.statusToneGood .statusDot {
+  background: var(--fc-status-success);
+}
+
+.statusToneWarn {
+  color: var(--fc-status-warning);
+  background: color-mix(in srgb, var(--fc-status-warning) 10%, transparent);
+}
+
+.statusToneWarn .statusDot {
+  background: var(--fc-status-warning);
+}
+
+.statusToneBad {
+  color: var(--fc-status-error);
+  background: color-mix(in srgb, var(--fc-status-error) 10%, transparent);
+}
+
+.statusToneBad .statusDot {
+  background: var(--fc-status-error);
+}
+
+.statusToneMuted {
+  color: var(--fc-text-dim);
+  background: color-mix(in srgb, var(--fc-text-primary) 5%, transparent);
+}
+
+.statusToneMuted .statusDot {
+  background: var(--fc-text-dim);
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  color: var(--fc-text-dim);
+  letter-spacing: 0.03em;
+}
+
+.metaChip {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--fc-glass-border-strong);
+  color: var(--fc-text-primary);
+}
+
+.metaSep {
+  color: var(--fc-text-subtle);
+}
+
+.metaValue {
+  color: var(--fc-text-primary);
+}
+
+.struct {
+  max-width: 520px;
+  margin-top: 3px;
+}
+
+.segs {
+  display: flex;
+  gap: 3px;
+  height: 8px;
+}
+
+.seg {
+  height: 100%;
+  border-radius: 2px;
+}
+
+.segLight {
+  background: var(--phase-light);
+}
+
+.segModerate {
+  background: var(--phase-mod);
+}
+
+.segHard {
+  background: var(--phase-hard);
+}
+
+.segDeload {
+  background: var(--phase-deload);
+}
+
+.seglabels {
+  display: flex;
+  gap: 3px;
+  margin-top: 9px;
+}
+
+.slab {
+  min-width: 0;
+  padding-right: 8px;
+}
+
+.slabName {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fc-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.slabDuration {
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  color: var(--fc-text-subtle);
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+}
+
+.assigned {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.avatars {
+  display: flex;
+}
+
+.avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  margin-left: -8px;
+  border: 2px solid var(--fc-collection-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--fc-bg-deep);
+}
+
+.avatar:first-child {
+  margin-left: 0;
+}
+
+.acount {
+  text-align: right;
+  line-height: 1.1;
+}
+
+.acountN {
+  font-family: var(--f-mono);
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--collection-hue, var(--fc-accent));
+}
+
+.acountZero .acountN {
+  color: var(--fc-text-subtle);
+}
+
+.acountL {
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fc-text-dim);
+  display: block;
+  margin-top: 2px;
+}
+
+.actions {
+  display: flex;
+  gap: 4px;
+}
+
+.iconBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  border: 1px solid var(--fc-hairline);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--fc-text-dim);
+  padding: 0;
+}
+
+.iconBtn:hover {
+  border-color: var(--fc-glass-border-strong);
+  color: var(--fc-text-primary);
+}
+
+.iconBtnDanger:hover {
+  color: var(--phase-hard);
+  border-color: color-mix(in srgb, var(--phase-hard) 40%, transparent);
+}
+
+.icon {
+  width: 15px;
+  height: 15px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (max-width: 1023px) {
+  .card {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* Client roster stays horizontal like the mockup — avoids ~50–70px column-stack inflation */
+  .cardClientRoster {
+    flex-direction: row;
+    gap: 20px;
+  }
+
+  .cardClientRoster .body {
+    flex: 0 1 auto;
+    width: auto;
+  }
+
+  .cardClientRoster .side {
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: space-between;
+    width: auto;
+    gap: 14px;
+  }
+
+  .side {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+  }
+}

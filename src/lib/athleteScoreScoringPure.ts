@@ -64,3 +64,19 @@ export function averageNullable(values: number[]): number | null {
   if (!v.length) return null;
   return v.reduce((a, b) => a + b, 0) / v.length;
 }
+
+/**
+ * Training-only athlete score.
+ * - completion weight: 70%
+ * - execution weight: 30%
+ * - execution null => completion carries 100%
+ */
+export function computeProgramAthleteScore(
+  completionPct: number,
+  executionPct: number | null
+): number {
+  const completion = Math.max(0, Math.min(100, completionPct));
+  if (executionPct == null) return Math.round(completion);
+  const execution = Math.max(0, Math.min(100, executionPct));
+  return Math.round(completion * 0.7 + execution * 0.3);
+}

@@ -3,12 +3,12 @@
 import React from "react";
 import styles from "./ClientDetailHero.module.css";
 
-export type ClientDetailHeroAccent = "cyan" | "lime" | "good" | "purple";
+export type ClientDetailHeroAccent = "cyan" | "action" | "good" | "purple";
 
 export type ClientDetailHeroStatTone =
   | "default"
   | "cyan"
-  | "lime"
+  | "action"
   | "good"
   | "purple"
   | "critical"
@@ -61,8 +61,8 @@ export default function ClientDetailHero({
               const toneClass =
                 tone === "cyan"
                   ? styles.statNumCyan
-                  : tone === "lime"
-                    ? styles.statNumLime
+                  : tone === "action"
+                    ? styles.statNumAction
                     : tone === "good"
                       ? styles.statNumGood
                       : tone === "purple"

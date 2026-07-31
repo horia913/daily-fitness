@@ -1,7 +1,7 @@
 .infoStrip {
   padding: 9px 12px;
   border-radius: 10px;
-  background: rgba(79, 227, 232, 0.06);
+  background: var(--fc-accent-dim);
   border: 1px solid var(--fc-set-type-straight-border);
   display: flex;
   gap: 8px;
@@ -11,7 +11,7 @@
 .infoText {
   font-size: 11px;
   line-height: 1.4;
-  color: var(--fc-text-secondary);
+  color: var(--fc-text-dim);
   margin: 0;
 }
 
@@ -27,14 +27,14 @@
 }
 
 .labelRow {
-  font-family: var(--font-geist-sans, ui-sans-serif);
+  font-family: var(--font-body, ui-sans-serif);
   font-size: 11px;
   font-weight: 500;
-  color: var(--fc-text-secondary);
+  color: var(--fc-text-dim);
 }
 
 .unit {
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono, ui-monospace, monospace);
   font-size: 10px;
   font-weight: 400;
   color: var(--fc-text-quaternary);
@@ -45,10 +45,10 @@
   padding: 10px 11px;
   border-radius: 10px;
   border: 1px solid var(--fc-glass-border);
-  background: var(--fc-glass-soft);
+  background: transparent;
   color: var(--fc-text-primary);
   font-size: 12px;
-  font-family: var(--font-geist-sans, ui-sans-serif);
+  font-family: var(--font-body, ui-sans-serif);
   width: 100%;
   box-sizing: border-box;
 }
@@ -72,11 +72,11 @@
   border-radius: 13px;
   border: none;
   cursor: pointer;
-  font-family: var(--font-geist-sans, ui-sans-serif);
+  font-family: var(--font-body, ui-sans-serif);
   font-weight: 600;
   font-size: 12.5px;
   color: var(--fc-ink);
-  background: linear-gradient(135deg, var(--fc-accent-lime), var(--fc-accent-lime-2));
+  background: linear-gradient(135deg, var(--fc-accent), var(--fc-accent));
 }
 
 .btnPrimary:disabled {
@@ -94,7 +94,7 @@
   border: 1px solid var(--fc-effort-max-border);
   background: transparent;
   cursor: pointer;
-  font-family: var(--font-geist-sans, ui-sans-serif);
+  font-family: var(--font-body, ui-sans-serif);
   font-weight: 600;
   font-size: 12.5px;
   color: var(--fc-effort-max);
@@ -109,12 +109,12 @@
   display: inline-flex;
   padding: 2px 8px;
   border-radius: 999px;
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono, ui-monospace, monospace);
   font-size: 10px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 600;
-  background: var(--fc-glass-soft);
+  background: transparent;
   border: 1px solid var(--fc-glass-border);
   color: var(--fc-text-subtle);
 }
@@ -123,12 +123,12 @@
   display: inline-flex;
   padding: 2px 8px;
   border-radius: 999px;
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono, ui-monospace, monospace);
   font-size: 10px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 600;
   background: color-mix(in srgb, var(--fc-effort-easy) 14%, transparent);
-  border: 1px solid rgba(52, 211, 153, 0.28);
+  border: 1px solid var(--fc-effort-easy-border);
   color: var(--fc-effort-easy);
 }

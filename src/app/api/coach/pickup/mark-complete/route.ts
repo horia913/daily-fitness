@@ -16,6 +16,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateApiAuth, createUnauthorizedResponse, createForbiddenResponse } from '@/lib/apiAuth'
 import { getProgramState } from '@/lib/programStateService'
 import { completeWorkout } from '@/lib/completeWorkoutService'
+import {
+  resolveProgramDayWorkoutMeta,
+  fetchProgramDayAssignmentById,
+} from '@/lib/resolveProgramDayWorkout'
 
 export async function POST(request: NextRequest) {
   try {
@@ -96,7 +100,7 @@ export async function POST(request: NextRequest) {
     }
 
     const programAssignmentId = state.assignment.id
-    const programScheduleId = state.nextSlot.id
+    const programDayAssignmentId = state.nextSlot.id
     const templateId = state.nextSlot.template_id
 
     // ========================================================================
@@ -111,7 +115,7 @@ export async function POST(request: NextRequest) {
       .select('id')
       .eq('client_id', clientId)
       .eq('program_assignment_id', programAssignmentId)
-      .eq('program_schedule_id', programScheduleId)
+      .eq('program_day_assignment_id', programDayAssignmentId)
       .is('completed_at', null)
       .order('started_at', { ascending: false })
       .limit(1)
@@ -121,16 +125,14 @@ export async function POST(request: NextRequest) {
       workoutLogId = existingLog.id
     } else {
       // Need to create workout_assignment + workout_log
-      // Get template info
-      const { data: template } = await supabaseAdmin
-        .from('workout_templates')
-        .select('id, name, description, estimated_duration, coach_id')
-        .eq('id', templateId)
-        .single()
+      const pdaRow = await fetchProgramDayAssignmentById(supabaseAdmin, programDayAssignmentId)
+      const workoutMeta = pdaRow
+        ? await resolveProgramDayWorkoutMeta(supabaseAdmin, pdaRow)
+        : null
 
-      if (!template) {
+      if (!workoutMeta) {
         return NextResponse.json(
-          { error: 'Template not found', message: `Template ${templateId} not found` },
+          { error: 'Workout not found', message: 'Could not resolve workout content for this program day' },
           { status: 404 }
         )
       }
@@ -140,22 +142,26 @@ export async function POST(request: NextRequest) {
       const dayPosition = slotsInWeek.findIndex(s => s.id === state.nextSlot!.id) + 1
       const positionLabel = `Week ${state.nextSlot.week_number} • Day ${dayPosition}`
 
-      // Create workout_assignment
+      const assignmentInsert: Record<string, unknown> = {
+        client_id: clientId,
+        coach_id: workoutMeta.coachId || user.id,
+        name: `${positionLabel}: ${workoutMeta.displayName}`,
+        description: workoutMeta.description,
+        estimated_duration: workoutMeta.estimatedDuration || 60,
+        assigned_date: today,
+        scheduled_date: today,
+        status: 'assigned',
+        is_customized: workoutMeta.contentKind === 'instance_workout',
+        notes: `Program: ${state.assignment.name || 'Program'} - ${positionLabel} (coach pickup)`,
+        program_assignment_id: programAssignmentId,
+      }
+      if (workoutMeta.assignmentTemplateId) {
+        assignmentInsert.workout_template_id = workoutMeta.assignmentTemplateId
+      }
+
       const { data: newAssignment, error: assignmentError } = await supabaseAdmin
         .from('workout_assignments')
-        .insert({
-          workout_template_id: templateId,
-          client_id: clientId,
-          coach_id: template.coach_id || user.id,
-          name: `${positionLabel}: ${template.name}`,
-          description: template.description,
-          estimated_duration: template.estimated_duration || 60,
-          assigned_date: today,
-          scheduled_date: today,
-          status: 'assigned',
-          is_customized: false,
-          notes: `Program: ${state.assignment.name || 'Program'} - ${positionLabel} (coach pickup)`,
-        })
+        .insert(assignmentInsert)
         .select()
         .single()
 
@@ -167,7 +173,12 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Create workout_log
+      await supabaseAdmin
+        .from('program_day_assignments')
+        .update({ workout_assignment_id: newAssignment.id })
+        .eq('id', programDayAssignmentId)
+        .is('workout_assignment_id', null)
+
       const { data: newLog, error: logError } = await supabaseAdmin
         .from('workout_logs')
         .insert({
@@ -175,7 +186,7 @@ export async function POST(request: NextRequest) {
           client_id: clientId,
           started_at: new Date().toISOString(),
           program_assignment_id: programAssignmentId,
-          program_schedule_id: programScheduleId,
+          program_day_assignment_id: programDayAssignmentId,
         })
         .select()
         .single()

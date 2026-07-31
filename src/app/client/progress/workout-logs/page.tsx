@@ -3,10 +3,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
-import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { ClientPageShell } from "@/components/client-ui";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { FileText, Download, ChevronRight } from "lucide-react";
@@ -15,127 +12,18 @@ import ps from "@/components/client/progress-suite/progressSuiteV1.module.css";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { WorkoutLogCard } from "@/components/client/WorkoutLogCard";
-
-const CYAN_FREQ = "#4FE3E8";
-
-function WorkoutFrequencyBars({ clientId }: { clientId: string }) {
-  const [weekCounts, setWeekCounts] = useState<{ week: string; count: number }[]>(
-    [],
-  );
-  const [loadingBars, setLoadingBars] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const fiveWeeksAgo = new Date();
-        fiveWeeksAgo.setDate(fiveWeeksAgo.getDate() - 35);
-        const { data: workoutLogs, error } = await supabase
-          .from("workout_logs")
-          .select("completed_at")
-          .eq("client_id", clientId)
-          .not("completed_at", "is", null)
-          .gte("completed_at", fiveWeeksAgo.toISOString())
-          .order("completed_at", { ascending: false });
-        if (error || cancelled) return;
-        const weekGroups = new Map<string, number>();
-        const now = new Date();
-        for (let i = 4; i >= 0; i--) {
-          const weekStart = new Date(now);
-          weekStart.setDate(now.getDate() - (i * 7 + now.getDay() - 1));
-          weekStart.setHours(0, 0, 0, 0);
-          weekGroups.set(weekStart.toISOString().split("T")[0], 0);
-        }
-        workoutLogs?.forEach((log: { completed_at: string }) => {
-          const logDate = new Date(log.completed_at);
-          const ws = new Date(logDate);
-          ws.setDate(logDate.getDate() - logDate.getDay() + 1);
-          ws.setHours(0, 0, 0, 0);
-          const weekKey = ws.toISOString().split("T")[0];
-          if (weekGroups.has(weekKey)) {
-            weekGroups.set(weekKey, (weekGroups.get(weekKey) || 0) + 1);
-          }
-        });
-        const arr = Array.from(weekGroups.entries())
-          .map(([date, count]) => ({
-            week: new Date(date).toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-            }),
-            count,
-          }))
-          .slice(0, 5);
-        if (!cancelled) setWeekCounts(arr);
-      } finally {
-        if (!cancelled) setLoadingBars(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [clientId]);
-
-  const maxC = Math.max(...weekCounts.map((w) => w.count), 1);
-  const barMaxPx = 56;
-
-  return (
-    <section className="mb-4 mt-2">
-      <div className={ps.psMonthHero}>
-        <div className="relative z-[1] border-t pt-2" style={{ borderColor: "var(--ps-line-2)", paddingTop: 8 }}>
-          <p
-            className={cn(ps.psFontMono, "mb-2 text-[9px] uppercase")}
-            style={{ color: "var(--ps-t3)", letterSpacing: "0.16em" }}
-          >
-            Workouts per week (last 5)
-          </p>
-          <div className="flex justify-between gap-1.5">
-            {weekCounts.map((wk, i) => {
-              const hPx = loadingBars
-                ? 4
-                : Math.max(4, (wk.count / maxC) * barMaxPx);
-              const countDisplay = loadingBars ? "—" : String(wk.count);
-              const labelNum =
-                wk.count === 0 ? "var(--ps-t4)" : "var(--ps-t1)";
-              return (
-                <div
-                  key={wk.week + String(i)}
-                  className="flex min-w-0 flex-1 flex-col items-center"
-                >
-                  <span
-                    className={cn(
-                      ps.psFontDisplay,
-                      "mb-1 text-sm font-bold tabular-nums",
-                    )}
-                    style={{ color: labelNum }}
-                  >
-                    {countDisplay}
-                  </span>
-                  <div className="flex h-[72px] w-full flex-col justify-end">
-                    <div
-                      className="w-full rounded-t-[6px] transition-opacity"
-                      style={{
-                        height: `${hPx}px`,
-                        minHeight: 4,
-                        opacity: wk.count > 0 ? 0.85 : 0.35,
-                        background: `linear-gradient(180deg, ${CYAN_FREQ} 0%, #34A8AD 100%)`,
-                      }}
-                    />
-                  </div>
-                  <span
-                    className={cn(ps.psFontMono, "mt-1 text-[9px]")}
-                    style={{ color: "var(--ps-t3)" }}
-                  >
-                    {wk.week}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
+import { useToast } from "@/components/ui/toast-provider";
+import {
+  exportWorkoutLogsCsv,
+  type WorkoutLogTimeFilter,
+} from "@/lib/exportWorkoutLogsCsv";
+import { AdherenceCalendar } from "@/components/client/adherence-calendar";
+import {
+  getWorkoutAdherenceHistory,
+  toWorkoutCalendarDays,
+} from "@/lib/workoutAdherenceHistoryService";
+import { toLocalDateString } from "@/lib/clientActivityService";
+import { resolveWorkoutDisplayDurationMinutes } from "@/lib/workoutLogDuration";
 
 interface WorkoutLog {
   id: string;
@@ -148,6 +36,7 @@ interface WorkoutLog {
   total_weight_lifted: number | null;
   workout_assignment_id: string | null;
   overall_difficulty_rating: number | null;
+  notes: string | null;
   workout_set_logs: WorkoutSet[];
   // Calculated fields
   totalSets: number;
@@ -177,15 +66,13 @@ function logCompletedDate(log: WorkoutLog): Date {
 }
 
 function durationMinutesForLog(log: WorkoutLog): number {
-  if (log.total_duration_minutes != null) {
-    return Math.round(log.total_duration_minutes);
-  }
-  if (log.completed_at && log.started_at) {
-    return Math.round(
-      (new Date(log.completed_at).getTime() - new Date(log.started_at).getTime()) / 60000,
-    );
-  }
-  return 0;
+  const fromSignals = resolveWorkoutDisplayDurationMinutes({
+    storedMinutes: log.total_duration_minutes,
+    startedAt: log.started_at,
+    completedAt: log.completed_at,
+    setCompletedAts: (log.workout_set_logs ?? []).map((s) => s.completed_at),
+  });
+  return fromSignals ?? 0;
 }
 
 function formatDurationLabel(totalMinutes: number): string {
@@ -200,20 +87,100 @@ function formatDurationLabel(totalMinutes: number): string {
 export default function WorkoutLogsPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const { performanceSettings } = useTheme();
+  const { addToast } = useToast();
+  const [exportingCsv, setExportingCsv] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([]);
   const [timeFilter, setTimeFilter] = useState<"all" | "this_month" | "this_week">("all");
+  /** Shared with AdherenceCalendar — list below filters to this month. */
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const n = new Date();
+    return new Date(n.getFullYear(), n.getMonth(), 1);
+  });
+  const [calendarDays, setCalendarDays] = useState<
+    { date: string; value: number | null }[]
+  >([]);
+  /** Day selected on the full calendar — filters the list below. */
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const listAnchorRef = useRef<HTMLDivElement | null>(null);
+  /** `?from=train` — entered from Train; back returns there and keeps Train tab highlighted. */
+  const [fromTrain, setFromTrain] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleCalendarMonthChange = useCallback((month: Date) => {
+    setCalendarMonth(month);
+    setTimeFilter("all");
+    setSelectedDay(null);
+  }, []);
+
+  const handleDaySelect = useCallback(
+    (ymd: string) => {
+      const dayLogs = workoutLogs.filter(
+        (log) => toLocalDateString(logCompletedDate(log)) === ymd,
+      );
+
+      if (dayLogs.length === 0) {
+        setSelectedDay(null);
+        addToast({
+          title: "No workout that day",
+          description: "Nothing logged for this date.",
+          variant: "default",
+          duration: 2500,
+        });
+        return;
+      }
+
+      // Filter the list to this day and scroll to it (works for 1 or many).
+      // Tap the card for detail — keeps month/list sync intact.
+      setSelectedDay((prev) => (prev === ymd ? null : ymd));
+      setTimeFilter("all");
+      requestAnimationFrame(() => {
+        listAnchorRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      });
+    },
+    [workoutLogs, addToast],
+  );
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setFromTrain(params.get("from") === "train");
+  }, []);
+
+  const backHref = fromTrain ? "/client/train" : "/client/progress";
+  const backAriaLabel = fromTrain ? "Back to Train" : "Back to progress hub";
 
   // Reset state when user changes
   useEffect(() => {
     setLoading(true);
     setWorkoutLogs([]);
     setError(null);
+    setCalendarDays([]);
+    setSelectedDay(null);
   }, [user]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const history = await getWorkoutAdherenceHistory(user.id);
+        if (!cancelled) {
+          setCalendarDays(toWorkoutCalendarDays(history.days));
+        }
+      } catch (e) {
+        console.error("Workout adherence calendar load failed:", e);
+        if (!cancelled) setCalendarDays([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   const loadWorkoutLogs = useCallback(async () => {
     if (!user?.id) return;
@@ -238,7 +205,8 @@ export default function WorkoutLogsPage() {
           total_reps_completed,
           total_weight_lifted,
           workout_assignment_id,
-          overall_difficulty_rating
+          overall_difficulty_rating,
+          notes
         `
         )
         .eq("client_id", user.id)
@@ -275,6 +243,7 @@ export default function WorkoutLogsPage() {
           .select(
             `
             id,
+            name,
             workout_template_id,
             workout_templates (
               id,
@@ -291,7 +260,9 @@ export default function WorkoutLogsPage() {
         if (assignments) {
           assignments.forEach((assignment: any) => {
             const templateName =
-              assignment.workout_templates?.name || "Workout";
+              assignment.name ||
+              assignment.workout_templates?.name ||
+              "Workout";
             assignmentTemplateMap.set(assignment.id, templateName);
           });
         }
@@ -337,6 +308,7 @@ export default function WorkoutLogsPage() {
           id,
           weight,
           reps,
+          completed_at,
           exercise_id,
           workout_log_id,
           exercises (
@@ -455,19 +427,45 @@ export default function WorkoutLogsPage() {
   }, [loadWorkoutLogs, user, authLoading]);
 
   const filteredLogs = useMemo(() => {
-    if (timeFilter === "all") return workoutLogs;
+    const monthStart = new Date(
+      calendarMonth.getFullYear(),
+      calendarMonth.getMonth(),
+      1,
+    );
+    const monthEnd = new Date(
+      calendarMonth.getFullYear(),
+      calendarMonth.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999,
+    );
+    let inCalendarMonth = workoutLogs.filter((log) => {
+      const date = logCompletedDate(log);
+      return date >= monthStart && date <= monthEnd;
+    });
+
+    if (selectedDay) {
+      inCalendarMonth = inCalendarMonth.filter(
+        (log) => toLocalDateString(logCompletedDate(log)) === selectedDay,
+      );
+    }
+
+    if (timeFilter === "all") return inCalendarMonth;
+
     const now = new Date();
     const startOfWeek = new Date(now);
     startOfWeek.setDate(now.getDate() - now.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    return workoutLogs.filter((log) => {
-      const date = log.completed_at ? new Date(log.completed_at) : new Date(log.started_at);
+    return inCalendarMonth.filter((log) => {
+      const date = logCompletedDate(log);
       if (timeFilter === "this_week") return date >= startOfWeek;
       if (timeFilter === "this_month") return date >= startOfMonth;
       return true;
     });
-  }, [workoutLogs, timeFilter]);
+  }, [workoutLogs, timeFilter, calendarMonth, selectedDay]);
 
   const thisMonthCount = useMemo(() => {
     const now = new Date();
@@ -517,12 +515,44 @@ export default function WorkoutLogsPage() {
       }));
   }, [filteredLogs]);
 
+  const handleExportCsv = async () => {
+    if (!user?.id || exportingCsv) return;
+    setExportingCsv(true);
+    try {
+      const { rowCount } = await exportWorkoutLogsCsv(
+        user.id,
+        timeFilter as WorkoutLogTimeFilter,
+      );
+      const rangeLabel =
+        timeFilter === "this_week"
+          ? "this week"
+          : timeFilter === "this_month"
+            ? "this month"
+            : "all time";
+      addToast({
+        variant: "success",
+        title: "CSV downloaded",
+        description:
+          rowCount > 0
+            ? `${rowCount} set${rowCount === 1 ? "" : "s"} from ${rangeLabel}.`
+            : `No sets in ${rangeLabel}.`,
+      });
+    } catch (err) {
+      console.error("CSV export failed:", err);
+      addToast({
+        variant: "destructive",
+        title: "Export failed",
+        description: "Couldn’t create the CSV. Try again.",
+      });
+    } finally {
+      setExportingCsv(false);
+    }
+  };
+
   if (error && !loading) {
     return (
       <ProtectedRoute requiredRole="client">
-        <AnimatedBackground>
-          {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
+        <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
             <div className="flex flex-col items-center justify-center min-h-[40vh] px-2 text-center">
               <p className="text-sm fc-text-dim mb-3">{error}</p>
               <button
@@ -537,7 +567,6 @@ export default function WorkoutLogsPage() {
               </button>
             </div>
           </ClientPageShell>
-        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
@@ -545,33 +574,77 @@ export default function WorkoutLogsPage() {
   if (authLoading || loading) {
     return (
       <ProtectedRoute requiredRole="client">
-        <AnimatedBackground>
-          {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
+        <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
             <PageSkeleton variant="list" />
           </ClientPageShell>
-        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
 
   return (
     <ProtectedRoute requiredRole="client">
-      <AnimatedBackground>
-        {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
+      <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
           <div className={ps.psV1}>
             <PsHero
               glow="cyan"
-              onBack={() => router.push("/client/progress")}
-              backAriaLabel="Back to progress hub"
-              eyebrow="Progress · history"
-              eyebrowColor="#4FE3E8"
+              onBack={() => router.push(backHref)}
+              backAriaLabel={backAriaLabel}
+              eyebrow={fromTrain ? "Train · history" : "Progress · history"}
+              eyebrowColor="var(--fc-group-c)"
               title="Workout history"
               subtitle="Every session you've logged"
             />
 
-            {user?.id ? <WorkoutFrequencyBars clientId={user.id} /> : null}
+            {user?.id ? (
+              <section className="mb-4 mt-2 rounded-2xl border border-[color:var(--fc-glass-border)] bg-transparent p-4">
+                <div className="mb-3">
+                  <h2
+                    className={cn(ps.psFontBody, "text-base font-semibold")}
+                    style={{ color: "var(--ps-t1)" }}
+                  >
+                    Month
+                  </h2>
+                  <p
+                    className={cn(ps.psFontBody, "mt-0.5 text-xs")}
+                    style={{ color: "var(--ps-t3)" }}
+                  >
+                    Daily completion of scheduled workouts.
+                  </p>
+                </div>
+                <AdherenceCalendar
+                  days={calendarDays}
+                  month={calendarMonth}
+                  onMonthChange={handleCalendarMonthChange}
+                  selectedDate={selectedDay}
+                  onDaySelect={handleDaySelect}
+                  aria-label="Workout adherence calendar"
+                />
+              </section>
+            ) : null}
+
+            {selectedDay ? (
+              <div className="mb-3 flex items-center justify-between gap-2 px-1">
+                <p
+                  className={cn(ps.psFontMono, "text-[10px] uppercase")}
+                  style={{ color: "var(--ps-t3)", letterSpacing: "0.12em" }}
+                >
+                  {new Date(selectedDay + "T12:00:00").toLocaleDateString(
+                    undefined,
+                    { weekday: "short", month: "short", day: "numeric" },
+                  )}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setSelectedDay(null)}
+                  className={cn(ps.psFontBody, "border-0 bg-transparent p-0 text-[11px] font-medium")}
+                  style={{ color: "var(--fc-accent)" }}
+                >
+                  Show month
+                </button>
+              </div>
+            ) : null}
+
+            <div ref={listAnchorRef} />
 
             {workoutLogs.length > 0 && (
               <section className="mb-3 mt-4">
@@ -603,7 +676,7 @@ export default function WorkoutLogsPage() {
                     type="button"
                     onClick={() => router.push("/client/progress/personal-records")}
                     className={cn(ps.psFontBody, "mt-1 inline-flex items-center gap-1 border-0 bg-transparent p-0 text-[11px] font-medium")}
-                    style={{ color: "var(--ps-cyan)" }}
+                    style={{ color: "var(--fc-accent)" }}
                   >
                     View PRs
                     <ChevronRight className="h-3.5 w-3.5" aria-hidden />
@@ -613,7 +686,7 @@ export default function WorkoutLogsPage() {
             )}
 
             {workoutLogs.length > 0 && (
-              <div className="sticky top-0 z-10 -mx-0 mb-3 bg-[color:var(--fc-bg-base)]/95 py-2 backdrop-blur-sm">
+              <div className="sticky top-0 z-10 -mx-0 mb-3 border-b border-[color:var(--fc-hairline)] bg-[color:var(--fc-bg-deep)] py-2">
                 <PsSegmented
                   ariaLabel="Time range"
                   options={[
@@ -622,7 +695,10 @@ export default function WorkoutLogsPage() {
                     { value: "this_week" as const, label: "This week" },
                   ]}
                   value={timeFilter}
-                  onChange={setTimeFilter}
+                  onChange={(v) => {
+                    setTimeFilter(v);
+                    setSelectedDay(null);
+                  }}
                 />
               </div>
             )}
@@ -636,8 +712,18 @@ export default function WorkoutLogsPage() {
                 <p className={cn(ps.psFontBody, "text-sm")} style={{ color: "var(--ps-t3)" }}>
                   {workoutLogs.length === 0
                     ? "Complete a workout and your history will show up here."
-                    : "Try another time filter."}
+                    : "Try another month or time filter."}
                 </p>
+                {workoutLogs.length === 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => router.push("/client/train")}
+                    className={cn(ps.psFontBody, "mt-3 text-[12px] font-semibold")}
+                    style={{ color: "var(--fc-accent)" }}
+                  >
+                    Start training →
+                  </button>
+                ) : null}
               </div>
             ) : (
               <div className="flex flex-col gap-4">
@@ -669,14 +755,28 @@ export default function WorkoutLogsPage() {
           {filteredLogs.length > 0 && (
             <button
               type="button"
-              className="fixed bottom-24 right-4 w-12 h-12 rounded-full fc-glass border border-[color:var(--fc-glass-border)] flex items-center justify-center fc-text-primary hover:fc-glass-strong shadow-lg z-20 sm:right-6"
-              aria-label="Download / export logs"
+              onClick={handleExportCsv}
+              disabled={exportingCsv}
+              className="fixed bottom-24 right-4 w-12 h-12 rounded-full fc-glass border border-[color:var(--fc-glass-border)] flex items-center justify-center fc-text-primary hover:fc-glass-strong shadow-lg z-20 sm:right-6 disabled:opacity-50"
+              aria-label={
+                timeFilter === "all"
+                  ? "Download all workout history as CSV"
+                  : timeFilter === "this_month"
+                    ? "Download this month’s workouts as CSV"
+                    : "Download this week’s workouts as CSV"
+              }
+              title={
+                timeFilter === "all"
+                  ? "Download CSV (all time)"
+                  : timeFilter === "this_month"
+                    ? "Download CSV (this month)"
+                    : "Download CSV (this week)"
+              }
             >
               <Download className="w-5 h-5" />
             </button>
           )}
         </ClientPageShell>
-      </AnimatedBackground>
     </ProtectedRoute>
   );
 }

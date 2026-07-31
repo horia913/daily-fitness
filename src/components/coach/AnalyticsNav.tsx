@@ -1,16 +1,25 @@
 'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
-import { LineChart, ShieldCheck, TrendingUp, FileText } from 'lucide-react'
+import { LineChart, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import hub from '@/components/coach-analytics/coachAnalyticsHub.module.css'
 
 const analyticsTabs = [
-  { href: '/coach/analytics', label: 'Overview', icon: LineChart, activeClass: hub.tabActiveCyan },
-  { href: '/coach/compliance', label: 'Compliance', icon: ShieldCheck, activeClass: hub.tabActiveWarning },
-  { href: '/coach/progress', label: 'Progress', icon: TrendingUp, activeClass: hub.tabActivePurple },
-  { href: '/coach/reports', label: 'Reports', icon: FileText, activeClass: hub.tabActiveGood },
+  { href: '/coach/insights', label: 'Insights', icon: LineChart, activeClass: hub.tabActiveAccentSolid },
+  { href: '/coach/reports', label: 'Reports', icon: FileText, activeClass: hub.tabActiveAccentSolid },
 ] as const
+
+function isTabActive(pathname: string, href: string): boolean {
+  if (href === '/coach/insights') {
+    return (
+      pathname === '/coach/insights' ||
+      pathname.startsWith('/coach/analytics') ||
+      pathname.startsWith('/coach/compliance')
+    )
+  }
+  return pathname === href || pathname.startsWith(`${href}/`)
+}
 
 export default function AnalyticsNav() {
   const pathname = usePathname()
@@ -24,7 +33,7 @@ export default function AnalyticsNav() {
     >
       {analyticsTabs.map((tab) => {
         const Icon = tab.icon
-        const isActive = pathname === tab.href
+        const isActive = isTabActive(pathname, tab.href)
 
         return (
           <button

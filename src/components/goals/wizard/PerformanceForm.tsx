@@ -1,14 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase";
 import type { GoalCreationPayload } from "@/lib/goalCreationService";
 import { WizardNotice } from "./WizardNotice";
 import { ENDURANCE_DEFERRED_NOTICE } from "./wizardCopy";
+import {
+  WizardFieldLabel,
+  WizardFormActions,
+  WizardHint,
+  WizardOptionChip,
+  WizardSectionLabel,
+  wizardInputClass,
+  wizardSelectClass,
+  wizardTextareaClass,
+} from "./wizardUi";
 
 const LB_TO_KG = 0.45359237;
 
@@ -26,7 +34,9 @@ export function PerformanceForm({
   const [subType, setSubType] = useState<PerfSub>("strength_pr");
 
   const [exSearch, setExSearch] = useState("");
-  const [exResults, setExResults] = useState<{ id: string; name: string }[]>([]);
+  const [exResults, setExResults] = useState<{ id: string; name: string }[]>(
+    [],
+  );
   const [exerciseId, setExerciseId] = useState<string | null>(null);
   const [exerciseName, setExerciseName] = useState("");
 
@@ -122,36 +132,31 @@ export function PerformanceForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <fieldset className="space-y-2">
-        <legend className="text-xs font-semibold uppercase tracking-wider fc-text-dim mb-2">Type</legend>
-        <div className="flex flex-col gap-2">
-          <label className="flex items-center gap-2 rounded-lg border border-[color:var(--fc-glass-border)] px-3 py-2 cursor-pointer has-[:checked]:border-[color:var(--fc-accent-cyan)]">
-            <input
-              type="radio"
-              name="perf-sub"
-              checked={subType === "strength_pr"}
-              onChange={() => setSubType("strength_pr")}
-              className="accent-[color:var(--fc-accent-cyan)]"
-            />
-            <span className="text-sm fc-text-primary">Strength PR</span>
-          </label>
-          <label className="flex items-center gap-2 rounded-lg border border-[color:var(--fc-glass-border)] px-3 py-2 cursor-pointer has-[:checked]:border-[color:var(--fc-accent-cyan)]">
-            <input
-              type="radio"
-              name="perf-sub"
-              checked={subType === "endurance"}
-              onChange={() => setSubType("endurance")}
-              className="accent-[color:var(--fc-accent-cyan)]"
-            />
-            <span className="text-sm fc-text-primary">Endurance / speed</span>
-          </label>
-        </div>
+      <fieldset>
+        <WizardSectionLabel>Type</WizardSectionLabel>
+        <WizardOptionChip
+          name="perf-type"
+          value={subType}
+          onChange={setSubType}
+          options={[
+            {
+              value: "strength_pr",
+              label: "Strength PR",
+              hint: "Lift target for an exercise",
+            },
+            {
+              value: "endurance",
+              label: "Endurance / speed",
+              hint: "Weekly workout cadence",
+            },
+          ]}
+        />
       </fieldset>
 
       {subType === "strength_pr" ? (
         <>
-          <div className="space-y-2 relative">
-            <Label className="text-sm fc-text-subtle">Exercise</Label>
+          <div className="relative">
+            <WizardFieldLabel>Exercise</WizardFieldLabel>
             <Input
               value={exSearch}
               onChange={(e) => {
@@ -159,16 +164,16 @@ export function PerformanceForm({
                 setExerciseId(null);
               }}
               placeholder="Search e.g. bench"
-              className="rounded-xl border-[color:var(--fc-glass-border)]"
+              className={wizardInputClass}
               autoComplete="off"
             />
-            {exResults.length > 0 && (
-              <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface)] shadow-lg">
+            {exResults.length > 0 ? (
+              <ul className="absolute z-10 mt-1.5 max-h-48 w-full overflow-auto rounded-[11px] border border-[color:var(--fc-hairline)] bg-[color:var(--fc-bg-deep)] shadow-lg">
                 {exResults.map((row) => (
                   <li key={row.id}>
                     <button
                       type="button"
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-[color:var(--fc-glass-highlight)] fc-text-primary"
+                      className="w-full px-3 py-2.5 text-left text-sm fc-text-primary transition-colors hover:bg-[color:var(--fc-surface-tint)]"
                       onClick={() => pickExercise(row)}
                     >
                       {row.name}
@@ -176,14 +181,14 @@ export function PerformanceForm({
                   </li>
                 ))}
               </ul>
-            )}
+            ) : null}
             {exerciseId ? (
-              <p className="text-xs fc-text-dim">Selected: {exerciseName}</p>
+              <WizardHint>Selected: {exerciseName}</WizardHint>
             ) : null}
           </div>
 
-          <div className="space-y-2">
-            <Label className="text-sm fc-text-subtle">Target weight</Label>
+          <div>
+            <WizardFieldLabel>Target weight</WizardFieldLabel>
             <div className="flex gap-2">
               <Input
                 type="number"
@@ -192,38 +197,43 @@ export function PerformanceForm({
                 required
                 value={targetWeight}
                 onChange={(e) => setTargetWeight(e.target.value)}
-                className="flex-1 rounded-xl border-[color:var(--fc-glass-border)]"
+                className={`flex-1 ${wizardInputClass}`}
               />
               <select
                 value={weightUnit}
-                onChange={(e) => setWeightUnit(e.target.value as "kg" | "lbs")}
-                className="rounded-xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface)] px-2 text-sm fc-text-primary"
+                onChange={(e) =>
+                  setWeightUnit(e.target.value as "kg" | "lbs")
+                }
+                className={wizardSelectClass}
               >
                 <option value="kg">kg</option>
                 <option value="lbs">lbs</option>
               </select>
             </div>
-            <p className="text-xs fc-text-dim">Progress direction is increase (PR).</p>
+            <div className="mt-1.5">
+              <WizardHint>Progress direction is increase (PR).</WizardHint>
+            </div>
           </div>
         </>
       ) : (
         <>
           <WizardNotice>{ENDURANCE_DEFERRED_NOTICE}</WizardNotice>
-          <p className="text-xs fc-text-dim">
-            Progress is tracked from completed workouts each week (same engine as strength goals sync).
-          </p>
-          <div className="space-y-2">
-            <Label className="text-sm fc-text-subtle">Title</Label>
+          <WizardHint>
+            Progress is tracked from completed workouts each week (same engine
+            as strength goals sync).
+          </WizardHint>
+          <div>
+            <WizardFieldLabel>Title</WizardFieldLabel>
             <Input
               value={enduranceTitle}
               onChange={(e) => setEnduranceTitle(e.target.value)}
               required
               placeholder="e.g. 5K under 28 minutes"
-              className="rounded-xl border-[color:var(--fc-glass-border)]"
+              className={wizardInputClass}
             />
           </div>
-          <div className="space-y-2">
-            <Label className="text-sm fc-text-subtle">Target workouts per week (1–21)</Label>
+          <div>
+            <WizardFieldLabel>Target workouts per week (1–21)</WizardFieldLabel>
             <Input
               type="number"
               min={1}
@@ -232,40 +242,33 @@ export function PerformanceForm({
               required
               value={enduranceWeeklyWorkouts}
               onChange={(e) => setEnduranceWeeklyWorkouts(e.target.value)}
-              className="rounded-xl border-[color:var(--fc-glass-border)]"
+              className={wizardInputClass}
             />
           </div>
         </>
       )}
 
-      <div className="space-y-2">
-        <Label className="text-sm fc-text-subtle">Target date (optional)</Label>
+      <div>
+        <WizardFieldLabel>Target date (optional)</WizardFieldLabel>
         <Input
           type="date"
           value={targetDate}
           onChange={(e) => setTargetDate(e.target.value)}
-          className="rounded-xl border-[color:var(--fc-glass-border)]"
+          className={wizardInputClass}
         />
       </div>
 
-      <div className="space-y-2">
-        <Label className="text-sm fc-text-subtle">Notes (optional)</Label>
+      <div>
+        <WizardFieldLabel>Notes (optional)</WizardFieldLabel>
         <Textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={3}
-          className="rounded-xl border-[color:var(--fc-glass-border)]"
+          className={wizardTextareaClass}
         />
       </div>
 
-      <div className="flex gap-2 pt-2">
-        <Button type="button" variant="outline" className="flex-1" onClick={onBack} disabled={submitting}>
-          Back
-        </Button>
-        <Button type="submit" className="flex-1 fc-btn fc-btn-primary" disabled={submitting}>
-          {submitting ? "Saving…" : "Create goal"}
-        </Button>
-      </div>
+      <WizardFormActions onBack={onBack} submitting={submitting} />
     </form>
   );
 }

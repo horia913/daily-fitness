@@ -16,6 +16,61 @@ function ringGeometry(size: number, stroke: number) {
   return { center, radius, circumference };
 }
 
+export function AthleteScoreRing({
+  score,
+  tier,
+  size = RING_SIZE,
+  valueClassName,
+}: {
+  score: number;
+  tier: string;
+  size?: number;
+  valueClassName?: string;
+}) {
+  const pct = Math.min(100, Math.max(0, Number(score)));
+  const tierColor = tierColorForKey(tier);
+  const { center, radius, circumference } = ringGeometry(size, STROKE);
+  const dashOffset = circumference - (pct / 100) * circumference;
+
+  return (
+    <div className={styles.listScoreRingWrap} style={{ width: size, height: size }}>
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        className="-rotate-90"
+        aria-hidden
+      >
+        <circle
+          cx={center}
+          cy={center}
+          r={radius}
+          fill="none"
+          stroke="var(--fc-surface-sunken)"
+          strokeWidth={STROKE}
+        />
+        <circle
+          cx={center}
+          cy={center}
+          r={radius}
+          fill="none"
+          stroke={tierColor}
+          strokeWidth={STROKE}
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          strokeLinecap="round"
+        />
+      </svg>
+      <span
+        className={valueClassName ?? styles.listScoreValue}
+        style={{ color: tierColor }}
+      >
+        {Math.round(pct)}
+      </span>
+    </div>
+  );
+}
+
 export function CoachClientListScoreChip({
   clientId,
   athleteScore,
@@ -26,10 +81,7 @@ export function CoachClientListScoreChip({
   if (!athleteScore) return null;
 
   const { score, tier, paused } = athleteScore;
-  const pct = Math.min(100, Math.max(0, Number(score)));
   const tierColor = tierColorForKey(tier);
-  const { center, radius, circumference } = ringGeometry(RING_SIZE, STROKE);
-  const dashOffset = circumference - (pct / 100) * circumference;
 
   return (
     <button
@@ -43,39 +95,10 @@ export function CoachClientListScoreChip({
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        window.location.href = `/coach/clients/${clientId}/stats`;
+        window.location.href = `/coach/clients/${clientId}`;
       }}
     >
-      <div className={styles.listScoreRingWrap} style={{ width: RING_SIZE, height: RING_SIZE }}>
-        <svg
-          width={RING_SIZE}
-          height={RING_SIZE}
-          viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}
-          className="-rotate-90"
-          aria-hidden
-        >
-          <circle
-            cx={center}
-            cy={center}
-            r={radius}
-            fill="none"
-            stroke="var(--fc-surface-sunken)"
-            strokeWidth={STROKE}
-          />
-          <circle
-            cx={center}
-            cy={center}
-            r={radius}
-            fill="none"
-            stroke={tierColor}
-            strokeWidth={STROKE}
-            strokeDasharray={circumference}
-            strokeDashoffset={dashOffset}
-            strokeLinecap="round"
-          />
-        </svg>
-        <span className={styles.listScoreValue}>{Math.round(pct)}</span>
-      </div>
+      <AthleteScoreRing score={score} tier={tier} />
       {paused ? (
         <span className={styles.listScoreCaption}>Paused</span>
       ) : (

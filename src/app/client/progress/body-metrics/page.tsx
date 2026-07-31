@@ -3,9 +3,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "@/contexts/ThemeContext";
-import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
-import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import {
   ArrowLeft,
   Scale,
@@ -22,6 +19,7 @@ import {
   Save,
   ChevronRight,
   Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { isFromCheckIns, progressBackHref } from "@/lib/clientProgressNav";
@@ -30,12 +28,20 @@ import { supabase } from "@/lib/supabase";
 import { LogMeasurementModal } from "@/components/client/LogMeasurementModal";
 import { AchievementUnlockModal } from "@/components/ui/AchievementUnlockModal";
 import type { Achievement } from "@/components/ui/AchievementCard";
-import { BodyMeasurement } from "@/lib/measurementService";
+import { BodyMeasurement, deleteMeasurement, isCoachMeasured } from "@/lib/measurementService";
 import type { NewlyUnlockedAchievement } from "@/lib/achievementService";
 import { MeasurementMiniChart } from "@/components/progress/MeasurementMiniChart";
-import { ClientPageShell } from "@/components/client-ui";
+import { ClientPageShell, ConfirmActionDialog } from "@/components/client-ui";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import checkinSuiteStyles from "@/components/client/check-ins/checkinSuite/checkinSuiteV1.module.css";
 import {
   getPhotosForDate,
@@ -70,6 +76,18 @@ function formatTimeAgo(dateStr: string): string {
 type PhotoType = "front" | "side" | "back";
 type BodyMetricsTabId = "overview" | "weight-bf" | "measurements" | "photos" | "history";
 
+function CoachMeasuredTag({ measuredDate }: { measuredDate: string }) {
+  const d = new Date(measuredDate.includes("T") ? measuredDate : `${measuredDate}T12:00:00`);
+  const label = Number.isNaN(d.getTime())
+    ? measuredDate
+    : d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  return (
+    <span className="inline-flex items-center rounded border border-[color:color-mix(in_srgb,var(--fc-accent)_40%,transparent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--fc-accent)]">
+      Coach measured · {label}
+    </span>
+  );
+}
+
 function formatPhotoDateLong(dateStr: string): string {
   return new Date(dateStr + "T12:00:00").toLocaleDateString("en-US", {
     month: "long",
@@ -78,12 +96,8 @@ function formatPhotoDateLong(dateStr: string): string {
   });
 }
 
-function normalizeBodyMetricsTab(
-  raw: string | null,
-  hasCircumference: boolean
-): BodyMetricsTabId {
+function normalizeBodyMetricsTab(raw: string | null): BodyMetricsTabId {
   if (!raw) return "overview";
-  if (raw === "measurements" && !hasCircumference) return "overview";
   if (
     raw === "overview" ||
     raw === "weight-bf" ||
@@ -95,6 +109,12 @@ function normalizeBodyMetricsTab(
   }
   return "overview";
 }
+
+const CHART_RANGE_MONTHS: Record<"12M" | "6M" | "1M", number> = {
+  "12M": 12,
+  "6M": 6,
+  "1M": 1,
+};
 
 interface PhotoSlot {
   type: PhotoType;
@@ -111,7 +131,6 @@ function BodyMetricsPageContent() {
   const { addToast } = useToast();
   const fromCheckIns = isFromCheckIns(searchParams);
   const { user, loading: authLoading } = useAuth();
-  const { performanceSettings } = useTheme();
 
   const [metrics, setMetrics] = useState<BodyMetric[]>([]);
   const [fullMeasurements, setFullMeasurements] = useState<BodyMeasurement[]>([]);
@@ -154,6 +173,13 @@ function BodyMetricsPageContent() {
   ]);
   const [photoStripNonce, setPhotoStripNonce] = useState(0);
   const [photoTimelineLoading, setPhotoTimelineLoading] = useState(false);
+  const [pendingDeleteMeasurement, setPendingDeleteMeasurement] =
+    useState<BodyMeasurement | null>(null);
+  const [deletingMeasurement, setDeletingMeasurement] = useState(false);
+  const [pendingDeletePhotoId, setPendingDeletePhotoId] = useState<string | null>(
+    null,
+  );
+  const [deletingPhoto, setDeletingPhoto] = useState(false);
 
   const loadMetricsData = useCallback(async () => {
     if (!user?.id) return;
@@ -392,6 +418,14 @@ function BodyMetricsPageContent() {
     [metrics]
   );
 
+  const chartMetrics = useMemo(() => {
+    const months = CHART_RANGE_MONTHS[chartRange];
+    const cutoff = new Date();
+    cutoff.setMonth(cutoff.getMonth() - months);
+    const cutoffStr = cutoff.toISOString().split("T")[0];
+    return metrics.filter((m) => m.date >= cutoffStr);
+  }, [metrics, chartRange]);
+
   const latestDate = metrics.length > 0 ? metrics[metrics.length - 1].date : null;
 
   // Nutrition vs body composition: last 30 days body_metrics + adherence
@@ -458,27 +492,22 @@ function BodyMetricsPageContent() {
 
   const setTab = useCallback(
     (tab: BodyMetricsTabId) => {
-      const effective =
-        tab === "measurements" && !hasCircumferenceData ? "overview" : tab;
-      setActiveTab(effective);
+      setActiveTab(tab);
       const p = new URLSearchParams(searchParams.toString());
-      if (effective === "overview") {
+      if (tab === "overview") {
         p.delete("tab");
       } else {
-        p.set("tab", effective);
+        p.set("tab", tab);
       }
       const q = p.toString();
       router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
     },
-    [hasCircumferenceData, pathname, router, searchParams]
+    [pathname, router, searchParams]
   );
 
   useEffect(() => {
     if (loading) return;
-    const normalized = normalizeBodyMetricsTab(
-      searchParams.get("tab"),
-      hasCircumferenceData
-    );
+    const normalized = normalizeBodyMetricsTab(searchParams.get("tab"));
     setActiveTab(normalized);
     const raw = searchParams.get("tab");
     if (raw && normalized !== raw) {
@@ -488,7 +517,7 @@ function BodyMetricsPageContent() {
       const q = p.toString();
       router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
     }
-  }, [loading, searchParams, hasCircumferenceData, pathname, router]);
+  }, [loading, searchParams, pathname, router]);
 
   const loadComparison = useCallback(async () => {
     if (!comparisonDate1 || !comparisonDate2 || !user?.id) return;
@@ -586,6 +615,7 @@ function BodyMetricsPageContent() {
       await refreshPhotoData();
       setPhotoUploadNotes("");
       setPhotoStripNonce((n) => n + 1);
+      addToast({ title: "Photos saved", variant: "success" });
     } catch (e) {
       console.error("Error saving photos:", e);
       addToast({ title: "Failed to save photos. Please try again.", variant: "destructive" });
@@ -594,19 +624,28 @@ function BodyMetricsPageContent() {
     }
   };
 
-  const handleDeleteProgressPhoto = async (photoId: string) => {
-    if (!user?.id || !confirm("Delete this photo?")) return;
+  const handleDeleteProgressPhoto = (photoId: string) => {
+    setPendingDeletePhotoId(photoId);
+  };
+
+  const confirmDeleteProgressPhoto = async () => {
+    if (!user?.id || !pendingDeletePhotoId) return;
+    setDeletingPhoto(true);
     try {
-      await deletePhoto(photoId, user.id);
+      await deletePhoto(pendingDeletePhotoId, user.id);
       await refreshPhotoData();
       setPhotoStripNonce((n) => n + 1);
       if (photoTimelineSelectedDate) {
         await loadPhotoDatePhotos(photoTimelineSelectedDate);
       }
       await loadTodayPhotoSlots();
+      addToast({ title: "Photo deleted", variant: "success" });
+      setPendingDeletePhotoId(null);
     } catch (e) {
       console.error("Error deleting photo:", e);
       addToast({ title: "Failed to delete photo", variant: "destructive" });
+    } finally {
+      setDeletingPhoto(false);
     }
   };
 
@@ -623,15 +662,12 @@ function BodyMetricsPageContent() {
   if (loadError && !loading) {
     return (
       <ProtectedRoute requiredRole="client">
-        <AnimatedBackground>
-          {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
+        <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
             <div className="py-6 text-center">
               <p className="mb-3 text-sm fc-text-dim">{loadError}</p>
               <button type="button" onClick={() => { setLoadError(null); loadMetricsData(); }} className="fc-btn fc-btn-secondary fc-press h-10 px-5 text-sm">Retry</button>
             </div>
           </ClientPageShell>
-        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
@@ -639,12 +675,9 @@ function BodyMetricsPageContent() {
   if (authLoading || loading) {
     return (
       <ProtectedRoute requiredRole="client">
-        <AnimatedBackground>
-          {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
+        <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
             <PageSkeleton variant="dashboard" />
           </ClientPageShell>
-        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
@@ -654,10 +687,9 @@ function BodyMetricsPageContent() {
   const tabChipInactive = "";
 
   return (
-    <AnimatedBackground>
-      {performanceSettings.floatingParticles && <FloatingParticles />}
-      <ClientPageShell
-        className={cn("relative z-10 max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden", checkinSuiteStyles.root)}
+    <>
+    <ClientPageShell
+        className={cn("relative z-10 max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden", checkinSuiteStyles.root)}
       >
         {/* Header */}
         <div className="mb-4 flex items-center gap-3">
@@ -698,15 +730,13 @@ function BodyMetricsPageContent() {
             >
               Weight & BF
             </button>
-            {hasCircumferenceData && (
-              <button
-                type="button"
-                onClick={() => setTab("measurements")}
-                className={cn(tabChipBase, activeTab === "measurements" ? tabChipActive : tabChipInactive)}
-              >
-                Measurements
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setTab("measurements")}
+              className={cn(tabChipBase, activeTab === "measurements" ? tabChipActive : tabChipInactive)}
+            >
+              Measurements
+            </button>
             <button
               type="button"
               onClick={() => setTab("photos")}
@@ -787,12 +817,12 @@ function BodyMetricsPageContent() {
                     </div>
                     <div className="h-2 rounded-full bg-white/10 overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-emerald-500/80 transition-all"
+                        className="h-full rounded-full bg-[color:var(--fc-status-success)]/80 transition-all"
                         style={{ width: `${Math.min(100, Math.max(0, progressPct))}%` }}
                       />
                     </div>
                     {reached ? (
-                      <p className="text-sm font-medium text-emerald-300 mt-2">Goal reached!</p>
+                      <p className="text-sm font-medium text-[color:var(--fc-status-success)] mt-2">Goal reached!</p>
                     ) : remaining != null ? (
                       <p className="text-sm fc-text-subtle mt-2">{remaining} {label === "Weight" ? "kg" : label === "Body fat" ? "%" : "cm"} to go</p>
                     ) : null}
@@ -803,7 +833,7 @@ function BodyMetricsPageContent() {
           }
           return goalCards.length > 0 ? (
             <section className="mb-4 space-y-2">
-              <h2 className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/80 mb-2">Goal progress</h2>
+              <h2 className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80 mb-2">Goal progress</h2>
               <div>{goalCards}</div>
             </section>
           ) : null;
@@ -813,7 +843,7 @@ function BodyMetricsPageContent() {
         {activeTab === "overview" && nutritionVsBodyInsight && (
           <section className="mb-4 space-y-2 rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3">
             <div className="flex flex-wrap items-center gap-2">
-              <Activity className="h-4 w-4 text-[color:var(--fc-accent-cyan)]" />
+              <Activity className="h-4 w-4 text-[color:var(--fc-accent)]" />
               <h2 className="text-sm font-semibold fc-text-primary">Nutrition &amp; body composition</h2>
               <span className="text-xs fc-text-dim">Last 30 days</span>
             </div>
@@ -840,7 +870,12 @@ function BodyMetricsPageContent() {
           <main className="space-y-4">
             {/* Last vs current comparison */}
             <section className="space-y-3 rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3">
-              <h2 className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/80">Body check-in</h2>
+              <div className="mb-1 flex flex-wrap items-center gap-2">
+                <h2 className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">Body check-in</h2>
+                {latest && isCoachMeasured(latest) ? (
+                  <CoachMeasuredTag measuredDate={latest.measured_date} />
+                ) : null}
+              </div>
               {previous && daysSincePrevious != null && (
                 <p className="text-xs fc-text-dim mb-2">
                   Last check-in: {new Date(previous.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} ({daysSincePrevious} day{daysSincePrevious === 1 ? "" : "s"} ago)
@@ -869,7 +904,7 @@ function BodyMetricsPageContent() {
                       {previous && (
                         <td className="py-2 pl-2 text-right">
                           {weightChange !== 0 ? (
-                            <span className={`text-sm font-bold ${weightChange < 0 ? "text-emerald-300" : "text-amber-300"}`}>
+                            <span className={`text-sm font-bold ${weightChange < 0 ? "text-[color:var(--fc-status-success)]" : "text-[color:var(--fc-status-warning)]"}`}>
                               {weightChange < 0 ? "▼" : "▲"} {weightChange > 0 ? "+" : ""}{weightChange.toFixed(1)} kg
                             </span>
                           ) : "—"}
@@ -884,7 +919,7 @@ function BodyMetricsPageContent() {
                         {previous && (
                           <td className="py-2 pl-2 text-right">
                             {bodyFatChange != null && bodyFatChange !== 0 ? (
-                              <span className={`text-sm font-bold ${bodyFatChange < 0 ? "text-emerald-300" : "text-amber-300"}`}>
+                              <span className={`text-sm font-bold ${bodyFatChange < 0 ? "text-[color:var(--fc-status-success)]" : "text-[color:var(--fc-status-warning)]"}`}>
                                 {bodyFatChange < 0 ? "▼" : "▲"} {bodyFatChange > 0 ? "+" : ""}{bodyFatChange.toFixed(1)}%
                               </span>
                             ) : "—"}
@@ -900,7 +935,7 @@ function BodyMetricsPageContent() {
                         {previous && (
                           <td className="py-2 pl-2 text-right">
                             {muscleChange != null && muscleChange !== 0 ? (
-                              <span className={`text-sm font-bold ${muscleChange > 0 ? "text-emerald-300" : "text-amber-300"}`}>
+                              <span className={`text-sm font-bold ${muscleChange > 0 ? "text-[color:var(--fc-status-success)]" : "text-[color:var(--fc-status-warning)]"}`}>
                                 {muscleChange > 0 ? "▲" : "▼"} {muscleChange > 0 ? "+" : ""}{muscleChange.toFixed(1)} kg
                               </span>
                             ) : "—"}
@@ -920,14 +955,14 @@ function BodyMetricsPageContent() {
                 const range = maxW - minW || 1;
                 return (
                   <div className="mt-3 border-t border-[color:var(--fc-glass-border)] pt-3">
-                    <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/80">Weight trend (last 3 months)</p>
+                    <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">Weight trend (last 3 months)</p>
                     <div className="flex h-10 items-end gap-0.5">
                       {sparkData.map((m, i) => {
                         const h = ((m.weight - minW) / range) * 100;
                         return (
                           <div
                             key={`${m.date}-${i}`}
-                            className="flex-1 min-w-[4px] rounded-t bg-[color:var(--fc-accent-cyan)]/50"
+                            className="flex-1 min-w-[4px] rounded-t bg-[color:var(--fc-accent)]/50"
                             style={{ height: `${Math.max(h, 4)}%` }}
                             title={`${m.weight.toFixed(1)} kg · ${new Date(m.date).toLocaleDateString()}`}
                           />
@@ -942,7 +977,7 @@ function BodyMetricsPageContent() {
                       <p className="mt-2 text-sm">
                         <button
                           type="button"
-                          className="text-[color:var(--fc-accent-cyan)] hover:underline"
+                          className="text-[color:var(--fc-accent)] hover:underline"
                           onClick={() => router.push("/client/nutrition")}
                         >
                           How&apos;s your nutrition?
@@ -967,7 +1002,7 @@ function BodyMetricsPageContent() {
                 if (rows.length === 0) return null;
                 return (
                   <div className="mt-3 border-t border-[color:var(--fc-glass-border)] pt-3">
-                    <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/80">Measurements</p>
+                    <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">Measurements</p>
                     <div className="overflow-x-auto">
                       <table className="w-full min-w-[240px] text-sm fc-text-primary">
                         <thead>
@@ -988,7 +1023,7 @@ function BodyMetricsPageContent() {
                                 <td className="text-right py-2 px-2 tabular-nums font-semibold">{r.curr != null ? `${r.curr} cm` : "—"}</td>
                                 <td className="text-right py-2 pl-2 tabular-nums">
                                   {change != null && change !== 0 ? (
-                                    <span className={change < 0 ? "text-emerald-300" : "text-amber-300"}>{change > 0 ? "+" : ""}{change} cm</span>
+                                    <span className={change < 0 ? "text-[color:var(--fc-status-success)]" : "text-[color:var(--fc-status-warning)]"}>{change > 0 ? "+" : ""}{change} cm</span>
                                   ) : "—"}
                                 </td>
                               </tr>
@@ -1009,7 +1044,7 @@ function BodyMetricsPageContent() {
                     onClick={() => setTab("photos")}
                     className="w-full rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft p-3 text-left transition-colors hover:bg-[color:var(--fc-glass-highlight)]"
                   >
-                    <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/80">
+                    <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">
                       Progress photos
                     </p>
                     <p className="mb-2 text-xs fc-text-dim">Tap to open Photos</p>
@@ -1044,7 +1079,7 @@ function BodyMetricsPageContent() {
 
         {activeTab === "weight-bf" && metrics.length > 0 && (
                 <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4 mb-4">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/80 mb-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80 mb-3">
                     Weight &amp; body fat
                   </p>
                   <div className="flex items-baseline gap-2 mb-3 flex-wrap">
@@ -1057,8 +1092,8 @@ function BodyMetricsPageContent() {
                         className={cn(
                           "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold border tabular-nums",
                           weightChange > 0
-                            ? "bg-amber-500/15 border-amber-500/30 text-amber-300"
-                            : "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+                            ? "bg-[color:color-mix(in_srgb,var(--fc-status-warning)_15%,transparent)] border-[color:color-mix(in_srgb,var(--fc-status-warning)_30%,transparent)] text-[color:var(--fc-status-warning)]"
+                            : "bg-[color:color-mix(in_srgb,var(--fc-status-success)_15%,transparent)] border-[color:color-mix(in_srgb,var(--fc-status-success)_30%,transparent)] text-[color:var(--fc-status-success)]"
                         )}
                       >
                         {weightChange > 0 ? (
@@ -1071,20 +1106,20 @@ function BodyMetricsPageContent() {
                       </span>
                     )}
                   </div>
-                  {metrics.length > 0 ? (
+                  {chartMetrics.length > 0 ? (
                     <div className="overflow-x-auto -mx-1 px-1">
                       <div className="min-w-[520px]">
                         <div className="relative">
                           <div className="flex h-48 items-end justify-between gap-1 sm:gap-2 sm:h-56">
-                            {metrics.slice(-12).map((metric, index) => {
-                              const maxW = Math.max(...metrics.map((m) => m.weight));
-                              const minW = Math.min(...metrics.map((m) => m.weight));
+                            {chartMetrics.map((metric, index) => {
+                              const maxW = Math.max(...chartMetrics.map((m) => m.weight));
+                              const minW = Math.min(...chartMetrics.map((m) => m.weight));
                               const range = maxW - minW || 1;
                               const height = ((metric.weight - minW) / range) * 100;
 
-                              const hasBodyFat = metrics.some((m) => m.bodyFat != null);
-                              const maxBF = hasBodyFat ? Math.max(...metrics.map((m) => m.bodyFat || 0)) : 0;
-                              const minBF = hasBodyFat ? Math.min(...metrics.map((m) => m.bodyFat || 0)) : 0;
+                              const hasBodyFat = chartMetrics.some((m) => m.bodyFat != null);
+                              const maxBF = hasBodyFat ? Math.max(...chartMetrics.map((m) => m.bodyFat || 0)) : 0;
+                              const minBF = hasBodyFat ? Math.min(...chartMetrics.map((m) => m.bodyFat || 0)) : 0;
                               const rangeBF = maxBF - minBF || 1;
                               const heightBF = metric.bodyFat != null ? ((metric.bodyFat - minBF) / rangeBF) * 100 : 0;
 
@@ -1092,7 +1127,7 @@ function BodyMetricsPageContent() {
                                 <div key={`${metric.date}-${index}`} className="flex-1 flex flex-col items-center min-w-0 relative h-full">
                                   {metric.bodyFat != null && heightBF > 0 && (
                                     <div
-                                      className="absolute w-2 h-2 rounded-full bg-emerald-400 border border-[color:var(--fc-glass-border)] z-10"
+                                      className="absolute w-2 h-2 rounded-full bg-[color:var(--fc-status-success)] border border-[color:var(--fc-hairline)] z-10"
                                       style={{
                                         bottom: `calc(${Math.max(heightBF, 2)}% + 2rem)`,
                                       }}
@@ -1103,8 +1138,7 @@ function BodyMetricsPageContent() {
                                     className="w-full rounded-t-lg min-h-[20px] transition-opacity hover:opacity-90 relative"
                                     style={{
                                       height: `${Math.max(height, 8)}%`,
-                                      background:
-                                        "linear-gradient(135deg, var(--fc-status-error) 0%, var(--fc-accent-blue) 100%)",
+                                      background: "var(--fc-group-a)",
                                     }}
                                   />
                                   <div className="mt-2 text-center truncate w-full">
@@ -1122,14 +1156,14 @@ function BodyMetricsPageContent() {
                               );
                             })}
                           </div>
-                          {metrics.some((m) => m.bodyFat != null) && (
+                          {chartMetrics.some((m) => m.bodyFat != null) && (
                             <div className="flex items-center gap-3 mt-4 text-xs fc-text-dim">
                               <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full bg-gradient-to-br from-[color:var(--fc-status-error)] to-[color:var(--fc-accent-blue)]" />
+                                <div className="w-3 h-3 rounded-full bg-[color:var(--fc-group-a)]" />
                                 <span>Weight</span>
                               </div>
                               <div className="flex items-center gap-2">
-                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                <div className="w-1.5 h-1.5 rounded-full bg-[color:var(--fc-status-success)]" />
                                 <span>Body Fat %</span>
                               </div>
                             </div>
@@ -1138,13 +1172,17 @@ function BodyMetricsPageContent() {
                       </div>
                     </div>
                   ) : (
-                    <p className="text-center py-8 text-sm fc-text-subtle">Not enough data to show chart</p>
+                    <p className="text-center py-8 text-sm fc-text-subtle">
+                      {metrics.length > 0
+                        ? `No weight data in the last ${chartRange === "1M" ? "month" : chartRange === "6M" ? "6 months" : "12 months"}.`
+                        : "Not enough data to show chart"}
+                    </p>
                   )}
                 </div>
         )}
 
-        {activeTab === "measurements" && metrics.length > 0 && hasCircumferenceData && (
-                fullMeasurements.length > 0 ? (
+        {activeTab === "measurements" && (
+                hasCircumferenceData && fullMeasurements.length > 0 ? (
                   <div className="space-y-3">
                     {/* Comparison Summary Card */}
                     {(() => {
@@ -1264,7 +1302,7 @@ function BodyMetricsPageContent() {
 
                       return (
                         <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3 mb-2">
-                          <h3 className="mb-3 text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/80">
+                          <h3 className="mb-3 text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">
                             Since {new Date(firstMeasurement.measured_date).toLocaleDateString("en-US", {
                               month: "short",
                               day: "numeric",
@@ -1287,8 +1325,8 @@ function BodyMetricsPageContent() {
                                     className={cn(
                                       "mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border tabular-nums",
                                       comp.change > 0
-                                        ? "bg-amber-500/15 border-amber-500/30 text-amber-300"
-                                        : "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+                                        ? "bg-[color:color-mix(in_srgb,var(--fc-status-warning)_15%,transparent)] border-[color:color-mix(in_srgb,var(--fc-status-warning)_30%,transparent)] text-[color:var(--fc-status-warning)]"
+                                        : "bg-[color:color-mix(in_srgb,var(--fc-status-success)_15%,transparent)] border-[color:color-mix(in_srgb,var(--fc-status-success)_30%,transparent)] text-[color:var(--fc-status-success)]"
                                     )}
                                   >
                                     {comp.change > 0 ? (
@@ -1453,8 +1491,17 @@ function BodyMetricsPageContent() {
                 ) : (
                   <div className="py-8 px-4 text-center">
                     <Ruler className="mx-auto mb-3 h-10 w-10 fc-text-subtle" aria-hidden />
-                    <p className="text-sm fc-text-dim">No measurement data available</p>
-                    <p className="mt-1 text-xs fc-text-dim">Log a check-in with circumferences to see charts here.</p>
+                    <p className="text-sm font-semibold fc-text-primary">No measurements yet</p>
+                    <p className="mt-1 text-xs fc-text-dim">
+                      Log circumferences (waist, hips, arms…) to track body composition beyond the scale.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowLogModal(true)}
+                      className="fc-btn fc-btn-primary mt-4 h-10 px-4 text-sm"
+                    >
+                      Log measurements
+                    </button>
                   </div>
                 )
         )}
@@ -1472,7 +1519,7 @@ function BodyMetricsPageContent() {
         {activeTab === "history" && metrics.length > 0 && (
             <div className="flex flex-col border-t border-[color:var(--fc-glass-border)] pt-4">
               <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/80">Log history</h3>
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">Log history</h3>
                 <ListFilter className="h-4 w-4 fc-text-subtle" />
               </div>
               <div className="max-h-[min(50vh,360px)] space-y-2 overflow-y-auto pr-1">
@@ -1497,25 +1544,44 @@ function BodyMetricsPageContent() {
                       className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3"
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm font-semibold fc-text-primary tracking-tight">
-                          {d.toLocaleDateString("en-US", {
-                            weekday: "short",
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          })}
-                        </p>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold fc-text-primary tracking-tight">
+                            {d.toLocaleDateString("en-US", {
+                              weekday: "short",
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </p>
+                          {full && isCoachMeasured(full) ? (
+                            <div className="mt-1">
+                              <CoachMeasuredTag measuredDate={full.measured_date} />
+                            </div>
+                          ) : null}
+                        </div>
                         <div className="flex flex-col items-end gap-1 shrink-0">
-                          <span className="text-sm font-semibold fc-text-primary tabular-nums">
-                            {metric.weight.toFixed(1)} kg
-                          </span>
+                          <div className="flex items-center gap-1">
+                            <span className="text-sm font-semibold fc-text-primary tabular-nums">
+                              {metric.weight.toFixed(1)} kg
+                            </span>
+                            {full?.id && !isCoachMeasured(full) ? (
+                              <button
+                                type="button"
+                                className="p-1.5 rounded-lg hover:bg-[color:var(--fc-glass-highlight)] text-[color:var(--fc-status-error)]"
+                                aria-label="Delete measurement"
+                                onClick={() => setPendingDeleteMeasurement(full)}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            ) : null}
+                          </div>
                           {delta !== null && delta !== 0 && (
                             <span
                               className={cn(
                                 "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border tabular-nums",
                                 delta > 0
-                                  ? "bg-amber-500/15 border-amber-500/30 text-amber-300"
-                                  : "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+                                  ? "bg-[color:color-mix(in_srgb,var(--fc-status-warning)_15%,transparent)] border-[color:color-mix(in_srgb,var(--fc-status-warning)_30%,transparent)] text-[color:var(--fc-status-warning)]"
+                                  : "bg-[color:color-mix(in_srgb,var(--fc-status-success)_15%,transparent)] border-[color:color-mix(in_srgb,var(--fc-status-success)_30%,transparent)] text-[color:var(--fc-status-success)]"
                               )}
                             >
                               {delta > 0 ? (
@@ -1548,7 +1614,7 @@ function BodyMetricsPageContent() {
         {activeTab === "photos" && user && (
           <div className="space-y-4 border-t border-[color:var(--fc-glass-border)] pt-4">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/80">Photos</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">Photos</p>
               {photoTimeline.length >= 2 && (
                 <button
                   type="button"
@@ -1562,7 +1628,7 @@ function BodyMetricsPageContent() {
             </div>
 
             <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4 mb-4">
-              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/80 mb-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80 mb-3">
                 Today&apos;s photos
               </p>
               <div className="grid grid-cols-3 gap-2">
@@ -1614,7 +1680,7 @@ function BodyMetricsPageContent() {
                     step="0.1"
                     value={photoUploadWeight}
                     onChange={(e) => setPhotoUploadWeight(e.target.value)}
-                    className="h-11 w-full rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft px-3 text-sm fc-text-primary placeholder:fc-text-subtle focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]/40"
+                    className="h-11 w-full rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft px-3 text-sm fc-text-primary placeholder:fc-text-subtle focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent)]/40"
                     placeholder="From latest log"
                   />
                 </div>
@@ -1624,7 +1690,7 @@ function BodyMetricsPageContent() {
                     type="text"
                     value={photoUploadNotes}
                     onChange={(e) => setPhotoUploadNotes(e.target.value)}
-                    className="h-11 w-full rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft px-3 text-sm fc-text-primary placeholder:fc-text-subtle focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]/40"
+                    className="h-11 w-full rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft px-3 text-sm fc-text-primary placeholder:fc-text-subtle focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent)]/40"
                     placeholder="Add notes"
                   />
                 </div>
@@ -1651,7 +1717,7 @@ function BodyMetricsPageContent() {
 
             {photoTimeline.length > 0 && (
               <div className="space-y-2">
-                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/80">Timeline</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">Timeline</p>
                 {photoTimeline.map((entry) => {
                   const isExpanded = photoTimelineSelectedDate === entry.date;
                   const photos = isExpanded ? photoTimelineSelectedPhotos : [];
@@ -1727,7 +1793,7 @@ function BodyMetricsPageContent() {
           Phase 0b 6-FAB extension — body-metrics FAB migration.
           Spec ref: design-system-v4 §6.21. Was: absolute bottom-24 right-4,
           fc-btn fc-btn-primary, h-14 w-14 rounded-2xl, Plus w-8 h-8.
-          Now: fab-action (fixed, bottom 96px, right 16px, 56px circle, lime).
+          Now: fab-action (fixed, bottom 96px, right 16px, 56px circle, action).
         */}
         <button
           type="button"
@@ -1764,6 +1830,90 @@ function BodyMetricsPageContent() {
           }}
         />
       )}
+
+      <Dialog
+        open={pendingDeleteMeasurement != null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteMeasurement(null);
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-[color:var(--fc-status-warning)]" />
+              Delete this measurement?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm fc-text-dim">
+            This removes the logged entry for{" "}
+            {pendingDeleteMeasurement
+              ? new Date(
+                  pendingDeleteMeasurement.measured_date + "T12:00:00",
+                ).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })
+              : "this date"}
+            . This can’t be undone.
+          </p>
+          <DialogFooter className="gap-2 sm:gap-2 pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 rounded-lg sm:flex-1"
+              disabled={deletingMeasurement}
+              onClick={() => setPendingDeleteMeasurement(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="h-11 rounded-lg fc-btn fc-btn-primary sm:flex-1"
+              disabled={deletingMeasurement}
+              onClick={async () => {
+                if (!pendingDeleteMeasurement) return;
+                if (isCoachMeasured(pendingDeleteMeasurement)) {
+                  addToast({
+                    title: "Can't delete coach-measured entries",
+                    variant: "destructive",
+                  });
+                  setPendingDeleteMeasurement(null);
+                  return;
+                }
+                setDeletingMeasurement(true);
+                const ok = await deleteMeasurement(pendingDeleteMeasurement.id);
+                setDeletingMeasurement(false);
+                if (ok) {
+                  addToast({ title: "Measurement deleted", variant: "success" });
+                  setPendingDeleteMeasurement(null);
+                  void loadMetricsData();
+                } else {
+                  addToast({
+                    title: "Failed to delete measurement",
+                    variant: "destructive",
+                  });
+                }
+              }}
+            >
+              {deletingMeasurement ? "Deleting…" : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmActionDialog
+        open={pendingDeletePhotoId != null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeletePhotoId(null);
+        }}
+        title="Delete this photo?"
+        description="This removes the progress photo. You can upload a new one anytime."
+        confirmLabel="Delete photo"
+        confirming={deletingPhoto}
+        variant="destructive"
+        onConfirm={() => void confirmDeleteProgressPhoto()}
+      />
 
       {newAchievementsQueue.length > 0 && (
         <AchievementUnlockModal
@@ -1899,7 +2049,7 @@ function BodyMetricsPageContent() {
               </div>
             ) : (
               <div className="flex justify-center py-16">
-                <div className="h-12 w-12 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent" />
+                <div className="h-12 w-12 animate-spin rounded-full border-2 border-[color:var(--fc-group-c)] border-t-transparent" />
               </div>
             )}
           </div>
@@ -1928,7 +2078,7 @@ function BodyMetricsPageContent() {
           />
         </div>
       )}
-    </AnimatedBackground>
+    </>
   );
 }
 
@@ -1937,11 +2087,9 @@ export default function BodyMetricsPage() {
     <ProtectedRoute requiredRole="client">
       <Suspense
         fallback={
-          <AnimatedBackground>
-            <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
+          <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
               <PageSkeleton variant="dashboard" />
             </ClientPageShell>
-          </AnimatedBackground>
         }
       >
         <BodyMetricsPageContent />

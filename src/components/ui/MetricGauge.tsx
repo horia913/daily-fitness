@@ -38,7 +38,7 @@ export function MetricGauge({
   label,
   size = 120,
   strokeWidth = 6,
-  color = "var(--fc-accent-cyan)",
+  color = "var(--fc-accent)",
   gradient,
   suffix = "",
   animate = true,

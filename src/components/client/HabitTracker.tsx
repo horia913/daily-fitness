@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { HabitLibraryModal } from "@/components/client-habits";
+import { ConfirmActionDialog } from "@/components/client-ui";
 import { supabase } from "@/lib/supabase";
 import {
   addCalendarDaysYmd,
@@ -221,6 +222,9 @@ export default function HabitTracker({ userId }: HabitTrackerProps) {
   );
   const [editForm, setEditForm] = useState<Record<string, string>>({});
   const [editSaving, setEditSaving] = useState(false);
+  const [pendingDeleteHabit, setPendingDeleteHabit] =
+    useState<ClientHabitWithTemplate | null>(null);
+  const [deletingHabit, setDeletingHabit] = useState(false);
 
   const [savingHabit, setSavingHabit] = useState(false);
   const [togglingHabitId, setTogglingHabitId] = useState<string | null>(null);
@@ -467,19 +471,18 @@ export default function HabitTracker({ userId }: HabitTrackerProps) {
   };
 
   const removeHabit = async (habit: ClientHabitWithTemplate) => {
-    const confirmed = window.confirm(
-      `Delete “${habit.template.name}”? Logs for this habit will be removed.`,
-    );
-    if (!confirmed) return;
     try {
       const { error } = await deleteHabit(habit.id);
       if (error) throw error;
       addToast({ title: "Habit deleted", variant: "success" });
       setEditHabit(null);
+      setPendingDeleteHabit(null);
       await loadPageData();
     } catch (e) {
       console.error(e);
       addToast({ title: "Could not delete", variant: "destructive" });
+    } finally {
+      setDeletingHabit(false);
     }
   };
 
@@ -495,6 +498,11 @@ export default function HabitTracker({ userId }: HabitTrackerProps) {
       if (error) throw error;
       if (result === "error") throw new Error("toggle failed");
       await loadPageData();
+      if (result === "inserted") {
+        addToast({ title: "Habit logged", variant: "success" });
+      } else if (result === "deleted") {
+        addToast({ title: "Log cleared", variant: "success" });
+      }
     } catch (e) {
       console.error(e);
       addToast({ title: "Could not update log", variant: "destructive" });
@@ -612,7 +620,7 @@ export default function HabitTracker({ userId }: HabitTrackerProps) {
                       type="button"
                       size="sm"
                       className="fc-btn fc-btn-secondary h-8 w-8 p-0"
-                      onClick={() => void removeHabit(habit)}
+                      onClick={() => setPendingDeleteHabit(habit)}
                       aria-label={`Delete ${habit.template.name}`}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -640,7 +648,7 @@ export default function HabitTracker({ userId }: HabitTrackerProps) {
                               ? "border-emerald-500 bg-emerald-500/20 text-emerald-300"
                               : "border-[color:var(--fc-glass-border)] fc-text-dim",
                             isToday &&
-                              "ring-2 ring-[color:var(--fc-accent-cyan)]",
+                              "ring-2 ring-[color:var(--fc-accent)]",
                           )}
                           title={day}
                         >
@@ -778,18 +786,26 @@ export default function HabitTracker({ userId }: HabitTrackerProps) {
                 Cancel
               </Button>
             </div>
-            {editHabit ? (
-              <Button
-                type="button"
-                className="fc-btn fc-btn-secondary w-full text-red-300"
-                onClick={() => void removeHabit(editHabit)}
-              >
-                Delete habit
-              </Button>
-            ) : null}
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmActionDialog
+        open={pendingDeleteHabit != null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteHabit(null);
+        }}
+        title={`Delete “${pendingDeleteHabit?.template.name ?? "habit"}”?`}
+        description="Your logged history for this habit will be removed."
+        confirmLabel="Delete habit"
+        confirming={deletingHabit}
+        variant="destructive"
+        onConfirm={() => {
+          if (!pendingDeleteHabit) return;
+          setDeletingHabit(true);
+          void removeHabit(pendingDeleteHabit);
+        }}
+      />
     </div>
   );
 }

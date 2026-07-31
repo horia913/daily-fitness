@@ -1,7 +1,9 @@
-'use client'
+﻿'use client'
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useCallback, useMemo } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import {
@@ -9,7 +11,6 @@ import {
   X,
   Star,
   Plus,
-  ExternalLink,
   ChevronRight,
   Minus,
   Check,
@@ -26,11 +27,12 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { useToast } from '@/components/ui/toast-provider'
 import WorkoutAssignmentModal from '@/components/WorkoutAssignmentModal'
 import { WeekReviewModal } from '@/components/coach/WeekReviewModal'
-import ClientProgressionEditor from '@/components/coach/client-views/ClientProgressionEditor'
-import ResponsiveModal from '@/components/ui/ResponsiveModal'
 import { useCoachClient } from '@/contexts/CoachClientContext'
 import { cn } from '@/lib/utils'
-import { computeCurrentProgramWeekForAssignment } from '@/lib/programWeekCalendar'
+import {
+  resolveInstanceWeekForAssignment,
+  isCoachSkipNote,
+} from '@/lib/programInstanceResolver'
 
 // Data mapping: workout_assignments -> workout_templates -> workout_set_entries ->
 // workout_set_entry_exercises -> protocol tables (workout_time_protocols,
@@ -196,10 +198,10 @@ function buildStandaloneGroups(workouts: WorkoutAssignment[]): StandaloneGroup[]
     const t = dateStr ? new Date(`${dateStr}T12:00:00`).getTime() : 0
     const mmm = dateStr
       ? new Date(`${dateStr}T12:00:00`).toLocaleDateString('en-US', { month: 'short' })
-      : '—'
+      : 'â€”'
     const tpl =
       w.workout_templates?.name?.trim() || w.name?.trim() || 'Workout'
-    const key = `${mmm} — ${tpl}`
+    const key = `${mmm} â€” ${tpl}`
     const g = map.get(key) ?? { sortKey: t, items: [] as WorkoutAssignment[] }
     g.items.push(w)
     g.sortKey = Math.max(g.sortKey, t)
@@ -211,28 +213,20 @@ function buildStandaloneGroups(workouts: WorkoutAssignment[]): StandaloneGroup[]
 }
 
 async function fetchWeekScheduleSlotsClient(
-  programId: string,
   assignmentId: string,
   displayWeek: number
 ): Promise<WeekScheduleSlot[]> {
+  // Instance-keyed: schedule from program_day_assignments, completion flag from
+  // program_day_completions.program_day_assignment_id (coach-skips don't count).
   const [{ data: rows, error: rErr }, { data: comps }] = await Promise.all([
     supabase
-      .from('program_schedule')
-      .select(
-        `
-        id,
-        day_of_week,
-        day_number,
-        is_optional,
-        template_id,
-        workout_templates ( name )
-      `
-      )
-      .eq('program_id', programId)
+      .from('program_day_assignments')
+      .select('id, program_day, day_number, week_number, is_optional, name, program_instance_workout_id')
+      .eq('program_assignment_id', assignmentId)
       .eq('week_number', displayWeek),
     supabase
       .from('program_day_completions')
-      .select('program_schedule_id, notes')
+      .select('program_day_assignment_id, notes')
       .eq('program_assignment_id', assignmentId),
   ])
   if (rErr || !rows?.length) return []
@@ -242,21 +236,19 @@ async function fetchWeekScheduleSlotsClient(
         (c: { notes?: string | null }) =>
           !String(c.notes || '').startsWith('Skipped by coach')
       )
-      .map((c: { program_schedule_id: string }) => c.program_schedule_id)
+      .map((c: { program_day_assignment_id: string | null }) => c.program_day_assignment_id)
+      .filter((id): id is string => !!id)
   )
   return rows.map((r: Record<string, unknown>) => {
-    const wt = r.workout_templates as { name?: string } | null | undefined
-    const dow =
-      typeof r.day_of_week === 'number' && r.day_of_week >= 0 && r.day_of_week <= 6
-        ? r.day_of_week
-        : 0
+    const pd = typeof r.program_day === 'number' ? r.program_day : null
+    const dow = pd != null ? Math.max(0, Math.min(6, pd - 1)) : 0
     return {
       scheduleId: String(r.id),
       dayOfWeek: dow,
       dayNumber: typeof r.day_number === 'number' ? r.day_number : null,
-      templateId: String(r.template_id ?? ''),
+      templateId: String(r.program_instance_workout_id ?? ''),
       isOptional: Boolean(r.is_optional),
-      templateName: wt?.name?.trim() || 'Workout',
+      templateName: (typeof r.name === 'string' && r.name.trim()) || 'Workout',
       isCompleted: completedIds.has(String(r.id)),
     }
   })
@@ -297,37 +289,30 @@ async function enrichRecentLogsTemplateCategories(
   }))
 }
 
-export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps) {
-  const router = useRouter()
-  const { addToast } = useToast()
-  const { clientName } = useCoachClient()
-  const [workouts, setWorkouts] = useState<WorkoutAssignment[]>([])
-  const [programs, setPrograms] = useState<ProgramAssignment[]>([])
-  const [loading, setLoading] = useState(true)
-  const [editWorkoutId, setEditWorkoutId] = useState<string | null>(null)
-  const [editDate, setEditDate] = useState('')
-  const [editNotes, setEditNotes] = useState('')
-  const [savingWorkoutMeta, setSavingWorkoutMeta] = useState(false)
-  const [activeProgramSummary, setActiveProgramSummary] =
-    useState<ActiveProgramSummary | null>(null)
-  const [recentLogs, setRecentLogs] = useState<RecentWorkoutLogRow[]>([])
-  const [assignWorkoutOpen, setAssignWorkoutOpen] = useState(false)
-  const [reviewModalOpen, setReviewModalOpen] = useState(false)
-  const [customizeOpen, setCustomizeOpen] = useState(false)
-  const [totalCompletedLogs, setTotalCompletedLogs] = useState(0)
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
+type CoachClientTrainingPageData = {
+  workouts: WorkoutAssignment[]
+  programs: ProgramAssignment[]
+  activeProgramSummary: ActiveProgramSummary | null
+  recentLogs: RecentWorkoutLogRow[]
+  totalCompletedLogs: number
+}
 
-  const loadTrainingData = useCallback(async () => {
-    setLoading(true)
-    setActiveProgramSummary(null)
-    setRecentLogs([])
+async function fetchCoachClientTrainingPage(
+  clientId: string
+): Promise<CoachClientTrainingPageData> {
+  let workouts: WorkoutAssignment[] = []
+  let programs: ProgramAssignment[] = []
+  let activeProgramSummary: ActiveProgramSummary | null = null
+  let recentLogs: RecentWorkoutLogRow[] = []
+  let totalCompletedLogs = 0
 
-    try {
+  try {
       const [waRes, paRes, logCountRes] = await Promise.all([
         supabase
           .from('workout_assignments')
           .select(`*, workout_templates(*)`)
           .eq('client_id', clientId)
+          .is('program_assignment_id', null)
           .order('created_at', { ascending: false }),
         supabase
           .from('program_assignments')
@@ -340,25 +325,25 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
           .eq('client_id', clientId)
           .not('completed_at', 'is', null),
       ])
-      setTotalCompletedLogs(logCountRes.count ?? 0)
+      totalCompletedLogs = logCountRes.count ?? 0
 
       const waData = waRes.data
       const waErr = waRes.error
       if (waErr || !waData) {
-        setWorkouts([])
+        workouts = []
       } else {
         const uniqueWorkouts =
           waData.filter(
             (workout, index, self) =>
               index === self.findIndex((w) => w.id === workout.id)
           ) || []
-        setWorkouts(uniqueWorkouts as WorkoutAssignment[])
+        workouts = uniqueWorkouts as WorkoutAssignment[]
       }
 
       const paData = paRes.data
       const paErr = paRes.error
       const programRows = (!paErr && paData ? paData : []) as ProgramAssignment[]
-      setPrograms(programRows)
+      programs = programRows
 
       const active = programRows.find((p) => p.status === 'active')
 
@@ -385,7 +370,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
             topExerciseNames: [] as string[],
           }))
           .filter((r) => r.id.length > 0)
-        setRecentLogs(await enrichRecentLogsTemplateCategories(fromRpc))
+        recentLogs = await enrichRecentLogsTemplateCategories(fromRpc)
       }
 
       if (active?.id && active.program_id) {
@@ -400,13 +385,9 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
           const dw = ap.displayWeek ?? 1
           let slots = parseWeekSchedule(ap.weekSchedule)
           if (slots.length === 0) {
-            slots = await fetchWeekScheduleSlotsClient(
-              active.program_id,
-              active.id,
-              dw
-            )
+            slots = await fetchWeekScheduleSlotsClient(active.id, dw)
           }
-          setActiveProgramSummary({
+          activeProgramSummary = {
             assignmentId: active.id,
             programId: active.program_id,
             programName:
@@ -421,57 +402,60 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
             requiredCount: ap.requiredSlotsThisWeek ?? 0,
             completedCount: ap.completedRequiredThisWeek ?? 0,
             durationWeeks:
-              ap.durationWeeks ?? active.workout_programs?.duration_weeks ?? null,
+              ap.durationWeeks ?? null,
             weekDays: normalizeWeekDays(ap.weekDays),
             weekScheduleSlots: slots,
-          })
+          }
         } else {
-          const [schedRes, compRes] = await Promise.all([
+          // Instance-keyed: schedule from program_day_assignments, completions by
+          // program_day_assignment_id; Week X of N from the canonical resolver.
+          const [schedRes, compRes, weekRes] = await Promise.all([
             supabase
-              .from('program_schedule')
-              .select('id, week_number, is_optional, day_of_week')
-              .eq('program_id', active.program_id),
+              .from('program_day_assignments')
+              .select('id, week_number, is_optional, program_day')
+              .eq('program_assignment_id', active.id),
             supabase
               .from('program_day_completions')
-              .select('program_schedule_id, notes')
+              .select('program_day_assignment_id, notes')
               .eq('program_assignment_id', active.id),
+            resolveInstanceWeekForAssignment(supabase, active.id),
           ])
 
           const mode = active.progression_mode ?? 'auto'
-          const displayWeek = computeCurrentProgramWeekForAssignment(
-            {
-              start_date: active.start_date ?? null,
-              pause_accumulated_days: active.pause_accumulated_days ?? 0,
-              pause_status: active.pause_status ?? null,
-              paused_at: active.paused_at ?? null,
-              timezone_snapshot: active.timezone_snapshot ?? null,
-              duration_weeks: active.workout_programs?.duration_weeks ?? null,
-            },
-            active.timezone_snapshot ?? 'UTC'
-          ).week
+          const displayWeek = weekRes?.currentWeek ?? 1
 
           const schedule = (schedRes.data || []) as {
             id: string
             week_number: number
             is_optional: boolean | null
-            day_of_week?: number | null
+            program_day?: number | null
           }[]
-          const weekSlots = schedule.filter(
-            (s) =>
-              s.week_number === displayWeek && !(s.is_optional ?? false)
-          )
-          const requiredScheduleIds = new Set(weekSlots.map((s) => s.id))
           const completions = (compRes.data || []) as {
-            program_schedule_id: string
+            program_day_assignment_id: string | null
             notes: string | null
           }[]
-          const completedForWeek = completions.filter(
-            (c) =>
-              requiredScheduleIds.has(c.program_schedule_id) &&
-              !String(c.notes || '').startsWith('Skipped by coach')
+          // Coach-skipped slots are excluded from the denominator entirely.
+          const skippedIds = new Set(
+            completions
+              .filter((c) => isCoachSkipNote(c.notes) && c.program_day_assignment_id)
+              .map((c) => c.program_day_assignment_id as string)
           )
+          const weekSlots = schedule.filter(
+            (s) =>
+              s.week_number === displayWeek &&
+              !(s.is_optional ?? false) &&
+              !skippedIds.has(s.id)
+          )
+          const requiredScheduleIds = new Set(weekSlots.map((s) => s.id))
           const completedIds = new Set(
-            completedForWeek.map((c) => c.program_schedule_id)
+            completions
+              .filter(
+                (c) =>
+                  !isCoachSkipNote(c.notes) &&
+                  c.program_day_assignment_id &&
+                  requiredScheduleIds.has(c.program_day_assignment_id)
+              )
+              .map((c) => c.program_day_assignment_id as string)
           )
           const completedCount = weekSlots.filter((s) =>
             completedIds.has(s.id)
@@ -479,12 +463,8 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
 
           const requiredByDay: Record<number, string[]> = {}
           for (const s of weekSlots) {
-            const dow =
-              typeof s.day_of_week === 'number' &&
-              s.day_of_week >= 0 &&
-              s.day_of_week <= 6
-                ? s.day_of_week
-                : 0
+            const pd = typeof s.program_day === 'number' ? s.program_day : null
+            const dow = pd != null ? Math.max(0, Math.min(6, pd - 1)) : 0
             if (!requiredByDay[dow]) requiredByDay[dow] = []
             requiredByDay[dow].push(s.id)
           }
@@ -497,12 +477,11 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
           })
 
           const weekScheduleSlots = await fetchWeekScheduleSlotsClient(
-            active.program_id,
             active.id,
             displayWeek
           )
 
-          setActiveProgramSummary({
+          activeProgramSummary = {
             assignmentId: active.id,
             programId: active.program_id,
             programName: active.workout_programs?.name || 'Program',
@@ -511,10 +490,10 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
             displayWeek,
             requiredCount: weekSlots.length,
             completedCount,
-            durationWeeks: active.workout_programs?.duration_weeks ?? null,
+            durationWeeks: weekRes?.totalWeeks ?? null,
             weekDays,
             weekScheduleSlots,
-          })
+          }
         }
       }
 
@@ -557,7 +536,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
           .limit(5)
 
         if (flatErr || !flatLogs?.length) {
-          setRecentLogs([])
+          recentLogs = []
         } else {
           const assignmentIds = [
             ...new Set(
@@ -648,10 +627,10 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
               topExerciseNames,
             }
           })
-          setRecentLogs(mappedFb)
+          recentLogs = mappedFb
         }
       } else if (!rawLogs?.length) {
-        setRecentLogs([])
+        recentLogs = []
       } else {
         const mapped: RecentWorkoutLogRow[] = (rawLogs as any[]).map(
           (row) => {
@@ -686,23 +665,76 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
             }
           }
         )
-        setRecentLogs(mapped)
+        recentLogs = mapped
       }
       }
-    } catch {
-      setWorkouts([])
-      setPrograms([])
-      setActiveProgramSummary(null)
-      setRecentLogs([])
-      setTotalCompletedLogs(0)
-    } finally {
-      setLoading(false)
+  } catch {
+    return {
+      workouts: [],
+      programs: [],
+      activeProgramSummary: null,
+      recentLogs: [],
+      totalCompletedLogs: 0,
     }
-  }, [clientId])
+  }
 
-  useEffect(() => {
-    loadTrainingData()
-  }, [loadTrainingData])
+  return {
+    workouts,
+    programs,
+    activeProgramSummary,
+    recentLogs,
+    totalCompletedLogs,
+  }
+}
+
+export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps) {
+  const router = useRouter()
+  const { user } = useAuth()
+  const queryClient = useQueryClient()
+  const { addToast } = useToast()
+  const { clientName } = useCoachClient()
+  const [editWorkoutId, setEditWorkoutId] = useState<string | null>(null)
+  const [editDate, setEditDate] = useState('')
+  const [editNotes, setEditNotes] = useState('')
+  const [savingWorkoutMeta, setSavingWorkoutMeta] = useState(false)
+  const [assignWorkoutOpen, setAssignWorkoutOpen] = useState(false)
+  const [reviewModalOpen, setReviewModalOpen] = useState(false)
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
+
+  const trainingQuery = useQuery({
+    queryKey: ['coach-client', clientId, 'training'],
+    queryFn: () => fetchCoachClientTrainingPage(clientId),
+    enabled: !!clientId,
+  })
+
+  const workouts = trainingQuery.data?.workouts ?? []
+  const programs = trainingQuery.data?.programs ?? []
+  const activeProgramSummary = trainingQuery.data?.activeProgramSummary ?? null
+  const recentLogs = trainingQuery.data?.recentLogs ?? []
+  const totalCompletedLogs = trainingQuery.data?.totalCompletedLogs ?? 0
+  const loading = trainingQuery.isLoading
+
+  const refreshTraining = useCallback(async () => {
+    await queryClient.invalidateQueries({
+      queryKey: ['coach-client', clientId, 'training'],
+    })
+    await queryClient.invalidateQueries({
+      queryKey: ['coach-client', clientId, 'summary'],
+    })
+    await queryClient.invalidateQueries({
+      queryKey: ['coach-clients', user?.id],
+    })
+  }, [queryClient, clientId, user?.id])
+
+  const refreshTrainingAndScore = useCallback(async () => {
+    await refreshTraining()
+    await queryClient.invalidateQueries({
+      queryKey: ['coach-client', clientId, 'athlete-score'],
+    })
+    await queryClient.invalidateQueries({
+      queryKey: ['coach-home-triage', user?.id],
+    })
+  }, [refreshTraining, queryClient, clientId, user?.id])
 
   const startEditWorkoutMeta = (w: WorkoutAssignment, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -727,7 +759,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
       if (error) throw error
       addToast({ title: 'Assignment updated', variant: 'default' })
       setEditWorkoutId(null)
-      await loadTrainingData()
+      await refreshTraining()
     } catch (err) {
       console.error(err)
       addToast({ title: 'Could not save changes', variant: 'destructive' })
@@ -747,7 +779,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
 
       if (error) throw error
 
-      await loadTrainingData()
+      await refreshTraining()
     } catch (error) {
       console.error('Error unassigning workout:', error)
       addToast({ title: "Couldn't unassign workout. Please try again.", variant: "destructive" })
@@ -789,7 +821,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
       if (error) throw error
 
       addToast({ title: "This workout is now the only in-progress workout for this client.", variant: "success" })
-      await loadTrainingData()
+      await refreshTraining()
     } catch (error) {
       console.error('Error setting active workout:', error)
       addToast({ title: "Couldn't set active workout. Please try again.", variant: "destructive" })
@@ -807,7 +839,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
 
       if (error) throw error
 
-      await loadTrainingData()
+      await refreshTrainingAndScore()
     } catch (error) {
       console.error('Error unassigning program:', error)
       addToast({ title: "Couldn't unassign program. Please try again.", variant: "destructive" })
@@ -851,7 +883,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
       if (error) throw error
 
       addToast({ title: "This program is now the only active program for this client.", variant: "success" })
-      await loadTrainingData()
+      await refreshTrainingAndScore()
     } catch (error) {
       console.error('Error setting active program:', error)
       addToast({ title: "Couldn't set active program. Please try again.", variant: "destructive" })
@@ -874,7 +906,9 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
       return
     }
     // Navigate to the CLIENT-SPECIFIC program details page
-    router.push(`/coach/clients/${clientId}/programs/${program.workout_programs.id}`)
+    router.push(
+      `/coach/clients/${clientId}/programs/${program.workout_programs.id}/edit?assignmentId=${program.id}`,
+    )
   }
 
   const standaloneGroups = useMemo(
@@ -889,7 +923,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
       <div className="space-y-4">
         {[1, 2, 3].map(i => (
           <div key={i} className="animate-pulse">
-            <div className="h-32 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl p-6"></div>
+            <div className="h-32 bg-transparent border border-[color:var(--fc-glass-border)] rounded-2xl p-6"></div>
           </div>
         ))}
       </div>
@@ -897,13 +931,13 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
   }
 
   const programHubHref = activeProgramSummary
-    ? `/coach/clients/${clientId}/programs/${activeProgramSummary.programId}`
+    ? `/coach/clients/${clientId}/programs/${activeProgramSummary.programId}/edit?assignmentId=${activeProgramSummary.assignmentId}`
     : null
 
   const formatWeight = (v: number | string | null) => {
-    if (v == null || v === '') return '—'
+    if (v == null || v === '') return 'â€”'
     const n = Number(v)
-    if (Number.isNaN(n)) return '—'
+    if (Number.isNaN(n)) return 'â€”'
     return `${Math.round(n)} kg`
   }
 
@@ -930,7 +964,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
     : programs
 
   const formatSessionDate = (iso: string | null) => {
-    if (!iso) return '—'
+    if (!iso) return 'â€”'
     return new Date(iso).toLocaleDateString(undefined, {
       month: 'short',
       day: 'numeric',
@@ -941,13 +975,13 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
   const weekSlots = activeProgramSummary?.weekScheduleSlots ?? []
 
   const heroEyebrow = activeProgramSummary
-    ? `Active program · W${activeProgramSummary.displayWeek} / ${activeProgramSummary.durationWeeks ?? '—'}`
+    ? `Active program Â· W${activeProgramSummary.displayWeek} / ${activeProgramSummary.durationWeeks ?? 'â€”'}`
     : 'Training'
 
   const heroTitle = activeProgramSummary?.programName ?? 'No active program'
 
   const heroSubtitle = activeProgramSummary
-    ? `${overallProgramPct}% complete · Active program, session history, and assignments`
+    ? `${overallProgramPct}% complete Â· Active program, session history, and assignments`
     : 'Assign a program to get started'
 
   const heroStats = [
@@ -968,15 +1002,16 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
 
   return (
     <>
-    <div className="space-y-4">
+    <div className={tw.page}>
       <ClientDetailHero
         eyebrow={heroEyebrow}
         title={heroTitle}
         subtitle={heroSubtitle}
         stats={heroStats}
-        accent="lime"
+        accent="action"
       />
 
+      <div className={tw.deskPair}>
       {activeProgramSummary && programHubHref ? (
         <div className={tw.activeCard}>
           <div className={tw.activeInner}>
@@ -1014,14 +1049,14 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
 
             <div className="mt-3 h-[5px] w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.06)]">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-[color:var(--fc-set-type-straight)] to-[color:var(--fc-accent-lime-2)]"
+                className="h-full rounded-full bg-gradient-to-r from-[color:var(--fc-set-type-straight)] to-[color:var(--fc-accent)]"
                 style={{ width: `${overallProgramPct}%` }}
               />
             </div>
 
             <div className={tw.metaRow}>
               <span>
-                This week · {activeProgramSummary.completedCount}/
+                This week Â· {activeProgramSummary.completedCount}/
                 {activeProgramSummary.requiredCount} workouts
               </span>
               <span className={tw.metaRight}>{requiredSlotsRight}</span>
@@ -1058,7 +1093,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
               })}
             </div>
 
-            <div className={tw.actionGrid3}>
+            <div className={tw.actionGrid2}>
               <button
                 type="button"
                 className={tw.btnOutlineSm}
@@ -1067,17 +1102,9 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
                 <Eye className="h-[13px] w-[13px]" aria-hidden />
                 Review
               </button>
-              <button
-                type="button"
-                className={tw.btnOutlineSm}
-                onClick={() => setCustomizeOpen(true)}
-              >
-                <Pencil className="h-[13px] w-[13px]" aria-hidden />
-                Customize
-              </button>
               <Link href={programHubHref} className={tw.btnOutlineSm}>
-                <ExternalLink className="h-[13px] w-[13px]" aria-hidden />
-                Full plan
+                <Pencil className="h-[13px] w-[13px]" aria-hidden />
+                Adjust client program
               </Link>
             </div>
           </div>
@@ -1085,7 +1112,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
       ) : (
         <div className={cn(tw.section, 'text-center')}>
           <p className="text-sm text-[color:var(--fc-text-subtle)]">
-            No active program · Assign one to schedule weekly workouts
+            No active program Â· Assign one to schedule weekly workouts
           </p>
           <Button className="fc-btn fc-btn-primary mx-auto mt-4 gap-2" asChild>
             <Link href="/coach/programs">
@@ -1139,9 +1166,9 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
                   <b>{log.workoutName}</b>
                 </p>
                 <p className="mt-0.5 font-mono text-[10px] text-[color:var(--fc-text-subtle)]">
-                  {formatSessionDate(log.completed_at)} ·{' '}
-                  {log.total_duration_minutes != null ? `${log.total_duration_minutes}min` : '—'} ·{' '}
-                  {log.total_sets_completed != null ? `${log.total_sets_completed} sets` : '—'} ·{' '}
+                  {formatSessionDate(log.completed_at)} Â·{' '}
+                  {log.total_duration_minutes != null ? `${log.total_duration_minutes}min` : 'â€”'} Â·{' '}
+                  {log.total_sets_completed != null ? `${log.total_sets_completed} sets` : 'â€”'} Â·{' '}
                   {formatWeight(log.total_weight_lifted)}
                 </p>
               </div>
@@ -1153,12 +1180,14 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
           ))
         )}
       </div>
+      </div>
 
+      <div className={tw.deskPair}>
       {otherPrograms.length > 0 && (
         <div className={tw.section}>
           <div className={tw.sectionHead}>
             <div>
-              <div className={tw.eyebrowCyan}>Programs · {otherPrograms.length}</div>
+              <div className={tw.eyebrowCyan}>Programs Â· {otherPrograms.length}</div>
               <h3
                 className="mt-1 text-[15px] font-semibold text-[color:var(--fc-text-primary)]"
                 style={{ fontFamily: 'var(--f-headline, var(--font-geist-sans))' }}
@@ -1240,7 +1269,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
         <div className={tw.section}>
           <div className={tw.sectionHead}>
             <div>
-              <div className={tw.eyebrowCyan}>Workouts · {workouts.length}</div>
+              <div className={tw.eyebrowCyan}>Workouts Â· {workouts.length}</div>
               <h3
                 className="mt-1 text-[15px] font-semibold text-[color:var(--fc-text-primary)]"
                 style={{ fontFamily: 'var(--f-headline, var(--font-geist-sans))' }}
@@ -1274,7 +1303,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
                         day: 'numeric',
                         year: 'numeric',
                       })
-                    : '—'
+                    : 'â€”'
                   return (
                     <React.Fragment key={workout.id}>
                       <div
@@ -1306,7 +1335,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
                           {workout.workout_templates?.difficulty_level ? (
                             <span className="text-[10px] text-[color:var(--fc-text-subtle)]">
                               {' '}
-                              · {workout.workout_templates.difficulty_level}
+                              Â· {workout.workout_templates.difficulty_level}
                             </span>
                           ) : null}
                           <div className="mt-0.5 font-mono text-[9.5px] text-[color:var(--fc-text-subtle)]">
@@ -1378,7 +1407,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
                               disabled={savingWorkoutMeta}
                               onClick={(e) => saveWorkoutMeta(workout.id, e)}
                             >
-                              {savingWorkoutMeta ? 'Saving…' : 'Save'}
+                              {savingWorkoutMeta ? 'Savingâ€¦' : 'Save'}
                             </Button>
                             <Button
                               type="button"
@@ -1403,7 +1432,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
                       setExpandedGroups((m) => ({ ...m, [group.key]: true }))
                     }
                   >
-                    Show all in {group.key.split(' — ')[0] ?? 'group'} ({hidden} more)
+                    Show all in {group.key.split(' â€” ')[0] ?? 'group'} ({hidden} more)
                   </button>
                 ) : null}
               </div>
@@ -1411,6 +1440,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
           })}
         </div>
       )}
+      </div>
 
       <div className={tw.bottomGrid}>
         <button type="button" className={tw.btnOutline} onClick={() => setAssignWorkoutOpen(true)}>
@@ -1431,36 +1461,13 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
           onClose={() => setReviewModalOpen(false)}
           onComplete={() => {
             setReviewModalOpen(false)
-            void loadTrainingData()
+            void refreshTraining()
           }}
           programAssignmentId={activeProgramSummary.assignmentId}
           programId={activeProgramSummary.programId}
           weekNumber={reviewWeekNumber}
           clientName={clientName || 'Client'}
         />
-        <ResponsiveModal
-          isOpen={customizeOpen}
-          onClose={() => setCustomizeOpen(false)}
-          title="Customize progression"
-          subtitle="Per-client loads, reps, and swaps for this program."
-          maxWidth="5xl"
-        >
-          <div className="max-h-[min(80vh,720px)] overflow-y-auto pr-1">
-            <ClientProgressionEditor
-              programAssignmentId={activeProgramSummary.assignmentId}
-              programId={activeProgramSummary.programId}
-              clientId={clientId}
-              durationWeeks={
-                activeProgramSummary.durationWeeks != null &&
-                activeProgramSummary.durationWeeks > 0
-                  ? activeProgramSummary.durationWeeks
-                  : 1
-              }
-              defaultWeek={activeProgramSummary.displayWeek}
-              initialOpen
-            />
-          </div>
-        </ResponsiveModal>
       </>
     )}
 
@@ -1468,7 +1475,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
       isOpen={assignWorkoutOpen}
       onClose={() => setAssignWorkoutOpen(false)}
       onSuccess={() => {
-        void loadTrainingData()
+        void refreshTraining()
       }}
       preselectedClientProfileId={clientId}
     />

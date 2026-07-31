@@ -1,0 +1,282 @@
+EXEC AUDIT — Client in-session set-logging (read-only)
+Date: 2026-07-16
+Scope: /client/workouts/[id]/start — does per-set prescription data reach the UI?
+
+================================================================================
+1. FILES & ROUTES
+================================================================================
+
+Primary route
+  /client/workouts/[id]/start
+  File: src/app/client/workouts/[id]/start/page.tsx (~7k lines, client component)
+
+[id] accepted types (page.tsx loadAssignment ~1517-1756):
+  • workout_assignments.id  (usual after Train start)
+  • program_day_assignments.id  (direct / legacy entry)
+
+Render tree (block-system path — normal program/standalone workouts)
+  page.tsx
+    ExecProgressSegments          src/components/client/workout-execution/ui/ExecProgressSegments.tsx
+    WorkoutExecutionChromeProvider
+    LiveWorkoutSetEntryExecutor   src/components/client/LiveWorkoutSetEntryExecutor.tsx
+      → switch on set_type → one of 13 block executors under
+        src/components/client/workout-execution/blocks/*.tsx
+      → shared layout: BaseBlockExecutor.tsx
+      → shared UI: PrescriptionCard, SetRowShell, LoggedSetsList, RestTimerModal, etc.
+        (50 files under src/components/client/workout-execution/)
+
+Local page pieces
+  src/app/client/workouts/[id]/start/types.ts
+  src/app/client/workouts/[id]/start/utils.ts
+  src/app/client/workouts/[id]/start/components/PreviousPerformanceCard.tsx
+
+Related (not in-session logging)
+  /client/workouts/[id]/details  — preview before start
+  /client/workouts/[id]/complete — post-workout summary
+
+Styling (current / pre-v6 skin)
+  Mixed stack on start page:
+    • Global tokens: src/styles/ui-system.css (--fc-glass-*, --fc-set-type-*, workout-exec-v6 effort tiers ~191+)
+    • Client shell atoms: @/components/client-ui (ClientPageShell, ClientGlassCard, Eyebrow)
+    • Legacy chrome: AnimatedBackground, FloatingParticles (page.tsx imports ~7-9)
+    • Execution-specific: PrescriptionCard.tsx (inline Tailwind + --fc-glass-border gradients)
+    • Row logging: SetRowShell, logWeightRepsPair.module.css
+    • Partial v6 polish already landed in workout-execution/ui/* (comments tag "workout-exec-v6")
+  Train page skin is separate: src/components/client/train/trainPage.module.css
+
+Train → execution path
+  1. User taps Start on Train (src/app/client/train/page.tsx handleStartWorkout ~218)
+  2. startProgramWorkout({ programDayAssignmentId: scheduleId })
+       src/lib/startProgramWorkout.ts
+  3. POST /api/program-workouts/start-from-progress
+       body: { program_day_assignment_id }  → returns workout_assignment_id
+  4. window.location.href = `/client/workouts/${workoutAssignmentId}/start`
+  5. start page loadAssignment resolves assignment + program_instance_workout_id via
+     program_day_assignments bridge (~1793-1856)
+
+Other entry points to same route
+  • HeroWorkoutCard, EnhancedClientWorkouts, details page router.push, DashboardWrapper Link
+  • All land on /client/workouts/<assignment-or-pda-id>/start
+
+Train page data (NOT used on execution screen)
+  get_train_page_data RPC — train/page.tsx ~129, mapped by trainPageDataMapper.ts
+
+================================================================================
+2. DATA SOURCE — WHAT FEEDS THE EXECUTION SCREEN
+================================================================================
+
+Orchestrator: loadAssignment() in start/page.tsx ~1481
+
+Path A — Program workout (has program_assignment_id / instance workout)
+  Call site: page.tsx ~1907-1914
+    loadWorkoutBlocksByContentId(supabase, programInstanceWorkoutId, { preferInstance: true })
+      src/lib/loadWorkoutBlocksByContentId.ts
+
+  RPC: get_instance_workout_canvas
+    Call site: src/lib/programInstance/instanceCanvasLoad.ts:13-14
+    Arg: p_program_instance_workout_id
+
+  Mapper chain:
+    mapWorkoutCanvasRpcToCanvasWorkout  (canvasLoadRpcMapper.ts — expects slot.prescriptions[])
+    → mapInstanceCanvasToSetEntries     (instanceWorkoutBlocksMapper.ts)
+    → adaptBlockRowToLegacy / toLegacyBlockShape
+
+Path B — Standalone workout_assignment (template only)
+  Call site: page.tsx ~1948-1957
+    supabase.rpc("get_workout_blocks", { p_template_id: templateId })
+  Mapper: mapWorkoutBlocksRpcToSetEntries (workoutBlocksRpcMapper.ts)
+    → adaptRpcBlockToLegacy (adaptBlockRow.ts) — comment: satellite arrays ignored
+
+Post-load enrichment (standalone only): enrichWorkoutBlocksPrescribedRir (~1966-1977)
+
+Converted to LiveWorkoutSetEntry[] and held in workoutSetEntries state; passed to
+LiveWorkoutSetEntryExecutor as liveSetEntry prop.
+
+Shape the UI actually consumes (WorkoutSetEntry / WorkoutSetEntryExercise — types/workoutSetEntries.ts)
+  Block level: id, set_type, set_order, total_sets, reps_per_set, rest_seconds, duration_seconds, exercises[]
+  Exercise level (what executors read):
+    exercise_id, exercise_order, exercise_letter, sets, reps, weight_kg, load_percentage,
+    rir, tempo, rest_seconds, notes, drop_sets[], cluster_sets[], rest_pause_sets[], time_protocols[]
+  NOT on WorkoutSetEntryExercise type: prescriptions[] array
+
+Executor display fields (example StraightSetExecutor.tsx):
+  totalSets from exercise.sets | block.total_sets
+  repsDisplay from exercise.reps | block.reps_per_set  (single value, ~418-419, 177-180)
+  rir/tempo from exercise.rir / exercise.tempo (single value)
+  Row prefills duplicate that one target for every set row (~191-209)
+
+RPC bodies — NEEDS DB CONFIRMATION (not in repo)
+  • get_instance_workout_canvas — need: does JSON include prescriptions[] per slot with
+    set_number, reps, weight_kg, load_percentage, rir, tempo, work_seconds, distance_meters?
+  • get_workout_blocks — need: same; workoutBlocksRpcMapper.ts:5-6 states satellite arrays ignored
+  • get_workout_set_logs_for_resume — need: column list matches SET_LOGS_RESUME_SELECT (page.tsx:796-797)
+
+================================================================================
+3. PER-SET PRESCRIPTION VERDICT
+================================================================================
+
+VERDICT: **PARTIALLY reach** — stored and likely returned by RPC, **lost before UI renders**
+
+3.1 Storage granularity (live DB confirmed via information_schema)
+  Per-set tables (one row per set_number per slot):
+    program_instance_set_prescriptions  (instance / program days)
+    workout_set_prescriptions           (templates)
+  Columns per row: slot_id, set_number, reps, weight_kg, load_percentage, rir, tempo,
+                  work_seconds, distance_meters
+  Rest is NOT per prescription row — lives on slot (rest_seconds) or group (rest_seconds).
+
+  Per-exercise slot table also has scalar fallbacks (often mirror set 1):
+    program_instance_set_entry_exercises / workout_set_entry_exercises
+    (sets, reps, weight_kg, rir, tempo, technique, drop_*, cluster_*, etc.)
+
+  Coach canvas writes per-set rows (PrescriptionTable.tsx — one input row per set_number).
+
+3.2 Delivery from loader
+  Intermediate: canvasLoadRpcMapper.ts:43-48 maps row.prescriptions[] from RPC payload when present.
+  So prescriptions likely survive **into CanvasExercise.prescriptions** inside get_instance_workout_canvas response.
+
+3.3 Break points (code evidence)
+
+  BREAK #1 — instanceWorkoutBlocksMapper.ts:37-48
+    const firstRx = slot.prescriptions?.[0]
+    Only firstRx copied to exercise scalars (reps, weight_kg, rir, tempo, …).
+    prescriptions array passed on slot row but…
+
+  BREAK #2 — toLegacyBlockShape.ts mapSlotToExercise:22-52
+    Builds WorkoutSetEntryExercise from slot scalars only.
+    Never reads slot.prescriptions[].
+
+  BREAK #3 — start/page.tsx clientBlocks mapping:2025-2045
+    Maps exercises without prescriptions field.
+
+  BREAK #4 — WorkoutSetEntryExercise type (workoutSetEntries.ts:51-78)
+    No prescriptions[] on the type executors receive.
+
+  BREAK #5 — Executors (e.g. StraightSetExecutor.tsx:177-180, 423-425)
+    One repsDisplay / prescribedRepsDefault for all set rows.
+
+  Standalone get_workout_blocks path: workoutBlocksRpcMapper.ts:5-6 explicitly ignores
+  satellite/prescription arrays; same legacy flatten via adaptRpcBlockToLegacy.
+
+3.4 Live example (instance workout — confirms break has user-visible effect)
+  Popescu instance 3e54eac4-… exercise CMJ:
+    set_number 1: rx weight 5 kg; sets 2-3: rx weight null (DB)
+  UI would show exercise.weight_kg from firstRx only and identical reps "3" on every row.
+
+3.5 Technique / rest per set
+  technique, drop_percentage, cluster params: slot-level only (not per prescription row).
+  Per-set tempo/RIR/weight/reps: in DB per row, flattened to set-1 only at BREAK #1.
+
+================================================================================
+4. SET LOGGING READ / WRITE
+================================================================================
+
+Write path
+  UI → useSetLoggingOrchestrator (LiveWorkoutSetEntryExecutor) → POST /api/log-set
+  Handler: src/app/api/log-set/route.ts
+  Insert builder: src/lib/setLogging/buildLogSetInsertData.ts
+  Target table: workout_set_logs (live columns confirmed — wide type-specific fields + rpe, set_number)
+
+Read / resume path
+  restoreWorkoutProgress — page.tsx ~762+
+  Primary: supabase.rpc("get_workout_set_logs_for_resume", { p_client_id, p_workout_log_id }) ~801
+  Fallback: .from("workout_set_logs").select(...) ~826-828
+  Block-level done: workout_set_entry_completions ~806-808
+
+Done vs pending on screen
+  • loggedSetsBySetEntryId state + loggedSets prop per block
+  • restoreWorkoutProgress sets completedSets / existingSetLogs from workout_set_logs
+  • SetRowShell row.done + green check (set-rows/SetRowShell.tsx)
+  • LoggedSetsList below card for completed sets + inline RPE (SetEffortPicker)
+
+Session persistence
+  workout_sessions update on block index change (page.tsx ~207-235)
+  goldenLogSet sessionStorage idempotency (useSetLoggingOrchestrator)
+
+Post-cleanup status
+  No references to program_days or dropped graveyard tables in start page path (grep src: zero program_days).
+  Uses program_day_assignments, program_day_completions, program_instance_workouts — present in live flow.
+  get_workout_set_logs_for_resume: fallback exists if RPC missing (page.tsx:819-823) — flag if migration not applied.
+
+================================================================================
+5. programWeekStateBuilder / GRAVEYARD EXPOSURE
+================================================================================
+
+Does execution screen use programWeekStateBuilder.ts?
+  **NO.** Execution load path does not import it.
+
+Where programWeekStateBuilder is used
+  • /api/client/program-week/route.ts → buildProgramWeekState
+  • Train UI types (ProgramWeekDayCard, etc.)
+  Train initial data uses get_train_page_data + rpcResponseToProgramWeekState (trainPageDataMapper.ts),
+  not buildProgramWeekState directly on train/page.tsx.
+
+programs table bug (user-reported lines 119, 240)
+  Current code at programWeekStateBuilder.ts:119 and :240 queries **workout_programs**, not programs.
+  (`.from('workout_programs').select('name')`)
+  **Execution screen unaffected** regardless.
+
+Graveyard tables in execution data path
+  • program_days — not referenced anywhere under src/
+  • programs — not referenced under src/ (workout_programs used elsewhere)
+  Execution path tables: workout_assignments, program_day_assignments, program_instance_workouts,
+  program_instance_set_*, workout_set_logs, workout_logs, workout_sessions, exercises
+
+================================================================================
+6. GAP LIST — v6 MOCKUP NEEDS vs DATA TODAY
+================================================================================
+
+| v6 need                         | Reaches UI today? | Notes |
+|---------------------------------|-------------------|-------|
+| Per-set weight/reps targets     | NO                | firstRx flatten only |
+| Per-set RIR                     | NO                | exercise.rir scalar |
+| Per-set tempo                   | NO                | exercise.tempo scalar |
+| Per-set rest                    | PARTIAL           | slot/group rest only, not per set |
+| Technique in-set instructions   | PARTIAL           | slot technique → set_type branch; drop % etc. often ignored in UI |
+| Last time per set               | PARTIAL           | clientProgressionService setDetails for weight defaults, not per-set rx display |
+| A1/A2 group badges              | NO                | exercise_letter in DB; SetTypeBadge instead |
+| All sets visible + tick off     | YES               | SetRowsListPanel / SetRowShell |
+| Inline RPE per logged set       | YES               | LoggedSetsList + SetEffortPicker |
+| Session resume                  | YES               | workout_set_logs + RPC resume |
+| Log write integrity             | YES               | /api/log-set → workout_set_logs |
+
+================================================================================
+7. PROPOSED BUILD PLAN (plan only — no code)
+================================================================================
+
+(a) Re-plumb first (blocking)
+  1. Stop flattening at instanceWorkoutBlocksMapper — carry prescriptions[] on each exercise
+     (or pass CanvasGroup[] parallel to legacy shape).
+  2. Extend LiveWorkoutSetEntry / executor props to accept Prescription[] per slot keyed by set_number.
+  3. Row prefills + "Your target today" read prescriptions[setNumber-1] for weight, reps, rir, tempo.
+  4. Keep deriveSetType / set_type only for logging payload shape (buildLogSetInsertData), not display.
+  5. Confirm get_instance_workout_canvas returns embedded prescriptions (DB review); if not, fix RPC first.
+  6. Standalone template path: decide whether get_workout_blocks should expose prescriptions or instance-only.
+
+(b) Reskin on top (after data lands)
+  1. Replace PrescriptionCard aggregate grid with Element 15 grammar (exercise-display/*) for read +
+     enlarged per-set target strip for the active set.
+  2. Remove SetTypeBadge; use ExerciseGroupDisplay A1/A2 badges for supersets.
+  3. Flatten card-in-card nesting (single execution surface; log rows inside, not nested footer card).
+  4. Wire technique extras from buildPrescriptionSegments (drop chain, cluster, rest-pause copy).
+  5. Apply v6 tokens already in ui-system.css; retire AnimatedBackground/ClientGlassCard on this route.
+  6. Leave intact: useSetLoggingOrchestrator, /api/log-set, restoreWorkoutProgress, completeWorkoutService path.
+
+================================================================================
+EVIDENCE INDEX
+================================================================================
+start/page.tsx loadAssignment program path     :1907-1914
+start/page.tsx get_workout_blocks              :1948-1957
+instanceCanvasLoad RPC                         :13-14
+instanceWorkoutBlocksMapper firstRx            :37-48
+toLegacyBlockShape no prescriptions            :22-52
+workoutBlocksRpcMapper ignores satellites      :5-6
+canvasLoadRpcMapper prescriptions in           :43-48
+StraightSetExecutor single target              :177-180, 418-425
+workout_set_logs resume                        :801-828
+startProgramWorkout navigate                   :79-80
+train handleStartWorkout                       :218-230
+programWeekStateBuilder workout_programs       :119, 240
+Live DB prescription columns                   :program_instance_set_prescriptions (set_number, …)
+
+END

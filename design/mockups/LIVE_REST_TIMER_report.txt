@@ -1,0 +1,40 @@
+LIVE REST TIMER — in-card countdown (block route)
+Date: 2026-07-19
+
+1. Files modified
+- src/components/client/workout-execution/LiveRestTimerContext.tsx (new)
+- src/components/client/LiveWorkoutSetEntryExecutor.tsx
+- src/components/client/workout-execution/live-card/LiveCard.tsx
+- src/components/client/workout-execution/live-card/LiveCardLog.tsx
+- src/components/client/workout-execution/blocks/SupersetExecutor.tsx
+- src/components/client/workout-execution/blocks/GiantSetExecutor.tsx
+
+Unchanged (still in repo, not opened on this route):
+- src/components/client/workout-execution/RestTimerModal.tsx
+
+2. How resting + countdown are driven
+- Signal: useSetLoggingOrchestrator.shouldOpenRestTimer (unchanged), after a set log when not the last set of the block.
+- Bridge: InCardRestBridge (inside LiveRestTimerProvider) acks the signal and calls startRest with rest_seconds from restStartRef (filled by handleSetComplete / handleLastSetLoggedForRest) plus next set numbers.
+- Tick: LiveRestTimerProvider keeps a deadlineMs; a 250ms interval + visibility/focus handlers recompute secondsLeft = max(0, ceil((deadline - now)/1000)). Never negative.
+- UI: LiveCard reads context → status ● Resting (green); auto-injects LiveCardGlue “↺ resting — Set N next” + countdown in .t. Superset/Giant pass restGlue="none" and feed the same into their existing glue slot.
+- Skip: LiveCardLogField / LiveCardLogButton call skipRest on focus/change/click so logging is never blocked behind the countdown.
+
+3. Reload / resume approach
+- On startRest, persist { deadlineMs, nextSetNumber, totalSets, pendingAction, setEntryId } to sessionStorage key df:live-rest:{sessionId}:{setEntryId}.
+- On provider mount / setEntry change: if deadline already past → clear storage and do not rest. Else resume with remaining seconds from the deadline (wall clock), never a stuck or negative countdown.
+- Backgrounding: same deadline math on visibility/focus — no interval-only decrement.
+
+4. RestTimerModal on this route
+- Confirmed: RestTimerModal is no longer imported, mounted, or opened from LiveWorkoutSetEntryExecutor.
+- Component file retained for other callers/routes.
+
+5. Tabata clock
+- Deferred. TabataTimerModal has no live countdown (static round list only); there is no shared tick to feed into the glue placeholder without restructuring Tabata. Escape hatch: 1 + 2 done; Tabata follow-up.
+
+6. Untouched (as required)
+- Logging write paths, resolveSetPrescriptionTargets, navigation, card layout/property slots, set rows.
+- RestTimerOverlay / traditional (non-block) path.
+- No audio/haptics, no DB/SQL/migrations, no git.
+
+7. tsc
+- npx tsc --noEmit → exit 0 (0 errors).

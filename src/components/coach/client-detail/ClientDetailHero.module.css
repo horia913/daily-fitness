@@ -3,12 +3,8 @@
   overflow: hidden;
   border-radius: 20px;
   padding: 16px;
-  border: 1px solid var(--fc-glass-border);
-  background: linear-gradient(
-    135deg,
-    var(--fc-surface-card) 0%,
-    var(--fc-glass-soft) 100%
-  );
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
 }
 
 .glow {
@@ -24,10 +20,10 @@
     var(--hero-glow, var(--fc-set-type-straight-soft)) 0%,
     transparent 70%
   );
+  opacity: 0.85;
 }
-
-.wrap[data-accent="lime"] {
-  --hero-glow: var(--fc-accent-lime-soft);
+.wrap[data-accent="action"] {
+  --hero-glow: var(--fc-accent-dim);
 }
 
 .wrap[data-accent="good"] {
@@ -47,7 +43,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 10px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -55,8 +51,8 @@
   color: var(--eyebrow-fg, var(--fc-set-type-straight));
 }
 
-.wrap[data-accent="lime"] .eyebrowRow {
-  --eyebrow-fg: var(--fc-accent-lime-2);
+.wrap[data-accent="action"] .eyebrowRow {
+  --eyebrow-fg: var(--fc-accent);
 }
 
 .wrap[data-accent="good"] .eyebrowRow {
@@ -73,7 +69,6 @@
   border-radius: 50%;
   background: currentColor;
   flex-shrink: 0;
-  box-shadow: 0 0 6px currentColor;
   animation: cdPulse 2s ease-in-out infinite;
 }
 
@@ -89,7 +84,7 @@
 
 .title {
   margin-top: 6px;
-  font-family: var(--f-headline, var(--font-geist-sans, ui-sans-serif));
+  font-family: var(--f-headline);
   font-weight: 700;
   font-size: 24px;
   line-height: 1.1;
@@ -113,7 +108,8 @@
 }
 
 .statNum {
-  font-family: var(--f-display, var(--font-geist-sans));
+  font-family: var(--f-display);
+  font-stretch: 125%;
   font-weight: 700;
   font-size: 22px;
   line-height: 1;
@@ -128,8 +124,8 @@
   color: var(--fc-set-type-straight);
 }
 
-.statNumLime {
-  color: var(--fc-accent-lime-2);
+.statNumAction {
+  color: var(--fc-accent);
 }
 
 .statNumGood {
@@ -149,7 +145,7 @@
 }
 
 .statNumSuffix {
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 14px;
   font-weight: 500;
   color: var(--fc-text-quaternary);
@@ -158,7 +154,7 @@
 
 .statLabel {
   margin-top: 4px;
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 9.5px;
   letter-spacing: 0.12em;
   text-transform: uppercase;

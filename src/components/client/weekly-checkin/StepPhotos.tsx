@@ -12,6 +12,7 @@ interface StepPhotosProps {
   setPhotoFiles: React.Dispatch<React.SetStateAction<WeeklyCheckInPhotoFiles>>;
   lastPhotoDate: string | null;
   weightKg: number | null;
+  stepLabel?: string;
   onSkip: () => void;
   onNext: () => void;
 }
@@ -21,6 +22,7 @@ export function StepPhotos({
   setPhotoFiles,
   lastPhotoDate,
   weightKg,
+  stepLabel = "Step 2 of 3",
   onSkip,
   onNext,
 }: StepPhotosProps) {
@@ -37,7 +39,7 @@ export function StepPhotos({
 
   return (
     <ClientGlassCard className="p-6 sm:p-8">
-      <p className="text-sm fc-text-subtle mb-4">Step 2 of 3</p>
+      <p className="text-sm fc-text-subtle mb-4">{stepLabel}</p>
       <h2 className="text-xl font-bold fc-text-primary mb-1">Progress photos</h2>
       <p className="text-sm fc-text-dim mb-6">Optional — add front, side, and/or back.</p>
       {lastPhotoDate && (
@@ -53,7 +55,7 @@ export function StepPhotos({
           return (
             <div key={type}>
               <label className="block text-sm font-medium fc-text-primary mb-2 capitalize">{type}</label>
-              <label className="block aspect-[3/4] rounded-xl border-2 border-dashed border-[color:var(--fc-glass-border)] overflow-hidden cursor-pointer hover:border-[color:var(--fc-accent-cyan)] transition-colors">
+              <label className="block aspect-[3/4] rounded-xl border-2 border-dashed border-[color:var(--fc-glass-border)] overflow-hidden cursor-pointer hover:border-[color:var(--fc-accent)] transition-colors">
                 {preview ? (
                   <img src={preview} alt={type} className="w-full h-full object-cover" />
                 ) : (

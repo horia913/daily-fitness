@@ -1,7 +1,7 @@
 .wrap {
   padding: 20px 14px;
   border-radius: 14px;
-  background: var(--fc-glass-soft);
+  background: transparent;
   border: 1px dashed var(--fc-glass-border);
   display: flex;
   flex-direction: column;
@@ -13,7 +13,7 @@
 .wrapCompact {
   padding: 14px;
   border-radius: 14px;
-  background: var(--fc-glass-soft);
+  background: transparent;
   border: 1px dashed var(--fc-glass-border);
   display: flex;
   flex-direction: column;
@@ -37,7 +37,7 @@
 
 .title {
   margin: 0;
-  font-family: var(--f-headline, var(--font-geist-sans));
+  font-family: var(--f-headline);
   font-weight: 600;
   font-size: 13px;
   color: var(--fc-text-primary);
@@ -65,11 +65,11 @@
   border-radius: 13px;
   border: none;
   cursor: pointer;
-  font-family: var(--font-geist-sans, ui-sans-serif);
+  font-family: var(--font-body);
   font-weight: 600;
   font-size: 11.5px;
   color: var(--fc-ink);
-  background: linear-gradient(135deg, var(--fc-accent-lime), var(--fc-accent-lime-2));
+  background: linear-gradient(135deg, var(--fc-accent), color-mix(in srgb, var(--fc-accent) 85%, white));
 }
 
 .btnOutline {
@@ -78,7 +78,7 @@
   border: 1px solid var(--fc-glass-border);
   background: transparent;
   cursor: pointer;
-  font-family: var(--font-geist-sans, ui-sans-serif);
+  font-family: var(--font-body);
   font-weight: 600;
   font-size: 11.5px;
   color: var(--fc-text-primary);
@@ -86,7 +86,7 @@
 
 .wrapCompact .title {
   font-size: 12.5px;
-  font-family: var(--font-geist-sans, ui-sans-serif);
+  font-family: var(--font-body);
   font-weight: 500;
 }
 

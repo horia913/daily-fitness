@@ -280,7 +280,7 @@ export const UpdateSessionSchema = SessionSchema.partial().extend({
 })
 
 // ============================================================================
-// SUBSCRIPTION (clipcards table — subscription rows, no session packs in UI)
+// SUBSCRIPTION (legacy subscription rows — no session packs in UI)
 // ============================================================================
 
 export const SubscriptionClipcardRowSchema = z.object({

@@ -24,8 +24,8 @@ import {
   FileQuestion,
 } from "lucide-react";
 import Link from "next/link";
-import { WorkoutBlockService } from "@/lib/workoutBlockService";
-import { WorkoutBlock } from "@/types/workoutBlocks";
+import { WorkoutSetEntryService } from "@/lib/workoutBlockService";
+import { WorkoutSetEntry } from "@/types/workoutSetEntries";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useToast } from "@/components/ui/toast-provider";
 import type {
@@ -109,7 +109,7 @@ function displayReps(
   return String(val);
 }
 
-function blockPrimaryLine(block: WorkoutBlock): string {
+function blockPrimaryLine(block: WorkoutSetEntry): string {
   const setType = String(block.set_type || "straight_set");
   const exercises = (block.exercises ?? []).slice().sort((a, b) => {
     const ao = a.exercise_order ?? 0;
@@ -231,7 +231,7 @@ export default function WorkoutTemplateDetailsPage() {
 
   // Load exercises for name lookup
   const [template, setTemplate] = useState<WorkoutTemplate | null>(null);
-  const [workoutBlocks, setWorkoutBlocks] = useState<WorkoutBlock[]>([]);
+  const [workoutSetEntries, setWorkoutSetEntries] = useState<WorkoutSetEntry[]>([]);
   const [exerciseCount, setExerciseCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -254,7 +254,7 @@ export default function WorkoutTemplateDetailsPage() {
     if (templateId) {
       setLoading(true);
       setTemplate(null);
-      setWorkoutBlocks([]);
+      setWorkoutSetEntries([]);
       setExerciseCount(0);
       setError(null);
     }
@@ -270,7 +270,7 @@ export default function WorkoutTemplateDetailsPage() {
         templateTimeoutRef.current = null;
         setLoading(false);
       }, 20_000);
-      Promise.all([loadTemplate(), loadWorkoutBlocks()]).finally(() => {
+      Promise.all([loadTemplate(), loadWorkoutSetEntries()]).finally(() => {
         if (templateTimeoutRef.current) {
           clearTimeout(templateTimeoutRef.current);
           templateTimeoutRef.current = null;
@@ -310,14 +310,14 @@ export default function WorkoutTemplateDetailsPage() {
     }
   };
 
-  const loadWorkoutBlocks = async () => {
+  const loadWorkoutSetEntries = async () => {
     try {
-      const blocks = await WorkoutBlockService.getWorkoutBlocks(templateId);
-      setWorkoutBlocks(blocks || []);
-      setExerciseCount(WorkoutBlockService.countExercisesFromBlocks(blocks || []));
+      const blocks = await WorkoutSetEntryService.getWorkoutBlocks(templateId);
+      setWorkoutSetEntries(blocks || []);
+      setExerciseCount(WorkoutSetEntryService.countExercisesFromBlocks(blocks || []));
     } catch (error: any) {
       console.error("Error loading workout blocks:", error);
-      setWorkoutBlocks([]);
+      setWorkoutSetEntries([]);
     }
   };
 
@@ -481,23 +481,23 @@ export default function WorkoutTemplateDetailsPage() {
               </span>
             </div>
 
-            {workoutBlocks.length > 0 ? (
+            {workoutSetEntries.length > 0 ? (
               <div className="space-y-2 border-b border-[color:var(--fc-glass-border)]/40 py-2">
-                {workoutBlocks.map((block, idx) => (
+                {workoutSetEntries.map((setEntry, idx) => (
                   <div
-                    key={`${block.id}-${idx}`}
+                    key={`${setEntry.id}-${idx}`}
                     className="rounded-xl border border-[color:var(--fc-glass-border)]/40 bg-[color:var(--fc-glass-soft)]/30 px-3 py-2.5"
                   >
                     <div className="mb-1.5 flex flex-wrap items-center gap-2">
-                      <span className="rounded-full border border-cyan-400/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-300">
-                        {blockTypeBadgeLabel(String(block.set_type || ""))}
+                      <span className="rounded-full border border-[color-mix(in_srgb,var(--fc-group-c)_30%,transparent)] bg-[color-mix(in_srgb,var(--fc-group-c)_10%,transparent)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color-mix(in_srgb,var(--fc-group-c)_70%,white)]">
+                        {blockTypeBadgeLabel(String(setEntry.set_type || ""))}
                       </span>
                       <span className="text-xs font-medium fc-text-dim">
                         Exercise {idx + 1}
                       </span>
                     </div>
                     <p className="text-sm leading-snug fc-text-primary">
-                      {blockPrimaryLine(block)}
+                      {blockPrimaryLine(setEntry)}
                     </p>
                   </div>
                 ))}

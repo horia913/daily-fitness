@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Apple } from "lucide-react";
+import { toLocalDateString } from "@/lib/clientActivityService";
 
 export type NutritionComplianceTimeRange = "1W" | "2W" | "1M" | "3M";
 
@@ -37,6 +38,8 @@ interface NutritionComplianceChartProps {
   onTimeRangeChange?: (range: NutritionComplianceTimeRange) => void;
   defaultTimeRange?: NutritionComplianceTimeRange;
   className?: string;
+  title?: string;
+  subtitle?: string;
 }
 
 function filterDataByTimeRange(
@@ -46,7 +49,7 @@ function filterDataByTimeRange(
   const days = TIME_RANGE_DAYS[timeRange];
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
-  const cutoffStr = cutoff.toISOString().split("T")[0];
+  const cutoffStr = toLocalDateString(cutoff);
   return data.filter((d) => d.date >= cutoffStr);
 }
 
@@ -56,6 +59,8 @@ export function NutritionComplianceChart({
   onTimeRangeChange,
   defaultTimeRange = "2W",
   className,
+  title = "Nutrition adherence",
+  subtitle = "Daily adherence to targets",
 }: NutritionComplianceChartProps) {
   const [internalTimeRange, setInternalTimeRange] =
     useState<NutritionComplianceTimeRange>(defaultTimeRange);
@@ -100,28 +105,6 @@ export function NutritionComplianceChart({
     })
     .join(" ");
 
-  const areaPath =
-    chartData.length >= 2
-      ? (() => {
-          const pts = chartData
-            .map((p, i) => {
-              const x =
-                padding.left +
-                (i / (chartData.length - 1)) * chartWidth;
-              const y =
-                padding.top +
-                chartHeight -
-                (p.compliance / 100) * chartHeight;
-              return `${x},${y}`;
-            })
-            .join(" L ");
-          const bottom = padding.top + chartHeight;
-          const left = padding.left;
-          const right = padding.left + chartWidth;
-          return `M ${pts} L ${right},${bottom} L ${left},${bottom} Z`;
-        })()
-      : "";
-
   const avgY =
     padding.top + chartHeight - (avgCompliance / 100) * chartHeight;
 
@@ -131,7 +114,7 @@ export function NutritionComplianceChart({
     return (
       <div
         className={cn(
-          "fc-card-shell p-6",
+          "rounded-2xl border border-[color:var(--fc-glass-border)] bg-transparent p-6",
           className
         )}
       >
@@ -139,7 +122,7 @@ export function NutritionComplianceChart({
           icon={Apple}
           variant="compact"
           title="No nutrition data yet"
-          description="Start logging meals to track compliance."
+          description="Start logging meals to track adherence."
         />
       </div>
     );
@@ -148,35 +131,35 @@ export function NutritionComplianceChart({
   return (
     <div
       className={cn(
-        "fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4 sm:p-6",
+        "rounded-2xl border border-[color:var(--fc-glass-border)] bg-transparent p-4 sm:p-6",
         className
       )}
     >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-[color:var(--fc-domain-meals)]/20 text-[color:var(--fc-domain-meals)]">
+          <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl border border-[color:var(--fc-glass-border)] bg-transparent text-[color:var(--fc-domain-meals)]">
             <Apple className="h-5 w-5 sm:h-6 sm:w-6" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-[color:var(--fc-text-primary)]">
-              Nutrition compliance
+            <h2 className="text-lg font-bold text-[color:var(--fc-text-primary)] [font-family:var(--f-headline)]">
+              {title}
             </h2>
-            <p className="text-xs text-[color:var(--fc-text-dim)]">
-              Daily adherence to targets
+            <p className="text-xs text-[color:var(--fc-text-dim)] [font-family:var(--font-body)]">
+              {subtitle}
             </p>
           </div>
         </div>
-        <div className="flex gap-1 rounded-xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)] p-1">
+        <div className="flex gap-1 rounded-xl border border-[color:var(--fc-glass-border)] bg-transparent p-1">
           {TIME_RANGE_OPTIONS.map((opt) => (
             <button
               key={opt.value}
               type="button"
               onClick={() => setTimeRange(opt.value)}
               className={cn(
-                "min-h-[44px] min-w-[44px] px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+                "min-h-[44px] min-w-[44px] px-2 sm:px-3 py-1.5 rounded-lg text-[10px] font-semibold uppercase tracking-wide transition-colors [font-family:var(--f-mono)] bg-transparent",
                 timeRange === opt.value
-                  ? "bg-[color:var(--fc-domain-meals)]/20 text-[color:var(--fc-domain-meals)]"
-                  : "text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)]"
+                  ? "text-[color:var(--fc-accent)] border border-[color-mix(in_srgb,var(--fc-accent)_40%,transparent)]"
+                  : "text-[color:var(--fc-text-dim)] border border-transparent hover:text-[color:var(--fc-text-primary)]"
               )}
             >
               {opt.label}
@@ -193,35 +176,16 @@ export function NutritionComplianceChart({
             style={{ height: 200, minHeight: 200 }}
             preserveAspectRatio="xMidYMid meet"
           >
-            <defs>
-              <linearGradient
-                id="nutrition-compliance-area"
-                x1="0"
-                x2="0"
-                y1="1"
-                y2="0"
-              >
-                <stop
-                  offset="0%"
-                  stopColor="var(--fc-domain-meals)"
-                  stopOpacity="0.25"
-                />
-                <stop
-                  offset="100%"
-                  stopColor="var(--fc-domain-meals)"
-                  stopOpacity="0"
-                />
-              </linearGradient>
-            </defs>
+            <defs />
 
-            {/* Color zones (horizontal bands: green 80–100%, yellow 50–79%, red 0–49%) */}
+            {/* Flat reference bands (token washes, no gradient) */}
             <rect
               x={padding.left}
               y={padding.top}
               width={chartWidth}
               height={(20 / 100) * chartHeight}
               fill="var(--fc-status-success)"
-              fillOpacity="0.1"
+              fillOpacity="0.06"
             />
             <rect
               x={padding.left}
@@ -229,7 +193,7 @@ export function NutritionComplianceChart({
               width={chartWidth}
               height={(30 / 100) * chartHeight}
               fill="var(--fc-status-warning)"
-              fillOpacity="0.1"
+              fillOpacity="0.05"
             />
             <rect
               x={padding.left}
@@ -237,7 +201,7 @@ export function NutritionComplianceChart({
               width={chartWidth}
               height={(50 / 100) * chartHeight}
               fill="var(--fc-status-error)"
-              fillOpacity="0.1"
+              fillOpacity="0.04"
             />
 
             {/* Grid lines */}
@@ -248,22 +212,12 @@ export function NutritionComplianceChart({
                 y1={padding.top + chartHeight * (1 - ratio)}
                 x2={padding.left + chartWidth}
                 y2={padding.top + chartHeight * (1 - ratio)}
-                stroke="var(--fc-glass-border)"
+                stroke="var(--fc-hairline)"
                 strokeWidth="0.5"
               />
             ))}
 
-            {/* Area fill */}
-            {areaPath && (
-              <path
-                d={areaPath}
-                fill="url(#nutrition-compliance-area)"
-                className="transition-opacity duration-300"
-                style={{ opacity: mounted ? 1 : 0 }}
-              />
-            )}
-
-            {/* Data line */}
+            {/* Data line — no area fill / gradient */}
             {chartData.length >= 2 && (
               <polyline
                 fill="none"
@@ -272,6 +226,8 @@ export function NutritionComplianceChart({
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 points={pathPoints}
+                className="transition-opacity duration-300"
+                style={{ opacity: mounted ? 1 : 0 }}
               />
             )}
 
@@ -307,7 +263,7 @@ export function NutritionComplianceChart({
                   cy={y}
                   r={3}
                   fill="var(--fc-domain-meals)"
-                  stroke="var(--fc-bg-base)"
+                  stroke="var(--fc-bg-deep)"
                   strokeWidth="1.5"
                 />
               );
@@ -316,9 +272,12 @@ export function NutritionComplianceChart({
 
           {/* Average label */}
           {chartData.length >= 2 && (
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs [font-family:var(--f-mono)]">
               <span className="text-[color:var(--fc-text-dim)]">
-                Avg: <strong className="text-[color:var(--fc-text-primary)]">{avgCompliance}%</strong>
+                Avg:{" "}
+                <strong className="text-[color:var(--fc-text-primary)] [font-family:var(--f-display)]">
+                  {avgCompliance}%
+                </strong>
               </span>
               <span className="text-[color:var(--fc-text-dim)]">
                 {chartData.length > 0 &&

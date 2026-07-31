@@ -13,14 +13,17 @@ import {
 } from "lucide-react";
 import {
   TrainingBlock,
-  TRAINING_BLOCK_GOALS,
-  TrainingBlockGoal,
 } from "@/types/trainingBlock";
+import {
+  formatPhaseDisplayName,
+  phaseTypeDisplayLabel,
+} from "@/lib/programs/periodizationStyles";
 import css from "./programEditV1.module.css";
 
 export interface TrainingBlockHeaderProps {
   trainingBlocks: TrainingBlock[];
   activeBlockId: string | null;
+  periodizationStyle?: string | null;
   onSelectBlock: (id: string) => void;
   onAddBlock: () => void;
   /** Opens block modal (rename + full block details). */
@@ -32,14 +35,15 @@ export interface TrainingBlockHeaderProps {
   onDuplicateBlock?: (block: TrainingBlock) => void | Promise<void>;
 }
 
-const CYAN = "#4FE3E8";
-const CYAN_DIM = "rgba(79,227,232,0.18)";
-const CYAN_SOFT = "rgba(79,227,232,0.12)";
-const CYAN_GLOW = "rgba(79,227,232,0.04)";
+const CYAN = "var(--fc-group-c)";
+const CYAN_DIM = "rgba(34, 211, 238, 0.18)";
+const CYAN_SOFT = "rgba(34, 211, 238, 0.12)";
+const CYAN_GLOW = "rgba(34, 211, 238, 0.04)";
 
 export function TrainingBlockHeader({
   trainingBlocks,
   activeBlockId,
+  periodizationStyle,
   onSelectBlock,
   onAddBlock,
   onEditBlock,
@@ -138,7 +142,7 @@ export function TrainingBlockHeader({
             className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--pe-t2)]"
             style={{ fontFamily: "var(--f-mono, Geist Mono, monospace)" }}
           >
-            Training blocks
+            Training phases
           </span>
           <span
             className="rounded-md px-1.5 py-0.5 text-[9px] text-[var(--pe-t2)]"
@@ -153,18 +157,21 @@ export function TrainingBlockHeader({
         <button
           type="button"
           onClick={onAddBlock}
-          className="inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-[11px] font-medium text-[var(--pe-cyan)] bg-transparent hover:bg-[var(--pe-cyan-soft)] border border-transparent hover:border-[var(--pe-cyan-dim)] transition-colors"
+          className="inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-[11px] font-medium text-[var(--fc-accent)] bg-transparent hover:bg-[var(--fc-accent-dim)] border border-transparent hover:border-[var(--fc-accent-glow)] transition-colors"
         >
           <Plus className="w-3.5 h-3.5" />
-          Add block
+          Add phase
         </button>
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-0.5 px-0.5 items-stretch">
         {trainingBlocks.map((block, index) => {
           const isActive = block.id === activeBlockId;
-          const goalKey = (block.goal || "custom") as TrainingBlockGoal;
-          const goalLabel = TRAINING_BLOCK_GOALS[goalKey] ?? block.goal;
+          const phaseSubtitle = phaseTypeDisplayLabel(block, { periodizationStyle });
+          const displayName = formatPhaseDisplayName(block.name, block.phase_label, {
+            periodizationStyle,
+            blockOrder: block.block_order,
+          });
           const { startWeek, endWeek } = blockWeekRanges[index];
 
           return (
@@ -193,7 +200,7 @@ export function TrainingBlockHeader({
                       className="text-[12.5px] font-semibold truncate leading-tight text-[var(--pe-t1)]"
                       style={{ fontFamily: "var(--font-geist-sans, Geist, sans-serif)" }}
                     >
-                      {block.name}
+                      {displayName}
                     </span>
                   </div>
                 </div>
@@ -205,7 +212,7 @@ export function TrainingBlockHeader({
                     textTransform: "uppercase",
                   }}
                 >
-                  {goalLabel} · Wks {startWeek}–{endWeek}
+                  {phaseSubtitle ? `${phaseSubtitle} · ` : ''}Wks {startWeek}–{endWeek}
                 </span>
               </button>
 
@@ -220,7 +227,7 @@ export function TrainingBlockHeader({
                   else openMenuForBlock(block.id);
                 }}
                 className="absolute top-2 right-2 w-[18px] h-[18px] rounded flex items-center justify-center text-[var(--pe-t3)] hover:text-[var(--pe-t1)] transition-colors"
-                aria-label="Block menu"
+                aria-label="Phase menu"
               >
                 <MoreHorizontal className="w-4 h-4" />
               </button>
@@ -235,7 +242,12 @@ export function TrainingBlockHeader({
           style={{ fontFamily: "var(--font-geist-sans, Geist, sans-serif)" }}
         >
           <span className="text-[var(--pe-t3)]">Editing </span>
-          <span className="font-semibold text-[var(--pe-cyan)]">{activeBlock.name}</span>
+          <span className="font-semibold text-[var(--fc-accent)]">
+            {formatPhaseDisplayName(activeBlock.name, activeBlock.phase_label, {
+              periodizationStyle,
+              blockOrder: activeBlock.block_order,
+            })}
+          </span>
           <span className="text-[var(--pe-t3)]">
             {" "}
             · Weeks {activeBlockRange.startWeek}–{activeBlockRange.endWeek}
@@ -262,7 +274,7 @@ export function TrainingBlockHeader({
           >
             <MenuRow
               icon={<Pencil className="w-3 h-3" />}
-              label="Rename block"
+              label="Rename phase"
               onClick={() => {
                 closeMenu();
                 onEditBlock(menuBlock);
@@ -271,7 +283,7 @@ export function TrainingBlockHeader({
             {onDuplicateBlock ? (
               <MenuRow
                 icon={<Copy className="w-3 h-3" />}
-                label="Duplicate"
+                label="Duplicate phase"
                 onClick={() => {
                   closeMenu();
                   void onDuplicateBlock(menuBlock);
@@ -302,7 +314,7 @@ export function TrainingBlockHeader({
             <div className="h-px my-1 bg-[rgba(255,255,255,0.08)]" />
             <MenuRow
               icon={<Trash2 className="w-3 h-3 text-[#FF5A5F]" />}
-              label="Delete block"
+              label="Delete phase"
               danger
               onClick={() => {
                 closeMenu();

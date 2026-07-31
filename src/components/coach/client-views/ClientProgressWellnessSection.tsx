@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useMemo } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
@@ -126,8 +126,8 @@ export default function ClientProgressWellnessSection({
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="animate-pulse h-48 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl" />
-        <div className="animate-pulse h-64 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl" />
+        <div className="animate-pulse h-48 bg-transparent border border-[color:var(--fc-glass-border)] rounded-2xl" />
+        <div className="animate-pulse h-64 bg-transparent border border-[color:var(--fc-glass-border)] rounded-2xl" />
       </div>
     );
   }
@@ -140,10 +140,10 @@ export default function ClientProgressWellnessSection({
           <>
             <p className="text-sm fc-text-subtle">
               {thisWeekWellnessSummary.sleep != null && (
-                <>Sleep avg: {thisWeekWellnessSummary.sleep.toFixed(1)}h · </>
+                <>Sleep avg: {thisWeekWellnessSummary.sleep.toFixed(1)}h Â· </>
               )}
               {thisWeekWellnessSummary.stress != null && (
-                <>Stress avg: {thisWeekWellnessSummary.stress.toFixed(1)}/5 · </>
+                <>Stress avg: {thisWeekWellnessSummary.stress.toFixed(1)}/5 Â· </>
               )}
               {thisWeekWellnessSummary.soreness != null && (
                 <>Soreness avg: {thisWeekWellnessSummary.soreness.toFixed(1)}/5</>
@@ -153,7 +153,7 @@ export default function ClientProgressWellnessSection({
                   {(thisWeekWellnessSummary.sleep != null ||
                     thisWeekWellnessSummary.stress != null ||
                     thisWeekWellnessSummary.soreness != null) &&
-                    " · "}
+                    " Â· "}
                   Energy avg: {thisWeekWellnessSummary.energy.toFixed(1)}
                 </>
               )}
@@ -193,7 +193,7 @@ export default function ClientProgressWellnessSection({
                   return (
                     <div
                       key={i}
-                      className="flex-1 rounded bg-[color:var(--fc-accent-cyan)]/40 min-h-[4px]"
+                      className="flex-1 rounded bg-[color:var(--fc-accent)]/40 min-h-[4px]"
                       style={{ height: `${Math.min(100, (avg / 10) * 100)}%` }}
                       title={`${avg.toFixed(1)}h`}
                     />
@@ -211,7 +211,7 @@ export default function ClientProgressWellnessSection({
                   return (
                     <div
                       key={i}
-                      className="flex-1 rounded bg-[color:var(--fc-accent-cyan)]/40 min-h-[4px]"
+                      className="flex-1 rounded bg-[color:var(--fc-accent)]/40 min-h-[4px]"
                       style={{ height: `${(avg / 5) * 100}%` }}
                       title={`${avg.toFixed(1)}/5`}
                     />
@@ -253,8 +253,8 @@ export default function ClientProgressWellnessSection({
                   </span>
                   <span className="text-sm font-mono fc-text-subtle">
                     {m.weight_kg?.toFixed(1)} kg
-                    {m.body_fat_percentage != null && ` · ${m.body_fat_percentage.toFixed(1)}%`}
-                    {m.waist_circumference != null && ` · ${m.waist_circumference} cm`}
+                    {m.body_fat_percentage != null && ` Â· ${m.body_fat_percentage.toFixed(1)}%`}
+                    {m.waist_circumference != null && ` Â· ${m.waist_circumference} cm`}
                   </span>
                 </div>
               ))}

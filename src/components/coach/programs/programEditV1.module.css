@@ -1,32 +1,25 @@
 /* Coach program edit v1 — scoped tokens (UI spec) */
 .wrap {
-  --pe-bg: #07101a;
-  --pe-card: #0e1f2e;
-  --pe-card-2: #0b1824;
-  --pe-card-3: #091420;
-  --pe-line: rgba(255, 255, 255, 0.08);
-  --pe-line-2: rgba(255, 255, 255, 0.05);
-  --pe-t1: #fff;
-  --pe-t2: rgba(255, 255, 255, 0.65);
-  --pe-t3: rgba(255, 255, 255, 0.42);
-  --pe-t4: rgba(255, 255, 255, 0.26);
-  --pe-cyan: #4fe3e8;
-  --pe-cyan-soft: rgba(79, 227, 232, 0.12);
-  --pe-cyan-dim: rgba(79, 227, 232, 0.18);
-  --pe-lime: #c5ff4a;
-  --pe-lime-2: #7fe89a;
-  --pe-lime-soft: rgba(197, 255, 74, 0.14);
-  --pe-critical: #ff5a5f;
-  --pe-critical-soft: rgba(255, 90, 95, 0.12);
-  --pe-warning: #f5c242;
-  --pe-warning-soft: rgba(245, 194, 66, 0.12);
-  --pe-good: #34d399;
-  --pe-good-soft: rgba(52, 211, 153, 0.12);
+  --pe-bg: var(--fc-bg-deep);
+  --pe-card: var(--fc-surface-card);
+  --pe-card-2: var(--fc-glass-soft);
+  --pe-card-3: var(--fc-bg-basalt);
+  --pe-line: var(--fc-glass-border);
+  --pe-line-2: var(--fc-hairline);
+  --pe-t1: var(--fc-text-primary);
+  --pe-t2: var(--fc-text-dim);
+  --pe-t3: var(--fc-text-subtle);
+  --pe-t4: var(--fc-text-quaternary);
+  --pe-critical: var(--fc-status-error);
+  --pe-critical-soft: color-mix(in srgb, var(--fc-status-error) 14%, transparent);
+  --pe-warning: var(--fc-status-warning);
+  --pe-warning-soft: color-mix(in srgb, var(--fc-status-warning) 14%, transparent);
+  --pe-good: var(--fc-status-success);
+  --pe-good-soft: color-mix(in srgb, var(--fc-status-success) 14%, transparent);
   --pe-purple: #a78bfa;
   --pe-purple-soft: rgba(167, 139, 250, 0.12);
-  --pe-thumb-on: #0a1a26;
-  --pe-lime-text: #0a1a18;
-  color: var(--pe-t1);
+  --pe-thumb-on: var(--fc-ink);
+  color: var(--fc-text-primary);
 }
 
 .hero {
@@ -45,23 +38,31 @@
   top: -40%;
   width: 55%;
   height: 90%;
-  background: radial-gradient(ellipse at center, rgba(79, 227, 232, 0.18) 0%, transparent 70%);
+  background: radial-gradient(
+    ellipse at center,
+    var(--fc-accent-dim) 0%,
+    transparent 70%
+  );
   pointer-events: none;
 }
 
-.heroGlowLime::before {
+.heroGlowAction::before {
   content: "";
   position: absolute;
   right: -20%;
   top: -40%;
   width: 55%;
   height: 90%;
-  background: radial-gradient(ellipse at center, rgba(197, 255, 74, 0.14) 0%, transparent 70%);
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in srgb, var(--fc-accent) 14%, transparent) 0%,
+    transparent 70%
+  );
   pointer-events: none;
 }
 
 .eyebrow {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono, ui-monospace, monospace);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.14em;
@@ -70,14 +71,15 @@
 }
 
 .statNum {
-  font-family: var(--f-display, "Big Shoulders Display", sans-serif);
+  font-family: var(--f-display, ui-sans-serif);
+  font-stretch: 125%;
   font-size: 22px;
   font-weight: 700;
   line-height: 1.1;
 }
 
 .statLbl {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono, ui-monospace, monospace);
   font-size: 9.5px;
   font-weight: 600;
   letter-spacing: 0.12em;
@@ -86,7 +88,7 @@
 }
 
 .heroTitle {
-  font-family: var(--f-headline, "Bricolage Grotesque", sans-serif);
+  font-family: var(--f-headline, ui-sans-serif);
   font-size: 24px;
   font-weight: 700;
   line-height: 1.15;
@@ -125,9 +127,9 @@
 }
 
 .subTabActive {
-  background: var(--pe-cyan-soft);
-  color: var(--pe-cyan);
-  box-shadow: inset 0 0 0 1px var(--pe-cyan-dim);
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
+  box-shadow: inset 0 0 0 1px var(--fc-accent-glow);
 }
 
 .formCard {
@@ -152,8 +154,8 @@
 
 .inputLike:focus {
   outline: none;
-  border-color: var(--pe-cyan);
-  box-shadow: 0 0 0 3px var(--pe-cyan-soft);
+  border-color: var(--fc-accent);
+  box-shadow: 0 0 0 3px var(--fc-accent-dim);
 }
 
 .inputLike::placeholder {
@@ -163,7 +165,7 @@
 
 .progScroll {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+  scrollbar-color: var(--fc-track) transparent;
 }
 
 .progScroll::-webkit-scrollbar {
@@ -175,6 +177,6 @@
 }
 
 .progScroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--fc-track);
   border-radius: 999px;
 }

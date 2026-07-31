@@ -1,0 +1,62 @@
+CHROME VISUAL RESKIN — background, header, progress (styling only)
+Date: 2026-07-17
+No git. Behaviour unchanged (one set-entry at a time; no group list).
+
+================================================================================
+1. FILES MODIFIED
+================================================================================
+  src/app/client/workouts/[id]/start/page.tsx
+  src/components/client/workout-execution/ui/ExecProgressSegments.tsx
+  src/components/client-ui/ClientPageShell.tsx
+    (additive: backdrop="none" | false | null — other routes keep default "info")
+
+================================================================================
+2. FLAT BACKGROUND (this route only)
+================================================================================
+  - Removed AnimatedBackground + FloatingParticles from start/page.tsx only
+    (components still exist; other routes unchanged).
+  - Outer wrapper: style={{ background: "var(--fc-bg-deep)" }} (#0A0B0D).
+  - ClientPageShell backdrop="none" — previously unsupported; added support
+    so AtmosphericBackdrop is skipped when backdrop is "none" / false / null.
+    Default remains "info" for all other callers.
+
+================================================================================
+3. HEADER — ELAPSED SOURCE
+================================================================================
+  Block-path header rewritten (~hd):
+    ‹ Train (confirm → /client/train)
+    Workout name (assignment.name, --f-display)
+    Meta: "{current} of {total} · {elapsed} elapsed"
+    ExecProgressSegments as .bar below
+
+  Elapsed source: existing `workoutStartTime` state on the page.
+    - Restored sessions: set from workout_log / session started_at via
+      restore path (setWorkoutStartTime(restoredProgress.workoutStartTime)).
+    - New sessions: Date.now() at page mount (approx session start; session
+      insert does not separately overwrite this — noted, not fabricated).
+  Ticks every 1s for display only. Progress numbers use the same
+  countWorkoutExercises / getGlobalExerciseIndex as the bar.
+
+================================================================================
+4. PROGRESS — THREE STATES
+================================================================================
+  ExecProgressSegments (exercises + sets variants):
+    i < current  → done     → --fc-status-success (green)
+    i === current → now     → group hue (matches LiveCard hue map)
+    i > current  → upcoming → --fc-hairline (dim)
+  currentHue prop from groupIndexToHue(currentSetEntryIndex).
+  Segment geometry: h-[3px], gap 3px, radius 2px (mockup .bar).
+
+================================================================================
+5. UNTOUCHED CONFIRMATION
+================================================================================
+  - No group list (done-collapse / upcoming dots)
+  - SetRowsListPanel / SetRowShell not moved
+  - NavigationControls / Prev-Next unchanged
+  - Executors, LiveCard, logging, RestTimerModal, resume path untouched
+  - AnimatedBackground / FloatingParticles / ClientPageShell not deleted globally
+
+================================================================================
+6. TSC
+================================================================================
+  npx tsc --noEmit → 0 errors

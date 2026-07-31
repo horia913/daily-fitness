@@ -1,0 +1,161 @@
+/**
+ * One-page execution group list — mirrors execution-screen-v6-CANONICAL §1.
+ */
+
+.list {
+  width: 100%;
+}
+
+.grp {
+  border-bottom: 1px solid var(--fc-hairline, rgba(255, 255, 255, 0.07));
+}
+
+.grp:last-child {
+  border-bottom: none;
+}
+
+.grpCurrent {
+  scroll-margin-top: 8px;
+}
+
+.ghead {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 18px 8px;
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
+button.gheadButton {
+  width: 100%;
+  margin: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.12s ease;
+}
+
+button.gheadButton:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+button.gheadButton:active {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+button.gheadButton:focus-visible {
+  outline: 2px solid var(--grp-hue, var(--fc-group-a));
+  outline-offset: -2px;
+}
+
+.gdot {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--grp-hue, var(--fc-text-dim, #98a2b3));
+  flex-shrink: 0;
+}
+
+/* live-card .badge has margin-right; ghead already gaps — avoid double space */
+.headerBadge {
+  margin-right: 0;
+}
+
+/* Done: keep filled hue square + letter, recede visually */
+.grpDone .headerBadge {
+  opacity: 0.55;
+  filter: saturate(0.4);
+}
+
+.gname {
+  font-family: var(--f-mono, ui-monospace, monospace);
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-weight: 700;
+  flex: 1;
+  min-width: 0;
+  color: var(--fc-text-primary, #eef1f5);
+}
+
+.gsets {
+  font-family: var(--f-mono, ui-monospace, monospace);
+  font-size: 10px;
+  color: var(--fc-text-subtle, #5c6470);
+  flex-shrink: 0;
+}
+
+.gcheck {
+  color: var(--fc-status-success, #22e56a);
+  font-size: 11px;
+  letter-spacing: 1px;
+  flex-shrink: 0;
+}
+
+.gchecks {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  font-size: 11px;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.gcheckOn {
+  color: var(--fc-status-success, #22e56a);
+}
+
+.gcheckOff {
+  color: var(--fc-text-subtle, #5c6470);
+}
+
+.grpDone .gname {
+  color: var(--fc-text-subtle, #5c6470);
+}
+
+.grpUpcoming .gname {
+  color: var(--fc-text-dim, #98a2b3);
+}
+
+.hueA {
+  --grp-hue: var(--fc-group-a);
+  --live-hue: var(--fc-group-a);
+}
+
+.hueB {
+  --grp-hue: var(--fc-group-c);
+  --live-hue: var(--fc-group-c);
+}
+
+.hueC {
+  --grp-hue: var(--fc-group-d);
+  --live-hue: var(--fc-group-d);
+}
+
+.hueD {
+  --grp-hue: var(--fc-group-b);
+  --live-hue: var(--fc-group-b);
+}
+
+/* Pre-start summary: PR pill per exercise piece */
+.prPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--fc-glass-border, rgba(255, 255, 255, 0.08));
+  background: rgba(255, 255, 255, 0.04);
+  padding: 1px 6px;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fc-text-dim, #5c6470);
+  white-space: nowrap;
+}

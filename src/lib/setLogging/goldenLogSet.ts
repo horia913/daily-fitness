@@ -28,7 +28,7 @@ export { buildIdempotencyKey };
 
 export function createPendingEntry(
   key: IdempotencyKey,
-  blockId: string,
+  setEntryId: string,
   blockType: string,
   exerciseId: string,
   setNumber: number,
@@ -37,7 +37,7 @@ export function createPendingEntry(
   return {
     key,
     state: SetInstanceState.PendingLocal,
-    blockId,
+    setEntryId,
     blockType,
     exerciseId,
     setNumber,

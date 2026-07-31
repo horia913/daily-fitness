@@ -17,17 +17,16 @@
   font-weight: 700;
   font-size: 14px;
   color: var(--fc-ink);
-  background: linear-gradient(135deg, var(--fc-accent-lime), var(--fc-accent-cyan));
-  box-shadow: 0 0 14px color-mix(in srgb, var(--fc-accent-lime) 28%, transparent);
-  font-family: var(--f-headline, var(--font-sans, ui-sans-serif));
+  background: linear-gradient(135deg, var(--fc-accent), var(--fc-accent));
+  box-shadow: none;
+  font-family: var(--f-headline);
 }
 
 .greetingPulse {
   width: 6px;
   height: 6px;
   border-radius: 999px;
-  background: var(--fc-accent-cyan);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--fc-accent-cyan) 35%, transparent);
+  background: var(--fc-accent);
   flex-shrink: 0;
   animation: coachDashPulse 2s ease-in-out infinite;
 }
@@ -60,22 +59,19 @@
   margin: 0 0 14px;
   padding: 22px 20px 18px;
   border-radius: 24px;
-  border: 1px solid color-mix(in srgb, var(--fc-accent-cyan) 14%, var(--fc-glass-border));
+  border: 1px solid color-mix(in srgb, var(--fc-accent) 14%, var(--fc-glass-border));
   background:
     radial-gradient(
       ellipse 80% 60% at 50% 0%,
-      color-mix(in srgb, var(--fc-accent-cyan) 10%, transparent),
+      var(--fc-accent-dim),
       transparent 65%
     ),
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--fc-accent-lime) 6%, transparent) 0%,
+      color-mix(in srgb, var(--fc-accent) 6%, transparent) 0%,
       transparent 100%
     ),
     var(--fc-surface-card);
-  box-shadow:
-    0 24px 48px -28px color-mix(in srgb, var(--fc-accent-cyan) 12%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
   overflow: hidden;
 }
 
@@ -89,21 +85,22 @@
     -45deg,
     transparent,
     transparent 3px,
-    color-mix(in srgb, var(--fc-accent-cyan) 22%, transparent) 3px,
-    color-mix(in srgb, var(--fc-accent-cyan) 22%, transparent) 4px
+    color-mix(in srgb, var(--fc-accent) 22%, transparent) 3px,
+    color-mix(in srgb, var(--fc-accent) 22%, transparent) 4px
   );
   mask-image: radial-gradient(ellipse 55% 70% at 100% 0%, black, transparent 72%);
 }
 
 .heroNumber {
-  font-family: var(--f-display, var(--font-display, ui-sans-serif));
+  font-family: var(--f-display);
+  font-stretch: 125%;
   font-size: 88px;
   font-weight: 700;
   line-height: 1;
   letter-spacing: -0.03em;
   background: linear-gradient(
     180deg,
-    #fff 0%,
+    var(--fc-text-primary) 0%,
     color-mix(in srgb, var(--fc-text-subtle) 70%, transparent) 100%
   );
   -webkit-background-clip: text;
@@ -112,7 +109,8 @@
 }
 
 .heroTotal {
-  font-family: var(--f-display, var(--font-display, ui-sans-serif));
+  font-family: var(--f-display);
+  font-stretch: 125%;
   font-size: 36px;
   font-weight: 600;
   color: var(--fc-text-dim);
@@ -121,7 +119,8 @@
 }
 
 .heroStatValue {
-  font-family: var(--f-display, var(--font-display, ui-sans-serif));
+  font-family: var(--f-display);
+  font-stretch: 125%;
   font-size: 22px;
   font-weight: 700;
   color: var(--fc-text-primary);
@@ -144,7 +143,7 @@
 
 .heroDivider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--fc-glass-border);
   margin: 18px 0;
 }
 
@@ -160,7 +159,7 @@
 }
 
 .heroStatCell + .heroStatCell {
-  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 1px solid var(--fc-hairline);
 }
 
 .featuredHero {
@@ -182,43 +181,40 @@
 }
 
 .featuredHero[data-variant="critical"] {
-  border: 1px solid color-mix(in srgb, var(--fc-accent-cyan) 18%, var(--fc-glass-border));
+  border: 1px solid color-mix(in srgb, var(--fc-accent) 18%, var(--fc-glass-border));
   background:
     radial-gradient(
       ellipse 70% 50% at 0% 0%,
-      color-mix(in srgb, var(--fc-accent-cyan) 8%, transparent),
+      var(--fc-accent-dim),
       transparent 65%
     ),
     var(--fc-surface-card);
 }
 
 .featuredHero[data-variant="critical"]::before {
-  background: linear-gradient(180deg, var(--fc-accent-lime), var(--fc-accent-cyan));
-  box-shadow: 0 0 10px color-mix(in srgb, var(--fc-accent-cyan) 25%, transparent);
+  background: linear-gradient(180deg, var(--fc-accent), var(--fc-accent));
 }
 
 .featuredHero[data-variant="warning"] {
   border: 1px solid color-mix(in srgb, var(--fc-sev-warning) 18%, var(--fc-glass-border));
   background:
-    radial-gradient(ellipse 70% 50% at 0% 0%, rgba(245, 194, 66, 0.06), transparent 65%),
+    radial-gradient(ellipse 70% 50% at 0% 0%, color-mix(in srgb, var(--fc-status-warning) 6%, transparent), transparent 65%),
     var(--fc-surface-card);
 }
 
 .featuredHero[data-variant="warning"]::before {
   background: var(--fc-sev-warning);
-  box-shadow: 0 0 8px rgba(245, 194, 66, 0.22);
 }
 
 .featuredHero[data-variant="new"] {
   border: 1px solid var(--fc-sev-new-border);
   background:
-    radial-gradient(ellipse 70% 50% at 0% 0%, rgba(79, 227, 232, 0.1), transparent 65%),
+    radial-gradient(ellipse 70% 50% at 0% 0%, var(--fc-accent-dim), transparent 65%),
     var(--fc-surface-card);
 }
 
 .featuredHero[data-variant="new"]::before {
   background: var(--fc-sev-new);
-  box-shadow: 0 0 8px rgba(79, 227, 232, 0.22);
 }
 
 .featuredHeroInner {
@@ -246,7 +242,7 @@
 }
 
 .attentionRowStripeCritical {
-  box-shadow: inset 3px 0 0 0 color-mix(in srgb, var(--fc-accent-cyan) 55%, var(--fc-accent-lime));
+  box-shadow: inset 3px 0 0 0 var(--fc-accent);
 }
 
 .attentionRowStripeWarning {
@@ -281,10 +277,10 @@
 }
 
 .rosterRowCritical {
-  border-color: color-mix(in srgb, var(--fc-accent-cyan) 22%, var(--fc-glass-border));
+  border-color: color-mix(in srgb, var(--fc-accent) 22%, var(--fc-glass-border));
   background: linear-gradient(
       90deg,
-      color-mix(in srgb, var(--fc-accent-cyan) 5%, transparent),
+      var(--fc-accent-dim),
       transparent 32%
     ),
     var(--fc-surface-card);
@@ -292,7 +288,7 @@
 
 .rosterRowWarning {
   border-color: var(--fc-sev-warning-border);
-  background: linear-gradient(90deg, rgba(245, 194, 66, 0.03), transparent 30%), var(--fc-surface-card);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--fc-status-warning) 3%, transparent), transparent 30%), var(--fc-surface-card);
 }
 
 .searchInput {
@@ -300,7 +296,7 @@
   min-width: 0;
   border-radius: 12px;
   border: 1px solid var(--fc-glass-border);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
   padding: 10px 12px 10px 36px;
   font-size: 13px;
   color: var(--fc-text-primary);
@@ -339,7 +335,7 @@
   height: 40px;
   border-radius: 12px;
   border: 1px solid var(--fc-glass-border);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
   color: var(--fc-text-subtle);
   font-size: 12px;
   font-weight: 600;
@@ -375,11 +371,11 @@
 }
 
 .sortMenuItem:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--fc-text-primary) 6%, transparent);
 }
 
 .sortMenuItemActive {
-  color: var(--fc-accent-cyan);
+  color: var(--fc-accent);
 }
 
 .wellnessEmpty {
@@ -401,8 +397,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(79, 227, 232, 0.08);
-  color: var(--fc-accent-cyan);
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
   flex-shrink: 0;
 }
 
@@ -415,7 +411,7 @@
   padding: 10px 18px;
   border-radius: 999px;
   border: 1px solid var(--fc-glass-border);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
   color: var(--fc-text-primary);
   font-size: 12px;
   font-weight: 600;
@@ -423,13 +419,13 @@
 }
 
 .viewAllClients:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: color-mix(in srgb, var(--fc-text-primary) 7%, transparent);
 }
 
 .sectionLink {
   font-size: 11.5px;
   font-weight: 600;
-  color: var(--fc-accent-cyan);
+  color: var(--fc-accent);
   background: none;
   border: none;
   padding: 0;
@@ -447,8 +443,8 @@
   border-radius: 999px;
   font-size: 9px;
   font-weight: 700;
-  background: color-mix(in srgb, var(--fc-accent-lime) 12%, transparent);
-  color: var(--fc-accent-lime);
-  border: 1px solid color-mix(in srgb, var(--fc-accent-lime) 22%, transparent);
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
+  border: 1px solid var(--fc-accent-glow);
   margin-left: 8px;
 }

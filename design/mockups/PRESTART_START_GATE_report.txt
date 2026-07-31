@@ -1,0 +1,36 @@
+PRE-START SUMMARY + START (UI gate)
+Date: 2026-07-19
+
+1. Files modified
+- src/components/client/workout-execution/ExecGroupList.tsx
+  (`preStart` mode: all groups upcoming/collapsed, no taps, no executor)
+- src/app/client/workouts/[id]/start/page.tsx
+  (`hasStarted`, START button, header meta, elapsed gate)
+
+2. How `hasStarted` is derived / resume skip
+- Default `false`. Reset to `false` at the start of each `loadAssignment`.
+- Resume skip: when `restoreWorkoutProgress` returns a non-null
+  `restoredProgress` (requires set logs and/or block completions), call
+  `setHasStarted(true)` immediately and keep `workoutStartTime` from
+  `log.started_at`. That is the exact gate-skip condition — empty incomplete
+  logs that restore to null still show pre-start.
+- Cold open / reload with nothing logged: stays `false` until START.
+
+3. Elapsed before/after START
+- Pre-start: interval not started; label forced to `0:00`; header shows
+  `N sets · M exercises` (no elapsed line).
+- START tap: `setWorkoutStartTime(Date.now())` then `setHasStarted(true)` —
+  clock ticks from ~0:00.
+- Resume: existing restored `workoutStartTime`; clock ticks from that.
+
+4. No new writes on START
+- START only flips UI state + local `workoutStartTime`. Does not call
+  `startWorkout`, create logs, or touch the orchestrator. Session/log creation
+  on load unchanged.
+
+5. Untouched
+- Live card, logging, set-advance fix, rest timer, per-set resolution,
+  `startWorkout` / log-set / Train API / stale-log closing.
+
+6. tsc
+- `node node_modules/typescript/bin/tsc --noEmit` → exit 0.

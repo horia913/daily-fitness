@@ -3,14 +3,14 @@
 import { cn } from "@/lib/utils";
 import styles from "./progressSuiteV1.module.css";
 
-type Tile = "cyan" | "purple" | "warning" | "good" | "lime" | "pink" | "orange";
+type Tile = "cyan" | "purple" | "warning" | "good" | "action" | "pink" | "orange";
 
 const tileMap: Record<Tile, string> = {
   cyan: styles.psIconTileCyan,
   purple: styles.psIconTilePurple,
   warning: styles.psIconTileWarning,
   good: styles.psIconTileGood,
-  lime: styles.psIconTileLime,
+  action: styles.psIconTileAction,
   pink: styles.psIconTilePink,
   orange: styles.psIconTileOrange,
 };

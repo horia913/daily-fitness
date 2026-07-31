@@ -137,7 +137,7 @@ export function WellnessTrends({ thisWeekLogs, lastWeekLogs }: WellnessTrendsPro
     <section className={cn(checkinSuiteStyles.root, checkinSuiteStyles.sectionCard)}>
       <p
         className={cn(checkinSuiteStyles.fontMono, "text-[10px] font-semibold uppercase tracking-[0.16em]")}
-        style={{ color: "var(--cs-cyan)" }}
+        style={{ color: "var(--fc-accent)" }}
       >
         Wellness trends
       </p>

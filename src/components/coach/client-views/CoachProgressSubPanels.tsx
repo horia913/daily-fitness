@@ -5,7 +5,6 @@ import { useCoachClient } from "@/contexts/CoachClientContext";
 import ClientProgressBodySection from "@/components/coach/client-views/ClientProgressBodySection";
 import ClientProgressWellnessSection from "@/components/coach/client-views/ClientProgressWellnessSection";
 import ClientProgressPhotosSection from "@/components/coach/client-views/ClientProgressPhotosSection";
-import { ClientFmsAssessmentsPanel } from "@/components/coach/client-views/ClientFmsAssessmentsPanel";
 import ClientGoalsView from "@/components/coach/client-views/ClientGoalsView";
 import ClientHabitsView from "@/components/coach/client-views/ClientHabitsView";
 
@@ -13,7 +12,6 @@ export const PROGRESS_SECTIONS = [
   { id: "body" as const, label: "Body", shortLabel: "Body" },
   { id: "wellness" as const, label: "Wellness", shortLabel: "Well" },
   { id: "photos" as const, label: "Photos", shortLabel: "Photos" },
-  { id: "fms" as const, label: "FMS", shortLabel: "FMS" },
   { id: "goals" as const, label: "Goals", shortLabel: "Goals" },
   { id: "habits" as const, label: "Habits", shortLabel: "Habit" },
 ] as const;
@@ -45,9 +43,6 @@ export default function CoachProgressSubPanels({
       )}
       {active === "wellness" && <ClientProgressWellnessSection clientId={clientId} coachId={coachId} />}
       {active === "photos" && <ClientProgressPhotosSection clientId={clientId} />}
-      {active === "fms" && (
-        <ClientFmsAssessmentsPanel clientId={clientId} showPageHeader={false} clientName={clientName} />
-      )}
       {active === "goals" && (
         <ClientGoalsView clientId={clientId} layoutVariant="coachV6" />
       )}

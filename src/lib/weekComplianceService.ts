@@ -13,6 +13,10 @@ import {
   getCompletedSlots,
 } from './programStateService'
 import {
+  resolveInstanceWeekForAssignment,
+  isCoachSkipNote,
+} from './programInstanceResolver'
+import {
   addCalendarDaysYmd,
   mondayYmdOfZonedWeekContaining,
 } from '@/lib/clientZonedCalendar'
@@ -133,15 +137,32 @@ export async function computeWeekCompliance(
 
   const startDate = startDateRaw
   const slotsInWeek = slots.filter((s) => s.week_number === weekNumber)
-  const requiredSlotsInWeek = slotsInWeek.filter((s) => !s.is_optional && s.id != null)
-  const requiredScheduleIds = new Set(
-    requiredSlotsInWeek.map((s) => s.id).filter((id): id is string => id != null),
-  )
+  // Instance-keyed required slots (program_day_assignment_id). Coach-skipped
+  // slots are excluded from the denominator entirely (a skip is NOT a miss).
   const completedInWeek = completedSlots.filter((c) => c.week_number === weekNumber)
-  const completedScheduleIds = new Set(completedInWeek.map((c) => c.program_schedule_id))
+  const coachSkippedKeys = new Set(
+    completedInWeek
+      .filter((c) => isCoachSkipNote(c.notes))
+      .map((c) => c.program_day_assignment_id)
+      .filter((id): id is string => !!id),
+  )
+  const requiredSlotsInWeek = slotsInWeek.filter(
+    (s) =>
+      !s.is_optional &&
+      s.program_day_assignment_id != null &&
+      !coachSkippedKeys.has(s.program_day_assignment_id),
+  )
+  const requiredKeys = new Set(
+    requiredSlotsInWeek.map((s) => s.program_day_assignment_id).filter((id): id is string => !!id),
+  )
 
   const assigned = requiredSlotsInWeek.length
-  const completedRequired = completedInWeek.filter((c) => requiredScheduleIds.has(c.program_schedule_id)).length
+  const completedRequired = completedInWeek.filter(
+    (c) =>
+      !isCoachSkipNote(c.notes) &&
+      c.program_day_assignment_id != null &&
+      requiredKeys.has(c.program_day_assignment_id),
+  ).length
   let completed = completedRequired
   if (completed > assigned) completed = assigned
 
@@ -158,10 +179,11 @@ export async function computeWeekCompliance(
   let overrideApplied = false
   let overrideTimeScore: number | null = null
 
-  if (weekCompleted && completedInWeek.length > 0) {
-    const maxCompletedAt = completedInWeek.reduce(
+  const realCompletedInWeek = completedInWeek.filter((c) => !isCoachSkipNote(c.notes))
+  if (weekCompleted && realCompletedInWeek.length > 0) {
+    const maxCompletedAt = realCompletedInWeek.reduce(
       (max, c) => (c.completed_at > max ? c.completed_at : max),
-      completedInWeek[0].completed_at
+      realCompletedInWeek[0].completed_at
     )
     weekFinishTs = maxCompletedAt
     const startMs = new Date(weekStartTs).getTime()
@@ -251,15 +273,8 @@ export async function getCurrentWeekNumber(
 ): Promise<number | null> {
   const assignment = await getActiveProgramAssignment(supabase, clientId)
   if (!assignment) return null
-  const [slots, completedSlots] = await Promise.all([
-    getProgramScheduleSlotsForAssignment(supabase, assignment.program_id, assignment.id),
-    getCompletedSlots(supabase, assignment.id),
-  ])
-  const completedIds = new Set(completedSlots.map((c) => c.program_schedule_id))
-  const nextSlot = slots.find((s) => s.id != null && !completedIds.has(s.id))
-  if (!nextSlot) {
-    const last = slots[slots.length - 1]
-    return last?.week_number ?? null
-  }
-  return nextSlot.week_number
+  // Canonical X = resolver (calendar/pause in client tz, clamped to N). This is
+  // the same source the train page / RPCs use, so every surface agrees.
+  const resolved = await resolveInstanceWeekForAssignment(supabase, assignment.id)
+  return resolved?.currentWeek ?? null
 }

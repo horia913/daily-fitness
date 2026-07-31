@@ -15,7 +15,10 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { computeCurrentProgramWeekForAssignment } from '@/lib/programWeekCalendar'
+import {
+  resolveInstanceWeeksForAssignments,
+  isCoachSkipNote,
+} from '@/lib/programInstanceResolver'
 
 export interface ControlRoomPeriod {
   startUtc: string
@@ -85,7 +88,6 @@ interface ResolvedAssignment {
   programId: string
   clientId: string
   startDate: string | null
-  durationWeeks: number | null
   pauseAccumulatedDays: number | null
   pauseStatus: string | null
   pausedAt: string | null
@@ -103,7 +105,6 @@ function resolveOneAssignmentPerClient(
     program_id: string
     updated_at: string | null
     start_date: string | null
-    duration_weeks: number | null
     pause_accumulated_days: number | null
     pause_status: string | null
     paused_at: string | null
@@ -140,7 +141,6 @@ function resolveOneAssignmentPerClient(
       programId: first.program_id,
       clientId,
       startDate: first.start_date ?? null,
-      durationWeeks: first.duration_weeks ?? null,
       pauseAccumulatedDays: first.pause_accumulated_days ?? 0,
       pauseStatus: first.pause_status ?? null,
       pausedAt: first.paused_at ?? null,
@@ -171,7 +171,7 @@ export async function getControlRoomResult(
 
   const { data: assignmentRows, error: assignErr } = await supabase
     .from('program_assignments')
-    .select('id, client_id, program_id, updated_at, start_date, duration_weeks, pause_accumulated_days, pause_status, paused_at, timezone_snapshot')
+    .select('id, client_id, program_id, updated_at, start_date, pause_accumulated_days, pause_status, paused_at, timezone_snapshot')
     .in('client_id', clientIds)
     .eq('status', 'active')
     .order('updated_at', { ascending: false })
@@ -194,83 +194,60 @@ export async function getControlRoomResult(
   }
 
   const assignmentIds = assignments.map((a) => a.assignmentId)
-  const programIds = [...new Set(assignments.map((a) => a.programId))]
 
-  const { data: profileRows } = await supabase
-    .from('profiles')
-    .select('id, timezone')
-    .in('id', clientIds)
-  const timezoneByClientId = new Map(
-    (profileRows ?? []).map((p) => [p.id as string, (p as { timezone?: string | null }).timezone ?? null])
-  )
-
+  // Instance-keyed: schedule from program_day_assignments, completions by
+  // program_day_assignment_id (with coach-skip notes). Week X of N from the
+  // canonical resolver (N = instance phases, X in client tz, clamped).
   const [
     { data: scheduleRows },
     { data: completionRows },
+    progressMap,
   ] = await Promise.all([
     supabase
-      .from('program_schedule')
-      .select('id, program_id, week_number, day_number, is_optional')
-      .in('program_id', programIds)
+      .from('program_day_assignments')
+      .select('id, program_assignment_id, week_number, day_number, is_optional')
+      .in('program_assignment_id', assignmentIds)
       .order('week_number', { ascending: true })
       .order('day_number', { ascending: true }),
     supabase
       .from('program_day_completions')
-      .select('program_assignment_id, program_schedule_id')
+      .select('program_assignment_id, program_day_assignment_id, notes')
       .in('program_assignment_id', assignmentIds),
+    resolveInstanceWeeksForAssignments(supabase, assignmentIds),
   ])
 
-  const progressMap = new Map<string, number>()
-  for (const assignment of assignments) {
-    const tzFallback = timezoneByClientId.get(assignment.clientId) ?? 'UTC'
-    const { week } = computeCurrentProgramWeekForAssignment(
-      {
-        start_date: assignment.startDate,
-        duration_weeks: assignment.durationWeeks,
-        pause_accumulated_days: assignment.pauseAccumulatedDays,
-        pause_status: assignment.pauseStatus,
-        paused_at: assignment.pausedAt,
-        timezone_snapshot: assignment.timezoneSnapshot,
-      },
-      tzFallback
-    )
-    progressMap.set(assignment.assignmentId, week)
-  }
-
-  const scheduleByProgram = new Map<string, { id: string; program_id: string; week_number: number; day_number: number; is_optional?: boolean }[]>()
-  const scheduleIdToWeek = new Map<string, { program_id: string; week_number: number }>()
+  const scheduleByAssignment = new Map<string, { id: string; week_number: number; day_number: number; is_optional?: boolean }[]>()
   for (const s of scheduleRows ?? []) {
-    const list = scheduleByProgram.get(s.program_id) ?? []
-    list.push({ id: s.id, program_id: s.program_id, week_number: s.week_number, day_number: s.day_number ?? 1, is_optional: s.is_optional ?? false })
-    scheduleByProgram.set(s.program_id, list)
-    scheduleIdToWeek.set(s.id, { program_id: s.program_id, week_number: s.week_number })
+    const list = scheduleByAssignment.get(s.program_assignment_id) ?? []
+    list.push({ id: s.id, week_number: s.week_number, day_number: s.day_number ?? 1, is_optional: s.is_optional ?? false })
+    scheduleByAssignment.set(s.program_assignment_id, list)
   }
 
-  const completedByAssignment = new Map<string, Set<string>>()
+  const completedByAssignment = new Map<string, { done: Set<string>; skipped: Set<string> }>()
   for (const c of completionRows ?? []) {
-    const set = completedByAssignment.get(c.program_assignment_id) ?? new Set()
-    set.add(c.program_schedule_id)
-    completedByAssignment.set(c.program_assignment_id, set)
+    const entry = completedByAssignment.get(c.program_assignment_id) ?? { done: new Set<string>(), skipped: new Set<string>() }
+    if (c.program_day_assignment_id) {
+      if (isCoachSkipNote(c.notes)) entry.skipped.add(c.program_day_assignment_id)
+      else entry.done.add(c.program_day_assignment_id)
+    }
+    completedByAssignment.set(c.program_assignment_id, entry)
   }
 
   const clientPcts: number[] = []
   for (const a of assignments) {
-    const slots = scheduleByProgram.get(a.programId) ?? []
-    const completedIds = completedByAssignment.get(a.assignmentId) ?? new Set()
-    const nextSlot = slots.find((s) => !completedIds.has(s.id)) ?? null
+    const slots = scheduleByAssignment.get(a.assignmentId) ?? []
+    const comp = completedByAssignment.get(a.assignmentId) ?? { done: new Set<string>(), skipped: new Set<string>() }
+    const nextSlot = slots.find((s) => !comp.done.has(s.id) && !comp.skipped.has(s.id)) ?? null
     const referenceSlot = nextSlot ?? slots[slots.length - 1]
     const currentWeek =
-      progressMap.get(a.assignmentId) ??
+      progressMap.get(a.assignmentId)?.currentWeek ??
       referenceSlot?.week_number ??
       1
 
-    const slotsThisWeek = (scheduleByProgram.get(a.programId) ?? []).filter((s) => s.week_number === currentWeek)
-    const requiredSlotsThisWeek = slotsThisWeek.filter((s) => !s.is_optional)
-    const scheduleIdsThisWeek = requiredSlotsThisWeek.map((s) => s.id)
-    const total = scheduleIdsThisWeek.length
-    const completedThisWeek = (completionRows ?? []).filter(
-      (c) => c.program_assignment_id === a.assignmentId && scheduleIdsThisWeek.includes(c.program_schedule_id)
-    ).length
+    const requiredSlotsThisWeek = slots.filter((s) => s.week_number === currentWeek && !s.is_optional)
+    const effectiveRequired = requiredSlotsThisWeek.filter((s) => !comp.skipped.has(s.id))
+    const total = effectiveRequired.length
+    const completedThisWeek = effectiveRequired.filter((s) => comp.done.has(s.id)).length
     const pct = total > 0 ? Math.round((completedThisWeek / total) * 100) : 0
     clientPcts.push(pct)
   }

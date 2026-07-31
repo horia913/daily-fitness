@@ -118,7 +118,12 @@ export function PRTimelineChart({
 
   if (milestones.length === 0) {
     return (
-      <div className={cn("fc-card-shell p-6", className)}>
+      <div
+        className={cn(
+          "rounded-[18px] border border-[color:var(--fc-hairline)] bg-transparent p-6",
+          className,
+        )}
+      >
         <EmptyState
           icon={Trophy}
           variant="compact"
@@ -135,8 +140,8 @@ export function PRTimelineChart({
   return (
     <div
       className={cn(
-        "fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] overflow-hidden",
-        className
+        "rounded-[18px] border border-[color:var(--fc-hairline)] bg-transparent overflow-hidden",
+        className,
       )}
     >
       <button
@@ -144,19 +149,21 @@ export function PRTimelineChart({
         onClick={() => setCollapsed((c) => !c)}
         className="w-full flex items-center justify-between p-4 sm:p-5 text-left min-h-[44px] touch-manipulation"
       >
-        <h3 className="text-lg font-bold text-[color:var(--fc-text-primary)]">PR Progress</h3>
+        <h3 className="font-[family-name:var(--f-display)] text-lg font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+          PR Progress
+        </h3>
         <ChevronDown
           className={cn(
             "w-5 h-5 text-[color:var(--fc-text-dim)] transition-transform",
-            collapsed ? "" : "rotate-180"
+            collapsed ? "" : "rotate-180",
           )}
         />
       </button>
 
       {!collapsed && (
-        <div className="px-4 sm:px-5 pb-5 border-t border-[color:var(--fc-glass-border)]">
+        <div className="px-4 sm:px-5 pb-5 border-t border-[color:var(--fc-hairline)]">
           <div className="mb-3">
-            <p className="text-sm text-[color:var(--fc-text-dim)]">
+            <p className="font-[family-name:var(--f-mono)] text-xs text-[color:var(--fc-text-dim)]">
               {exerciseName} — {subtitle}
             </p>
           </div>
@@ -168,10 +175,10 @@ export function PRTimelineChart({
                 type="button"
                 onClick={() => setTimeRange(opt.value)}
                 className={cn(
-                  "min-h-[44px] min-w-[44px] px-3 py-2 rounded-lg text-xs font-medium transition-colors",
+                  "min-h-[44px] min-w-[44px] px-3 py-2 rounded-lg font-[family-name:var(--f-mono)] text-xs font-medium transition-colors",
                   timeRange === opt.value
-                    ? "bg-[color:var(--fc-domain-workouts)]/20 text-[color:var(--fc-domain-workouts)]"
-                    : "text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)]"
+                    ? "bg-[color:var(--fc-group-a)]/20 text-[color:var(--fc-group-a)]"
+                    : "text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)]",
                 )}
               >
                 {opt.label}
@@ -208,9 +215,7 @@ export function PRTimelineChart({
                     />
                   </linearGradient>
                   <filter id="pr-dot-glow" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
                     <feMerge>
-                      <feMergeNode in="blur" />
                       <feMergeNode in="SourceGraphic" />
                     </feMerge>
                   </filter>
@@ -222,7 +227,7 @@ export function PRTimelineChart({
                     y1={padding.top + chartHeight * (1 - ratio)}
                     x2={padding.left + chartWidth}
                     y2={padding.top + chartHeight * (1 - ratio)}
-                    stroke="var(--fc-glass-border)"
+                    stroke="var(--fc-hairline)"
                     strokeWidth="0.5"
                   />
                 ))}
@@ -275,7 +280,7 @@ export function PRTimelineChart({
                         cy={y}
                         r={isHovered ? 7 : 5}
                         fill="var(--fc-status-success)"
-                        stroke="var(--fc-bg-base)"
+                        stroke="var(--fc-bg-deep)"
                         strokeWidth="2"
                         className="cursor-pointer"
                         style={isLast ? { filter: "url(#pr-dot-glow)" } : undefined}
@@ -290,7 +295,7 @@ export function PRTimelineChart({
 
               {hoveredPoint && (
                 <div
-                  className="absolute bottom-0 left-0 right-0 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-xl p-3 text-sm min-h-[44px] flex flex-col justify-center"
+                  className="absolute bottom-0 left-0 right-0 rounded-xl border border-[color:var(--fc-hairline)] bg-[color:var(--fc-surface-float)] p-3 text-sm min-h-[44px] flex flex-col justify-center font-[family-name:var(--f-mono)]"
                   style={{ zIndex: 10 }}
                 >
                   <p className="font-semibold text-[color:var(--fc-text-primary)]">
@@ -306,7 +311,7 @@ export function PRTimelineChart({
                 </div>
               )}
 
-              <div className="flex justify-between mt-1 text-xs text-[color:var(--fc-text-dim)] px-1">
+              <div className="flex justify-between mt-1 px-1 font-[family-name:var(--f-mono)] text-xs text-[color:var(--fc-text-subtle)]">
                 {chartData.length > 0 && (
                   <>
                     <span>
@@ -328,7 +333,7 @@ export function PRTimelineChart({
               </div>
             </div>
           ) : (
-            <div className="py-8 text-center text-sm text-[color:var(--fc-text-dim)]">
+            <div className="py-8 text-center font-[family-name:var(--f-mono)] text-sm text-[color:var(--fc-text-dim)]">
               No PR milestones in this time range.
             </div>
           )}

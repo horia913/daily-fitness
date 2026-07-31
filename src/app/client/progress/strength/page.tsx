@@ -4,9 +4,6 @@ import React, { useState, useEffect, useCallback, useRef, Suspense } from "react
 import { useRouter, useSearchParams } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "@/contexts/ThemeContext";
-import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
-import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { ClientPageShell } from "@/components/client-ui";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { PsHero, PsSectionEyebrow, PsSegmented } from "@/components/client/progress-suite";
@@ -32,7 +29,6 @@ function StrengthProgressPageInner() {
   const searchParams = useSearchParams();
   const exerciseIdFromUrl = searchParams.get("exerciseId");
   const { user } = useAuth();
-  const { performanceSettings } = useTheme();
 
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<StrengthTimeRange>("3M");
@@ -140,28 +136,23 @@ function StrengthProgressPageInner() {
   if (loading) {
     return (
       <ProtectedRoute requiredRole="client">
-        <AnimatedBackground>
-          {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
+        <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
             <PageSkeleton variant="dashboard" />
           </ClientPageShell>
-        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
 
   return (
     <ProtectedRoute requiredRole="client">
-      <AnimatedBackground>
-        {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
+      <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
           <div className={ps.psV1}>
             <PsHero
               glow="purple"
               onBack={() => router.push("/client/progress")}
               backAriaLabel="Back to progress hub"
               eyebrow="Performance · strength"
-              eyebrowColor="#A78BFA"
+              eyebrowColor="var(--fc-group-b)"
               title="Strength Progress"
               subtitle="Estimated 1RM and exercise trends"
             >
@@ -178,6 +169,25 @@ function StrengthProgressPageInner() {
                 onChange={setTimeRange}
               />
             </PsHero>
+
+            {topProgressions.length === 0 && trainedExercises.length === 0 ? (
+              <div className={cn(ps.psChartCard, "mt-4 py-8 text-center")}>
+                <p className={cn(ps.psFontBody, "mb-1 text-sm font-semibold")} style={{ color: "var(--ps-t1)" }}>
+                  No strength data yet
+                </p>
+                <p className={cn(ps.psFontBody, "text-sm")} style={{ color: "var(--ps-t3)" }}>
+                  Complete workouts to see estimated 1RM and progression charts.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => router.push("/client/train")}
+                  className={cn(ps.psFontBody, "mt-3 text-[12px] font-semibold")}
+                  style={{ color: "var(--fc-accent)" }}
+                >
+                  Start training →
+                </button>
+              </div>
+            ) : null}
 
             {(topProgressions.length > 0 || trainedExercises.length > 0) && (
               <div className="mt-4 space-y-6">
@@ -288,7 +298,7 @@ function StrengthProgressPageInner() {
                               <div className="border-t p-3" style={{ borderColor: "var(--ps-line)" }}>
                                 {lp && (
                                   <div className="flex justify-center py-6">
-                                    <div className="h-7 w-7 animate-spin rounded-full border-2 border-[color:var(--ps-cyan)] border-t-transparent" />
+                                    <div className="h-7 w-7 animate-spin rounded-full border-2 border-[color:var(--fc-accent)] border-t-transparent" />
                                   </div>
                                 )}
                                 {!lp && cached && (
@@ -313,7 +323,6 @@ function StrengthProgressPageInner() {
             )}
           </div>
         </ClientPageShell>
-      </AnimatedBackground>
     </ProtectedRoute>
   );
 }
@@ -323,11 +332,9 @@ export default function StrengthProgressPage() {
     <Suspense
       fallback={
         <ProtectedRoute requiredRole="client">
-          <AnimatedBackground>
-            <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
+          <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
               <PageSkeleton variant="dashboard" />
             </ClientPageShell>
-          </AnimatedBackground>
         </ProtectedRoute>
       }
     >

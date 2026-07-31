@@ -2,46 +2,48 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { createPortal } from "react-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
-import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { Button } from "@/components/ui/button";
 import {
   Plus,
-  Dumbbell,
   Apple,
   Scale,
-  ChevronDown,
   Leaf,
   Zap,
+  ChevronDown,
+  ListFilter,
   type LucideIcon,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui/toast-provider";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "@/contexts/ThemeContext";
 import { GoalCard } from "@/components/goals/GoalCard";
 import { GoalWizard } from "@/components/goals/GoalWizard";
 import { EditGoalModal } from "@/components/goals/EditGoalModal";
 import type { GoalWizardCategory } from "@/lib/goalCreationService";
 import { withTimeout } from "@/lib/withTimeout";
-import { ClientPageShell } from "@/components/client-ui";
+import { ClientPageShell, ConfirmActionDialog } from "@/components/client-ui";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { getGoalStats as getGoalStatsFromService } from "@/lib/goalAdherenceService";
+import {
+  PsHero,
+  PsSectionEyebrow,
+  progressSuiteV1Styles as ps,
+} from "@/components/client/progress-suite";
+import { CheckinActionAddButton } from "@/components/client/check-ins/checkinSuite";
+import { cn } from "@/lib/utils";
+
 const PILLAR_SECTIONS: {
   id: Goal["pillar"];
   label: string;
-  emoji: string;
   icon: LucideIcon;
 }[] = [
-  { id: "training", label: "Training", emoji: "🏋️", icon: Zap },
-  { id: "nutrition", label: "Nutrition", emoji: "🍎", icon: Apple },
-  { id: "checkins", label: "Body", emoji: "🧍", icon: Scale },
-  { id: "lifestyle", label: "Lifestyle", emoji: "🌿", icon: Leaf },
+  { id: "training", label: "Training", icon: Zap },
+  { id: "nutrition", label: "Nutrition", icon: Apple },
+  { id: "checkins", label: "Body", icon: Scale },
+  { id: "lifestyle", label: "Lifestyle", icon: Leaf },
 ];
 
-/** Phase 0b Task 8.5: per-pillar icon color (tokens from `ui-system.css` §2.6 aliases). */
 const PILLAR_SECTION_ICON_COLOR: Record<Goal["pillar"], string> = {
   training: "var(--fc-pillar-training)",
   nutrition: "var(--fc-pillar-nutrition)",
@@ -122,11 +124,13 @@ function goalHasAutoSync(goal: Goal): boolean {
   return typeof t === "string" && t !== "manual";
 }
 
+type FilterStatus = "all" | "active" | "completed" | "paused" | "cancelled";
+type SortBy = "newest" | "oldest" | "priority" | "progress";
+
 export default function ClientGoals() {
   const router = useRouter();
   const { addToast } = useToast();
   const { user } = useAuth();
-  const { performanceSettings } = useTheme();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const loadingRef = useRef(false);
@@ -135,15 +139,11 @@ export default function ClientGoals() {
   const [goalWizardInitialCategory, setGoalWizardInitialCategory] =
     useState<GoalWizardCategory | null>(null);
   const [editGoal, setEditGoal] = useState<Goal | null>(null);
-  const [filterStatus, setFilterStatus] = useState<
-    "all" | "active" | "completed" | "paused" | "cancelled"
-  >("all");
-  const [sortBy, setSortBy] = useState<
-    "newest" | "oldest" | "priority" | "progress"
-  >("newest");
-  const [completedSectionOpen, setCompletedSectionOpen] = useState(false);
+  const [pendingDeleteGoal, setPendingDeleteGoal] = useState<Goal | null>(null);
+  const [deletingGoal, setDeletingGoal] = useState(false);
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
+  const [sortBy, setSortBy] = useState<SortBy>("newest");
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [fabPortalReady, setFabPortalReady] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -158,10 +158,6 @@ export default function ClientGoals() {
     const initial = pillar && map[pillar] ? map[pillar]! : null;
     setGoalWizardInitialCategory(initial);
     setGoalWizardOpen(true);
-  }, []);
-
-  useEffect(() => {
-    setFabPortalReady(true);
   }, []);
 
   const loadGoals = useCallback(async () => {
@@ -182,11 +178,10 @@ export default function ClientGoals() {
           if (error) throw error;
 
           const goalsList = data || [];
-          // Fetch habit_logs once for all habit-type goals (client_id = user.id)
           const habitGoalStarts = goalsList
             .filter((g: Goal) => g.type === "habit" && g.start_date)
             .map((g: Goal) => g.start_date!);
-          let habitLogsByDate: Set<string> = new Set();
+          const habitLogsByDate: Set<string> = new Set();
           if (habitGoalStarts.length > 0) {
             const minStart = habitGoalStarts
               .reduce((a, b) => (a < b ? a : b))
@@ -207,7 +202,6 @@ export default function ClientGoals() {
             }
           }
 
-          // Calculate progress for each goal
           const goalsWithProgress = goalsList.map((goal: Goal) => {
             let progressPercentage = 0;
 
@@ -217,7 +211,6 @@ export default function ClientGoals() {
                 100,
               );
             } else if (goal.type === "habit") {
-              // Habit progress: days with at least one completion in [start_date, today] / total days in period
               const start = goal.start_date
                 ? new Date(goal.start_date)
                 : new Date();
@@ -238,7 +231,6 @@ export default function ClientGoals() {
                 Math.round((daysWithHabit / totalDays) * 100),
               );
             } else if (goal.type === "milestone") {
-              // For milestone goals, calculate based on time progress
               if (goal.target_date) {
                 const startDate = new Date(goal.start_date);
                 const targetDate = new Date(goal.target_date);
@@ -268,13 +260,17 @@ export default function ClientGoals() {
         30000,
         "timeout",
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error loading goals:", error);
       setGoals([]);
+      const message =
+        error && typeof error === "object" && "message" in error
+          ? String((error as { message: unknown }).message)
+          : "Failed to load goals";
       setLoadError(
-        error?.message === "timeout"
+        message === "timeout"
           ? "Loading took too long. Please try again."
-          : error?.message || "Failed to load goals",
+          : message || "Failed to load goals",
       );
     } finally {
       setLoading(false);
@@ -282,13 +278,11 @@ export default function ClientGoals() {
     }
   }, [user]);
 
-  // Update goal progress
   const updateGoalProgress = async (
     goalId: string,
     newCurrentValue: number,
   ) => {
     try {
-      // Get goal to calculate progress percentage
       const { data: goal } = await supabase
         .from("goals")
         .select("target_value, status")
@@ -319,6 +313,7 @@ export default function ClientGoals() {
 
       if (error) throw error;
 
+      addToast({ title: "Progress updated", variant: "success" });
       await loadGoals();
     } catch (error) {
       console.error("Error updating goal progress:", error);
@@ -336,14 +331,23 @@ export default function ClientGoals() {
   }, [user, loadGoals]);
 
   const handleDeleteGoal = async (goalId: string) => {
+    setDeletingGoal(true);
     try {
       const { error } = await supabase.from("goals").delete().eq("id", goalId);
 
       if (error) throw error;
 
+      addToast({ title: "Goal deleted", variant: "success" });
+      setPendingDeleteGoal(null);
       await loadGoals();
     } catch (error) {
       console.error("Error deleting goal:", error);
+      addToast({
+        title: "Failed to delete goal. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingGoal(false);
     }
   };
 
@@ -360,17 +364,14 @@ export default function ClientGoals() {
   const filteredAndSortedGoals = (goalList: Goal[]) => {
     let filtered = goalList;
 
-    // Apply status filter (category filter removed — grouping is by pillar now)
     if (filterStatus !== "all") {
       filtered = filtered.filter((goal) => {
-        // Treat "in_progress" as "active" for filtering
         const normalizedStatus =
           goal.status === "in_progress" ? "active" : goal.status;
         return normalizedStatus === filterStatus;
       });
     }
 
-    // Apply sorting
     switch (sortBy) {
       case "newest":
         return filtered.sort(
@@ -382,11 +383,12 @@ export default function ClientGoals() {
           (a, b) =>
             new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
         );
-      case "priority":
+      case "priority": {
         const priorityOrder = { high: 3, medium: 2, low: 1 };
         return filtered.sort(
           (a, b) => priorityOrder[b.priority] - priorityOrder[a.priority],
         );
+      }
       case "progress":
         return filtered.sort(
           (a, b) => (b.progress_percentage || 0) - (a.progress_percentage || 0),
@@ -398,80 +400,20 @@ export default function ClientGoals() {
 
   const getGoalStats = () => {
     const total = goals.length;
-    const active = goals.filter(
-      (g) => g.status === "active" || g.status === "in_progress",
-    ).length;
     const completed = goals.filter((g) => g.status === "completed").length;
-    const avgProgress =
-      total > 0
-        ? Math.round(
-            goals.reduce(
-              (acc, goal) => acc + (goal.progress_percentage || 0),
-              0,
-            ) / total,
-          )
-        : 0;
-
-    return { total, active, completed, avgProgress };
+    return { total, completed };
   };
 
-  if (loading) {
-    return (
-      <ProtectedRoute requiredRole="client">
-        <div className="min-h-screen bg-gradient-to-br from-[color:var(--fc-bg-page)] to-[color:var(--fc-surface)] dark:from-[color:var(--fc-bg-page)] dark:to-[color:var(--fc-surface)]">
-          <div className="p-4">
-            <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 space-y-3 overflow-x-hidden">
-              <PageSkeleton variant="dashboard" />
-            </ClientPageShell>
-          </div>
-        </div>
-      </ProtectedRoute>
-    );
-  }
-
-  if (loadError) {
-    return (
-      <ProtectedRoute requiredRole="client">
-        <div className="min-h-screen bg-gradient-to-br from-[color:var(--fc-bg-page)] to-[color:var(--fc-surface)] dark:from-[color:var(--fc-bg-page)] dark:to-[color:var(--fc-surface)] flex items-center justify-center p-4">
-          <ClientPageShell className="max-w-lg mx-auto w-full px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
-            <div className="py-8 px-4 text-center rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft">
-              <p className="text-sm fc-text-dim mb-3">{loadError}</p>
-              <Button
-                type="button"
-                onClick={() => {
-                  setLoadError(null);
-                  setLoading(true);
-                  loadGoals();
-                }}
-                className="fc-btn fc-btn-primary h-10 text-sm"
-              >
-                Retry
-              </Button>
-            </div>
-          </ClientPageShell>
-        </div>
-      </ProtectedRoute>
-    );
-  }
-
-  const stats = getGoalStats();
-  const goalStatsFromService = getGoalStatsFromService(goals);
-  const completedGoalsList = goals.filter((g) => g.status === "completed");
-  const activeGoalsList = goals.filter(
-    (g) => g.status === "active" || g.status === "in_progress",
-  );
-  const activeFilterCount =
-    (filterStatus !== "all" ? 1 : 0) + (sortBy !== "newest" ? 1 : 0);
-
-  const getActiveGoalsForPillar = (pillar: Goal["pillar"]) => {
-    let list = activeGoalsList.filter(
-      (g) => sectionPillarForGoal(g) === pillar,
-    );
+  const getGoalsForPillar = (pillar: Goal["pillar"]) => {
+    const list = goals.filter((g) => sectionPillarForGoal(g) === pillar);
     return filteredAndSortedGoals(list);
   };
+
   const getPillarStats = (pillar: Goal["pillar"]) => {
-    const list = activeGoalsList.filter(
-      (g) => sectionPillarForGoal(g) === pillar,
+    const list = goals.filter(
+      (g) =>
+        sectionPillarForGoal(g) === pillar &&
+        (g.status === "active" || g.status === "in_progress"),
     );
     const count = list.length;
     const adherence =
@@ -484,163 +426,358 @@ export default function ClientGoals() {
     return { count, adherence };
   };
 
-  return (
-    <ProtectedRoute requiredRole="client">
-      <AnimatedBackground>
-        {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden space-y-4">
-          {/* Header */}
-          <header>
-            <h1 className="text-xl font-bold fc-text-primary tracking-tight mb-4">
-              My Goals
-            </h1>
-            <div className="flex items-center justify-between gap-2 -mt-2 mb-1">
-              <p className="text-sm fc-text-dim min-w-0">
-                Set and track goals by pillar.
-              </p>
-              <button
-                type="button"
-                onClick={() => router.push("/client/goals/history")}
-                className="shrink-0 text-xs font-semibold uppercase tracking-wider text-[color:var(--fc-accent-cyan)] hover:text-[color:var(--fc-accent-cyan)]/80"
-              >
-                History
-              </button>
-            </div>
-          </header>
+  const statusCounts = {
+    all: goals.length,
+    active: goals.filter(
+      (g) => g.status === "active" || g.status === "in_progress",
+    ).length,
+    completed: goals.filter((g) => g.status === "completed").length,
+    paused: goals.filter((g) => g.status === "paused").length,
+    cancelled: goals.filter((g) => g.status === "cancelled").length,
+  };
 
-          {/* Overall stats */}
-          <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3">
-            <div className="flex items-center justify-between gap-1">
-              <div className="flex-1 min-w-0 text-center">
-                <p className="text-base font-semibold fc-text-primary tabular-nums">
-                  {stats.total}
-                </p>
-                <p className="text-[10px] uppercase tracking-wider fc-text-dim mt-0.5">
-                  Total
-                </p>
-              </div>
-              <div
-                className="w-px h-8 bg-[color:var(--fc-glass-border)] shrink-0"
-                aria-hidden
-              />
-              <div className="flex-1 min-w-0 text-center">
-                <p className="text-base font-semibold fc-text-primary tabular-nums">
-                  {goalStatsFromService.active}
-                </p>
-                <p className="text-[10px] uppercase tracking-wider fc-text-dim mt-0.5">
-                  Active
-                </p>
-              </div>
-              <div
-                className="w-px h-8 bg-[color:var(--fc-glass-border)] shrink-0"
-                aria-hidden
-              />
-              <div className="flex-1 min-w-0 text-center">
-                <p className="text-base font-semibold fc-text-primary tabular-nums">
-                  {stats.completed}
-                </p>
-                <p className="text-[10px] uppercase tracking-wider fc-text-dim mt-0.5">
-                  Completed
-                </p>
-              </div>
-              <div
-                className="w-px h-8 bg-[color:var(--fc-glass-border)] shrink-0"
-                aria-hidden
-              />
-              <div className="flex-1 min-w-0 text-center">
-                <p className="text-base font-semibold fc-text-primary tabular-nums">
-                  {goalStatsFromService.overallAdherence}%
-                </p>
-                <p className="text-[10px] uppercase tracking-wider fc-text-dim mt-0.5">
-                  Adherence
-                </p>
-              </div>
+  if (loading) {
+    return (
+      <ProtectedRoute requiredRole="client">
+        <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
+          <PageSkeleton variant="dashboard" />
+        </ClientPageShell>
+      </ProtectedRoute>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <ProtectedRoute requiredRole="client">
+        <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
+          <div className={cn(ps.psV1, "space-y-4")}>
+            <PsHero
+              glow="action"
+              onBack={() => router.push("/client/me")}
+              backAriaLabel="Back to Me"
+              eyebrow="Me · goals"
+              eyebrowColor="var(--fc-accent)"
+              title="Goals"
+              subtitle="Set and track goals by pillar"
+            />
+            <div className="rounded-[13px] border border-[color:var(--fc-hairline)] px-4 py-8 text-center">
+              <p className="mb-3 text-sm fc-text-dim">{loadError}</p>
+              <Button
+                type="button"
+                onClick={() => {
+                  setLoadError(null);
+                  setLoading(true);
+                  loadGoals();
+                }}
+                className="fc-btn fc-btn-primary h-10 text-sm"
+              >
+                Retry
+              </Button>
             </div>
           </div>
+        </ClientPageShell>
+      </ProtectedRoute>
+    );
+  }
 
-          {/* Status and Sort chips */}
-          <section className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3">
+  const stats = getGoalStats();
+  const goalStatsFromService = getGoalStatsFromService(goals);
+  const activeFilterCount =
+    (filterStatus !== "all" ? 1 : 0) + (sortBy !== "newest" ? 1 : 0);
+
+  const statusOptions: { value: FilterStatus; label: string; count: number }[] =
+    statusCounts.paused > 0 || statusCounts.cancelled > 0
+      ? [
+          { value: "all", label: "All", count: statusCounts.all },
+          { value: "active", label: "Active", count: statusCounts.active },
+          { value: "completed", label: "Done", count: statusCounts.completed },
+          { value: "paused", label: "Paused", count: statusCounts.paused },
+        ]
+      : [
+          { value: "all", label: "All", count: statusCounts.all },
+          { value: "active", label: "Active", count: statusCounts.active },
+          { value: "completed", label: "Done", count: statusCounts.completed },
+        ];
+
+  const sortOptions: { value: SortBy; label: string }[] = [
+    { value: "newest", label: "Newest" },
+    { value: "oldest", label: "Oldest" },
+    { value: "priority", label: "Priority" },
+    { value: "progress", label: "Progress" },
+  ];
+
+  const filterSummary =
+    filterStatus === "all" && sortBy === "newest"
+      ? "All · Newest"
+      : `${
+          statusOptions.find((o) => o.value === filterStatus)?.label ?? "All"
+        } · ${sortOptions.find((o) => o.value === sortBy)?.label ?? "Newest"}`;
+
+  return (
+    <ProtectedRoute requiredRole="client">
+      <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
+        <div className={cn(ps.psV1, "space-y-4")}>
+          <PsHero
+            glow="action"
+            onBack={() => router.push("/client/me")}
+            backAriaLabel="Back to Me"
+            eyebrow="Me · goals"
+            eyebrowColor="var(--fc-accent)"
+            title="Goals"
+            subtitle="Set and track goals by pillar"
+            rightSlot={
+              <CheckinActionAddButton
+                onClick={() => {
+                  setGoalWizardInitialCategory(null);
+                  setGoalWizardOpen(true);
+                }}
+              >
+                Add
+              </CheckinActionAddButton>
+            }
+          >
+            {/* Colored overview — adherence ring + tinted tiles */}
+            <div className="relative overflow-hidden rounded-[16px] border border-[color:var(--fc-accent-glow)] bg-[color:color-mix(in_srgb,var(--fc-accent)_8%,transparent)] p-3.5">
+              <div
+                className="pointer-events-none absolute -right-8 -top-10 h-28 w-28 rounded-full"
+                style={{
+                  background:
+                    "radial-gradient(circle, var(--fc-accent-dim) 0%, transparent 70%)",
+                }}
+                aria-hidden
+              />
+              <div className="relative z-[1] flex items-start gap-3.5">
+                <div className="relative h-[72px] w-[72px] shrink-0">
+                  <svg
+                    width={72}
+                    height={72}
+                    viewBox="0 0 72 72"
+                    className="block"
+                    aria-hidden
+                  >
+                    <g transform="translate(36 36) rotate(-90)">
+                      <circle
+                        r={28}
+                        fill="none"
+                        stroke="var(--fc-hairline)"
+                        strokeWidth={6}
+                      />
+                      <circle
+                        r={28}
+                        fill="none"
+                        stroke="var(--fc-accent)"
+                        strokeWidth={6}
+                        strokeLinecap="round"
+                        strokeDasharray={2 * Math.PI * 28}
+                        strokeDashoffset={
+                          2 *
+                          Math.PI *
+                          28 *
+                          (1 -
+                            Math.min(
+                              100,
+                              goalStatsFromService.overallAdherence,
+                            ) /
+                              100)
+                        }
+                        style={{
+                          filter: "drop-shadow(0 0 6px var(--fc-accent-glow))",
+                        }}
+                      />
+                    </g>
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span
+                      className="text-lg font-bold tabular-nums leading-none fc-text-primary"
+                      style={{ fontFamily: "var(--f-display)" }}
+                    >
+                      {goalStatsFromService.overallAdherence}
+                    </span>
+                    <span
+                      className="mt-0.5 text-[8px] font-semibold uppercase tracking-[0.12em] text-[color:var(--fc-accent)]"
+                      style={{ fontFamily: "var(--f-mono)" }}
+                    >
+                      adhere
+                    </span>
+                  </div>
+                </div>
+                <div className="min-w-0 flex-1 pt-0.5">
+                  <p
+                    className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--fc-accent)]"
+                    style={{ fontFamily: "var(--f-mono)" }}
+                  >
+                    Overview
+                  </p>
+                  <p
+                    className="mt-1 text-[15px] font-bold leading-tight fc-text-primary"
+                    style={{ fontFamily: "var(--f-display)" }}
+                  >
+                    {goalStatsFromService.active} active · {stats.completed}{" "}
+                    done
+                  </p>
+                  <p
+                    className="mt-1 text-xs fc-text-dim"
+                    style={{ fontFamily: "var(--f-mono)" }}
+                  >
+                    {stats.total} goal{stats.total === 1 ? "" : "s"} across
+                    pillars
+                  </p>
+                </div>
+              </div>
+              <div className="relative z-[1] mt-3 grid grid-cols-3 gap-2">
+                {(
+                  [
+                    {
+                      label: "Total",
+                      value: stats.total,
+                      color: "var(--fc-group-c)",
+                      soft: "var(--fc-group-c-soft)",
+                      dim: "var(--fc-group-c-dim)",
+                    },
+                    {
+                      label: "Active",
+                      value: goalStatsFromService.active,
+                      color: "var(--fc-text-primary)",
+                      soft: "var(--fc-surface-tint)",
+                      dim: "var(--fc-hairline)",
+                    },
+                    {
+                      label: "Done",
+                      value: stats.completed,
+                      color: "var(--fc-status-success)",
+                      soft: "color-mix(in srgb, var(--fc-status-success) 12%, transparent)",
+                      dim: "color-mix(in srgb, var(--fc-status-success) 28%, transparent)",
+                    },
+                  ] as const
+                ).map((tile) => (
+                  <div
+                    key={tile.label}
+                    className="flex flex-col items-center gap-0.5 rounded-[11px] border px-1.5 py-2 text-center"
+                    style={{
+                      borderColor: tile.dim,
+                      background: tile.soft,
+                    }}
+                  >
+                    <span
+                      className="text-base font-bold tabular-nums leading-none"
+                      style={{
+                        fontFamily: "var(--f-display)",
+                        color: tile.color,
+                      }}
+                    >
+                      {tile.value}
+                    </span>
+                    <span
+                      className="text-[9px] font-semibold uppercase tracking-[0.12em]"
+                      style={{
+                        fontFamily: "var(--f-mono)",
+                        color: tile.color,
+                        opacity: 0.85,
+                      }}
+                    >
+                      {tile.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </PsHero>
+
+          {/* Collapsed filters */}
+          <section className="rounded-[13px] border border-[color:var(--fc-hairline)] bg-transparent">
             <button
               type="button"
               onClick={() => setFiltersOpen((prev) => !prev)}
-              className="w-full flex items-center justify-between py-2 mb-3 text-left"
+              className="flex w-full items-center justify-between gap-3 px-3.5 py-3 text-left"
               aria-expanded={filtersOpen}
             >
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-[0.15em] fc-text-subtle">
+              <div className="flex min-w-0 items-center gap-2">
+                <ListFilter className="h-3.5 w-3.5 shrink-0 fc-text-subtle" />
+                <span
+                  className="text-[10px] font-semibold uppercase tracking-[0.16em] fc-text-subtle"
+                  style={{ fontFamily: "var(--f-mono)" }}
+                >
                   Filters
                 </span>
+                <span
+                  className="truncate text-xs fc-text-dim"
+                  style={{ fontFamily: "var(--f-mono)" }}
+                >
+                  {filterSummary}
+                </span>
                 {activeFilterCount > 0 ? (
-                  <span className="text-[10px] text-[color:var(--fc-accent-cyan)]/70">
-                    {activeFilterCount} active
+                  <span className="shrink-0 rounded-md border border-[color:var(--fc-hairline)] bg-[color:var(--fc-surface-tint)] px-1.5 py-0.5 font-mono text-[9px] font-semibold tabular-nums fc-text-primary">
+                    {activeFilterCount}
                   </span>
                 ) : null}
               </div>
               <ChevronDown
-                className={`w-4 h-4 fc-text-dim transition-transform duration-200 ${
-                  filtersOpen ? "rotate-180" : ""
-                }`}
+                className={cn(
+                  "h-4 w-4 shrink-0 fc-text-dim transition-transform duration-200",
+                  filtersOpen && "rotate-180",
+                )}
               />
             </button>
 
             {filtersOpen ? (
-              <div className="space-y-3">
+              <div className="space-y-3 border-t border-[color:var(--fc-hairline)] px-3.5 pb-3.5 pt-3">
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-[color:var(--fc-accent-cyan)]/80 mb-2">
+                  <p
+                    className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] fc-text-subtle"
+                    style={{ fontFamily: "var(--f-mono)" }}
+                  >
                     Status
                   </p>
-                  <div className="flex flex-wrap gap-2">
-                    {(
-                      [
-                        { value: "all", label: "All" },
-                        { value: "active", label: "Active" },
-                        { value: "completed", label: "Completed" },
-                        { value: "paused", label: "Paused" },
-                        { value: "cancelled", label: "Cancelled" },
-                      ] as const
-                    ).map((option) => {
+                  <div className="flex flex-wrap gap-1.5">
+                    {statusOptions.map((option) => {
                       const isActive = filterStatus === option.value;
                       return (
                         <button
                           key={option.value}
                           type="button"
                           onClick={() => setFilterStatus(option.value)}
-                          className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.1em] border transition-colors ${
+                          className={cn(
+                            "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] transition-colors",
                             isActive
-                              ? "border-[color-mix(in_srgb,var(--fc-accent-cyan)_40%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent-cyan)_15%,transparent)] text-[color:var(--fc-accent-cyan)]"
-                              : "border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)] fc-text-dim hover:fc-text-primary"
-                          }`}
+                              ? "border-[color:var(--fc-hairline-strong,var(--fc-glass-border))] bg-[color:var(--fc-surface-tint)] fc-text-primary"
+                              : "border-[color:var(--fc-hairline)] bg-transparent fc-text-subtle hover:fc-text-primary",
+                          )}
                         >
                           {option.label}
+                          <span
+                            className={cn(
+                              "tabular-nums",
+                              isActive ? "fc-text-dim" : "fc-text-subtle",
+                            )}
+                          >
+                            {option.count}
+                          </span>
                         </button>
                       );
                     })}
                   </div>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-[color:var(--fc-accent-cyan)]/80 mb-2">
+                  <p
+                    className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] fc-text-subtle"
+                    style={{ fontFamily: "var(--f-mono)" }}
+                  >
                     Sort
                   </p>
-                  <div className="flex flex-wrap gap-2">
-                    {(
-                      [
-                        { value: "newest", label: "Newest" },
-                        { value: "oldest", label: "Oldest" },
-                        { value: "priority", label: "Priority" },
-                        { value: "progress", label: "Progress" },
-                      ] as const
-                    ).map((option) => {
+                  <div className="flex flex-wrap gap-1.5">
+                    {sortOptions.map((option) => {
                       const isActive = sortBy === option.value;
                       return (
                         <button
                           key={option.value}
                           type="button"
                           onClick={() => setSortBy(option.value)}
-                          className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.1em] border transition-colors ${
+                          className={cn(
+                            "rounded-lg border px-2.5 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] transition-colors",
                             isActive
-                              ? "border-[color-mix(in_srgb,var(--fc-accent-cyan)_40%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent-cyan)_15%,transparent)] text-[color:var(--fc-accent-cyan)]"
-                              : "border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)] fc-text-dim hover:fc-text-primary"
-                          }`}
+                              ? "border-[color:var(--fc-hairline-strong,var(--fc-glass-border))] bg-[color:var(--fc-surface-tint)] fc-text-primary"
+                              : "border-[color:var(--fc-hairline)] bg-transparent fc-text-subtle hover:fc-text-primary",
+                          )}
                         >
                           {option.label}
                         </button>
@@ -654,54 +791,66 @@ export default function ClientGoals() {
 
           {/* Pillar sections */}
           {PILLAR_SECTIONS.map(({ id: pillarId, label, icon: PillarIcon }) => {
-            const pillarGoalsList = getActiveGoalsForPillar(pillarId);
+            const pillarGoalsList = getGoalsForPillar(pillarId);
             const pillarStat = getPillarStats(pillarId);
             const count = pillarStat?.count ?? 0;
             const adherence = pillarStat?.adherence ?? 0;
             return (
               <section
                 key={pillarId}
-                className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4"
+                className="rounded-[16px] border border-[color:var(--fc-hairline)] bg-transparent p-4"
               >
-                <p className="text-[10px] uppercase tracking-wider text-[color:var(--fc-accent-cyan)]/80 mb-1">
-                  {label} pillar
-                </p>
                 <div className="mb-3 flex items-center justify-between gap-2">
-                  <h2 className="flex min-w-0 flex-1 items-center gap-2 text-sm font-semibold tracking-tight fc-text-primary">
-                    <PillarIcon
-                      className="h-3.5 w-3.5 shrink-0"
-                      style={{ color: PILLAR_SECTION_ICON_COLOR[pillarId] }}
-                    />
-                    <span className="truncate">{label}</span>
-                  </h2>
+                  <div className="min-w-0 flex-1">
+                    <PsSectionEyebrow accent="action" className="mb-1">
+                      {label} pillar
+                    </PsSectionEyebrow>
+                    <h2 className="flex min-w-0 items-center gap-2 text-sm font-bold tracking-tight fc-text-primary">
+                      <PillarIcon
+                        className="h-3.5 w-3.5 shrink-0"
+                        style={{ color: PILLAR_SECTION_ICON_COLOR[pillarId] }}
+                      />
+                      <span
+                        className="truncate"
+                        style={{ fontFamily: "var(--f-display)" }}
+                      >
+                        {label}
+                      </span>
+                    </h2>
+                  </div>
                   {count > 0 ? (
-                    <span className="shrink-0 text-xs tabular-nums fc-text-dim">
+                    <span
+                      className="shrink-0 text-xs tabular-nums fc-text-dim"
+                      style={{ fontFamily: "var(--f-mono)" }}
+                    >
                       {count} · {adherence}%
                     </span>
                   ) : null}
                 </div>
+
                 {pillarGoalsList.length === 0 ? (
-                  <div className="py-8 px-4 text-center">
-                    <p className="text-sm fc-text-dim mb-1">
+                  <div className="rounded-[13px] border border-dashed border-[color:var(--fc-hairline)] px-4 py-8 text-center">
+                    <p className="mb-2 text-sm fc-text-dim">
                       No goals in this pillar yet.
                     </p>
                     <button
                       type="button"
                       onClick={() => openGoalWizard(pillarId)}
-                      className="text-xs font-semibold uppercase tracking-wider text-[color:var(--fc-accent-cyan)] hover:text-[color:var(--fc-accent-cyan)]/80"
+                      className="inline-flex items-center gap-1 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-[color:var(--fc-accent)] hover:opacity-80"
                     >
-                      + Add {label} Goal
+                      <Plus className="h-3 w-3" strokeWidth={2.5} />
+                      Add {label} goal
                     </button>
                   </div>
                 ) : (
                   <>
-                    <div className="grid grid-cols-1 gap-3 mb-3">
+                    <div className="mb-3 grid grid-cols-1 gap-3">
                       {pillarGoalsList.map((goal) => (
                         <GoalCard
                           key={goal.id}
                           goal={goal as Goal}
                           isAutoTracked={goalHasAutoSync(goal)}
-                          onDelete={handleDeleteGoal}
+                          onDelete={() => setPendingDeleteGoal(goal as Goal)}
                           onUpdate={updateGoalProgress}
                           onEdit={(g) => setEditGoal(g as Goal)}
                         />
@@ -710,15 +859,34 @@ export default function ClientGoals() {
                     <button
                       type="button"
                       onClick={() => openGoalWizard(pillarId)}
-                      className="text-xs font-semibold uppercase tracking-wider text-[color:var(--fc-accent-cyan)] hover:text-[color:var(--fc-accent-cyan)]/80"
+                      className="inline-flex items-center gap-1 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-[color:var(--fc-accent)] hover:opacity-80"
                     >
-                      + Add {label} Goal
+                      <Plus className="h-3 w-3" strokeWidth={2.5} />
+                      Add {label} goal
                     </button>
                   </>
                 )}
               </section>
             );
           })}
+
+          <button
+            type="button"
+            onClick={() => router.push("/client/goals/history")}
+            className="flex w-full items-center justify-between rounded-[13px] border border-[color:var(--fc-hairline)] bg-transparent px-4 py-3 text-left transition-colors hover:bg-[color:var(--fc-surface-tint)]"
+          >
+            <span
+              className="text-sm font-semibold fc-text-primary"
+              style={{ fontFamily: "var(--f-display)" }}
+            >
+              Goal history
+            </span>
+            <span
+              className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[color:var(--fc-accent)]"
+            >
+              View all →
+            </span>
+          </button>
 
           <GoalWizard
             open={goalWizardOpen}
@@ -750,88 +918,23 @@ export default function ClientGoals() {
             onSaved={() => void loadGoals()}
           />
 
-          {/* Completed goals: collapsible */}
-          <section className="overflow-hidden rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft">
-            <button
-              type="button"
-              onClick={() => setCompletedSectionOpen((o) => !o)}
-              className="w-full flex items-center justify-between py-3 px-4 hover:bg-[color:var(--fc-glass-highlight)] transition-colors text-left"
-            >
-              <div className="min-w-0">
-                <p className="text-[10px] uppercase tracking-wider text-[color:var(--fc-accent-cyan)]/80">
-                  Archive
-                </p>
-                <h3 className="text-sm font-semibold fc-text-primary tracking-tight">
-                  Completed goals
-                </h3>
-                <p className="text-xs fc-text-dim mt-0.5">
-                  {completedGoalsList.length} completed
-                </p>
-              </div>
-              <ChevronDown
-                className={`w-5 h-5 shrink-0 fc-text-subtle transition-transform duration-300 ${completedSectionOpen ? "rotate-180" : ""}`}
-              />
-            </button>
-            <div className={completedSectionOpen ? "block" : "hidden"}>
-              <div className="px-4 pb-4 pt-0 space-y-3">
-                {completedGoalsList.length === 0 ? (
-                  <div className="py-8 px-4 text-center">
-                    <p className="text-sm fc-text-dim">
-                      No completed goals yet.
-                    </p>
-                  </div>
-                ) : (
-                  filteredAndSortedGoals(completedGoalsList).map((goal) => (
-                    <GoalCard
-                      key={goal.id}
-                      goal={goal as Goal}
-                      isAutoTracked={goalHasAutoSync(goal)}
-                      compact
-                    />
-                  ))
-                )}
-              </div>
-            </div>
-          </section>
-        </ClientPageShell>
-      </AnimatedBackground>
-
-      {/*
-        Phase 0b Task 6 — "Add new goal" FAB migration.
-        Spec ref: design-system-v4 §6.21 Floating Action Button.
-        Was: <div className="fixed bottom-24 right-4 z-40 pointer-events-auto">
-               <button className="fc-fab group">
-                 <Plus className="w-8 h-8 text-white" /> ...
-        Now:  the wrapper <div> is removed; the button uses the v4 atomic
-              `fab-action` class (lime gradient, dark glyph #061018, position
-              fixed, z-index 40, bottom 96px) directly. The Plus glyph drops
-              `text-white` so it inherits the dark glyph color from
-              `.fab-action`. The `group` class stays — required for the
-              existing hover-tooltip span behavior.
-        Note: createPortal still mounts to document.body; `position: fixed`
-              positions to the viewport regardless of portal target.
-        Phase 0b Task 6.5 cleanup: removed stale Plus `w-8 h-8` classes
-              because `.fab-action svg` enforces the rendered 24px size.
-      */}
-      {fabPortalReady
-        ? createPortal(
-            <button
-              type="button"
-              onClick={() => {
-                setGoalWizardInitialCategory(null);
-                setGoalWizardOpen(true);
-              }}
-              className="fab-action group"
-              aria-label="Add new goal"
-            >
-              <Plus />
-              <span className="absolute right-full mr-3 fc-glass border border-[color:var(--fc-glass-border)] px-3 py-1.5 rounded-xl text-xs font-semibold opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap fc-text-primary">
-                Add goal
-              </span>
-            </button>,
-            document.body,
-          )
-        : null}
+          <ConfirmActionDialog
+            open={pendingDeleteGoal != null}
+            onOpenChange={(open) => {
+              if (!open) setPendingDeleteGoal(null);
+            }}
+            title={`Delete “${pendingDeleteGoal?.title ?? "goal"}”?`}
+            description="This removes the goal and its progress. You can create a new one anytime."
+            confirmLabel="Delete goal"
+            confirming={deletingGoal}
+            variant="destructive"
+            onConfirm={() => {
+              if (!pendingDeleteGoal) return;
+              void handleDeleteGoal(pendingDeleteGoal.id);
+            }}
+          />
+        </div>
+      </ClientPageShell>
     </ProtectedRoute>
   );
 }

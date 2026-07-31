@@ -6,6 +6,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { computeCurrentProgramWeekForAssignment } from '@/lib/programWeekCalendar';
+import { resolveInstanceWeekForAssignment } from '@/lib/programInstanceResolver';
 
 export interface DashboardStats {
   streak: number;
@@ -28,7 +29,7 @@ async function getActiveProgramCtx(
 ): Promise<ActiveProgramCtx | null> {
   const { data: pa, error: paErr } = await sb
     .from('program_assignments')
-    .select('id, client_id, program_id, start_date, duration_weeks, pause_accumulated_days, pause_status, paused_at, timezone_snapshot')
+    .select('id, client_id, program_id, start_date, pause_accumulated_days, pause_status, paused_at, timezone_snapshot')
     .eq('client_id', clientId)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
@@ -42,16 +43,18 @@ async function getActiveProgramCtx(
     .select('timezone')
     .eq('id', clientId)
     .maybeSingle();
+  const weekRes = await resolveInstanceWeekForAssignment(sb, pa.id);
+  const totalWeeksCap = weekRes?.totalWeeks ?? null;
   const { week: calendarWeek } = computeCurrentProgramWeekForAssignment(
     {
       start_date: pa.start_date ?? null,
-      duration_weeks: pa.duration_weeks ?? null,
       pause_accumulated_days: pa.pause_accumulated_days ?? 0,
       pause_status: pa.pause_status ?? null,
       paused_at: pa.paused_at ?? null,
       timezone_snapshot: pa.timezone_snapshot ?? null,
     },
-    (profile as { timezone?: string | null } | null)?.timezone ?? 'UTC'
+    (profile as { timezone?: string | null } | null)?.timezone ?? 'UTC',
+    { totalWeeksCap },
   );
 
   return {
@@ -107,12 +110,12 @@ export async function fetchProgramWorkoutCounters(
     }
 
     const { data: schedRows, error: schedErr } = await sb
-      .from('program_schedule')
+      .from('program_day_assignments')
       .select('id, week_number')
-      .eq('program_id', ctx.programId);
+      .eq('program_assignment_id', ctx.paId);
 
     if (schedErr) {
-      console.error('fetchProgramWorkoutCounters program_schedule:', schedErr);
+      console.error('fetchProgramWorkoutCounters program_day_assignments:', schedErr);
       return { streak: 0, weeklyProgress: { current: 0, goal: 0 } };
     }
 
@@ -133,12 +136,12 @@ export async function fetchProgramWorkoutCounters(
 
     const { data: sessions, error: sessErr } = await sb
       .from('workout_sessions')
-      .select('completed_at, program_schedule_id')
+      .select('completed_at, program_day_assignment_id')
       .eq('client_id', clientId)
       .eq('status', 'completed')
       .not('completed_at', 'is', null)
       .eq('program_assignment_id', ctx.paId)
-      .not('program_schedule_id', 'is', null);
+      .not('program_day_assignment_id', 'is', null);
 
     if (sessErr) {
       console.error('fetchProgramWorkoutCounters workout_sessions:', sessErr);
@@ -147,7 +150,7 @@ export async function fetchProgramWorkoutCounters(
 
     const sessionList = sessions ?? [];
     const current = sessionList.filter(
-      (s) => s.program_schedule_id && slotSet.has(s.program_schedule_id)
+      (s) => s.program_day_assignment_id && slotSet.has(s.program_day_assignment_id)
     ).length;
 
     const dayStrings = sessionList.map((s) =>
@@ -342,6 +345,7 @@ export async function getTodaysWorkout(clientId: string): Promise<TodaysWorkout 
       .eq('client_id', clientId)
       .eq('scheduled_date', today)
       .in('status', ['assigned', 'active'])
+      .is('program_assignment_id', null)
       .maybeSingle();
 
     if (assignmentError) {

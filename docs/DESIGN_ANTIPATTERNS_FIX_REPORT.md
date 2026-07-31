@@ -1,5 +1,7 @@
 # Design Anti-Patterns Fix Report
 
+> **Historical.** Describes a past cleanup pass. Not the live design system — see [`design-system-v5.md`](./design-system-v5.md).
+
 ## Summary
 
 Implemented the three design anti-pattern fixes across the app: (1) standardized page titles to `text-2xl font-bold`, (2) replaced full-page spinner+text loading with skeleton blocks and ensured AnimatedBackground in loading branches, (3) replaced inline hex colors and `bg-slate-*` with theme variables in the in-scope files.

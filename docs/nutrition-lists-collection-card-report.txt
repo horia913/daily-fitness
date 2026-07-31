@@ -1,0 +1,113 @@
+# NUTRITION LISTS — plans + assignments → collection card
+**Date:** 2026-07-06
+
+## 1. Files created / modified
+
+| Path | Change |
+|------|--------|
+| `src/components/coach/nutrition/fetchNutritionWorkspaceData.ts` | **Modified** — additive `assignedPreview` on meal plans; explicit `MealPlanWithStats` type |
+| `src/components/coach/nutrition/CoachMealPlansPanel.tsx` | **Modified** — table → `CollectionCardStack` / `CollectionCard` |
+| `src/components/coach/nutrition/CoachAssignmentsPanel.tsx` | **Modified** — 7-column table → client-forward `CollectionCardStack` |
+| `src/components/coach/nutrition/CoachFoodDatabasePanel.tsx` | **Unchanged** |
+| `src/components/coach/nutrition/CoachNutritionWorkspace.tsx` | **Unchanged** |
+| `src/app/coach/nutrition/page.tsx` | **Unchanged** (`data-7xl` shell preserved) |
+| `src/components/ui/CollectionCard.tsx` | **Unchanged** (consumed only) |
+
+---
+
+## 2. `assignedPreview` extension + stats preservation
+
+**File:** `fetchNutritionWorkspaceData.ts`
+
+**Change (additive only):**
+- `meal_plan_assignments` query extended from `select("meal_plan_id")` to `select("meal_plan_id, client_id")`.
+- Per plan: up to 3 unique `client_id`s collected (same dedupe/cap pattern as Programs API).
+- One batched `profiles` fetch for all preview client ids.
+- Each plan row now includes:
+
+```ts
+assignedPreview: {
+  count: number;      // mirrors usage_count
+  initials: string[]; // up to 3, via clientInitialsFromProfile
+}
+```
+
+**Preserved unchanged:**
+- `meal_count` — still aggregated from `meals` table.
+- `usage_count` — still total assignment row count (all assignments, not filtered by `is_active`).
+- `MealPlanService.getMealPlans(coachId)` base fields untouched.
+- `fetchNutritionWorkspaceMeta` untouched.
+
+---
+
+## 3. Card slot mapping
+
+### Meal plans (`CoachMealPlansPanel`)
+
+| Slot | Mapping |
+|------|---------|
+| `hue` | `programCollectionHue(plan.id)` — stable hash of id |
+| `name` | `plan.name` |
+| `status` | `is_active` → `active` / `inactive`; `statusLabel` **Active** / **Draft** |
+| `meta` | Real fields: `{kcal} kcal · P {p}g · C {c}g · F {f}` (`computed_*` else `target_*`; `—` when unset) · `{meal_count} meals/day` |
+| `structure` | **Omitted** |
+| `rightStat` | `CollectionCardAssignedStat` — `count={usage_count}`; avatars from `assignedPreview.initials` + `avatarHueByIndex` |
+| `actions` | Eye → `/coach/nutrition/meal-plans/[id]` · UserPlus → `handleAssignMealPlan` · Edit → `MealPlanMetadataModal` · Trash2 → `deleteMealPlan` |
+
+Search + All/Active chips filter which cards render. Modals unchanged.
+
+### Assignments (`CoachAssignmentsPanel`) — client-forward
+
+| Slot | Mapping |
+|------|---------|
+| `hue` | `programCollectionHue(row.id)` |
+| `name` | `clientDisplayName(row.client)` |
+| `status` | `is_active` → Active / Inactive (default pill labels) |
+| `meta` | `{meal_plan.name}` · Started `{formatted start_date}` · Label `{label}` — **label segment omitted when null/empty** |
+| `structure` | **Omitted** |
+| `rightStat` | `compliancePct30d` as mono `%` in `acount` layout; tier colors via existing `complianceGood` / `complianceWarn` / `complianceBad`; sublabel `30d`. **Null → muted `—`** (no fake 0%) |
+| `actions` | Eye → `/coach/clients/[id]` · UserMinus → `handleUnassign` **only when `is_active`** |
+
+Summary line, search, Active/All chips, ＋ Assign plan (plan picker → modal) preserved.
+
+---
+
+## 4. Food database tab
+
+**Unchanged.** `CoachFoodDatabasePanel.tsx` not modified. Existing table uses design tokens (`var(--fc-*)`), hairline rows, category chips — no raw hex found; no token tidying required.
+
+---
+
+## 5. Conformance + logic-untouched confirmations
+
+### Element 16 conformance
+- Plans and assignments render via governed `CollectionCard` / `CollectionCardStack` from `src/components/ui/CollectionCard.tsx`.
+- Dark collection surface, hue left-rail + right glow (`--collection-hue`), active/inactive states, meta chips, assigned stat / compliance stat in side column, icon action buttons — all from the primitive CSS module.
+- No new card CSS or mockup rebuild.
+
+### Logic fences (unchanged)
+| Fence | Status |
+|-------|--------|
+| `MealPlanAssignmentModal` → `assignMealPlanToClients` | ✓ Unchanged |
+| Assignments plan-picker → modal | ✓ Unchanged |
+| `MealPlanService.deactivateAssignment` | ✓ Unchanged |
+| `MealPlanService.deleteMealPlan` | ✓ Unchanged |
+| `MealPlanMetadataModal` (edit) | ✓ Unchanged |
+| `updateAssignmentLabel` | ✓ Not wired (was not; still not) |
+| `fetchCoachAssignments` | ✓ Unchanged |
+| `fetchCoachFoods` | ✓ Unchanged |
+| `CoachNutritionWorkspace` tab routing | ✓ Unchanged |
+| Shell `data-7xl` | ✓ Unchanged |
+
+`fetchCoachMealPlansWithStats` changed **only** by additive `assignedPreview` (+ `client_id` in assignments select for preview batch).
+
+---
+
+## 6. `tsc` result
+
+```
+npx tsc --noEmit
+exit code: 0
+```
+
+No git commits. No migrations. No schema changes.

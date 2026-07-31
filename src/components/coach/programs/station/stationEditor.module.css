@@ -1,0 +1,81 @@
+/* Station program editor — scoped contrast + layout (not global tokens) */
+
+.root {
+  position: relative;
+  min-height: 100vh;
+  color: var(--fc-text-primary);
+  --se-bg-0: var(--fc-bg-deep);
+  --se-bg-1: var(--fc-bg-basalt);
+  --se-card: var(--fc-surface-card);
+  --se-card-header: var(--fc-surface-elevated);
+  --se-separator: var(--fc-hairline);
+  --se-separator-strong: var(--fc-glass-border);
+  --se-text-muted: var(--fc-text-subtle);
+  --se-text-dim: var(--fc-text-quaternary);
+  --pe-bg: var(--se-bg-0);
+  --pe-card: var(--se-card);
+  --pe-card-2: var(--fc-glass-soft);
+  --pe-card-3: var(--fc-bg-basalt);
+  --pe-line: var(--se-separator);
+  --pe-line-2: var(--fc-hairline);
+  --pe-t1: var(--fc-text-primary);
+  --pe-t2: var(--fc-text-dim);
+  --pe-t3: var(--se-text-muted);
+  --pe-t4: var(--se-text-dim);
+  --se-gutter: 22px;
+  --se-scroll-pad-inline: var(--se-gutter);
+  background: linear-gradient(180deg, var(--se-bg-1) 0%, var(--se-bg-0) 42%, var(--fc-bg-deep) 100%);
+}
+
+.root::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 80% 45% at 50% -8%, rgba(255, 255, 255, 0.045) 0%, transparent 55%),
+    radial-gradient(ellipse 40% 30% at 12% 18%, rgba(46, 242, 198, 0.04) 0%, transparent 60%),
+    radial-gradient(ellipse 35% 28% at 88% 22%, rgba(255, 138, 31, 0.035) 0%, transparent 58%);
+}
+
+.shell {
+  position: relative;
+  z-index: 1;
+  max-width: none !important;
+  width: 100%;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.contained {
+  width: 100%;
+  max-width: none;
+  padding-inline: var(--se-gutter);
+}
+
+.sessionsBleed {
+  position: relative;
+  width: 100%;
+  padding-bottom: 32px;
+  box-sizing: border-box;
+}
+
+/* Vibrant group letter badges inside station canvas only */
+.root :global([data-station-canvas] [data-group-letter]) {
+  font-weight: 800 !important;
+  letter-spacing: 0.03em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 1px 0 var(--fc-glass-highlight);
+  border: 1px solid var(--fc-glass-border);
+}
+
+.modeBannerClient {
+  background: color-mix(in srgb, var(--fc-accent) 12%, var(--fc-bg-deep));
+  border-color: color-mix(in srgb, var(--fc-accent) 35%, transparent);
+}
+
+.modeBannerMaster {
+  background: color-mix(in srgb, var(--fc-status-warning) 10%, var(--fc-bg-deep));
+  border-color: color-mix(in srgb, var(--fc-status-warning) 32%, transparent);
+}

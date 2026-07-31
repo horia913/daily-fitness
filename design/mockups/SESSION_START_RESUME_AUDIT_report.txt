@@ -1,0 +1,196 @@
+AUDIT — workout session start / resume (before pre-start START)
+Date: 2026-07-19 · READ-ONLY
+
+────────────────────────────────────────────────────────────────────────
+1. What’s created on load
+────────────────────────────────────────────────────────────────────────
+
+Route: `/client/workouts/[id]/start` → `page.tsx` `loadAssignment` + auto `startWorkout`.
+
+A) UPDATES on load (not inserts)
+   • `closeIncompleteLogsFromPreviousDays` (~L667–722), called from load path ~L2343.
+   • Table: `workout_logs`
+   • Match: same `workout_assignment_id` + `client_id`, `completed_at IS NULL`, `started_at` < local midnight today.
+   • Update: `completed_at = started_at` (abandon-close). Console: “Closing N incomplete workout_log(s)…”.
+   • Does NOT touch `workout_sessions`.
+
+B) CREATED on load (often, before any set)
+   • `startWorkout` (~L2722–2778), triggered by useEffect ~L1492–1499 when
+     `assignment && exercises.length > 0 && !sessionId`.
+   • Table: `workout_sessions`
+   • First: SELECT existing `status = 'in_progress'` for `assignment_id` + `client_id`
+     (most recent). Console: “Reusing existing workout session”.
+   • Else: INSERT `{ assignment_id, client_id, status: 'in_progress',
+     current_block_index: 0, current_exercise_index: 0, last_activity_at }`.
+     Console: “Created new workout session”.
+   • Fallback on DB error: local non-UUID `sessionId` (timestamp string).
+
+C) NOT created on load (direct / cold start-page open)
+   • `workout_logs` — deferred until first successful `/api/log-set` when no log id
+     (route.ts ~L162–384; comment: “first set creates the log”).
+   • `workout_set_logs` / completions — only on log / block-complete writes.
+   • **Exception — program entry:** Train’s `start-from-progress` often already
+     inserted both `workout_sessions` and `workout_logs` before this page loads.
+
+D) Console “No active workout session found for today — starting fresh” (~L2511)
+   • Misleading wording: it means no incomplete `workout_logs` row for this
+     assignment after stale-close + resume lookup — not “no workout_sessions”.
+   • UI then initializes empty live set entries (~L2521–2539). Session row may
+     still be created by `startWorkout` in parallel (see race note below).
+
+Race (confirmed in code): `setAssignment` / `setExercises` run before the await
+resume block finishes (~L2281 then ~L2341+). Effect can call `startWorkout` while
+`sessionId` is still null even if resume is about to set it from an active log.
+
+────────────────────────────────────────────────────────────────────────
+2. Resume detection + restore
+────────────────────────────────────────────────────────────────────────
+
+Primary: RPC `get_workout_session_data(p_client_id, p_assignment_id)` (~L2375).
+Fallback if RPC fails / no activeLog: `findActiveWorkoutLogForToday` (~L728–778).
+
+Matching rules
+• Assignment: resolved `workout_assignment_id` (standalone or via program day).
+• Client: authenticated user id.
+• Active log (RPC): latest `workout_logs` with `completed_at IS NULL` for that
+  assignment — **no calendar-day filter in the RPC** (migration
+  `20260701_…_rpcs.sql`). Day hygiene relies on stale-close running first.
+• Fallback query: incomplete + `started_at` within local today only.
+• Session blob in RPC: latest `workout_sessions` `in_progress` for
+  `assignment_id` + client (used for metadata; resume progress is log-driven).
+
+Restore (`restoreWorkoutProgress` ~L786+)
+• Prefetched or fetched: `workout_set_logs` (+ RPE / protocol fields),
+  `workout_set_entry_completions`, log `started_at`.
+• Rebuilds per-entry `completedSets` / `isCompleted` / `existingSetLogs`,
+  picks `currentSetEntryIndex`.
+• Sets `workoutStartTime` from log `started_at` (else `Date.now()`).
+• Sets `workoutLogId`, `sessionId` from `activeLog.workout_session_id` if UUID,
+  else `restored-${logId}` (non-UUID → progress persist skipped).
+• Toast: “Workout Resumed”.
+• If log exists but zero set logs and zero block completions → returns null
+  (“No set logs and no block completions - starting fresh”); empty incomplete
+  log can remain in DB while UI looks fresh.
+
+Also: if `program_day_assignment_id` is in `dayCompletions`, redirects to Train.
+
+────────────────────────────────────────────────────────────────────────
+3. Stale-log closing
+────────────────────────────────────────────────────────────────────────
+
+• Location: `closeIncompleteLogsFromPreviousDays` in `page.tsx` (~L667–722),
+  called at start of resume block (~L2343) before session RPC.
+• Related (elsewhere): `/api/program-workouts/start-from-progress` has its own
+  24h stale close for sessions/logs when entering from Train — not this page’s
+  calendar-midnight rule.
+• Must it run on page load? **Not strictly.** It only needs to run before resume
+  treats an incomplete log as active. Safe to run on START **if** START also
+  runs the same resume path before creating/reusing a session. If START only
+  creates and never resumes, old incomplete same-assignment logs could still
+  confuse `/api/log-set` (it reuses incomplete logs). Prefer: keep stale-close
+  on whatever path first decides “active log vs new”.
+
+────────────────────────────────────────────────────────────────────────
+4. Elapsed-time source
+────────────────────────────────────────────────────────────────────────
+
+• State: `workoutStartTime` — init `Date.now()` on mount (~L147).
+• Tick: `elapsedLabel` from `Date.now() - workoutStartTime` (~L208–225).
+• On resume: overwritten with `new Date(log.started_at).getTime()`.
+• Fresh open today: stays page-mount time (not session `started_at`, unless
+  something else sets it — session insert does not update this state).
+• Under deferred START: measure from START tap (`Date.now()` / session
+  `started_at` / log `started_at` once created). Until then show `0:00` or hide
+  the clock. Do not use page mount.
+
+────────────────────────────────────────────────────────────────────────
+5. Downstream dependencies on early session/log
+────────────────────────────────────────────────────────────────────────
+
+Depends on `sessionId` (often present soon after load):
+• `useSetLoggingOrchestrator(sessionId)` — pending-set sessionStorage keys.
+• `persistSessionProgress` → updates `workout_sessions` cursors (~L227–268);
+  no-ops if non-UUID.
+• `/api/log-set` — prefers linking/creating `workout_logs` with
+  `workout_session_id` when UUID; can still create log without session.
+• `completeWorkoutService` — marks session `completed` if UUID session id.
+• Golden-flow / LiveWorkoutSetEntryExecutor — requires session for orchestrator;
+  logging currently assumes page already called `startWorkout`.
+
+Does NOT require `workout_logs` until first set:
+• Progress restore only if an incomplete log already exists.
+• Empty open: no log row.
+
+Train / program entry:
+• `EnhancedClientWorkouts` → `POST /api/program-workouts/start-from-progress`
+  before navigating to `/start`. On a **new** day path that API inserts
+  `workout_assignments`, then `workout_sessions` (`in_progress`), then
+  `workout_logs` (with `started_at`) — so program clients often already have
+  **session + empty log** before the start page mounts. Reuse paths return an
+  existing assignment id without always inserting again (24h stale guards).
+• Standalone / legacy Train links can hit `/start` without that API — then
+  only the page’s `startWorkout` creates the session; log still waits for
+  first set.
+• Coach gym-console status reads `in_progress` sessions.
+
+Analytics / streaks / achievements: generally on complete / set sync, not on
+empty session create — **uncertain** for any coach live-dashboard that keys
+off `in_progress` alone (persistSessionProgress / gym console suggest yes).
+
+────────────────────────────────────────────────────────────────────────
+6. Abandonment today
+────────────────────────────────────────────────────────────────────────
+
+Open screen, leave without logging:
+• **Program path (via start-from-progress):** often leaves `workout_sessions`
+  `in_progress` **and** an incomplete `workout_logs` row (no set logs yet) —
+  heavier garbage than the start page alone.
+• **Direct/fresh start page:** likely `workout_sessions` `in_progress` only;
+  no `workout_logs` until first set.
+• Next visit: `startWorkout` reuses in_progress session (no day filter);
+  resume may pick up the empty incomplete log and either restore or fall
+  through to “starting fresh” UI while the log row remains.
+• Prior-day incomplete logs: abandon-closed on this page load; **sessions**
+  are not closed by that helper.
+
+Pre-start START reduces garbage only if **both** Train pre-create and the
+start-page `startWorkout` effect stop creating rows until the client commits.
+
+────────────────────────────────────────────────────────────────────────
+7. Verdict + plan (no code)
+────────────────────────────────────────────────────────────────────────
+
+**Worthwhile:** Yes — today load creates (or reuses) an `in_progress`
+`workout_sessions` row even when the client never logs; deferring that to START
+cuts abandoned empty sessions and aligns elapsed with real start.
+
+**Safe if done carefully — preferred plan:**
+
+1. Keep **read-only** load: resolve assignment, blocks, stale-close + resume
+   lookup (so a true in-progress day still restores). Do **not** call
+   `startWorkout` on the assignment/exercises effect for a cold open.
+2. UI: pre-start summary; elapsed frozen/hidden until START.
+3. START tap:
+   a. If incomplete log for today (post stale-close) → same resume path as now
+      (set sessionId from log / reuse session; restore progress; enter live UI).
+   b. Else → `startWorkout()` (create/reuse session) + set `workoutStartTime =
+      Date.now()`; still **no** `workout_logs` until first set (unchanged).
+4. Move or duplicate `closeIncompleteLogsFromPreviousDays` so it runs before
+   START’s resume/create decision (can stay on load; must not only run after
+   create without checking existing logs).
+5. Audit Train `start-from-progress`: confirmed it often creates/reuses
+   `workout_sessions` (and may stamp incomplete logs) **before** navigating to
+   `/start`. Deferring only the start-page `startWorkout` effect is incomplete
+   for program workouts — either stop pre-create there until START, or treat
+   Train’s API as START and make the screen a UI gate.
+
+**Safer alternative if full defer is too risky in one pass:**
+• Keep session creation on load (current `startWorkout` effect).
+• Make START a **UI gate only** (hide live card / don’t allow log until tap);
+  set `workoutStartTime` on tap for elapsed display.
+• Does **not** fix empty-session abandonment; buys UX without touching
+  log-set / orchestrator / Train contracts.
+
+**Risks to watch:** effect vs resume race; log-set’s reuse of incomplete logs;
+non-UUID `restored-*` session ids; Train/gym-console `in_progress` meaning;
+orchestrator storage keyed by sessionId changing when START creates the real id.

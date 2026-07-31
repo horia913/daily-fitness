@@ -1,0 +1,50 @@
+BUILD — restore rest timer modal + revisit completed exercises
+Date: 2026-07-20
+
+1) Files modified
+- src/components/client/LiveWorkoutSetEntryExecutor.tsx
+- src/components/client/workout-execution/LiveRestTimerContext.tsx
+- src/components/client/workout-execution/RestTimerModal.tsx
+- src/components/client/workout-execution/restTimerModalTypes.ts (new)
+- src/app/client/workouts/[id]/start/page.tsx
+
+2) Rest timer modal re-enabled + single source of truth
+- InCardRestBridge (unchanged role): when useSetLoggingOrchestrator sets
+  shouldOpenRestTimer=true, it acks and calls LiveRestTimerContext.startRest()
+  with the shared deadline (sessionStorage + visibility/focus recompute preserved).
+- LiveRestTimerModal (new export in RestTimerModal.tsx): renders RestTimerModal
+  when context isResting, reading controlledTimeLeft / controlledTotalSeconds
+  from context — modal does NOT run its own countdown in this mode.
+- In-card ● Resting glue (LiveCard + LiveRestTimerContext) unchanged as secondary
+  indicator; same deadline as the modal.
+- Minimize (X / backdrop): hides modal only; rest keeps running in-card.
+- Skip rest: calls context.skipRest() (ends rest, same as before).
+- +/- 15s: context.adjustRest() shifts the shared deadline and persists it.
+
+3) Auto-advance on revisit — root cause + gate
+- Root cause: LiveWorkoutSetEntryExecutor.tsx useEffect (~L876–902) called
+  onSetEntryComplete whenever a mounted block already had completedSets >=
+  totalSets on the last exercise. Revisiting a done group remounts the executor
+  with a fresh completedSetEntryRef, so the effect fired again →
+  handleSetEntryComplete → 1.5s auto-advance timeout.
+- Fix: removed that mount-time useEffect entirely. Block completion now only
+  flows through handleSetComplete after an actual log (guarded by
+  completedSetEntryRef in the logging path).
+- Additional guard: handleSetEntryChange in start/page.tsx now clears any pending
+  setEntryAdvanceTimeoutRef so manual navigation cannot be overridden by a
+  stale auto-advance timer.
+
+4) Edit / re-log on revisited set
+- Write path unchanged (no /api/log-set payload changes).
+- New log: golden-flow orchestrator → POST /api/log-set (insert).
+- Edit existing set: executor handleSaveEdit → PATCH with set_log_id;
+  parent handleSetEditSaved / handleSetLogUpsert replace by id (update in place,
+  not append). Confirmed in StraightSetExecutor and siblings via replaceId /
+  findIndex on set_log id.
+
+5) Untouched
+- /api/log-set payloads, session creation, one-open-session rule, pre-start / ?start=1
+  routing, workout-complete screen.
+
+6) tsc
+- npx tsc -p tsconfig.json --noEmit → 0 errors (exit code 0)

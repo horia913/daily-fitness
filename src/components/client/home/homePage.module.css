@@ -1,0 +1,635 @@
+.page {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 24px 20px var(--fc-bottom-safe-area);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+/* ── Greeting ── */
+.greetEyebrow {
+  font-family: var(--f-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fc-accent);
+  margin: 0 0 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.greetTitle {
+  font-family: var(--f-display);
+  font-stretch: 125%;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--fc-text-primary);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.greetName {
+  color: var(--fc-accent);
+}
+
+.greetDate {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--fc-text-dim);
+  margin: 6px 0 0;
+  letter-spacing: 0.03em;
+}
+
+/* ── Score hero ── */
+.scoreHero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0 4px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  width: 100%;
+  min-width: 0;
+}
+
+.scoreHero:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.scoreHeroRing {
+  width: 150px;
+  height: 150px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.scoreHeroValue {
+  position: relative;
+  z-index: 1;
+  font-family: var(--f-display);
+  font-stretch: 125%;
+  font-weight: 900;
+  font-size: 48px;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--fc-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.scoreHeroMicro {
+  position: relative;
+  z-index: 1;
+  font-family: var(--f-mono);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fc-text-dim);
+  margin-top: 2px;
+}
+
+.scoreHeroTier {
+  font-family: var(--f-display);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--fc-accent);
+  letter-spacing: 0.02em;
+}
+
+.scoreHeroTap {
+  font-family: var(--f-mono);
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--fc-text-subtle);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ── Check-in CTA ── */
+.checkInCta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 54px;
+  height: 54px;
+  border: none;
+  border-radius: 15px;
+  cursor: pointer;
+  box-sizing: border-box;
+  font-family: var(--f-display);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  background: var(--fc-accent);
+  color: #fff;
+  box-shadow: 0 4px 24px var(--fc-accent-glow);
+}
+
+.checkInCtaDone {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--fc-status-success) 35%, transparent);
+  color: var(--fc-status-success);
+  box-shadow: none;
+  cursor: default;
+}
+
+/* ── Section head ── */
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+  min-width: 0;
+}
+
+.sectionTitleWrap {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.sectionAccentBar {
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--fc-accent);
+  flex-shrink: 0;
+}
+
+.sectionTitle {
+  font-family: var(--f-display);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--fc-text-primary);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sectionLink {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fc-accent);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ── Today card ── */
+.todayCard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--fc-surface-card);
+  border-radius: 16px;
+  padding: 16px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--fc-hairline);
+  text-align: left;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  color: inherit;
+}
+
+.todayCard::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  right: -15%;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    var(--fc-accent-glow) 0%,
+    transparent 70%
+  );
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.todayMinutes {
+  text-align: center;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+  min-width: 44px;
+}
+
+.todayMinutesValue {
+  font-family: var(--f-display);
+  font-stretch: 125%;
+  font-weight: 900;
+  font-size: 30px;
+  letter-spacing: -0.04em;
+  line-height: 0.9;
+  color: var(--fc-text-primary);
+}
+
+.todayMinutesUnit {
+  font-family: var(--f-mono);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--fc-accent);
+  text-transform: uppercase;
+}
+
+.todayDivider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--fc-hairline);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.todayBody {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.todayEyebrow {
+  font-family: var(--f-mono);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fc-text-dim);
+  margin: 0 0 3px;
+}
+
+.todayName {
+  font-family: var(--f-display);
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--fc-text-primary);
+  letter-spacing: -0.02em;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.todaySub {
+  font-size: 11px;
+  color: var(--fc-text-dim);
+  margin: 2px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.todayChevron {
+  font-size: 18px;
+  color: var(--fc-accent);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+  line-height: 1;
+}
+
+/* ── Fuel glance ── */
+.fuelBlock {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  border-top: 1px solid var(--fc-hairline);
+  border-bottom: 1px solid var(--fc-hairline);
+  padding: 15px 2px;
+  min-width: 0;
+}
+
+.fuelRing {
+  width: 52px;
+  height: 52px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.fuelRingValue {
+  position: relative;
+  z-index: 1;
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--fc-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.fuelCols {
+  display: flex;
+  gap: 22px;
+  flex: 1;
+  min-width: 0;
+}
+
+.fuelStatValue {
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--fc-text-primary);
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.fuelStatUnit {
+  font-size: 10px;
+  color: var(--fc-text-dim);
+  font-weight: 600;
+}
+
+.fuelStatLabel {
+  font-family: var(--f-mono);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--fc-text-dim);
+  margin-top: 3px;
+}
+
+.fuelLogLink {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--fc-accent);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+/* ── Score takeover (element 11) ── */
+.takeover {
+  position: fixed;
+  inset: 0;
+  z-index: 10030;
+  background: var(--fc-bg-deep);
+  display: flex;
+  flex-direction: column;
+  padding: 18px 18px calc(22px + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.takeoverTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+
+.takeoverBack {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--fc-text-dim);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.takeoverClose {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--fc-surface-float);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fc-text-dim);
+  font-size: 13px;
+  border: 1px solid var(--fc-hairline);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.takeoverHero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.takeoverRing {
+  width: 118px;
+  height: 118px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.takeoverRingValue {
+  position: relative;
+  z-index: 1;
+  font-family: var(--f-display);
+  font-stretch: 125%;
+  font-weight: 900;
+  font-size: 34px;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--fc-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.takeoverRingTier {
+  position: relative;
+  z-index: 1;
+  font-family: var(--f-mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fc-accent);
+  margin-top: 3px;
+}
+
+.takeoverName {
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 16px;
+  color: var(--fc-text-primary);
+}
+
+.takeoverRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--fc-hairline);
+  min-width: 0;
+}
+
+.takeoverRowKey {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fc-text-dim);
+}
+
+.takeoverRowKeySub {
+  color: var(--fc-text-subtle);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+}
+
+.takeoverRowValue {
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 17px;
+  color: var(--fc-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.takeoverRowValueDim {
+  color: var(--fc-text-dim);
+}
+
+.takeoverBar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--fc-track);
+  overflow: hidden;
+  margin: -4px 0 8px;
+}
+
+.takeoverBarFill {
+  height: 100%;
+  border-radius: 3px;
+}
+
+.takeoverNote {
+  font-size: 12px;
+  color: var(--fc-text-dim);
+  line-height: 1.55;
+  margin-top: 10px;
+}
+
+.loadingStack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.errorBlock {
+  text-align: center;
+  padding: 24px 0;
+}
+
+.errorText {
+  font-size: 14px;
+  color: var(--fc-text-dim);
+  margin: 0 0 12px;
+}
+
+/* ── B2 adherence calendars ── */
+.adherenceSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+.adherenceSecLabel {
+  font-family: var(--f-mono);
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--fc-text-subtle);
+  margin: 0 4px 9px;
+}
+
+.adherencePair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  min-width: 0;
+}
+
+.adherenceCard {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  border: 1px solid var(--fc-hairline, rgba(255, 255, 255, 0.07));
+  border-radius: 12px;
+  padding: 9px 8px 8px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  min-width: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  color: inherit;
+}
+
+.adherenceCard:hover {
+  border-color: var(--fc-hairline-strong, rgba(255, 255, 255, 0.13));
+}
+
+.adherenceCard:focus-visible {
+  outline: 2px solid var(--fc-accent);
+  outline-offset: 2px;
+}
+
+.adherenceCardLabel {
+  font-family: var(--f-mono);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fc-text-dim);
+  margin-bottom: 6px;
+}
+

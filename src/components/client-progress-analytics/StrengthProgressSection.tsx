@@ -98,7 +98,7 @@ export function StrengthProgressSection({
       <SectionCard>
         <SectionHead
           icon={Dumbbell}
-          iconClassName="bg-[rgba(79,227,232,0.12)] text-[var(--cyan)]"
+          iconClassName="bg-[color:var(--fc-group-c-soft)] text-[var(--fc-accent)]"
           title="Strength progress"
           description="Estimated 1RM & progression"
         />
@@ -115,7 +115,7 @@ export function StrengthProgressSection({
     <SectionCard>
       <SectionHead
         icon={Dumbbell}
-        iconClassName="bg-[rgba(79,227,232,0.12)] text-[var(--cyan)]"
+        iconClassName="bg-[color:var(--fc-group-c-soft)] text-[var(--fc-accent)]"
         title="Strength progress"
         description="Estimated 1RM & progression"
       />
@@ -123,7 +123,7 @@ export function StrengthProgressSection({
       {topProgressions.length > 0 ? (
         <div>
           <div
-            className="mb-2 flex items-center gap-1.5 text-[9.5px] font-semibold uppercase tracking-[0.14em] text-[var(--lime)]"
+            className="mb-2 flex items-center gap-1.5 text-[9.5px] font-semibold uppercase tracking-[0.14em] text-[var(--fc-accent)]"
             style={{ fontFamily: 'var(--f-mono, "Geist Mono", monospace)' }}
           >
             <TrendingUp className="h-[11px] w-[11px] shrink-0" aria-hidden />

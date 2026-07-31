@@ -242,6 +242,17 @@ export async function joinChallenge(
       return null;
     }
 
+    try {
+      const { emitInAppNotification } = await import('@/lib/inAppNotificationEvents');
+      void emitInAppNotification({
+        event: 'coach_challenge_activity',
+        challengeId,
+        activity: 'joined',
+      });
+    } catch {
+      /* non-blocking */
+    }
+
     return data;
   } catch (error) {
     console.error('Error in joinChallenge:', error);
@@ -435,6 +446,16 @@ export async function inviteParticipants(challengeId: string, clientIds: string[
     if (error) {
       console.error('Error inviting participants:', error);
       return false;
+    }
+    try {
+      const { emitInAppNotification } = await import('@/lib/inAppNotificationEvents');
+      void emitInAppNotification({
+        event: 'client_challenge_invite',
+        challengeId,
+        clientIds,
+      });
+    } catch {
+      /* non-blocking */
     }
     return true;
   } catch (error) {

@@ -1,0 +1,86 @@
+PHANTOM in_progress WORKOUT SESSIONS — BUILD report (2026-07-20)
+================================================================
+No git. No migrations. Stops new phantom sessions; does not backfill existing rows.
+
+------------------------------------------------------------------------------
+1 · FILES MODIFIED
+------------------------------------------------------------------------------
+  src/lib/workoutSessionLifecycle.ts                    (new)
+  src/app/client/workouts/[id]/start/page.tsx
+  src/app/api/program-workouts/start-from-progress/route.ts
+
+------------------------------------------------------------------------------
+2 · ONE OPEN SESSION PER CLIENT
+------------------------------------------------------------------------------
+Helper: abandonOtherInProgressSessions(clientId, keepSessionId, db)
+  → selects all workout_sessions with status='in_progress' for client_id
+  → except keepSessionId
+  → updates status='abandoned', completed_at=coalesce(last_activity_at,
+    started_at, created_at)
+
+Call sites:
+  • startWorkout (page.tsx) — after reuse OR after insert for current assignment
+  • start-from-progress — after bridge reuse, bridge insert, 3b reuse, and
+    step-4 new session insert
+
+Invariant: opening workout B abandons any other in_progress session for that client;
+the surviving session is always the one for the assignment being opened.
+
+------------------------------------------------------------------------------
+3 · STALE SESSION CLOSE (same pass as stale logs)
+------------------------------------------------------------------------------
+Helper: closeStaleInProgressSessionsForClient(clientId, cutoffISO, db)
+  → in_progress sessions where coalesce(last_activity_at, started_at,
+    created_at) < cutoff → abandoned (same completed_at rule)
+
+Wired inside closeIncompleteLogsFromPreviousDays (page.tsx), which already
+closed stale workout_logs with started_at < start-of-today. Sessions now close
+on the same calendar-day cutoff, client-wide, before resume RPC runs.
+
+Call site unchanged: loadAssignment resume block (~L2351) — same helper, extended.
+
+------------------------------------------------------------------------------
+4 · LOAD RACE FIX
+------------------------------------------------------------------------------
+New state: sessionResolutionDone (default false).
+  • set false at start of loadAssignment
+  • set true in loadAssignment finally (after resume/restore finishes)
+
+Auto-start effect now requires sessionResolutionDone && assignment && exercises
+&& !sessionId before calling startWorkout. Resume can set sessionId first;
+effect no longer creates a duplicate while restore is in flight.
+
+------------------------------------------------------------------------------
+5 · STATUS READERS / 'abandoned'
+------------------------------------------------------------------------------
+No analytics reader changes required:
+  • completeWorkoutService — still sets status='completed' on the active session
+  • clientDashboardService weekly counters — .eq('status','completed') only
+  • gym-console status route — .eq('status','in_progress') only
+  • Abandoned rows are excluded from both “training now” and “completed” counts
+
+start-from-progress stale guard (24h): was incorrectly marking stale sessions
+'completed'; now uses 'abandoned' + abandonCompletedAt() so abandoned workouts
+do not inflate completion metrics.
+
+------------------------------------------------------------------------------
+6 · start-from-progress
+------------------------------------------------------------------------------
+Yes — it was a source of extra sessions (new insert per program day without
+closing other assignments' sessions). Fixed with abandonOtherInProgressSessions
+on every reuse/create path. Contract/response shape unchanged.
+
+Not changed in this pass: coach gym-console/start-workout (still uses
+'completed' for its 24h stale close — separate path; recommend aligning later).
+
+------------------------------------------------------------------------------
+7 · VERIFY
+------------------------------------------------------------------------------
+tsc: node node_modules/typescript/bin/tsc --noEmit → exit 0
+
+Browser (manual while signed in):
+  • Open workout A, leave, open B → only B in_progress; A abandoned
+  • Resume in-progress → reused, no duplicate
+  • Complete → session completed (not abandoned)
+  • Gym console → client “training” only with live in_progress session
+  • Rapid reload start page → no second session (sessionResolutionDone gate)

@@ -5,6 +5,8 @@ export type CoachAthleteScoreSummary = {
   score: number;
   tier: AthleteScoreTierKey | string;
   paused: boolean;
+  /** Latest row timestamp — used for list staleness (additive). */
+  calculated_at?: string;
 };
 
 export type CoachAthleteScoreBundle = {
@@ -12,8 +14,4 @@ export type CoachAthleteScoreBundle = {
   prior: import("@/types/athleteScore").AthleteScore | null;
   hasActiveProgram: boolean;
   paused: boolean;
-  sleepTargetHours: number;
-  stepsTarget: number;
-  avgSleepHours: number | null;
-  avgSteps: number | null;
 };

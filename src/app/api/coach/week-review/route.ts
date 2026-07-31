@@ -72,6 +72,20 @@ export async function POST(request: NextRequest) {
       // best-effort
     }
 
+    try {
+      const { notifyClientCoachNote } = await import('@/lib/inAppNotificationEvents')
+      notifyClientCoachNote({
+        clientId: assignment.client_id,
+        actorId: user.id,
+        weekNumber: Number(weekNumber),
+        notePreview: coachNotes?.trim() || null,
+        programAssignmentId: programAssignmentId,
+        admin: supabaseAdmin,
+      })
+    } catch {
+      // best-effort
+    }
+
     return NextResponse.json({ success: true, weekNumber })
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Internal server error'

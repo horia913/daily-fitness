@@ -99,7 +99,7 @@ export function BiggestWinCard({
               </p>
               <button
                 type="button"
-                className="mt-4 w-full rounded-lg bg-cyan-600/90 py-2.5 text-sm font-semibold text-white hover:bg-cyan-500"
+                className="mt-4 w-full rounded-lg bg-[color-mix(in_srgb,var(--fc-group-c)_90%,transparent)] py-2.5 text-sm font-semibold text-white hover:bg-[color:var(--fc-group-c)]"
                 onClick={() => {
                   window.location.href = "/client/train";
                 }}
@@ -183,7 +183,7 @@ export function BiggestWinCard({
         }}
         className={cn(
           "bwiBreatheCyan w-full rounded-xl border border-solid px-4 py-4 text-left",
-          "focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50",
+          "focus:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--fc-group-c)_50%,transparent)]",
         )}
         style={{
           borderColor: "rgba(6,182,212,0.22)",
@@ -200,7 +200,7 @@ export function BiggestWinCard({
             <p className="mt-2 text-lg font-semibold text-white break-words hyphens-auto">
               {w.exerciseName}
             </p>
-            <p className="mt-1 text-2xl font-bold text-cyan-300 tabular-nums break-words">
+            <p className="mt-1 text-2xl font-bold text-[color-mix(in_srgb,var(--fc-group-c)_70%,white)] tabular-nums break-words">
               {w.consistencySummary || w.currentBest}
             </p>
           </div>

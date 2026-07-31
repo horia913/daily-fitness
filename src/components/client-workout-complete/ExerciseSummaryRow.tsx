@@ -1,108 +1,74 @@
 "use client";
 
 import React from "react";
-import { ChevronDown, Star } from "lucide-react";
-import type { ExerciseSummaryModel } from "./types";
-import styles from "./clientWorkoutCompleteV1.module.css";
-import { rowTotals } from "./buildExerciseSummary";
-import { buildCompressLinesForExercise } from "./setLinesFromLogs";
-import { CompressedSetList } from "./CompressedSetList";
+import {
+  formatSoloGroupBadge,
+} from "@/components/client/workout-execution/groupLetterBadges";
+import { groupIndexToHue } from "@/components/client/workout-execution/live-card";
+import type { ExerciseSummaryModel, PrescribedRirMap } from "./types";
+import {
+  CompressedSetList,
+  buildLinesForRow,
+  collapseFootnote,
+} from "./CompressedSetList";
+import styles from "./clientWorkoutCompleteV6.module.css";
+import { cn } from "@/lib/utils";
 
-function pillClass(v: ExerciseSummaryModel["setTypeVariant"]) {
-  if (v === "straight") return styles.pillStraight;
-  if (v === "cluster") return styles.pillCluster;
-  if (v === "drop") return styles.pillDrop;
-  return styles.pillOther;
-}
-
-function shortPillLabel(v: ExerciseSummaryModel["setTypeVariant"], full: string) {
-  if (v === "straight") return "Straight";
-  if (v === "cluster") return "Cluster";
-  if (v === "drop") return "Drop";
-  return full.split(" ")[0] ?? full;
-}
+const HUE_CLASS = {
+  a: styles.exHueA,
+  b: styles.exHueB,
+  c: styles.exHueC,
+  d: styles.exHueD,
+} as const;
 
 export function ExerciseSummaryRow(props: {
   row: ExerciseSummaryModel;
-  indexLabel: string;
-  open: boolean;
-  onToggle: () => void;
-  exerciseHasPr: boolean;
+  groupIndex: number;
   prs: Array<{
     exercise_id?: string;
     record_type?: string;
     record_value?: number | string;
   }>;
+  exerciseHasPr: boolean;
+  prescribed?: PrescribedRirMap;
+  ratingTargetId: string | null;
+  onTapNa: (setLogIds: string[]) => void;
+  onRate: (setLogIds: string[], rpe: number) => void;
+  ratingBusy: boolean;
 }) {
-  const t = rowTotals(props.row);
-  const kgRounded = t.totalKg >= 100 ? Math.round(t.totalKg) : Math.round(t.totalKg * 10) / 10;
-
-  const lines = buildCompressLinesForExercise(
-    props.row.blockType,
-    props.row.sets,
-    props.row.exerciseId ?? "",
-    () => false
+  const hue = groupIndexToHue(props.groupIndex);
+  const badge = formatSoloGroupBadge(props.groupIndex);
+  const lines = buildLinesForRow(props.row, props.prs, props.prescribed);
+  const collapseNote = collapseFootnote(lines);
+  const hasUnrated = lines.some(
+    (l) => l.loggedRpe == null || !(Number(l.loggedRpe) > 0),
   );
+  const rateHint = hasUnrated ? "↳ tap N/A to rate how these felt" : null;
+  const footNotes = [
+    props.row.techniqueNote,
+    collapseNote,
+    rateHint,
+  ].filter(Boolean) as string[];
 
   return (
-    <div
-      className={styles.exerciseRow}
-      data-open={props.open ? "true" : "false"}
-      role="button"
-      tabIndex={0}
-      onClick={props.onToggle}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          props.onToggle();
-        }
-      }}
-    >
-      <div className={styles.rowHead}>
-        <div className={styles.rowIdx}>{props.indexLabel}</div>
-        <div className={styles.rowMeta}>
-          <div className={styles.nameRow}>
-            <span className={styles.exName}>{props.row.name}</span>
-            <span
-              className={`${styles.pill} ${pillClass(props.row.setTypeVariant)}`.trim()}
-            >
-              {shortPillLabel(props.row.setTypeVariant, props.row.setTypeLabel)}
-            </span>
-          </div>
-          <div className={styles.footRow}>
-            <span>
-              <span className={styles.footStrong}>{t.setCount}</span> sets
-            </span>
-            <span aria-hidden>·</span>
-            <span>
-              <span className={styles.footStrong}>{t.totalReps}</span> reps
-            </span>
-            <span aria-hidden>·</span>
-            <span>
-              <span className={styles.footStrong}>{kgRounded}</span> kg
-            </span>
-            {props.exerciseHasPr ? (
-              <>
-                <span aria-hidden>·</span>
-                <span className={styles.prTag}>
-                  <Star size={8} aria-hidden />
-                  PR
-                </span>
-              </>
-            ) : null}
-          </div>
-        </div>
-        <ChevronDown size={13} className={styles.chevron} aria-hidden />
+    <div className={cn(styles.ex, HUE_CLASS[hue])}>
+      <div className={styles.exhead}>
+        <span className={styles.badge}>{badge}</span>
+        <span className={styles.exname}>{props.row.name}</span>
+        {props.exerciseHasPr ? (
+          <span className={styles.prchip}>PR</span>
+        ) : null}
       </div>
-      {props.open ? (
-        <div className={styles.expandBody} onClick={(e) => e.stopPropagation()}>
-          <CompressedSetList
-            lines={lines}
-            exerciseId={props.row.exerciseId}
-            prs={props.prs}
-          />
-        </div>
-      ) : null}
+      <CompressedSetList
+        lines={lines}
+        exerciseId={props.row.exerciseId}
+        prs={props.prs}
+        ratingTargetId={props.ratingTargetId}
+        onTapNa={props.onTapNa}
+        onRate={props.onRate}
+        ratingBusy={props.ratingBusy}
+        footNotes={footNotes}
+      />
     </div>
   );
 }

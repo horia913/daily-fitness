@@ -2,58 +2,51 @@ import type { AttentionLevel } from "@/lib/coachClientAttention";
 import { daysSinceIsoDate } from "@/lib/coachClientAttention";
 import type { ClientMetrics } from "@/lib/coachDashboardService";
 import type { ClientAvatarSeverity } from "@/components/coach/dashboard/ClientAvatar";
-import type { ClientTrainingStatusKind } from "@/lib/coachClientListTrainingStatus";
+import {
+  coachAttentionNeedsListFilter,
+  coachAttentionSortKey,
+  type CoachAttentionLevel,
+  type CoachAttentionVerdict,
+} from "@/lib/coachAttention";
 import type { Client } from "./coachClientsTypes";
 
 export type CoachClientRosterStatus = Client["status"];
 
 export type CoachClientVisualTier = "critical" | "warning" | "new" | "good";
 
-/** Sort / bell / quick-filter: clients worth surfacing on the roster. */
-export function coachClientNeedsTrainingAttention(
-  trainingStatus: ClientTrainingStatusKind,
-): boolean {
+function clientAttentionVerdict(client: Client): CoachAttentionVerdict {
   return (
-    trainingStatus === "missed_week" ||
-    trainingStatus === "behind" ||
-    trainingStatus === "paused" ||
-    trainingStatus === "no_program"
+    client.attention ?? {
+      level: "on_track" as CoachAttentionLevel,
+      reasons: [],
+    }
   );
 }
 
-export function coachClientTrainingAttentionSortKey(
-  trainingStatus: ClientTrainingStatusKind,
-): number {
-  switch (trainingStatus) {
-    case "missed_week":
-      return 0;
-    case "behind":
-      return 1;
-    case "paused":
-      return 2;
-    case "no_program":
-      return 3;
-    default:
-      return 10;
-  }
+/** Sort / bell / quick-filter: clients worth surfacing on the roster. */
+export function coachClientNeedsTrainingAttention(client: Client): boolean {
+  if (client.status === "pending" || client.status === "inactive") return false;
+  return coachAttentionNeedsListFilter(clientAttentionVerdict(client));
 }
 
-/** List/grid row border + avatar severity from training + roster (not check-ins). */
-export function coachClientListVisualTierFromTraining(
+export function coachClientTrainingAttentionSortKey(client: Client): number {
+  return coachAttentionSortKey(clientAttentionVerdict(client));
+}
+
+/** List/grid row border + avatar severity from attention level + roster. */
+export function coachClientListVisualTierFromAttention(
   rosterStatus: Client["status"],
-  trainingStatus: ClientTrainingStatusKind,
+  level: CoachAttentionLevel,
 ): CoachClientVisualTier {
   if (rosterStatus === "pending") return "new";
   if (rosterStatus === "inactive") return "warning";
-  if (trainingStatus === "paused") return "good";
-  if (trainingStatus === "missed_week") return "critical";
-  if (trainingStatus === "behind") return "warning";
-  if (trainingStatus === "no_program") return "new";
+  if (level === "needs_attention") return "critical";
+  if (level === "monitor") return "warning";
   return "good";
 }
 
 /**
- * Maps existing `computeClientAttention` output + roster status to list/grid chrome tiers.
+ * Maps UI attention level + roster status to list/grid chrome tiers.
  * Does not change attention rules — only presentation grouping.
  */
 export function coachClientVisualTier(

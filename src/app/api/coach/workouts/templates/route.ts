@@ -27,11 +27,13 @@ export async function GET() {
         .select('*')
         .eq('coach_id', user.id)
         .eq('is_active', true)
+        .eq('kind', 'library')
         .order('created_at', { ascending: false }),
       supabase
         .from('workout_assignments')
         .select('workout_template_id')
-        .eq('coach_id', user.id),
+        .eq('coach_id', user.id)
+        .is('program_assignment_id', null),
     ])
 
     if (templatesError) {

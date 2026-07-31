@@ -1,11 +1,14 @@
 /**
  * Week Review Service
  *
- * Provides prescribed-vs-actual comparison data and auto-suggest adjustments
- * for the coach week review modal.
+ * Provides prescribed-vs-actual comparison data for the coach week review modal.
+ * Prescribed values are assembled from program instance workouts (not cppr).
  */
 
 import { SupabaseClient } from '@supabase/supabase-js'
+import { getAssignmentSchedule } from '@/lib/programStateService'
+import { loadWorkoutBlocksByContentId } from '@/lib/loadWorkoutBlocksByContentId'
+import type { WorkoutSetEntry } from '@/types/workoutSetEntries'
 
 // ============================================================================
 // Interfaces
@@ -60,70 +63,84 @@ export interface WeekReviewData {
   summary: WeekReviewSummary
 }
 
-export interface SuggestedAdjustment {
-  ruleId: string | null
-  exerciseId: string
-  exerciseName: string
-  currentWeightKg: number | null
-  suggestedWeightKg: number | null
-  currentReps: string | null
-  suggestedReps: string | null
-  currentSets: number | null
-  suggestedSets: number | null
-  reason: string
+type SlotPrescribedMap = Map<
+  string,
+  { prescribed: PrescribedData; blockType: string | null }
+>
+
+// ============================================================================
+// Instance prescribed assembly
+// ============================================================================
+
+function prescribedFromBlockExercise(
+  block: WorkoutSetEntry,
+  ex: NonNullable<WorkoutSetEntry['exercises']>[number],
+): PrescribedData {
+  return {
+    sets: ex.sets ?? block.total_sets ?? null,
+    reps: ex.reps != null ? String(ex.reps) : null,
+    weightKg: ex.weight_kg != null ? Number(ex.weight_kg) : null,
+    rir: ex.rir ?? null,
+  }
 }
 
-// ============================================================================
-// Prescribed data loader
-// ============================================================================
+function prescribedMapFromBlocks(blocks: WorkoutSetEntry[]): SlotPrescribedMap {
+  const result: SlotPrescribedMap = new Map()
+  const ordered = [...blocks].sort((a, b) => (a.set_order ?? 0) - (b.set_order ?? 0))
+  for (const block of ordered) {
+    const blockType = block.set_type ?? null
+    for (const ex of block.exercises ?? []) {
+      if (!ex.exercise_id || result.has(ex.exercise_id)) continue
+      result.set(ex.exercise_id, {
+        prescribed: prescribedFromBlockExercise(block, ex),
+        blockType,
+      })
+    }
+  }
+  return result
+}
 
-async function getPrescribedForWeek(
+async function loadInstanceWorkoutNames(
+  supabase: SupabaseClient,
+  instanceWorkoutIds: string[],
+): Promise<Map<string, string>> {
+  if (instanceWorkoutIds.length === 0) return new Map()
+  const { data } = await supabase
+    .from('program_instance_workouts')
+    .select('id, name')
+    .in('id', instanceWorkoutIds)
+  return new Map((data ?? []).map((row) => [row.id, row.name]))
+}
+
+/** Per program_day_assignment id → prescribed exercises for that slot's instance workout. */
+async function getInstancePrescribedBySlotForWeek(
   supabase: SupabaseClient,
   programAssignmentId: string,
-  programId: string,
   weekNumber: number,
-): Promise<Map<string, { ruleId: string | null; prescribed: PrescribedData; blockType: string | null }>> {
-  const result = new Map<string, { ruleId: string | null; prescribed: PrescribedData; blockType: string | null }>()
+): Promise<Map<string, SlotPrescribedMap>> {
+  const schedule = await getAssignmentSchedule(supabase, programAssignmentId)
+  const weekSlots = schedule.filter((s) => s.week_number === weekNumber)
+  const blocksCache = new Map<string, WorkoutSetEntry[]>()
+  const bySlot = new Map<string, SlotPrescribedMap>()
 
-  // Client-specific rules first (override)
-  const { data: clientRules } = await supabase
-    .from('client_program_progression_rules')
-    .select('id, exercise_id, sets, reps, weight_kg, rir, block_type')
-    .eq('program_assignment_id', programAssignmentId)
-    .eq('week_number', weekNumber)
-
-  if (clientRules) {
-    for (const r of clientRules) {
-      if (r.exercise_id) {
-        result.set(r.exercise_id, {
-          ruleId: r.id,
-          prescribed: { sets: r.sets, reps: r.reps, weightKg: r.weight_kg != null ? Number(r.weight_kg) : null, rir: r.rir },
-          blockType: r.block_type,
-        })
+  await Promise.all(
+    weekSlots.map(async (slot) => {
+      const instanceWorkoutId = slot.program_instance_workout_id
+      if (!instanceWorkoutId || slot.day_type === 'rest') {
+        bySlot.set(slot.id, new Map())
+        return
       }
-    }
-  }
-
-  // Fill gaps with master program rules
-  const { data: masterRules } = await supabase
-    .from('program_progression_rules')
-    .select('id, exercise_id, sets, reps, weight_kg, rir, set_type')
-    .eq('program_id', programId)
-    .eq('week_number', weekNumber)
-
-  if (masterRules) {
-    for (const r of masterRules) {
-      if (r.exercise_id && !result.has(r.exercise_id)) {
-        result.set(r.exercise_id, {
-          ruleId: null,
-          prescribed: { sets: r.sets, reps: r.reps, weightKg: r.weight_kg != null ? Number(r.weight_kg) : null, rir: r.rir },
-          blockType: r.set_type ?? null,
+      if (!blocksCache.has(instanceWorkoutId)) {
+        const blocks = await loadWorkoutBlocksByContentId(supabase, instanceWorkoutId, {
+          preferInstance: true,
         })
+        blocksCache.set(instanceWorkoutId, blocks)
       }
-    }
-  }
+      bySlot.set(slot.id, prescribedMapFromBlocks(blocksCache.get(instanceWorkoutId) ?? []))
+    }),
+  )
 
-  return result
+  return bySlot
 }
 
 // ============================================================================
@@ -137,23 +154,31 @@ interface RawSetLog {
   block_type: string | null
 }
 
+async function getActualForDayAssignment(
+  supabase: SupabaseClient,
+  programAssignmentId: string,
+  dayAssignmentId: string,
+): Promise<Map<string, { sets: RawSetLog[] }>> {
+  return getActualForWeek(supabase, programAssignmentId, [dayAssignmentId])
+}
+
 async function getActualForWeek(
   supabase: SupabaseClient,
   programAssignmentId: string,
-  scheduleIds: string[],
+  dayAssignmentIds: string[],
 ): Promise<Map<string, { sets: RawSetLog[] }>> {
-  if (scheduleIds.length === 0) return new Map()
+  if (dayAssignmentIds.length === 0) return new Map()
 
   const { data: logs } = await supabase
     .from('workout_logs')
     .select('id')
     .eq('program_assignment_id', programAssignmentId)
-    .in('program_schedule_id', scheduleIds)
+    .in('program_day_assignment_id', dayAssignmentIds)
     .not('completed_at', 'is', null)
 
   if (!logs || logs.length === 0) return new Map()
 
-  const logIds = logs.map(l => l.id)
+  const logIds = logs.map((l) => l.id)
 
   const { data: setLogs } = await supabase
     .from('workout_set_logs')
@@ -179,21 +204,26 @@ async function getActualForWeek(
 
 function computeActualData(sets: RawSetLog[]): ActualData {
   const setsCompleted = sets.length
-  const weights = sets.filter(s => s.weight != null).map(s => Number(s.weight))
-  const reps = sets.filter(s => s.reps != null).map(s => s.reps!)
+  const weights = sets.filter((s) => s.weight != null).map((s) => Number(s.weight))
+  const reps = sets.filter((s) => s.reps != null).map((s) => s.reps!)
 
   return {
     setsCompleted,
-    avgWeight: weights.length > 0 ? Math.round((weights.reduce((a, b) => a + b, 0) / weights.length) * 10) / 10 : 0,
+    avgWeight:
+      weights.length > 0
+        ? Math.round((weights.reduce((a, b) => a + b, 0) / weights.length) * 10) / 10
+        : 0,
     totalReps: reps.reduce((a, b) => a + b, 0),
-    avgReps: reps.length > 0 ? Math.round((reps.reduce((a, b) => a + b, 0) / reps.length) * 10) / 10 : 0,
+    avgReps:
+      reps.length > 0
+        ? Math.round((reps.reduce((a, b) => a + b, 0) / reps.length) * 10) / 10
+        : 0,
   }
 }
 
 function compareStatus(prescribed: PrescribedData, actual: ActualData): ExerciseComparisonStatus {
   if (actual.setsCompleted === 0) return 'no_data'
 
-  // Weight-based comparison when both are available
   if (prescribed.weightKg != null && prescribed.weightKg > 0 && actual.avgWeight > 0) {
     const ratio = actual.avgWeight / prescribed.weightKg
     if (ratio > 1.05) return 'exceeded'
@@ -201,7 +231,6 @@ function compareStatus(prescribed: PrescribedData, actual: ActualData): Exercise
     return 'on_target'
   }
 
-  // Rep-based comparison
   const prescribedReps = parseRepTarget(prescribed.reps)
   if (prescribedReps != null && prescribedReps > 0 && actual.avgReps > 0) {
     const ratio = actual.avgReps / prescribedReps
@@ -219,6 +248,45 @@ function parseRepTarget(reps: string | null): number | null {
   return match ? parseInt(match[1], 10) : null
 }
 
+function buildDayExercises(
+  prescribed: SlotPrescribedMap,
+  actual: Map<string, { sets: RawSetLog[] }>,
+  exerciseNames: Map<string, string>,
+): ExerciseComparison[] {
+  const exercises: ExerciseComparison[] = []
+
+  for (const [exId, prescribedEntry] of prescribed.entries()) {
+    const actualSets = actual.get(exId)
+    const actualData = actualSets
+      ? computeActualData(actualSets.sets)
+      : { setsCompleted: 0, avgWeight: 0, totalReps: 0, avgReps: 0 }
+    exercises.push({
+      exerciseId: exId,
+      exerciseName: exerciseNames.get(exId) ?? 'Unknown Exercise',
+      blockType: prescribedEntry.blockType,
+      prescribed: prescribedEntry.prescribed,
+      actual: actualData,
+      status: compareStatus(prescribedEntry.prescribed, actualData),
+    })
+  }
+
+  for (const [exId, actualEntry] of actual.entries()) {
+    if (!prescribed.has(exId)) {
+      const actualData = computeActualData(actualEntry.sets)
+      exercises.push({
+        exerciseId: exId,
+        exerciseName: exerciseNames.get(exId) ?? 'Unknown Exercise',
+        blockType: null,
+        prescribed: { sets: null, reps: null, weightKg: null, rir: null },
+        actual: actualData,
+        status: 'no_data',
+      })
+    }
+  }
+
+  return exercises
+}
+
 // ============================================================================
 // Main: getWeekReview
 // ============================================================================
@@ -226,38 +294,52 @@ function parseRepTarget(reps: string | null): number | null {
 export async function getWeekReview(
   supabase: SupabaseClient,
   programAssignmentId: string,
-  programId: string,
+  _programId: string,
   weekNumber: number,
 ): Promise<WeekReviewData> {
-  // Get schedule slots for this week
-  const { data: scheduleSlots } = await supabase
-    .from('program_schedule')
-    .select('id, week_number, day_number, day_of_week, template_id, is_optional')
-    .eq('program_id', programId)
-    .eq('week_number', weekNumber)
-    .order('day_number', { ascending: true })
+  const schedule = await getAssignmentSchedule(supabase, programAssignmentId)
+  const weekSlots = schedule.filter((s) => s.week_number === weekNumber)
+  const requiredSlots = weekSlots.filter((s) => !s.is_optional)
+  const dayAssignmentIds = weekSlots.map((s) => s.id)
 
-  const slots = scheduleSlots ?? []
-  const requiredSlots = slots.filter(s => !s.is_optional)
-  const scheduleIds = slots.map(s => s.id)
-
-  // Get completions for this week
   const { data: completions } = await supabase
     .from('program_day_completions')
-    .select('program_schedule_id')
+    .select('program_day_assignment_id')
     .eq('program_assignment_id', programAssignmentId)
-    .in('program_schedule_id', scheduleIds)
+    .in('program_day_assignment_id', dayAssignmentIds)
 
-  const completedIds = new Set((completions ?? []).map(c => c.program_schedule_id))
+  const completedIds = new Set((completions ?? []).map((c) => c.program_day_assignment_id))
 
-  // Load prescribed and actual data
-  const [prescribed, actual] = await Promise.all([
-    getPrescribedForWeek(supabase, programAssignmentId, programId, weekNumber),
-    getActualForWeek(supabase, programAssignmentId, scheduleIds),
+  const [prescribedBySlot, instanceNames, actualBySlot] = await Promise.all([
+    getInstancePrescribedBySlotForWeek(supabase, programAssignmentId, weekNumber),
+    loadInstanceWorkoutNames(
+      supabase,
+      [
+        ...new Set(
+          weekSlots
+            .map((s) => s.program_instance_workout_id)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      ],
+    ),
+    Promise.all(
+      weekSlots.map(async (slot) => ({
+        slotId: slot.id,
+        actual: await getActualForDayAssignment(supabase, programAssignmentId, slot.id),
+      })),
+    ),
   ])
 
-  // Get exercise names
-  const allExerciseIds = new Set<string>([...prescribed.keys(), ...actual.keys()])
+  const actualMap = new Map(actualBySlot.map((row) => [row.slotId, row.actual]))
+
+  const allExerciseIds = new Set<string>()
+  for (const slotMap of prescribedBySlot.values()) {
+    for (const exId of slotMap.keys()) allExerciseIds.add(exId)
+  }
+  for (const actual of actualMap.values()) {
+    for (const exId of actual.keys()) allExerciseIds.add(exId)
+  }
+
   let exerciseNames = new Map<string, string>()
   if (allExerciseIds.size > 0) {
     const { data: exercises } = await supabase
@@ -265,67 +347,29 @@ export async function getWeekReview(
       .select('id, name')
       .in('id', [...allExerciseIds])
     if (exercises) {
-      exerciseNames = new Map(exercises.map(e => [e.id, e.name]))
+      exerciseNames = new Map(exercises.map((e) => [e.id, e.name]))
     }
   }
 
-  // Get template names for each slot
-  const templateIds = [...new Set(slots.map(s => s.template_id).filter(Boolean))]
-  let templateNames = new Map<string, string>()
-  if (templateIds.length > 0) {
-    const { data: templates } = await supabase
-      .from('workout_templates')
-      .select('id, name')
-      .in('id', templateIds)
-    if (templates) {
-      templateNames = new Map(templates.map(t => [t.id, t.name]))
-    }
-  }
-
-  // Build per-day review
-  const days: DayReview[] = slots.map(slot => {
+  const days: DayReview[] = weekSlots.map((slot) => {
     const isCompleted = completedIds.has(slot.id)
-    const exercises: ExerciseComparison[] = []
+    const prescribed = prescribedBySlot.get(slot.id) ?? new Map()
+    const actual = actualMap.get(slot.id) ?? new Map()
 
-    for (const [exId, prescribedEntry] of prescribed.entries()) {
-      const actualSets = actual.get(exId)
-      const actualData = actualSets ? computeActualData(actualSets.sets) : { setsCompleted: 0, avgWeight: 0, totalReps: 0, avgReps: 0 }
-      const status = compareStatus(prescribedEntry.prescribed, actualData)
-
-      exercises.push({
-        exerciseId: exId,
-        exerciseName: exerciseNames.get(exId) ?? 'Unknown Exercise',
-        blockType: prescribedEntry.blockType,
-        prescribed: prescribedEntry.prescribed,
-        actual: actualData,
-        status,
-      })
-    }
-
-    // Add exercises that appear in actual but not prescribed
-    for (const [exId, actualEntry] of actual.entries()) {
-      if (!prescribed.has(exId)) {
-        const actualData = computeActualData(actualEntry.sets)
-        exercises.push({
-          exerciseId: exId,
-          exerciseName: exerciseNames.get(exId) ?? 'Unknown Exercise',
-          blockType: null,
-          prescribed: { sets: null, reps: null, weightKg: null, rir: null },
-          actual: actualData,
-          status: 'no_data',
-        })
-      }
-    }
+    const instanceWorkoutId = slot.program_instance_workout_id
+    const workoutName =
+      (instanceWorkoutId ? instanceNames.get(instanceWorkoutId) : null) ||
+      slot.name?.trim() ||
+      (slot.day_type === 'rest' ? 'Rest day' : 'Workout')
 
     return {
       scheduleId: slot.id,
       dayLabel: `Day ${slot.day_number}${isCompleted ? '' : ' (incomplete)'}`,
-      workoutName: templateNames.get(slot.template_id) ?? 'Workout',
-      exercises,
+      workoutName,
+      exercises: buildDayExercises(prescribed, actual, exerciseNames),
     }
   })
 
-  // Summary
   let totalVolume = 0
   let exercisesOnTarget = 0
   let exercisesExceeded = 0
@@ -342,18 +386,14 @@ export async function getWeekReview(
     }
   }
 
-  // Previous week volume (optional)
   let previousWeekVolume: number | null = null
   if (weekNumber > 1) {
-    const prevScheduleIds = (await supabase
-      .from('program_schedule')
-      .select('id')
-      .eq('program_id', programId)
-      .eq('week_number', weekNumber - 1)
-    ).data?.map(s => s.id) ?? []
+    const prevDayAssignmentIds = schedule
+      .filter((s) => s.week_number === weekNumber - 1)
+      .map((s) => s.id)
 
-    if (prevScheduleIds.length > 0) {
-      const prevActual = await getActualForWeek(supabase, programAssignmentId, prevScheduleIds)
+    if (prevDayAssignmentIds.length > 0) {
+      const prevActual = await getActualForWeek(supabase, programAssignmentId, prevDayAssignmentIds)
       let vol = 0
       for (const entry of prevActual.values()) {
         const d = computeActualData(entry.sets)
@@ -377,73 +417,4 @@ export async function getWeekReview(
       totalExercises,
     },
   }
-}
-
-// ============================================================================
-// Auto-suggest adjustments for next week
-// ============================================================================
-
-export async function suggestAdjustments(
-  supabase: SupabaseClient,
-  programAssignmentId: string,
-  programId: string,
-  currentWeek: number,
-  reviewData: WeekReviewData,
-): Promise<SuggestedAdjustment[]> {
-  const nextWeek = currentWeek + 1
-
-  // Get existing rules for next week (client-specific or master)
-  const nextWeekRules = await getPrescribedForWeek(supabase, programAssignmentId, programId, nextWeek)
-
-  const suggestions: SuggestedAdjustment[] = []
-
-  for (const day of reviewData.days) {
-    for (const ex of day.exercises) {
-      const nextRule = nextWeekRules.get(ex.exerciseId)
-      const currentWeight = ex.prescribed.weightKg
-      const currentReps = ex.prescribed.reps
-      const currentSets = ex.prescribed.sets
-
-      let suggestedWeightKg = nextRule?.prescribed.weightKg ?? currentWeight
-      let suggestedReps = nextRule?.prescribed.reps ?? currentReps
-      let suggestedSets = nextRule?.prescribed.sets ?? currentSets
-      let reason = ''
-
-      if (ex.status === 'exceeded') {
-        if (currentWeight != null && currentWeight > 0) {
-          const increment = currentWeight >= 100 ? Math.round(currentWeight * 0.05 * 2) / 2 : 2.5
-          suggestedWeightKg = Math.round((currentWeight + increment) * 2) / 2
-          reason = `Exceeded target — suggest +${increment} kg`
-        } else {
-          reason = 'Exceeded target — consider increasing load'
-        }
-      } else if (ex.status === 'on_target') {
-        reason = 'On target — maintain or progress slightly'
-      } else if (ex.status === 'under') {
-        if (currentWeight != null && currentWeight > 0) {
-          suggestedWeightKg = currentWeight
-          reason = 'Under target — hold weight, focus on completing prescribed reps'
-        } else {
-          reason = 'Under target — keep same parameters'
-        }
-      } else {
-        reason = 'No data available'
-      }
-
-      suggestions.push({
-        ruleId: nextRule?.ruleId ?? null,
-        exerciseId: ex.exerciseId,
-        exerciseName: ex.exerciseName,
-        currentWeightKg: currentWeight,
-        suggestedWeightKg,
-        currentReps,
-        suggestedReps,
-        currentSets,
-        suggestedSets,
-        reason,
-      })
-    }
-  }
-
-  return suggestions
 }

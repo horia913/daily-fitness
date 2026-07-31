@@ -53,8 +53,8 @@ export function CreateExerciseModalShell({
         <header className={styles.modalHead}>
           <div className={styles.titleRow}>
             <div className={styles.metaCol}>
-              <div className={sheetExtras.eyebrowLime}>
-                <span className={sheetExtras.eyebrowDotLime} aria-hidden />
+              <div className={sheetExtras.eyebrowAction}>
+                <span className={sheetExtras.eyebrowDotAction} aria-hidden />
                 New exercise
               </div>
               <h2 id="coach-ex-create-title" className={styles.modalTitle}>

@@ -2,41 +2,52 @@
 
 import React from "react";
 import { cn } from "@/lib/utils";
+import type { LiveCardHue } from "../live-card/types";
 
 /** Cap so very large workouts still fit the header row. */
 const MAX_EXERCISE_SEGMENTS = 24;
 
-export interface LiveWorkoutBlockLike {
-  block: { exercises?: unknown[] | null };
+/** Match LiveCard hue → CSS group colour (same mapping as liveCard.module.css). */
+const HUE_BG: Record<LiveCardHue, string> = {
+  a: "var(--fc-group-a)",
+  b: "var(--fc-group-c)",
+  c: "var(--fc-group-d)",
+  d: "var(--fc-group-b)",
+};
+
+export interface LiveWorkoutSetEntryLike {
+  setEntry: { exercises?: unknown[] | null };
   currentExerciseIndex?: number;
 }
 
 export function countWorkoutExercises(
-  blocks: LiveWorkoutBlockLike[] | null | undefined,
+  setEntries: LiveWorkoutSetEntryLike[] | null | undefined,
 ): number {
-  if (!blocks?.length) return 0;
-  return blocks.reduce((sum, b) => {
-    const n = Array.isArray(b.block?.exercises) ? b.block.exercises.length : 0;
+  if (!setEntries?.length) return 0;
+  return setEntries.reduce((sum, entry) => {
+    const n = Array.isArray(entry.setEntry?.exercises)
+      ? entry.setEntry.exercises.length
+      : 0;
     return sum + (n > 0 ? n : 1);
   }, 0);
 }
 
-/** 0-based global exercise index from block + in-block exercise index. */
+/** 0-based global exercise index from set entry + in-entry exercise index. */
 export function getGlobalExerciseIndex(
-  blocks: LiveWorkoutBlockLike[] | null | undefined,
-  blockIndex: number,
-  exerciseIndexInBlock: number,
+  setEntries: LiveWorkoutSetEntryLike[] | null | undefined,
+  setEntryIndex: number,
+  exerciseIndexInEntry: number,
 ): number {
-  if (!blocks?.length) return 0;
+  if (!setEntries?.length) return 0;
   let sum = 0;
-  const safeBlock = Math.max(0, Math.min(blockIndex, blocks.length - 1));
-  for (let i = 0; i < safeBlock; i++) {
-    const n = Array.isArray(blocks[i]?.block?.exercises)
-      ? blocks[i]!.block.exercises!.length
+  const safeIndex = Math.max(0, Math.min(setEntryIndex, setEntries.length - 1));
+  for (let i = 0; i < safeIndex; i++) {
+    const n = Array.isArray(setEntries[i]?.setEntry?.exercises)
+      ? setEntries[i]!.setEntry.exercises!.length
       : 0;
     sum += n > 0 ? n : 1;
   }
-  return sum + Math.max(0, exerciseIndexInBlock);
+  return sum + Math.max(0, exerciseIndexInEntry);
 }
 
 export type ExecProgressSegmentsProps =
@@ -45,21 +56,39 @@ export type ExecProgressSegmentsProps =
       totalExercises: number;
       /** 0-based global index of the exercise the user is on */
       currentExerciseIndex: number;
+      /** Hue for the “now” segment (defaults to group a). */
+      currentHue?: LiveCardHue;
       className?: string;
     }
   | {
       variant: "sets";
       completedSets: number;
       totalSets: number;
+      currentHue?: LiveCardHue;
       className?: string;
     };
+
+function segmentStyle(
+  state: "done" | "now" | "upcoming",
+  currentHue: LiveCardHue,
+): React.CSSProperties {
+  if (state === "done") {
+    return { background: "var(--fc-status-success)" };
+  }
+  if (state === "now") {
+    return { background: HUE_BG[currentHue] };
+  }
+  return { background: "var(--fc-hairline, rgba(255,255,255,0.1))" };
+}
 
 /**
  * Header progress: one segment per exercise (workout order), or set-based
  * segments when variant is `sets`.
+ * States: done (green) · now (group hue) · upcoming (dim).
  */
 export function ExecProgressSegments(props: ExecProgressSegmentsProps) {
   const { className } = props;
+  const currentHue: LiveCardHue = props.currentHue ?? "a";
 
   if (props.variant === "exercises") {
     const totalEx = Math.max(1, Math.floor(props.totalExercises) || 1);
@@ -80,29 +109,22 @@ export function ExecProgressSegments(props: ExecProgressSegmentsProps) {
 
     return (
       <div
-        className={cn("flex min-w-0 max-w-[220px] flex-1 items-center gap-0.5 sm:gap-1", className)}
-        role="progressbar"
-        aria-valuenow={Math.min(rawCurrent + 1, totalEx)}
-        aria-valuemin={1}
-        aria-valuemax={totalEx}
-        aria-label={`Exercise ${Math.min(rawCurrent + 1, totalEx)} of ${totalEx}`}
+        className={cn("flex items-center gap-[3px] w-full min-w-0", className)}
+        aria-label="Workout exercise progress"
       >
         {Array.from({ length: segmentCount }).map((_, i) => {
-          const isDone = allComplete || (!allComplete && i < visualIndex);
-          const isActive = !allComplete && i === visualIndex;
+          const state: "done" | "now" | "upcoming" = allComplete
+            ? "done"
+            : i < visualIndex
+              ? "done"
+              : i === visualIndex
+                ? "now"
+                : "upcoming";
           return (
             <div
               key={i}
-              className={cn(
-                "h-[3px] min-w-[2px] flex-1 rounded-sm transition-colors",
-                allComplete
-                  ? "bg-[var(--fc-accent-lime)] shadow-[0_0_6px_color-mix(in_srgb,var(--fc-accent-lime)_40%,transparent)]"
-                  : isDone
-                    ? "bg-[var(--fc-accent-lime)] shadow-[0_0_4px_color-mix(in_srgb,var(--fc-accent-lime)_35%,transparent)]"
-                    : isActive
-                      ? "bg-[var(--fc-accent-lime)] shadow-[0_0_10px_var(--fc-accent-lime)]"
-                      : "bg-white/10",
-              )}
+              className="h-[3px] flex-1 rounded-[2px] transition-colors duration-300"
+              style={segmentStyle(state, currentHue)}
             />
           );
         })}
@@ -110,49 +132,31 @@ export function ExecProgressSegments(props: ExecProgressSegmentsProps) {
     );
   }
 
-  // variant === "sets" — one segment per set when small; else compress with ratio
   const totalSets = Math.max(1, Math.floor(props.totalSets) || 1);
-  const done = Math.max(0, Math.min(props.completedSets, totalSets));
-  const allSetsComplete = done >= totalSets;
-  const segmentCount = Math.min(totalSets, MAX_EXERCISE_SEGMENTS);
-  let visualActive: number;
-  if (totalSets <= 1) {
-    visualActive = 0;
-  } else if (totalSets <= MAX_EXERCISE_SEGMENTS) {
-    visualActive = allSetsComplete ? segmentCount - 1 : Math.min(done, segmentCount - 1);
-  } else {
-    const p = totalSets > 0 ? done / totalSets : 0;
-    visualActive = Math.min(
-      segmentCount - 1,
-      Math.floor(p * segmentCount),
-    );
-  }
+  const completed = Math.max(
+    0,
+    Math.min(Math.floor(props.completedSets) || 0, totalSets),
+  );
+  const allComplete = completed >= totalSets;
 
   return (
     <div
-      className={cn("flex min-w-0 max-w-[220px] flex-1 items-center gap-0.5 sm:gap-1", className)}
-      role="progressbar"
-      aria-valuenow={done}
-      aria-valuemin={0}
-      aria-valuemax={totalSets}
+      className={cn("flex items-center gap-[3px] w-full min-w-0", className)}
       aria-label="Set progress"
     >
-      {Array.from({ length: segmentCount }).map((_, i) => {
-        const isDone = allSetsComplete || (!allSetsComplete && i < visualActive);
-        const isActive = !allSetsComplete && i === visualActive;
+      {Array.from({ length: totalSets }).map((_, i) => {
+        const state: "done" | "now" | "upcoming" = allComplete
+          ? "done"
+          : i < completed
+            ? "done"
+            : i === completed
+              ? "now"
+              : "upcoming";
         return (
           <div
             key={i}
-            className={cn(
-              "h-[3px] min-w-[2px] flex-1 rounded-sm transition-colors",
-              allSetsComplete
-                ? "bg-[var(--fc-accent-lime)] shadow-[0_0_6px_color-mix(in_srgb,var(--fc-accent-lime)_40%,transparent)]"
-                : isDone
-                  ? "bg-[var(--fc-accent-lime)] shadow-[0_0_4px_color-mix(in_srgb,var(--fc-accent-lime)_35%,transparent)]"
-                  : isActive
-                    ? "bg-[var(--fc-accent-lime)] shadow-[0_0_10px_var(--fc-accent-lime)]"
-                    : "bg-white/10",
-            )}
+            className="h-[3px] flex-1 rounded-[2px] transition-colors duration-300"
+            style={segmentStyle(state, currentHue)}
           />
         );
       })}

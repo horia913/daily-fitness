@@ -1,9 +1,9 @@
 /**
- * Shared coach client attention levels for list, detail banner, and summary API.
+ * Shared coach client attention UI chrome (levels, CSS helpers).
+ * Attention *rules* live in `@/lib/coachAttention` — do not reintroduce logic here.
  */
 
 import type { CSSProperties } from "react";
-import type { ClientMetrics } from "@/lib/coachDashboardService";
 
 export type AttentionLevel = 'urgent' | 'warning' | 'good' | 'inactive';
 
@@ -18,93 +18,6 @@ export function daysSinceIsoDate(isoDate: string | null): number | null {
   today.setHours(0, 0, 0, 0);
   const t = new Date(today.toISOString().slice(0, 10) + 'T12:00:00Z');
   return Math.floor((t.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
-}
-
-export function computeClientAttention(
-  status: ClientRosterStatus,
-  metrics: ClientMetrics
-): { level: AttentionLevel; reasons: string[] } {
-  const reasons: string[] = [];
-
-  if (status === 'at-risk') {
-    reasons.push('Flagged at-risk (compliance)');
-  }
-
-  if (status === 'inactive' || status === 'pending') {
-    return {
-      level: 'inactive',
-      reasons: [status === 'pending' ? 'Pending onboarding' : 'Inactive client'],
-    };
-  }
-
-  if (metrics.programStatus === 'noProgram') {
-    reasons.push('No program assigned');
-  }
-
-  const daysSinceWorkoutOrTouch = daysSinceIsoDate(metrics.lastActive);
-  const daysSinceCheckin = daysSinceIsoDate(metrics.lastCheckinDate);
-
-  if (!metrics.lastActive && status === 'active') {
-    reasons.push('No recorded activity');
-  }
-  if (daysSinceWorkoutOrTouch != null && daysSinceWorkoutOrTouch >= 5) {
-    reasons.push(`No activity in ${daysSinceWorkoutOrTouch}+ days`);
-  }
-  if (daysSinceCheckin != null && daysSinceCheckin >= 3) {
-    reasons.push(`Check-in ${daysSinceCheckin}d ago`);
-  }
-
-  if (
-    metrics.programStatus === 'active' &&
-    metrics.workoutsThisWeek < 2 &&
-    daysSinceWorkoutOrTouch != null &&
-    daysSinceWorkoutOrTouch >= 2
-  ) {
-    reasons.push('Behind weekly workout target');
-  }
-
-  if (metrics.mealCompliance7dPct != null && metrics.mealCompliance7dPct < 60) {
-    reasons.push(`Meals ~${metrics.mealCompliance7dPct}% (7d)`);
-  }
-
-  if (metrics.latestStress != null && metrics.latestStress >= 4) {
-    reasons.push('High stress');
-  }
-  if (metrics.latestSoreness != null && metrics.latestSoreness >= 4) {
-    reasons.push('High soreness');
-  }
-
-  const hasUrgent =
-    (!metrics.lastActive && status === 'active') ||
-    (daysSinceWorkoutOrTouch != null && daysSinceWorkoutOrTouch >= 5) ||
-    (daysSinceCheckin != null && daysSinceCheckin >= 3);
-
-  if (hasUrgent) {
-    return { level: 'urgent', reasons: reasons.length ? reasons : ['Needs attention'] };
-  }
-
-  if (metrics.programStatus === 'noProgram' && reasons.length <= 1) {
-    return { level: 'inactive', reasons };
-  }
-
-  if (
-    reasons.some((r) => r.includes('Behind')) ||
-    reasons.some((r) => r.startsWith('Meals')) ||
-    reasons.includes('High stress') ||
-    reasons.includes('High soreness')
-  ) {
-    return { level: 'warning', reasons: reasons.length ? reasons : ['Review client'] };
-  }
-
-  if (metrics.programStatus === 'noProgram') {
-    return { level: 'inactive', reasons };
-  }
-
-  if (status === 'at-risk') {
-    return { level: 'warning', reasons: reasons.length ? reasons : ['Review client'] };
-  }
-
-  return { level: 'good', reasons: [] };
 }
 
 export function attentionLevelClass(level: AttentionLevel): string {
@@ -201,51 +114,4 @@ export function attentionPriority(level: AttentionLevel): number {
     default:
       return 4;
   }
-}
-
-/** Dashboard roster: same attention rules without weekly workout count (avoids false "behind target"). */
-export function computeClientAttentionFromSummary(summary: {
-  status: string;
-  lastWorkoutDate: string | null;
-  lastCheckinDate: string | null;
-  checkinStreak: number;
-  hasActiveProgram: boolean;
-  latestStress: number | null;
-  latestSoreness: number | null;
-}): { level: AttentionLevel; reasons: string[] } {
-  const lastActive = summary.lastWorkoutDate ?? summary.lastCheckinDate;
-  const rosterStatus: ClientRosterStatus =
-    summary.status === 'pending'
-      ? 'pending'
-      : summary.status === 'inactive'
-        ? 'inactive'
-        : summary.status === 'at-risk'
-          ? 'at-risk'
-          : 'active';
-
-  const metrics: ClientMetrics = {
-    clientId: '',
-    lastActive,
-    workoutsThisWeek: 99,
-    checkinStreak: summary.checkinStreak,
-    programStatus: summary.hasActiveProgram ? 'active' : 'noProgram',
-    programEndDate: null,
-    latestStress: summary.latestStress,
-    latestSoreness: summary.latestSoreness,
-    trainedToday: false,
-    checkedInToday: false,
-    activeProgramName: null,
-    programCurrentWeek: null,
-    programDurationWeeks: null,
-    mealCompliance7dPct: null,
-    lastCheckinDate: summary.lastCheckinDate,
-    weekReviewNeeded: false,
-    completedWeekNumber: null,
-    activeProgramId: null,
-    activeProgramAssignmentId: null,
-    subscriptionEndDate: null,
-    subscriptionExpiringSoon: false,
-  };
-
-  return computeClientAttention(rosterStatus, metrics);
 }

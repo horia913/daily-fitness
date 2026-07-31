@@ -3,6 +3,10 @@
 // (Formerly called "Workout Blocks" — renamed in Phase 1 to free "block" for
 //  its correct coaching meaning: Training Blocks / mesocycles.)
 
+import type { Prescription } from '@/lib/groupModel/types'
+
+export type { Prescription }
+
 export type SetType =
   | 'straight_set'      // Traditional sets with rest
   | 'superset'          // Two exercises back-to-back
@@ -64,6 +68,12 @@ export interface WorkoutSetEntryExercise {
   tempo?: string                      // Tempo notation
   rest_seconds?: number               // Exercise-specific rest
   notes?: string
+
+  /**
+   * Per-set coach prescriptions (instance canvas path).
+   * Matched by set_number — not array index. Optional; standalone template path omits this.
+   */
+  prescriptions?: Prescription[]
 
   // Relations
   exercise?: Exercise
@@ -206,7 +216,7 @@ export interface SetTypeConfig {
 
 // Live Workout Execution Types
 export interface LiveWorkoutSetEntry {
-  block: WorkoutSetEntry              // the WorkoutSetEntry object (field kept as 'block' for internal compat)
+  setEntry: WorkoutSetEntry
   currentExerciseIndex: number
   currentSetIndex: number
   isCompleted: boolean

@@ -1,14 +1,17 @@
 /**
- * PATCH /api/sets/[id] — Edit a set log (in-progress workout only).
+ * PATCH /api/sets/[id] — Edit a set log.
  * DELETE /api/sets/[id] — Delete a set log (in-progress workout only).
  *
- * Both require: set exists, workout_log.client_id === auth user, workout_log.completed_at IS NULL.
+ * Both require: set exists, workout_log.client_id === auth user.
+ * DELETE (and full PATCH) require workout_log.completed_at IS NULL.
+ * PATCH of `{ rpe }` only is also allowed after completion (post-workout rating).
  * After edit/delete, user_exercise_metrics is recomputed for affected exercises.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { validateApiAuth } from '@/lib/apiAuth'
 import { recomputeUserExerciseMetrics } from '@/lib/recomputeUserExerciseMetrics'
+import { normalizeSetType } from '@/lib/setTypeUtils'
 
 const FORBIDDEN_KEYS = new Set([
   'client_id',
@@ -33,7 +36,7 @@ const WHITELIST: Record<string, Set<string>> = {
   ]),
   giant_set: new Set(['round_number', 'giant_set_exercises', 'rpe']),
   amrap: new Set(['exercise_id', 'weight', 'amrap_total_reps', 'amrap_duration_seconds', 'amrap_target_reps', 'rpe']),
-  dropset: new Set([
+  drop_set: new Set([
     'set_number',
     'dropset_initial_weight',
     'dropset_initial_reps',
@@ -56,7 +59,7 @@ const WHITELIST: Record<string, Set<string>> = {
     'max_rest_pauses',
     'rpe',
   ]),
-  preexhaust: new Set([
+  pre_exhaustion: new Set([
     'set_number',
     'preexhaust_isolation_exercise_id',
     'preexhaust_isolation_weight',
@@ -68,7 +71,7 @@ const WHITELIST: Record<string, Set<string>> = {
   ]),
   emom: new Set(['exercise_id', 'weight', 'emom_minute_number', 'emom_total_reps_this_min', 'emom_total_duration_sec', 'rpe']),
   tabata: new Set(['exercise_id', 'tabata_rounds_completed', 'tabata_total_duration_sec', 'rpe']),
-  fortime: new Set([
+  for_time: new Set([
     'exercise_id',
     'weight',
     'fortime_total_reps',
@@ -195,20 +198,20 @@ function getAffectedExerciseIds(row: Record<string, unknown>, blockType: string)
   }
   switch (blockType) {
     case 'straight_set':
-    case 'dropset':
+    case 'drop_set':
     case 'cluster_set':
     case 'rest_pause':
     case 'amrap':
     case 'emom':
     case 'tabata':
-    case 'fortime':
+    case 'for_time':
       add(row.exercise_id)
       break
     case 'superset':
       add(row.superset_exercise_a_id)
       add(row.superset_exercise_b_id)
       break
-    case 'preexhaust':
+    case 'pre_exhaustion':
       add(row.preexhaust_isolation_exercise_id)
       add(row.preexhaust_compound_exercise_id)
       break
@@ -226,7 +229,8 @@ function getAffectedExerciseIds(row: Record<string, unknown>, blockType: string)
 async function getSetAndValidate(
   supabaseAdmin: import('@supabase/supabase-js').SupabaseClient,
   setId: string,
-  userId: string
+  userId: string,
+  opts?: { allowCompleted?: boolean }
 ): Promise<{ set: Record<string, unknown>; workoutLog: { id: string; client_id: string; completed_at: string | null } } | NextResponse> {
   const { data: setRow, error } = await supabaseAdmin
     .from('workout_set_logs')
@@ -254,7 +258,7 @@ async function getSetAndValidate(
       { status: 403 }
     )
   }
-  if (workoutLog.completed_at != null) {
+  if (workoutLog.completed_at != null && !opts?.allowCompleted) {
     return NextResponse.json(
       { success: false, error: 'Workout already completed; set cannot be modified' },
       { status: 403 }
@@ -274,14 +278,6 @@ export async function PATCH(
     const { id: setLogId } = await params
     const { user, supabaseAdmin } = await validateApiAuth(request)
 
-    const result = await getSetAndValidate(supabaseAdmin, setLogId, user.id)
-    if (result instanceof NextResponse) return result
-    const { set } = result
-
-    const blockType = (set.set_type as string) || ''
-    const allowed = WHITELIST[blockType] ?? WHITELIST.straight_set
-    const allowedKeys = Array.from(allowed)
-
     let body: Record<string, unknown>
     try {
       body = await request.json()
@@ -290,6 +286,26 @@ export async function PATCH(
     }
 
     const receivedKeys = Object.keys(body)
+    const isRpeOnly =
+      receivedKeys.length === 1 && receivedKeys[0] === 'rpe'
+
+    const result = await getSetAndValidate(supabaseAdmin, setLogId, user.id, {
+      allowCompleted: isRpeOnly,
+    })
+    if (result instanceof NextResponse) return result
+    const { set, workoutLog } = result
+
+    if (workoutLog.completed_at != null && !isRpeOnly) {
+      return NextResponse.json(
+        { success: false, error: 'Workout already completed; set cannot be modified' },
+        { status: 403 }
+      )
+    }
+
+    const blockType = normalizeSetType((set.set_type as string) || '') || 'straight_set'
+    const allowed = WHITELIST[blockType] ?? WHITELIST.straight_set
+    const allowedKeys = Array.from(allowed)
+
     const debugPayload = { set_type_from_db: blockType, receivedKeys, allowedKeys }
 
     for (const key of receivedKeys) {

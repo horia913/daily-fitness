@@ -1,0 +1,90 @@
+/**
+ * SetEffortPicker — v6 (design/mockups/rest-modal-effort-picker-v6.html)
+ * Presentation only; write path unchanged.
+ */
+
+.wrap {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.opt {
+  height: 44px;
+  border-radius: 11px;
+  border: 1px solid var(--fc-hairline-strong, rgba(255, 255, 255, 0.13));
+  background: #050608;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+  padding: 0 8px;
+}
+
+.opt:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.opt:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+.label {
+  font-family: var(--f-display, var(--font-bricolage-grotesque, ui-sans-serif));
+  font-stretch: 125%;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+
+.easy {
+  color: var(--fc-status-success, #22e56a);
+}
+.medium {
+  color: var(--fc-status-warning, #ffb020);
+}
+.hard {
+  color: var(--fc-effort-hard, #ff7a2f);
+}
+.max {
+  color: var(--fc-status-error, #ff5a4d);
+}
+
+.optSelected.easy {
+  background: color-mix(in srgb, var(--fc-status-success, #22e56a) 14%, #050608);
+  border-color: var(--fc-status-success, #22e56a);
+  color: var(--fc-status-success, #22e56a);
+}
+.optSelected.medium {
+  background: color-mix(in srgb, var(--fc-status-warning, #ffb020) 14%, #050608);
+  border-color: var(--fc-status-warning, #ffb020);
+  color: var(--fc-status-warning, #ffb020);
+}
+.optSelected.hard {
+  background: color-mix(in srgb, var(--fc-effort-hard, #ff7a2f) 14%, #050608);
+  border-color: var(--fc-effort-hard, #ff7a2f);
+  color: var(--fc-effort-hard, #ff7a2f);
+}
+.optSelected.max {
+  background: color-mix(in srgb, var(--fc-status-error, #ff5a4d) 14%, #050608);
+  border-color: var(--fc-status-error, #ff5a4d);
+  color: var(--fc-status-error, #ff5a4d);
+}
+
+/* Flat prompt under logged set — no nested card */
+.promptBlock {
+  padding: 11px 0 0 25px;
+}
+
+.promptLabel {
+  font-family: var(--f-mono, var(--font-mono, ui-monospace));
+  font-size: 8px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--fc-text-subtle, #5c6470);
+  margin: 0 0 7px;
+  font-weight: 600;
+}

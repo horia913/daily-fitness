@@ -1,0 +1,85 @@
+# CLIENTS GRID — collection-card harmonization
+**Date:** 2026-07-07  
+**Mockup:** `design/mockups/coach-04-clients-grid-mockup.html`  
+**Scope:** Grid mode presentation only — no API / logic changes
+
+---
+
+## 1. Files changed
+
+| Path | Change |
+|------|--------|
+| `src/app/coach/clients/CoachClientGridCard.tsx` | Full reskin — collection-card surface, attention hue, stats + tier ring + footer; whole-card navigation; stale-score suppression |
+| `src/app/coach/clients/coachClients.module.css` | New grid token styles (`.gridCard`, rail/glow, stats, ring, footer); 12px gap; 1-col @≤900px; removed old severity-gradient grid classes |
+
+**Untouched:** `page.tsx` fetch/filter/sort/toggle, API route, `CoachClientListCard`, `CollectionCard`, programs/nutrition panels, `CoachClientProgramPauseMenu` logic.
+
+---
+
+## 2. Diff table — app grid card vs mockup CSS
+
+| Mockup rule | Mockup value | Before (grid) | After |
+|-------------|--------------|---------------|-------|
+| **`.grid` gap** | `12px` | `8px` | **12px** |
+| **`.grid` columns @≤900px** | `1fr` | `1fr 1fr` (no breakpoint) | **1 col @≤900px** |
+| **`.gcard` surface** | `#0B0C0F`, `1px rgba(255,255,255,.09)`, `16px` radius | `--fc-surface-card`, glass border, severity gradients | **`--fc-collection-card`**, **`--fc-collection-card-border`**, 16px |
+| **`.gcard` padding** | `18px 20px 16px 24px` | `12px` inner | **Match** |
+| **Left rail `::before`** | `3px` left, `var(--hue)` | `3px` top bar, severity color | **3px left**, `--grid-hue` (attention map) |
+| **Corner glow `::after`** | top-right radial, **14%** mix, 55%×60% | none / top gradient | **Match** (14% mix, top-right) |
+| **`.gcard.inactive`** | `opacity .6`, hue subtle | severity tier classes | **`opacity: 0.6`**, `--grid-hue: subtle** |
+| **`.avatar`** | `34×34`, mono initials | `ClientAvatar` 32px + severity | **34×34** initials / image |
+| **`.nm .n`** | `16px` bold | `13px` headline | **16px** bold |
+| **`.nm .e`** | mono `10px`, `--dim` | quaternary gray | **`--fc-text-dim`**, mono |
+| **`.status` pill** | mono uppercase, tone classes | `CoachClientTrainingStatusBadge` | **CollectionCard status** tones (good/warn/bad/muted) |
+| **`.gbody` layout** | stats left + ring right, `margin-top 16px` | stats only column; ring in header | **Match** (flex row, align end) |
+| **`.srow .k`** | `--dim`, `11px` mono | quaternary, `10px` | **`--fc-text-dim`**, 11px mono |
+| **`.srow .v`** | `--text` | subtle tertiary | **`--fc-text-primary`** |
+| **`.v.dimv` / Never** | `--dim` | inline semantic colors | **`gridStatValDim`** for Never / 0 workouts |
+| **`.v.warnv`** | `--warn` | inline error/warning | **`gridStatValWarn`** on aged check-in |
+| **Stat rows** | activity · check-in · workouts/wk | + meals, streak, sub | **3 rows only** (mockup set) |
+| **`.ring`** | `54×54`, tier arc + value `15px` | `36px` header chip | **54×54** in body + tier label |
+| **Stale / null score** | `—` / `no score` | ring always if score exists | **`scoreIsStale` suppress** (same as list) |
+| **`.tier` label** | `8px` uppercase dim | under chip in header | **Below ring** in body |
+| **`.gfoot`** | hairline top, `11px` mono, program · week | sunken chip | **Hairline footer**, program name in `--text` |
+| **Pause / kebab** | not drawn | header kebab | **Kept** — subtle `28×28` in header aside (`stopPropagation`) |
+| **Card click** | implied | partial links | **Whole card** → `/coach/clients/[id]` |
+
+---
+
+## 3. Attention-hue + suppress-when-stale (list parity)
+
+| Rule | List card | Grid card (after) |
+|------|-----------|-------------------|
+| Hue source | `coachClientListStatusPresentation` → `coachClientAttentionHue` | **Same** via `--grid-hue` |
+| on_track → success | ✓ | ✓ |
+| behind → warning | ✓ | ✓ |
+| missed_week → error | ✓ | ✓ |
+| paused / no_program → subtle | ✓ | ✓ |
+| roster inactive → muted + dim card | ✓ | ✓ `.gridCardInactive` |
+| Show ring | `athleteScore != null && !scoreIsStale` | **Same** |
+| Stale / null | `—` + `no score` | **Same** |
+| Tier color | `tierColorForKey` | **Same** |
+| Tier label | (list: no label) | `tierLabelForKey` (mockup shows label under ring) |
+
+---
+
+## 4. List / programs / nutrition + functionality
+
+| Surface | Status |
+|---------|--------|
+| **List mode** (`CoachClientListCard`) | Unchanged |
+| **Programs** (`ProgramsDashboardContent` / `CollectionCard`) | Unchanged |
+| **Nutrition** (meal plans / assignments) | Unchanged |
+| **Grid → detail** | Whole card `onClick` / Enter / Space → `router.push(href)` |
+| **Pause / resume** | `CoachClientProgramPauseMenu` in header; `stopPropagation` on aside; logic unchanged |
+
+---
+
+## 5. `tsc` result
+
+```
+npx tsc --noEmit
+exit code: 0
+```
+
+No git commits.

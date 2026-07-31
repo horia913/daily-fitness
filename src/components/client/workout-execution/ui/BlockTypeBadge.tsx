@@ -18,15 +18,15 @@ import {
   Dumbbell,
   Repeat,
 } from "lucide-react";
-import { WorkoutBlockType, WORKOUT_BLOCK_CONFIGS } from "@/types/workoutBlocks";
+import { SetType, WORKOUT_SET_TYPE_CONFIGS } from "@/types/workoutSetEntries";
 
 interface BlockTypeBadgeProps {
-  blockType: WorkoutBlockType;
+  blockType: SetType;
   blockName?: string;
 }
 
 export function BlockTypeBadge({ blockType, blockName }: BlockTypeBadgeProps) {
-  const config = WORKOUT_BLOCK_CONFIGS[blockType];
+  const config = WORKOUT_SET_TYPE_CONFIGS[blockType];
 
   const getIcon = () => {
     switch (blockType) {

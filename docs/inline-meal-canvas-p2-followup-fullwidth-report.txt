@@ -1,0 +1,90 @@
+# INLINE MEAL CANVAS — P2 FOLLOW-UP: TRUE FULL-WIDTH BUILDER
+**Date:** 2026-07-05
+
+---
+
+## 1. Files changed
+
+### Modified
+- `src/components/coach-ui/CoachPageShell.tsx` — additive `canvas-full` width variant (`max-w-none`)
+- `src/app/coach/nutrition/meal-plans/[id]/page.tsx` — all three `CoachPageShell` instances (loading, not-found, main) switched from `data-7xl` to `canvas-full` with `className="p-0 sm:p-0"`
+
+### Unchanged (no edits)
+- `src/components/meal-display/mealDisplay.module.css` — `.page` gutters and `<1024px` responsive stacking untouched
+- All other routes and existing shell variants (`benchmark-5xl`, `default-5xl`, `data-7xl`, `form-2xl`)
+- Client-side, generator, schema, migrations, git
+
+---
+
+## 2. Station width finding
+
+**Route:** `/coach/programs/[id]/edit` → `ProgramStationShell`
+
+The program station nominally uses `CoachPageShell widthVariant="data-7xl"` (1280px cap), but the editing canvas is **not** capped in practice. `ProgramStationShell` applies `stationEditor.module.css` class `.shell` on the shell:
+
+```css
+.shell {
+  max-width: none !important;
+  width: 100%;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+```
+
+Horizontal gutters are applied one level inward via `.contained`:
+
+```css
+.contained {
+  width: 100%;
+  max-width: none;
+  padding-inline: var(--se-gutter);  /* --se-gutter: 22px */
+}
+```
+
+**Conclusion:** The station is **effectively full-width** — no max-width cap on the editing canvas, symmetric horizontal gutters (22px) on inner content. It achieves this via a **local CSS override** on top of `data-7xl`, not via a dedicated `CoachPageShell` variant.
+
+---
+
+## 3. What the builder now uses
+
+| Layer | Treatment |
+|-------|-----------|
+| `CoachPageShell` | `widthVariant="canvas-full"` → `max-w-none` (no width cap) |
+| Shell padding | `p-0 sm:p-0` — shell carries no horizontal padding |
+| Content gutters | `mealDisplay.module.css` `.page`: `20px` base → `28px` @ ≥640px → `32px` @ ≥1024px |
+
+The builder now matches the station's **full-width intent** (no max-width cap, gutters on inner content). Gutters are slightly wider than the station's fixed 22px at sm/lg breakpoints — acceptable; left alignment under the ‹ NUTRITION back link is preserved.
+
+**Variant used:** New additive `canvas-full` variant. The station does not yet use this variant; it still relies on `data-7xl` + `.shell` override. The builder is the first consumer of `canvas-full`.
+
+---
+
+## 4. Regression / responsive confirmation
+
+- **Existing variants untouched:** `benchmark-5xl`, `default-5xl`, `data-7xl`, and `form-2xl` are unchanged in `WIDTH_BY_VARIANT`. No other route was modified.
+- **Other coach routes unchanged:** Nutrition workspace, coach home, clients, programs list, etc. still use their prior variants.
+- **`<1024px` stacking preserved:** No edits to macro strip 2×2 grid, legend placement, or header stack rules in `mealDisplay.module.css`. Only the outer shell max-width was removed.
+- **P4/P1/P2 behavior preserved:** Save-only glow, read-state grammar, inline editing, keyboard shortcuts (M/F), recents, inline create-food — all unchanged.
+
+---
+
+## 5. Coherence recommendation (future follow-up — not done here)
+
+The builder now uses the clean `canvas-full` shell variant. The program station still uses `data-7xl` + `.shell { max-width: none !important }` — a workaround for the same goal.
+
+**Recommended follow-up (do not implement in this prompt):**
+1. Migrate `ProgramStationShell` from `data-7xl` + `.shell` override → `canvas-full`, keeping `.contained` gutters (or align gutter tokens with `.page`).
+2. Optionally apply `canvas-full` to the nutrition workspace (`/coach/nutrition`) if list views should stay capped at `data-7xl` — only the **editing canvases** need full width; dashboards/lists can remain `data-7xl`.
+
+This would unify both editing surfaces under one width language and remove the station's `!important` override.
+
+---
+
+## 6. TypeScript check
+
+```
+npx tsc --noEmit
+Exit code: 0
+```
+
+No type errors.

@@ -1,0 +1,437 @@
+================================================================================
+WAVE 2 AUDIT (READ-ONLY) — Storage Reality Check + SECURITY DEFINER Function Audit
+================================================================================
+Generated: 2026-07-09
+Project: dailyfitness-app (Supabase MCP read-only)
+Scope: storage.buckets, storage.objects policies, public SECURITY DEFINER functions
+Method: execute_sql (live catalog) + src/ grep (.storage, getPublicUrl, createSignedUrl, .rpc)
+Rules observed: Read-only. No migrations, writes, or code changes.
+
+================================================================================
+EXECUTIVE SUMMARY
+================================================================================
+
+PART 1 — Storage
+- 5 buckets live. progress-photos and meal-photos are PRIVATE; avatars and
+  exercise-images are PUBLIC buckets.
+- CONFIRMED: policy "Public can read progress photos" grants anon/authenticated
+  SELECT on entire progress-photos bucket — redundant with private-bucket design
+  and a data exposure risk if URLs leak.
+- CONFIRMED: four meal_photos_* 1o5iea3_0 policies have NO bucket_id filter —
+  they apply to ALL buckets (critical mis-scope).
+- CONFIRMED: avatar INSERT/UPDATE/DELETE only check auth.role()=authenticated,
+  not object ownership; paths are FLAT (not user-foldered).
+- No .storage.list() calls anywhere in src/ — listing restrictions unlikely to
+  break UI; exercise picker uses exercises.image_url from DB, not storage list.
+
+PART 2 — SECURITY DEFINER functions
+- 52 public SECURITY DEFINER functions callable by anon and/or authenticated.
+- CRITICAL drift: migration 20260409_security_auth_uid_checks_on_rpcs.sql is
+  PARTIALLY applied on live DB.
+    APPLIED (confirmed in live bodies): get_train_page_data, get_client_nutrition_page,
+      get_workout_set_logs_for_resume, get_workout_session_data (and others).
+    NOT APPLIED on live: get_workout_blocks (zero auth guard), get_coach_dashboard(uuid)
+      (uses caller-supplied p_coach_id, not auth.uid()).
+- 18+ UNGUARDED callable functions identified (ranked list in Part 2d).
+
+================================================================================
+PART 1 — STORAGE REALITY CHECK
+================================================================================
+
+1a. BUCKETS (live: storage.buckets)
+-----------------------------------
+| id               | name             | public | file_size_limit | allowed_mime_types                          |
+|------------------|------------------|--------|-----------------|---------------------------------------------|
+| avatars          | avatars          | TRUE   | null            | null                                        |
+| challenge-videos | challenge-videos | FALSE  | 52428800 (50MB) | video/mp4, video/quicktime, video/webm        |
+| exercise-images  | exercise-images  | TRUE   | null            | null                                        |
+| meal-photos      | meal-photos      | FALSE  | 5242880 (5MB)   | image/jpeg, image/png, image/webp           |
+| progress-photos  | progress-photos  | FALSE  | 10485760 (10MB) | image/jpeg/jpg/png/webp/heic/heif           |
+
+1b. PER-BUCKET CODE USAGE (grep-confirmed, with file:line)
+----------------------------------------------------------
+
+── progress-photos (bucket private) ──
+
+Upload path conventions (TWO patterns in production code):
+
+  Pattern A — client timeline (progressPhotoService.ts)
+    Path: {clientId}/{dateStr}/{photo_type}.jpg
+    Example: abc-uuid/20260709/front.jpg
+    Code: src/lib/progressPhotoService.ts:149-152
+      storagePath = `${clientId}/${dateStr}/${fileName}`
+
+  Pattern B — record attachments (progressPhotoStorage.ts)
+    Path: {recordType}/{clientId}/{recordId}/{uniqueFileName}
+    Example: mobility/{clientId}/{recordId}/1234_abc.jpg
+    Code: src/lib/progressPhotoStorage.ts:39-40
+      storagePath = `${recordType}/${clientId}/${recordId}/${uniqueFileName}`
+    Used by: src/components/progress/MobilityFormFields.tsx:62
+             src/components/coach/client-views/ClientFmsAssessmentsPanel.tsx:191
+
+Read / URL strategy:
+  - Primary: createSignedUrl(storagePath, 3600)
+    src/lib/progressPhotoService.ts:32-36 (getSignedUrl helper)
+    src/lib/progressPhotoService.ts:53-64 (enrichPhotosWithSignedUrls on fetch)
+    src/lib/progressPhotoStorage.ts:137-144 (getSignedUrl)
+  - DB storage:
+    progress_photos.photo_path  → storage path (CONFIRMED)
+    progress_photos.photo_url   → placeholder `storage://{path}` on upload; replaced
+                                  with signed URL at read time (line 170, 57-60)
+    mobility_metrics / FMS: path stored in record fields (progressPhotoStorage returns
+      path only, line 55-56); display likely via stored path + signed URL at UI
+  - Deprecated public URL helper still exists:
+    src/lib/progressPhotoStorage.ts:126-130 (getPhotoUrl → getPublicUrl)
+    INFER: not used on hot display paths; body-metrics page uses photo.photo_url
+    after enrichPhotosWithSignedUrls (signed)
+  - Render points using photo_url (post-enrichment = signed):
+    src/app/client/progress/body-metrics/page.tsx:1703, 1854, 1887
+    src/components/client/weekly-checkin/ProgressMomentCard.tsx:21
+
+.list() calls: NONE in src/
+
+── meal-photos (bucket private, id = meal-photos) ──
+
+Upload path convention:
+  Canonical: {clientId}/{mealId}/{timestamp}_{sanitizedFilename}
+  Code:
+    src/lib/mealPhotoService.ts:113-116
+    src/lib/mealCompletionService.ts:103-105 (new Fuel flow — stores PATH not URL)
+    src/app/client/progress/nutrition/page.tsx:382
+      filePath = `${user.id}/${mealId}/${fileName}`  (no timestamp prefix)
+
+Read / URL strategy:
+  - New flow (meal_completions): stores storage PATH in meal_completions.photo_url
+    src/lib/mealCompletionService.ts:123-124, 139-140
+    Resolved at display via createSignedUrl:
+      src/app/client/nutrition/page.tsx:369-383 (resolveMealPhotoUrls)
+      src/components/coach/client-views/ClientMealsView.tsx:383-384
+  - Legacy flow (meal_photo_logs): stores full public URL from getPublicUrl
+    src/lib/mealPhotoService.ts:134-157 (photo_url + photo_path)
+    INFER: public URLs will NOT work on private bucket without anon SELECT policy;
+    legacy rows may be broken for display unless signed-URL fallback added
+  - Legacy page still uses getPublicUrl on upload:
+    src/app/client/progress/nutrition/page.tsx:396-398, 414 (stores publicUrl in
+    meal_completions.photo_url) — MIXED with signed-URL read path on Fuel page
+
+.list() calls: NONE
+
+── avatars (bucket PUBLIC) ──
+
+Upload path convention: FLAT filename (NOT user-foldered)
+  Pattern: {userId}-{timestamp}.{ext}
+  Code:
+    src/app/client/profile/page.tsx:391-393
+      fileName = `${user.id}-${Date.now()}.${fileExt}`
+      supabase.storage.from('avatars').upload(fileName, file)
+    src/app/coach/profile/page.tsx:206-211 (same pattern)
+
+Read / URL strategy:
+  - getPublicUrl(fileName) → full HTTPS public URL stored in profiles.avatar_url
+    src/app/client/profile/page.tsx:408-414
+    src/app/coach/profile/page.tsx:233-240
+  - Display: profiles.avatar_url used across app (public render/image transform)
+  - imageConfig.ts references bucket 'user-avatars' (PHANTOM — live bucket is
+    'avatars'): src/lib/imageConfig.ts:5-6 — INFER dead config path unless used
+
+.list() calls: NONE
+
+── exercise-images (bucket PUBLIC) ──
+
+Upload path convention: {userId}/{timestamp}.{ext}
+  Code: src/lib/imageTransform.ts:151-155
+    fileName = `${userId}/${Date.now()}.${fileExt}`
+    supabase.storage.from('exercise-images').upload(fileName, optimizedFile)
+  Hook: src/hooks/useImageOptimization.ts:167
+
+Read / URL strategy:
+  - Stored in exercises.image_url as full public render URL or path
+    src/lib/imageTransform.ts:55-57, 160 (getOptimizedImageUrl → public render URL)
+  - Display via exercises.image_url in library/cards (no storage list):
+    src/components/coach/ExerciseCard.tsx:131-133
+    src/components/ExerciseSelector.tsx:198-200
+    src/app/client/workouts/[id]/start/page.tsx:6823-6851
+
+.list() calls: NONE — exercise picker reads DB image_url, not storage listing
+
+── challenge-videos (bucket private) ──
+
+Upload path convention:
+  challenge_proofs/{participantId}/{timestamp}.{ext}
+  Code: src/lib/challengeService.ts:847-852
+
+Read / URL strategy:
+  - getPublicUrl after upload (line 863-865) — INFER broken on private bucket
+    unless coach/own SELECT policies match path
+  - Stored: challenge_video_submissions.video_url (public URL), video_path (path)
+
+.list() calls: NONE
+
+1c. DECISION ANSWERS
+--------------------
+
+S1 — progress photos: drop "Public can read progress photos"?
+  VERDICT: YES, safe to drop for primary app flows — CONFIRMED reads use signed URLs.
+  Evidence:
+    - Bucket is already private (public=false in storage.buckets).
+    - progressPhotoService enriches all fetches with createSignedUrl (lines 53-64).
+    - Authenticated scoped policies exist: Clients can read/update/delete own photos
+      (foldername[1]=auth.uid()), Coaches can read client photos (clients join).
+  Exposure note:
+    - The PUBLIC bucket flag is false — the policy is the main anon bypass, not bucket
+      publicness. Dropping the policy is the right fix; bucket can stay private.
+  Caveats / minimal changes:
+    1. progressPhotoStorage Pattern B paths ({recordType}/{clientId}/...) do NOT match
+       client folder policy (expects foldername[1]=uid). Coaches rely on
+       "Coaches can read client photos" (foldername[1]=client_id) — works for Pattern A
+       only. Pattern B needs coach policy extended OR paths normalized.
+    2. Remove or stop calling getPublicUrl in progressPhotoStorage.getPhotoUrl (deprecated).
+    3. Any legacy progress_photos rows with real public URLs in photo_url (pre-migration)
+       need signed-URL migration at render — grep shows placeholder storage:// pattern now.
+  Render points already on signed URLs: body-metrics page, ProgressMomentCard (above).
+
+S2 — meal photos: bucket id + path for policy rescope
+  Exact bucket id: meal-photos  (CONFIRMED live id=name)
+  Policies to scope: meal_photos_delete_own 1o5iea3_0, meal_photos_insert_own 1o5iea3_0,
+    meal_photos_select_own_and_coach 1o5iea3_0, meal_photos_update_own 1o5iea3_0
+  Required addition to each: AND bucket_id = 'meal-photos'
+  Upload path for policy folder check: foldername(name)[1] must equal auth.uid()::text
+    Matches code: {clientId}/{mealId}/... — CONFIRMED
+  Additional finding: meal_photos_select_own_and_coach allows ANY coach/admin to SELECT
+    any object (no clients-table join) — over-permissive even after bucket scoping.
+  Legacy getPublicUrl in mealPhotoService + client/progress/nutrition/page.tsx should
+    switch to path + createSignedUrl (align with mealCompletionService).
+
+S3 — avatars: path convention for ownership policy
+  Actual convention: FLAT files `{userId}-{timestamp}.{ext}` at bucket root — NOT foldered.
+  Ownership fix cannot use foldername[1]=auth.uid() — must use e.g.:
+    (storage.filename(name)) LIKE (auth.uid())::text || '-%'
+  OR migrate uploads to `{userId}/{filename}` and use folder policy.
+  Current policies (live):
+    Public can view avatars — SELECT, qual: bucket_id='avatars' (public role)
+    Users can upload/update/delete — WITH CHECK/qual: bucket_id='avatars' AND
+      auth.role()='authenticated' ONLY (no per-user check) — CONFIRMED mismatch
+  profiles.avatar_url stores full public URL:
+    .../storage/v1/object/public/avatars/{fileName}
+
+S4 — listing restriction on avatars / exercise-images
+  grep result: ZERO .list( calls on storage in entire src/
+  Exercise UI: reads exercises.image_url from DB (ExerciseCard, ExerciseSelector, etc.)
+  Avatar UI: reads profiles.avatar_url (public URL string)
+  VERDICT: Restricting storage.objects LIST policies should NOT break current UI.
+  Caveat: Supabase advisor flagged public bucket SELECT policies enabling enumeration;
+    that is a storage API concern, not img src. No code depends on list today.
+
+1d. PER-BUCKET SUMMARY TABLE
+----------------------------
+| bucket           | public? | path convention                              | read strategy                    | .list() in code? | policies match/mismatch |
+|------------------|---------|----------------------------------------------|----------------------------------|------------------|-------------------------|
+| progress-photos  | NO      | {clientId}/{date}/{type}.jpg OR {type}/{clientId}/{recordId}/file | signed URL (primary); deprecated getPublicUrl | NO | MISMATCH: "Public can read progress photos" anon SELECT whole bucket — drop. Pattern B paths vs coach folder policy. |
+| meal-photos      | NO      | {clientId}/{mealId}/{timestamp}_file         | signed URL (new); getPublicUrl (legacy) | NO | MISMATCH: meal_photos_* policies missing bucket_id='meal-photos'. Coach SELECT over-broad. |
+| avatars          | YES     | flat {userId}-{ts}.{ext}                     | getPublicUrl → profiles.avatar_url | NO | MISMATCH: write/delete any authenticated user; no ownership. Public bucket + public SELECT. |
+| exercise-images  | YES     | {userId}/{timestamp}.{ext}                   | public render URL in exercises.image_url | NO | OK for reads (public bucket). Writes folder-scoped to uid. Public SELECT whole bucket. |
+| challenge-videos | NO      | challenge_proofs/{participantId}/{ts}.{ext}  | getPublicUrl (likely broken)     | NO | MISMATCH: upload policy expects foldername[1]=auth.uid() but path starts with challenge_proofs — INFER uploads fail or policy unused. |
+
+Live storage.objects policies (verbatim summary, 22 policies):
+  progress-photos: Public can read progress photos (SELECT, public, bucket only)
+  progress-photos: Clients CRUD own (foldername[1]=uid)
+  progress-photos: Coaches can read client photos (clients join on foldername[1])
+  avatars: Public can view avatars (SELECT public)
+  avatars: Users upload/update/delete (authenticated only, no ownership)
+  exercise-images: Anyone can view (SELECT public, bucket scoped)
+  exercise-images: Users CRUD own (foldername[1]=uid)
+  meal_photos_* 1o5iea3_0 (4): NO bucket_id — foldername[1]=uid OR coach role
+  challenge-videos: own upload/select (foldername[1]=uid), coach select/delete
+
+================================================================================
+PART 2 — SECURITY DEFINER FUNCTION AUDIT
+================================================================================
+
+2a. INVENTORY
+-------------
+Live query: 52 SECURITY DEFINER functions in public schema with
+has_function_privilege(anon|authenticated, execute).
+
+Callable by anon: 51 functions (all except get_workout_log_full)
+Callable by authenticated: 52 functions (all)
+
+Note: Two overloads of get_coach_dashboard exist:
+  - get_coach_dashboard() — uses auth.uid(), role check (GUARDED)
+  - get_coach_dashboard(uuid) — uses p_coach_id parameter (UNGUARDED)
+
+2b. GUARD CLASSIFICATION (every anon/authenticated-callable DEFINER function)
+------------------------------------------------------------------------------
+
+Legend: R=reads W=writes G=GUARDED U=UNGUARDED N=N/A (trigger/helper) ?=UNCLEAR
+
+| function | anon? | authed? | R/W | guard | verdict |
+|----------|-------|---------|-----|-------|---------|
+| handle_new_user() | Y | Y | W | trigger on auth.users | N/A (trigger) |
+| is_coach() | Y | Y | R | auth.uid() role lookup | N/A (helper) |
+| is_client() | Y | Y | R | auth.uid() role lookup | N/A (helper) |
+| is_admin() | Y | Y | R | role lookup | N/A (helper) |
+| is_admin(uuid) | Y | Y | R | param user_id | N/A (helper) |
+| ensure_default_block_on_program_insert() | Y | Y | W | trigger | N/A |
+| prevent_last_block_deletion() | Y | Y | W | trigger | N/A |
+| cleanup_workout_cache() | Y | Y | W | none | U — any caller can purge cache |
+| create_user_profile(uuid,text,text) | Y | Y | W | none | U — insert profile for arbitrary user_id |
+| consume_invite_code(text,uuid) | Y | Y | W | code+coach_id match | G — signup scoped; anon callable by design |
+| rollback_invite_code(text) | Y | Y | W | none | U — decrement any invite code |
+| extend_clipcard_validity(uuid,uuid,int) | Y | Y | W | clipcard coach_id param only | U — no auth.uid() verify caller is coach |
+| get_client_compliance_scores(uuid) | Y | Y | R | none | U — pass any coach_id_param |
+| get_client_compliance_scores_simple(uuid) | Y | Y | R | none | U — pass any coach_id_param |
+| get_daily_workout(uuid,date) | Y | Y | R | none | U — any client_id |
+| generate_daily_workout(uuid,uuid,date) | Y | Y | W | none | U — writes cache for any client |
+| get_available_time_slots(uuid,date) | Y | Y | R | none | U — any coach_id (reference/scheduling) |
+| book_session(uuid,uuid,text,text) | Y | Y | W | slot exists | U — book any client_id into any slot |
+| cancel_session(uuid,uuid,text) | Y | Y | W | partial | U — no caller identity check in head |
+| complete_session(uuid,text) | Y | Y | W | partial | U |
+| add_session_feedback(uuid,uuid,int,text) | Y | Y | W | partial | U |
+| complete_workout(...) | Y | Y | W | none | U — writes completions for any assignment_progress id |
+| deactivate_previous_program(uuid,uuid) | Y | Y | W | none | U — deactivate any client's programs |
+| get_coach_dashboard() | Y | Y | R | auth.uid()+role | G |
+| get_coach_dashboard(uuid) | Y | Y | R | uses p_coach_id only | U — IDOR: pass any coach UUID |
+| get_client_nutrition_page(uuid,date) | Y | Y | R | auth.uid client/coach | G — 20260409 applied |
+| get_coach_client_training(uuid) | Y | Y | R | auth.uid coach+clients | G |
+| count_exercises_by_template_ids(uuid[]) | Y | Y | R | wt.coach_id=auth.uid() | G |
+| get_workout_set_logs_for_resume(uuid,uuid) | Y | Y | R | auth.uid=p_client_id | G — 20260409 applied |
+| get_workout_log_full(uuid,uuid) | N | Y | R | auth.uid viewer authz | G |
+| discard_workout_session(uuid) | Y | Y | W | auth.uid=client | G |
+| get_workout_blocks(uuid) | Y | Y | R | NONE in live body | U — CRITICAL: any template_id |
+| save_workout_canvas(uuid,jsonb) | Y | Y | W | wt.coach_id=auth.uid() | G |
+| assign_program_instance(...) | Y | Y | W | auth.uid=p_coach_id+ownership | G |
+| get_gym_console_status(uuid,uuid[]) | Y | Y | R | cl.coach_id=auth.uid() | G — ignores p_coach_id param safely |
+| save_instance_workout_canvas(uuid,jsonb) | Y | Y | W | pa.coach_id=auth.uid() | G |
+| clone_template_to_instance_workout(...) | Y | Y | W | auth checks in body | G (per 20260625+ migrations) |
+| copy_week_schedule(uuid,int,int) | Y | Y | W | auth.uid program owner | G |
+| get_workout_canvas(uuid) | Y | Y | R | coach/client/program | G |
+| get_instance_workout_canvas(uuid) | Y | Y | R | coach/client/admin | G |
+| get_workout_session_data(uuid,uuid) | Y | Y | R | auth.uid=p_client_id | G — 20260409 applied |
+| get_train_page_data(uuid,int) | Y | Y | R | auth.uid client/coach | G — 20260409 applied |
+| get_client_dashboard() | Y | Y | R | auth.uid() only | G |
+| get_next_due_workout(uuid) | Y | Y | R | auth.uid=p_client_id | G |
+| get_next_incomplete_program_slot(uuid) | Y | Y | R | none | U — any assignment_id |
+| get_client_workout_summary() | Y | Y | R | auth.uid() only | G |
+| get_coach_pickup_workout(uuid) | Y | Y | R | coach+clients join | G |
+| check_and_complete_program(uuid) | Y | Y | W | none | U |
+| calculate_adherence(uuid) | Y | Y | R | none | U — any program_assignment_id |
+| get_weekly_breakdown(uuid) | Y | Y | R | none | U |
+| get_completed_programs(uuid) | Y | Y | R | none | U — any p_client_id |
+| get_completed_programs | code: workoutTemplateService.ts:1691 | | | |
+
+Hot RPC guard details (live pg_get_functiondef CONFIRMED):
+
+  get_workout_blocks — body is bare SELECT on template_id with NO auth.uid(),
+    NO Forbidden exception. Any authenticated/anon caller can read any template's
+    full block tree (exercises, drop sets, protocols). Code paths:
+    src/lib/loadWorkoutBlocksByContentId.ts:34
+    src/app/client/workouts/[id]/start/page.tsx:1949
+    src/app/api/coach/pickup/next-workout/route.ts:55
+
+  get_coach_dashboard(uuid) — WHERE cl.coach_id = p_coach_id (parameter), NOT
+    auth.uid(). App passes user.id from API route (safe when honest client) but
+    RPC is directly callable with any UUID:
+    src/app/api/coach/dashboard/route.ts:31-32
+
+  complete_workout — INSERT program_workout_completions + UPDATE
+    program_assignment_progress with no auth.uid() or client ownership check.
+
+  create_user_profile — INSERT INTO profiles for arbitrary user_id with role client.
+
+2c. CROSS-REFERENCE — migration 20260409_security_auth_uid_checks_on_rpcs.sql
+-----------------------------------------------------------------------------
+Repo migration explicitly replaces 6 functions:
+
+| function in migration | live DB guard state | applied? |
+|-----------------------|---------------------|----------|
+| get_train_page_data | v_caller:=auth.uid(); client OR coach EXISTS | YES |
+| get_client_nutrition_page | same pattern | YES |
+| get_coach_dashboard(uuid) | migration: v_coach_id:=auth.uid(); ignores param | NO — live uses p_coach_id |
+| get_workout_blocks | migration: coach/assignment/program EXISTS + Forbidden | NO — live has zero guard |
+| get_workout_set_logs_for_resume | auth.uid()=p_client_id | YES |
+| get_workout_session_data | auth.uid()=p_client_id | YES |
+
+Drift risk — functions created/updated AFTER 20260409 that are guarded (good):
+  get_workout_canvas, get_instance_workout_canvas, save_workout_canvas,
+  save_instance_workout_canvas, assign_program_instance, discard_workout_session,
+  get_gym_console_status (uses auth.uid for coach filter), get_workout_log_full
+
+Functions after 20260409 still UNGUARDED on live:
+  get_next_incomplete_program_slot (SQL, no auth) — used internally by
+    get_gym_console_status but also directly callable
+
+list_migrations on live: [] (empty) — consistent with manual-apply drift.
+
+2d. RANKED UNGUARDED FUNCTIONS + FIX NOTES
+------------------------------------------
+
+CRITICAL (direct PII / program data exfiltration or writes)
+  1. get_workout_blocks(uuid)
+     Missing: auth.uid() check — template coach OR assigned client OR active program.
+     Repo fix exists in 20260409 — NOT on live DB.
+  2. get_coach_dashboard(uuid)
+     Missing: force v_coach_id := auth.uid(); ignore p_coach_id.
+     Repo fix exists in 20260409 — NOT on live DB.
+  3. complete_workout(...)
+     Missing: verify caller is owner of program_assignment_progress.client_id before INSERT.
+  4. create_user_profile(uuid,...)
+     Missing: auth.uid()=user_id OR service-role only; revoke from anon.
+  5. get_completed_programs(p_client_id)
+     Missing: auth.uid()=p_client_id OR coach clients join.
+     Code: src/lib/workoutTemplateService.ts:1691
+
+HIGH (coach-scoped data via parameter)
+  6. get_client_compliance_scores(coach_id_param)
+  7. get_client_compliance_scores_simple(coach_id_param)
+     Missing: auth.uid()=coach_id_param.
+     Code: src/components/coach/ComplianceSnapshot.tsx:111, 118
+  8. deactivate_previous_program(p_client_id, ...)
+     Missing: coach or client authorization before UPDATE program_assignments.
+  9. get_next_incomplete_program_slot(p_assignment_id)
+     Missing: verify assignment belongs to caller (client or coach).
+  10. check_and_complete_program(p_program_assignment_id)
+      Missing: same assignment ownership check.
+
+MEDIUM (scheduling / cache / analytics)
+  11. book_session — Missing: auth.uid()=p_client_id OR coach owns slot.
+  12. cancel_session / complete_session / add_session_feedback — Missing caller identity.
+  13. get_daily_workout / generate_daily_workout — Missing client ownership.
+  14. get_available_time_slots — Missing: optional coach verification (lower risk).
+  15. calculate_adherence / get_weekly_breakdown — Missing assignment ownership.
+  16. extend_clipcard_validity — Missing: auth.uid()=p_coach_id.
+  17. rollback_invite_code — Missing: auth.uid()=coach on code row.
+  18. cleanup_workout_cache — Missing: restrict to service_role or admin.
+
+CANDIDATES FOR REVOKE EXECUTE FROM anon
+  - create_user_profile — never legitimately anon-called from browser
+  - get_coach_dashboard (both overloads) — coach-only
+  - get_client_dashboard, get_client_workout_summary — authenticated client only
+  - complete_workout, deactivate_previous_program, discard_workout_session
+  - save_workout_canvas, save_instance_workout_canvas, assign_program_instance
+  - get_client_compliance_scores* — coach only
+  - cleanup_workout_cache — service_role only
+  - keep consume_invite_code anon if signup flow requires it — verify no data leak
+    (currently scoped to code+coach_id UPDATE)
+
+LEGITIMATE anon-callable (verify only)
+  - consume_invite_code(text,uuid) — increments used_count for matching code+coach
+  - is_coach / is_client / is_admin — helpers (leak role boolean only)
+  - handle_new_user — trigger-fired, not user-invoked
+
+================================================================================
+OPEN QUESTIONS / UNCERTAINTIES
+================================================================================
+  - challenge-videos upload path vs policy mismatch: are challenge uploads working in
+    prod? If yes, INFER service-role or different path than grep shows.
+  - mobility/FMS photos (Pattern B): how are they displayed to coaches today?
+    Likely via "Public can read progress photos" anon policy — dropping it may break
+    coach view of mobility attachments until coach policy covers Pattern B.
+  - meal_photo_logs legacy rows with public URLs: volume unknown; may need backfill.
+  - get_coach_dashboard() no-arg vs (uuid): which does PostgREST prefer when app
+    calls .rpc('get_coach_dashboard', { p_coach_id })? App uses uuid overload.
+  - Edge functions / cron may call UNGUARDED RPCs with service_role — not grepped;
+    revoke anon/authenticated still recommended for browser-facing surface.
+
+================================================================================
+END OF REPORT
+================================================================================

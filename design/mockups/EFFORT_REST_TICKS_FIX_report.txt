@@ -1,0 +1,68 @@
+FIX — effort card v6, rest modal, partial ticks
+Date: 2026-07-20
+No git.
+
+================================================================================
+1. FILES MODIFIED
+================================================================================
+Rest timer
+- src/components/client/LiveWorkoutSetEntryExecutor.tsx
+
+Effort card (presentation only)
+- src/components/client/workout-execution/ui/SetEffortPicker.tsx
+- src/components/client/workout-execution/ui/setEffortPicker.module.css  (new)
+- src/components/client/workout-execution/ui/LoggedSetsList.tsx
+
+Partial-completion ticks
+- src/components/client/workout-execution/ExecGroupList.tsx
+- src/components/client/workout-execution/execGroupListHelpers.ts
+- src/components/client/workout-execution/execGroupList.module.css
+
+================================================================================
+2. REST MODAL — ROOT CAUSE + FIX
+================================================================================
+Root cause (file + lines):
+- InCardRestBridge in LiveWorkoutSetEntryExecutor.tsx (~old L1158–1181)
+  acked `shouldOpenRestTimer` after one rAF when resolved duration was <= 0,
+  starting nothing.
+- Duration seed used `exercise.rest_seconds || setEntry.rest_seconds || 0`
+  (handleSetComplete), while the live card *displayed* rest via
+  `?? 60` (StraightSetExecutor ~L429–430). Null prescription → UI shows 1:00,
+  bridge sees 0 → ack + no modal / no in-card countdown.
+- handleLastSetLoggedForRest seeded next-set metadata but not restSeconds.
+- Orchestrator signal itself was fine: logSet sets shouldOpenRestTimer when
+  !isLastSet (useSetLoggingOrchestrator.ts ~L290–293).
+- hasStarted / ?start=1 only gate mount before START — not this post-log bug.
+- Removed revisit mount-time completion effect was auto-advance only; not the
+  first-set rest trigger.
+
+Fix:
+1. resolveRestSeconds() aligned with card display (`?? 60` when both null).
+2. Seed restStartRef *before* orchestrator.logSet when !isLastSet.
+3. handleLastSetLoggedForRest / handleSetComplete use the same resolver.
+4. InCardRestBridge: never ack on 0s immediately; retry ~600ms, then ack only
+   if still zero (true no-rest).
+
+================================================================================
+3. EFFORT CARD
+================================================================================
+Changed: SetEffortPicker layout/styles only — 2×2 grid, dark inset (#050608),
+hairline, ~44px, display-font labels in tier colours, no emoji; selected =
+soft fill + full-strength border. LoggedSetsList wraps the unrated prompt in
+the same hairline card + mono uppercase label as WEIGHT/REPS.
+
+Untouched: EFFORT_TO_RPE (4/6/8/10), rpeToEffortTier / workoutEffortLabels,
+onSelect → PATCH / useUpdateSetRpe write path.
+
+================================================================================
+4. TICK RENDERING
+================================================================================
+getGroupTickState(entry) → { completed, total } from completedSets vs
+getGroupTotalSets (rounds for grouped types via total_sets).
+Collapsed prior headers render one glyph per set: ✓ (gcheckOn / green) if
+index < completed, else ○ (gcheckOff / subtle). Fully done → all green.
+
+================================================================================
+5. tsc
+================================================================================
+npx tsc -p tsconfig.json --noEmit → 0 errors

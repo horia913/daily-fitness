@@ -1,0 +1,205 @@
+/* Coach exercise diagnostic — multi-series indexed chart */
+
+.shell {
+  position: relative;
+  background: transparent;
+  border: 1px solid var(--fc-hairline, rgba(255, 255, 255, 0.08));
+  border-radius: 14px;
+  padding: 12px 10px 10px;
+  box-sizing: border-box;
+}
+
+.legendHint {
+  margin: 0 0 10px;
+  font-family: var(--f-mono, ui-monospace, monospace);
+  font-size: 10px;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  color: var(--fc-text-subtle);
+}
+
+.toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.toggle {
+  appearance: none;
+  border: 1px solid var(--fc-glass-border);
+  background: transparent;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-family: var(--f-mono, ui-monospace, monospace);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  color: var(--fc-text-subtle);
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s,
+    box-shadow 0.15s;
+}
+
+.toggleOnVolume {
+  color: var(--fc-group-c, #22d3ee);
+  border-color: color-mix(in srgb, var(--fc-group-c, #22d3ee) 45%, transparent);
+  background: color-mix(in srgb, var(--fc-group-c, #22d3ee) 12%, transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--fc-group-c, #22d3ee) 35%, transparent);
+}
+
+.toggleOnLoad {
+  color: var(--gold, #f5c242);
+  border-color: color-mix(in srgb, var(--gold, #f5c242) 45%, transparent);
+  background: color-mix(in srgb, var(--gold, #f5c242) 12%, transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--gold-glow, rgba(245, 194, 66, 0.28)) 50%, transparent);
+}
+
+.toggleOnStrength {
+  color: var(--fc-effort-easy, #84cc16);
+  border-color: color-mix(in srgb, var(--fc-effort-easy, #84cc16) 45%, transparent);
+  background: color-mix(in srgb, var(--fc-effort-easy, #84cc16) 12%, transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--fc-effort-easy, #84cc16) 35%, transparent);
+}
+
+.omitNote {
+  margin: 0 0 8px;
+  font-family: var(--f-mono, ui-monospace, monospace);
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--fc-text-quaternary);
+}
+
+.chartWrap {
+  position: relative;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  height: 220px;
+}
+
+@media (min-width: 1024px) {
+  .svg {
+    height: 280px;
+  }
+}
+
+.baseline {
+  stroke: color-mix(in srgb, var(--fc-text-subtle) 55%, transparent);
+  stroke-width: 1;
+  stroke-dasharray: 4 5;
+}
+
+.gridLine {
+  stroke: var(--fc-hairline, rgba(255, 255, 255, 0.06));
+  stroke-width: 1;
+}
+
+.lineVolume {
+  fill: none;
+  stroke: var(--fc-group-c, #22d3ee);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--fc-group-c, #22d3ee) 70%, transparent));
+}
+
+.lineLoad {
+  fill: none;
+  stroke: var(--gold, #f5c242);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--gold, #f5c242) 70%, transparent));
+}
+
+.lineStrength {
+  fill: none;
+  stroke: var(--fc-effort-easy, #84cc16);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--fc-effort-easy, #84cc16) 70%, transparent));
+}
+
+.dot {
+  stroke: var(--fc-bg-deep, #0b0f14);
+  stroke-width: 1.5;
+}
+
+.prTick {
+  stroke: var(--fc-status-success, #22c55e);
+  stroke-width: 2;
+}
+
+.prLabel {
+  fill: var(--fc-status-success, #22c55e);
+  font-family: var(--f-mono, ui-monospace, monospace);
+  font-size: 8px;
+}
+
+.yLabel {
+  fill: var(--fc-text-quaternary);
+  font-family: var(--f-mono, ui-monospace, monospace);
+  font-size: 9px;
+}
+
+.dateAxis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  padding: 0 2px;
+  font-family: var(--f-mono, ui-monospace, monospace);
+  font-size: 9px;
+  color: var(--fc-text-quaternary);
+}
+
+.hoverCard {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 11px;
+  border: 1px solid var(--fc-hairline, rgba(255, 255, 255, 0.08));
+  background: color-mix(in srgb, #000 28%, transparent);
+  font-family: var(--f-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--fc-text-dim);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hoverDate {
+  font-family: var(--f-display, var(--f-headline), ui-sans-serif);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--fc-text-primary);
+  letter-spacing: -0.01em;
+}
+
+.hoverRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hoverAbs {
+  color: var(--fc-text-primary);
+  font-family: var(--f-display, var(--f-headline), ui-sans-serif);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.empty {
+  margin: 0;
+  padding: 28px 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--fc-text-subtle);
+  font-family: var(--f-mono, ui-monospace, monospace);
+  line-height: 1.45;
+}

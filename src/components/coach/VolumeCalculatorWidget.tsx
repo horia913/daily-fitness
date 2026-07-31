@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ChevronDown, ChevronUp, BarChart3 } from "lucide-react";
-import type { WorkoutBlock } from "@/types/workoutBlocks";
+import type { WorkoutSetEntry } from "@/types/workoutSetEntries";
 import {
   calculateVolumePerMuscleGroup,
   isGuidelineCategory,
@@ -13,7 +13,7 @@ import wt from "@/components/coach/workouts/workoutTemplateEditV1.module.css";
 import { cn } from "@/lib/utils";
 
 interface VolumeCalculatorWidgetProps {
-  blocks: WorkoutBlock[];
+  blocks: WorkoutSetEntry[];
   category: string;
   className?: string;
   /** Coach workout template editor v1 layout (always expanded, token styling). */

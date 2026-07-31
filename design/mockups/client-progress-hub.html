@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<title>Client — Progress hub</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;}
+  :root{
+    --page:#0A0B0D; --well:#050608;
+    --line:rgba(255,255,255,.07); --line-2:rgba(255,255,255,.13);
+    --accent:#2E7BFF; --accent-dim:rgba(46,123,255,.16); --accent-glow:rgba(46,123,255,.30);
+    --good:#22E56A; --warn:#FFB020; --hot:#FF7A2F; --bad:#FF5A4D; --gold:#F5C242; --purple:#9D6BFF; --aqua:#22D3EE;
+    --text:#F0F2F5; --dim:#8B93A1; --subtle:#5C6470; --faint:#3D434D;
+    --f-d:'Archivo',sans-serif; --f-b:'Inter',sans-serif; --f-m:'JetBrains Mono',monospace;
+  }
+  body{background:#070809;color:var(--text);font-family:var(--f-b);-webkit-font-smoothing:antialiased;padding:22px;font-size:13px;
+       display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start;}
+  .d{font-family:var(--f-d);font-stretch:105%;}
+  svg{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;}
+  .lbl{font-family:var(--f-m);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:9px;font-weight:700;}
+  .phone{width:375px;background:var(--page);border:1px solid var(--line-2);border-radius:22px;padding:18px 16px 26px;}
+
+  h1{font-family:var(--f-d);font-size:26px;font-weight:800;letter-spacing:-.025em;}
+  .sub{font-size:12px;color:var(--dim);margin-top:4px;}
+
+  /* ONE page range */
+  .rng{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;background:var(--well);border:1px solid var(--line);
+       border-radius:11px;padding:4px;margin:16px 0 18px;}
+  .rg{text-align:center;padding:8px;border-radius:8px;font-family:var(--f-m);font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--dim);}
+  .rg.on{background:var(--accent);color:#fff;box-shadow:0 3px 14px -5px var(--accent-glow);}
+
+  .eb{font-family:var(--f-m);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--subtle);margin:20px 0 9px;font-weight:700;}
+  .card{border:1px solid var(--line);border-radius:13px;padding:15px 16px;position:relative;overflow:hidden;}
+  .card.rail::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:3px;background:var(--h);border-radius:0 3px 3px 0;}
+
+  /* rhythm */
+  .big{display:flex;align-items:baseline;gap:9px;}
+  .big .n{font-family:var(--f-d);font-size:42px;font-weight:900;line-height:1;letter-spacing:-.04em;}
+  .big .l{font-family:var(--f-m);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);}
+  .big .dt{margin-left:auto;font-family:var(--f-m);font-size:9.5px;color:var(--faint);}
+  .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border-radius:10px;overflow:hidden;margin-top:14px;}
+  .tl{background:var(--page);padding:10px 8px;text-align:center;}
+  .tl .v{font-family:var(--f-d);font-size:16px;font-weight:800;line-height:1;}
+  .tl .k{font-family:var(--f-m);font-size:7.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-top:6px;}
+  .prog{font-family:var(--f-m);font-size:10.5px;color:var(--dim);margin-top:13px;}
+  .prog b{color:var(--text);}
+  .days{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:12px;}
+  .dy{text-align:center;}
+  .dy .bar{height:26px;border-radius:4px;background:rgba(255,255,255,.05);display:flex;align-items:flex-end;overflow:hidden;}
+  .dy .bar i{width:100%;border-radius:4px;background:var(--good);box-shadow:0 0 10px -3px var(--good);}
+  .dy .d2{font-family:var(--f-m);font-size:8px;color:var(--faint);margin-top:5px;}
+
+  /* session rows */
+  .sr{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:8px;position:relative;overflow:hidden;}
+  .sr::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:3px;background:var(--accent);border-radius:0 3px 3px 0;}
+  .sr .dt{text-align:center;flex-shrink:0;width:32px;}
+  .sr .dt .dw{font-family:var(--f-m);font-size:8px;letter-spacing:.1em;color:var(--faint);}
+  .sr .dt .dd{font-family:var(--f-d);font-size:18px;font-weight:800;line-height:1;margin-top:2px;}
+  .sr .dt .mo{font-family:var(--f-m);font-size:8px;color:var(--faint);margin-top:2px;}
+  .sr .bd{flex:1;min-width:0;}
+  .sr .bd .n{font-size:13px;font-weight:600;}
+  .sr .bd .tag{font-family:var(--f-m);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);
+               background:color-mix(in srgb,var(--gold) 16%,transparent);border-radius:4px;padding:2px 6px;display:inline-block;margin-top:5px;}
+  .sr .bd .mt{font-family:var(--f-m);font-size:10px;color:var(--subtle);margin-top:6px;}
+  .sr .cv{color:var(--faint);align-self:center;}
+
+  .lnk{display:block;text-align:center;font-family:var(--f-m);font-size:10.5px;color:var(--accent);font-weight:700;
+       letter-spacing:.07em;text-transform:uppercase;padding:11px;border:1px solid var(--line);border-radius:11px;margin-top:4px;}
+
+  /* volume */
+  .vh{display:flex;align-items:baseline;gap:10px;}
+  .vh .n{font-family:var(--f-d);font-size:30px;font-weight:900;line-height:1;letter-spacing:-.03em;}
+  .vh .u{font-family:var(--f-m);font-size:12px;color:var(--dim);}
+  .vh .dl{margin-left:auto;font-family:var(--f-m);font-size:10px;font-weight:700;padding:3px 8px;border-radius:999px;}
+  .dl.up{color:var(--good);background:color-mix(in srgb,var(--good) 13%,transparent);}
+  .dl.dn{color:var(--bad);background:color-mix(in srgb,var(--bad) 13%,transparent);}
+  .chart{display:flex;align-items:flex-end;gap:4px;height:60px;margin-top:14px;}
+  .chart i{flex:1;border-radius:3px 3px 0 0;background:linear-gradient(180deg,var(--purple),color-mix(in srgb,var(--purple) 45%,transparent));}
+  .vstats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border-radius:10px;overflow:hidden;margin-top:13px;}
+
+  /* strength summary — ONE card, not three */
+  .sg{display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid var(--line);}
+  .sg:last-of-type{border-bottom:none;}
+  .sg .nm{flex:1;min-width:0;}
+  .sg .nm .e{font-size:12.5px;font-weight:600;}
+  .sg .nm .s{font-family:var(--f-m);font-size:9.5px;color:var(--faint);margin-top:3px;}
+  .sg .rm{text-align:right;}
+  .sg .rm .v{font-family:var(--f-d);font-size:16px;font-weight:800;line-height:1;}
+  .sg .rm .u{font-family:var(--f-m);font-size:9px;color:var(--faint);}
+  .sg .pc{font-family:var(--f-m);font-size:11px;font-weight:700;width:52px;text-align:right;}
+  .pc.up{color:var(--good);} .pc.dn{color:var(--bad);} .pc.flat{color:var(--faint);}
+
+  /* compact link grid */
+  .lg{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .lc{border:1px solid var(--line);border-radius:12px;padding:13px;position:relative;overflow:hidden;}
+  .lc::before{content:"";position:absolute;left:0;top:11px;bottom:11px;width:3px;background:var(--h);border-radius:0 3px 3px 0;}
+  .lc .ic{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+          background:color-mix(in srgb,var(--h) 20%,transparent);color:var(--h);margin-bottom:9px;}
+  .lc .ic svg{width:14px;height:14px;}
+  .lc .n{font-size:12.5px;font-weight:700;}
+  .lc .s{font-family:var(--f-m);font-size:9px;color:var(--faint);margin-top:4px;}
+  .lc .v{font-family:var(--f-d);font-size:15px;font-weight:800;color:var(--h);margin-top:7px;}
+
+  .note{width:420px;font-size:12px;line-height:1.85;color:var(--subtle);border-left:2px solid var(--accent);padding-left:14px;}
+  .note b{color:var(--text);} .note code{font-family:var(--f-m);font-size:11px;color:var(--aqua);}
+</style></head>
+<body>
+
+<div>
+  <div class="lbl">Client progress · 375px</div>
+  <div class="phone">
+
+    <h1 class="d">Progress</h1>
+    <div class="sub">How am I progressing?</div>
+
+    <!-- ONE range control for the whole page -->
+    <div class="rng"><span class="rg on">This week</span><span class="rg">4 weeks</span><span class="rg">3 months</span></div>
+
+    <!-- RHYTHM -->
+    <div class="card rail" style="--h:var(--accent)">
+      <div class="big"><span class="n d">3</span><span class="l">workouts</span><span class="dt">Jul 27 – Aug 2</span></div>
+      <div class="tiles">
+        <div class="tl"><div class="v d">142<span style="font-size:10px">m</span></div><div class="k">Duration</div></div>
+        <div class="tl"><div class="v d">4.2<span style="font-size:10px">k</span></div><div class="k">Volume kg</div></div>
+        <div class="tl"><div class="v d" style="color:var(--gold)">3</div><div class="k">Streak</div></div>
+        <div class="tl"><div class="v d" style="color:var(--good)">75<span style="font-size:10px">%</span></div><div class="k">Adherence</div></div>
+      </div>
+      <div class="prog">Program · <b>3 of 4</b> required workouts this week</div>
+      <div class="days">
+        <div class="dy"><div class="bar"><i style="height:70%"></i></div><div class="d2">M</div></div>
+        <div class="dy"><div class="bar"></div><div class="d2">T</div></div>
+        <div class="dy"><div class="bar"><i style="height:100%"></i></div><div class="d2">W</div></div>
+        <div class="dy"><div class="bar"></div><div class="d2">T</div></div>
+        <div class="dy"><div class="bar"><i style="height:85%"></i></div><div class="d2">F</div></div>
+        <div class="dy"><div class="bar"></div><div class="d2">S</div></div>
+        <div class="dy"><div class="bar"></div><div class="d2">S</div></div>
+      </div>
+    </div>
+
+    <!-- RECENT -->
+    <div class="eb">Recent sessions</div>
+    <div class="sr">
+      <span class="dt"><div class="dw">FRI</div><div class="dd d">24</div><div class="mo">JUL</div></span>
+      <span class="bd"><div class="n">Strength test — Back Squat</div><div class="tag">Coach tested</div>
+        <div class="mt">1 set · 100 kg · 5 min</div></span>
+      <span class="cv"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M9 5l7 7-7 7"/></svg></span>
+    </div>
+    <div class="sr">
+      <span class="dt"><div class="dw">TUE</div><div class="dd d">21</div><div class="mo">JUL</div></span>
+      <span class="bd"><div class="n">Week 3 · Day 1</div>
+        <div class="mt">16 sets · 2,009 kg · 43 min</div></span>
+      <span class="cv"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M9 5l7 7-7 7"/></svg></span>
+    </div>
+    <div class="sr">
+      <span class="dt"><div class="dw">MON</div><div class="dd d">20</div><div class="mo">JUL</div></span>
+      <span class="bd"><div class="n">Week 1 · Day 2 — Lower 2</div>
+        <div class="mt">13 sets · 190 kg · 36 min</div></span>
+      <span class="cv"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M9 5l7 7-7 7"/></svg></span>
+    </div>
+    <a class="lnk">View full history →</a>
+
+    <!-- VOLUME -->
+    <div class="eb">Training volume</div>
+    <div class="card">
+      <div class="vh"><span class="n d">4.2<span class="u">k kg</span></span><span class="dl up">▲ 18% vs prev</span></div>
+      <div class="chart">
+        <i style="height:44%"></i><i style="height:52%"></i><i style="height:38%"></i><i style="height:61%"></i>
+        <i style="height:57%"></i><i style="height:70%"></i><i style="height:64%"></i><i style="height:82%"></i>
+      </div>
+      <div class="vstats">
+        <div class="tl"><div class="v d">16</div><div class="k">Sets this wk</div></div>
+        <div class="tl"><div class="v d">1,190</div><div class="k">Avg vol / wk</div></div>
+        <div class="tl"><div class="v d">1,242</div><div class="k">4-wk avg</div></div>
+      </div>
+    </div>
+
+    <!-- STRENGTH — one summary card -->
+    <div class="eb">Strength</div>
+    <div class="card">
+      <div class="sg">
+        <span class="nm"><div class="e">Back Squat</div><div class="s">est 1RM · 8 sessions</div></span>
+        <span class="rm"><div class="v d">100<span class="u"> kg</span></div></span>
+        <span class="pc up">+12%</span>
+      </div>
+      <div class="sg">
+        <span class="nm"><div class="e">Romanian Deadlift</div><div class="s">est 1RM · 11 sessions</div></span>
+        <span class="rm"><div class="v d">82.5<span class="u"> kg</span></div></span>
+        <span class="pc up">+7%</span>
+      </div>
+      <div class="sg">
+        <span class="nm"><div class="e">Leg Press Wide Stance</div><div class="s">est 1RM · 19 sessions</div></span>
+        <span class="rm"><div class="v d">140<span class="u"> kg</span></div></span>
+        <span class="pc flat">— 0%</span>
+      </div>
+      <a class="lnk" style="margin-top:12px">All lifts & charts →</a>
+    </div>
+
+    <!-- LINK GRID -->
+    <div class="eb">Explore</div>
+    <div class="lg">
+      <div class="lc" style="--h:var(--gold)">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M7 4h10v5a5 5 0 0 1-10 0zM12 14v3M9 21h6"/></svg></span>
+        <div class="n">Personal records</div><div class="s">Full list & timeline</div><div class="v d">12</div></div>
+      <div class="lc" style="--h:var(--aqua)">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg></span>
+        <div class="n">Performance</div><div class="s">Jumps, sprints, cardio</div><div class="v d">3</div></div>
+      <div class="lc" style="--h:var(--good)">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M12 3v18M5 8l7-5 7 5"/></svg></span>
+        <div class="n">Body</div><div class="s">Weight & measurements</div><div class="v d">54<span style="font-size:10px"> kg</span></div></div>
+      <div class="lc" style="--h:var(--purple)">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M9 3h6v4a3 3 0 0 1-6 0zM12 10v6M8 21h8"/></svg></span>
+        <div class="n">Mobility</div><div class="s">Coach assessments</div><div class="v d">2</div></div>
+      <div class="lc" style="--h:var(--hot)">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>
+        <div class="n">Recovery</div><div class="s">Load, sleep, soreness</div><div class="v d">Good</div></div>
+      <div class="lc" style="--h:var(--accent)">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8M21 7h-5V2"/></svg></span>
+        <div class="n">Full analytics</div><div class="s">All charts & trends</div><div class="v d">→</div></div>
+    </div>
+
+  </div>
+</div>
+
+<div class="note">
+  <b>Roughly half the height.</b> Seven screenfuls became about three.<br><br>
+  <b>One time control</b> for the page, at the top. Today there are <b>five independent ones</b> — Week/Month on rhythm, 8W/12W/6M on volume, and 1M/3M/6M/1Y/ALL on <i>each</i> strength card.<br><br>
+  <b>Strength collapsed to one summary card.</b> Today three full exercise cards render inline with their own charts and range pickers — then there's a "Strength charts" link <i>and</i> "Full analytics" (which embeds the same thing). Three routes to one screen. Now: three lifts, est 1RM, change, one link out.<br><br>
+  <b>Explore grid</b> — six 2-across tiles with a count each, replacing eight full-width rows. Each tells you something (12 PRs, 54 kg, 2 assessments) instead of just being a door.<br><br>
+  <b>Data problems this exposes — fix before shipping:</b><br>
+  · <b>"Jump Rope · est 1RM 20 kg · +300%"</b> as biggest gain. A 1RM for jump rope is meaningless. Est-1RM should only be computed for <b>loaded, muscle-tagged resistance exercises</b> — the same <code>athletic_development</code> exclusion the volume rail uses.<br>
+  · <b>"Deadlift · est 1RM 7.7 kg · −31%"</b>. Not a real deadlift. Likely a bodyweight/technique entry polluting the featured lifts.<br>
+  · <b>Performance shows "—"</b> for both tests — correct now that the module exists, but the section shouldn't render at all with nothing in it.<br><br>
+  <b>Performance problem in the console:</b> <code>progress-dash resolved</code> fires <b>twice</b> (3815ms, 3919ms), 9 parallel branches, ~9 Supabase calls each, plus a <code>(REPEAT)</code> query. That's a double fetch of a heavy page — worth fixing regardless of layout.<br><br>
+  <b>Desktop (≥1024):</b> two columns — rhythm + recent + volume left, strength + explore right; the explore grid goes 3-across. Nothing else changes.
+</div>
+
+</body></html>

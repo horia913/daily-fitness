@@ -1,12 +1,18 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Play, Loader2, Dumbbell, ChevronRight, PauseCircle, Moon } from "lucide-react";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { Badge } from "@/components/ui/badge";
 import { ProgramWeekState, type ProgramWeekDayCard } from "@/lib/programWeekStateBuilder";
-import { TrainingBlockService } from "@/lib/trainingBlockService";
-import { TrainingBlock, TRAINING_BLOCK_GOALS } from "@/types/trainingBlock";
+import { loadInstancePhases } from "@/lib/programInstance/instanceCanvasLoad";
+import { supabase } from "@/lib/supabase";
+import {
+  buildPhaseWeekRanges,
+  clientPhaseChipLabel,
+  formatClientWeekPositionLine,
+  resolvePhaseForAbsoluteWeek,
+} from "@/lib/clientInstancePhaseContext";
 
 interface ActiveProgramCardProps {
   programWeek: ProgramWeekState;
@@ -25,21 +31,6 @@ function todayOrdinalInWeek(): number {
   return ((new Date().getDay() + 6) % 7) + 1;
 }
 
-function getCurrentBlock(
-  blocks: TrainingBlock[],
-  absoluteWeek: number,
-): { block: TrainingBlock; weekWithinBlock: number } | null {
-  let accumulated = 0;
-  for (const block of blocks) {
-    accumulated += block.duration_weeks;
-    if (absoluteWeek <= accumulated) {
-      const weekWithinBlock = absoluteWeek - (accumulated - block.duration_weeks);
-      return { block, weekWithinBlock };
-    }
-  }
-  return null;
-}
-
 export function ActiveProgramCard({
   programWeek,
   weeklyProgress,
@@ -52,41 +43,62 @@ export function ActiveProgramCard({
   const {
     programId,
     programName,
-    currentUnlockedWeek,
-    currentWeekNumber,
+    programAssignmentId,
     totalWeeks,
     days,
     todaySlot,
     isRestDay,
     pauseStatus,
     pauseReason,
+    displayWeekNumber,
   } = programWeek;
 
-  const [trainingBlocks, setTrainingBlocks] = useState<TrainingBlock[]>([]);
-  const cachedProgramIdRef = useRef<string | null>(null);
-  const cachedBlocksRef = useRef<TrainingBlock[] | null>(null);
-  const inFlightProgramIdRef = useRef<string | null>(null);
+  const [phaseChipLabel, setPhaseChipLabel] = useState<string | null>(null);
+  const [weekWithinPhase, setWeekWithinPhase] = useState<number | null>(null);
+  const [phaseDurationWeeks, setPhaseDurationWeeks] = useState<number | null>(null);
+
+  const absoluteWeek =
+    displayWeekNumber > 0 ? displayWeekNumber : programWeek.currentWeekNumber;
 
   useEffect(() => {
-    if (pauseStatus === "paused" || !programId) return;
-    if (cachedProgramIdRef.current === programId && cachedBlocksRef.current) {
-      setTrainingBlocks(cachedBlocksRef.current);
+    if (pauseStatus === "paused" || !programAssignmentId) {
+      setPhaseChipLabel(null);
+      setWeekWithinPhase(null);
+      setPhaseDurationWeeks(null);
       return;
     }
-    if (inFlightProgramIdRef.current === programId) return;
-    inFlightProgramIdRef.current = programId;
-    cachedProgramIdRef.current = programId;
-    cachedBlocksRef.current = null;
-    const requestedId = programId;
-    TrainingBlockService.getTrainingBlocks(programId).then((data) => {
-      inFlightProgramIdRef.current = null;
-      const blocks = data ?? [];
-      if (cachedProgramIdRef.current === requestedId) {
-        cachedBlocksRef.current = blocks;
-        setTrainingBlocks(blocks);
+    let cancelled = false;
+    loadInstancePhases(supabase, programAssignmentId).then((phases) => {
+      if (cancelled) return;
+      const ranges = buildPhaseWeekRanges(phases);
+      const pos = resolvePhaseForAbsoluteWeek(absoluteWeek, ranges);
+      if (pos) {
+        setPhaseChipLabel(clientPhaseChipLabel(pos.range.phase));
+        setWeekWithinPhase(pos.weekWithinPhase);
+        setPhaseDurationWeeks(
+          Math.max(0, Math.floor(Number(pos.range.phase.duration_weeks) || 0)) || null,
+        );
+      } else {
+        setPhaseChipLabel(null);
+        setWeekWithinPhase(null);
+        setPhaseDurationWeeks(null);
       }
     });
-  }, [programId, pauseStatus]);
+    return () => {
+      cancelled = true;
+    };
+  }, [programAssignmentId, pauseStatus, absoluteWeek]);
+
+  const weekPositionLine = useMemo(
+    () =>
+      formatClientWeekPositionLine({
+        absoluteWeek,
+        totalWeeks,
+        weekWithinPhase,
+        phaseDurationWeeks,
+      }),
+    [absoluteWeek, totalWeeks, weekWithinPhase, phaseDurationWeeks],
+  );
 
   if (pauseStatus === "paused") {
     return (
@@ -112,10 +124,6 @@ export function ActiveProgramCard({
     );
   }
 
-  const blockInfo = trainingBlocks.length > 0
-    ? getCurrentBlock(trainingBlocks, currentUnlockedWeek)
-    : null;
-
   const safeGoal = Math.max(0, Math.floor(Number(weeklyProgress.goal) || 0));
   const safeCurrent = Math.max(0, Math.floor(Number(weeklyProgress.current) || 0));
   const weekPct =
@@ -133,20 +141,12 @@ export function ActiveProgramCard({
     if (!nextWorkout || isRestDay) return;
     if (!nextWorkout.scheduleId) {
       console.warn(
-        "[ActiveProgramCard] Next workout has no program_schedule id — snapshot/master mismatch; cannot start.",
+        "[ActiveProgramCard] Next workout has no program_day_assignment id; cannot start.",
       );
       return;
     }
-    onSelectDay?.(nextWorkout);
     onStartWorkout(nextWorkout.scheduleId);
   };
-
-  const goalChipLabel =
-    blockInfo?.block.goal === "custom" && blockInfo.block.custom_goal_label
-      ? blockInfo.block.custom_goal_label
-      : blockInfo
-        ? TRAINING_BLOCK_GOALS[blockInfo.block.goal]
-        : null;
 
   const todayOrdinal = todayOrdinalInWeek();
 
@@ -166,9 +166,9 @@ export function ActiveProgramCard({
             onClick={() => {
               window.location.href = `/client/programs/${programId}/details`;
             }}
-            className="inline-flex shrink-0 items-center gap-0.5 text-xs font-medium text-[var(--fc-accent-cyan)] hover:opacity-90"
+            className="inline-flex shrink-0 items-center gap-0.5 text-xs font-medium text-[var(--fc-accent)] hover:opacity-90"
           >
-            View outline
+            Full program details
             <ChevronRight className="h-3 w-3" aria-hidden />
           </button>
         ) : null}
@@ -181,14 +181,9 @@ export function ActiveProgramCard({
       >
         {programName ?? "Your program"}
       </h2>
-      {goalChipLabel ? (
+      {phaseChipLabel ? (
         <div className="mb-3.5 flex flex-wrap items-center gap-2">
-          <Badge variant="status-info">{goalChipLabel}</Badge>
-          {blockInfo?.block.name ? (
-            <span className="max-w-[55%] truncate text-xs fc-text-dim">
-              {blockInfo.block.name}
-            </span>
-          ) : null}
+          <Badge variant="status-info">{phaseChipLabel}</Badge>
         </div>
       ) : null}
 
@@ -223,7 +218,7 @@ export function ActiveProgramCard({
             style={{
               width: `${weekPct}%`,
               background:
-                "linear-gradient(90deg, var(--fc-accent-lime), var(--fc-accent-lime-2))",
+                "linear-gradient(90deg, var(--fc-accent), var(--fc-accent))",
             }}
           />
         </div>
@@ -234,7 +229,7 @@ export function ActiveProgramCard({
       <div className="mb-6 flex items-center">
         <div className="min-w-0 flex-1">
           <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
-            Phase
+            Program
           </div>
           <p
             className="text-base font-semibold leading-tight fc-text-primary"
@@ -242,7 +237,7 @@ export function ActiveProgramCard({
               fontFamily: "var(--font-bricolage-grotesque, var(--font-body))",
             }}
           >
-            Week {currentWeekNumber} of {totalWeeks}
+            {weekPositionLine}
           </p>
         </div>
         <div className="flex min-w-0 flex-1 justify-end text-right">
@@ -264,12 +259,12 @@ export function ActiveProgramCard({
 
       {!isRestDay && nextWorkout ? (
         <>
-          <div className="mb-4 flex items-center gap-3 rounded-r-lg border-l-2 border-l-cyan-500 pl-3 pr-1 py-2">
+          <div className="mb-4 flex items-center gap-3 rounded-r-lg border-l-2 border-l-[color:var(--fc-group-c)] pl-3 pr-1 py-2">
             <div
-              className="shrink-0 rounded-lg bg-cyan-500/20 p-2"
+              className="shrink-0 rounded-lg bg-[color-mix(in_srgb,var(--fc-group-c)_20%,transparent)] p-2"
               aria-hidden
             >
-              <Dumbbell className="h-5 w-5 text-cyan-400" />
+              <Dumbbell className="h-5 w-5 text-[color:var(--fc-group-c)]" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="mb-2 flex items-center gap-2">
@@ -282,14 +277,14 @@ export function ActiveProgramCard({
                 {exerciseCount > 0 ? `${exerciseCount} exercises` : "Workout"} • ~{nextWorkout.estimatedDuration || 45} min
               </p>
             </div>
-            <ChevronRight className="h-5 w-5 shrink-0 text-cyan-400" aria-hidden />
+            <ChevronRight className="h-5 w-5 shrink-0 text-[color:var(--fc-group-c)]" aria-hidden />
           </div>
 
           <button
             type="button"
             onClick={handleStart}
             disabled={isStarting && startingScheduleId === nextWorkout.scheduleId}
-            className="flex h-14 w-full items-center justify-center gap-2 rounded-xl font-bold text-white transition-all disabled:cursor-not-allowed disabled:opacity-50 bg-gradient-to-r from-cyan-600 to-cyan-400 shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40"
+            className="flex h-14 w-full items-center justify-center gap-2 rounded-xl font-bold text-white transition-all disabled:cursor-not-allowed disabled:opacity-50 bg-gradient-to-r from-[color-mix(in_srgb,var(--fc-group-c)_75%,black)] to-[color:var(--fc-group-c)] shadow-lg shadow-[0_0_24px_color-mix(in_srgb,var(--fc-group-c)_25%,transparent)] hover:shadow-[0_0_24px_color-mix(in_srgb,var(--fc-group-c)_40%,transparent)]"
           >
             {isStarting && startingScheduleId === nextWorkout.scheduleId ? (
               <>
@@ -308,10 +303,10 @@ export function ActiveProgramCard({
         <div
           className="rounded-[18px] border border-[color:var(--fc-glass-border)] px-4 py-5 text-center"
           style={{
-            background: `linear-gradient(135deg, rgba(79, 227, 232, 0.05) 0%, transparent 100%), var(--fc-surface-card)`,
+            background: `linear-gradient(135deg, rgba(34, 211, 238, 0.05) 0%, transparent 100%), var(--fc-surface-card)`,
           }}
         >
-          <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-cyan-500/15 text-cyan-400">
+          <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--fc-group-c)_15%,transparent)] text-[color:var(--fc-group-c)]">
             <Moon className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
           </div>
           <p

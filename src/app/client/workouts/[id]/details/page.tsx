@@ -159,6 +159,8 @@ interface AssignmentInfo {
   category?: string | null;
   estimatedDuration?: number | null;
   currentWeek?: number | null;
+  /** Program instance preview — start from Train, not assignment /start. */
+  isInstancePreview?: boolean;
 }
 
 interface PersonalRecord {
@@ -210,6 +212,12 @@ export default function WorkoutDetailsPage() {
     new Set()
   );
 
+  // Retired route: consolidate into the pre-start summary on `/start`.
+  useEffect(() => {
+    if (!id) return;
+    router.replace(`/client/workouts/${id}/start`);
+  }, [id, router]);
+
   // Expand all blocks by default when blocks load (client came to see the workout)
   useEffect(() => {
     if (blocks.length > 0) {
@@ -239,7 +247,85 @@ export default function WorkoutDetailsPage() {
           throw new Error("User not authenticated");
         }
 
-        let { data: assignmentRow, error: assignmentError } = await supabase
+        type AssignmentRow = {
+          id: string;
+          name: string;
+          description: string | null;
+          scheduled_date: string | null;
+          status: string | null;
+          workout_template_id: string | null;
+        };
+
+        let assignmentRow: AssignmentRow | null = null;
+        let instanceWorkoutBlocks: Awaited<
+          ReturnType<
+            typeof import("@/lib/instanceWorkoutBlocksMapper")["mapInstanceCanvasToSetEntries"]
+          >
+        > | null = null;
+        let instanceCategory: string | null = null;
+        let instanceEstimatedDuration: number | null = null;
+        let isInstancePreview = false;
+
+        const { data: instanceRow } = await supabase
+          .from("program_instance_workouts")
+          .select("id, name, estimated_duration, program_assignment_id")
+          .eq("id", assignmentId)
+          .maybeSingle();
+
+        if (instanceRow) {
+          const { data: ownedAssignment, error: ownedErr } = await supabase
+            .from("program_assignments")
+            .select("id")
+            .eq("id", instanceRow.program_assignment_id)
+            .eq("client_id", user.id)
+            .maybeSingle();
+
+          if (ownedErr) {
+            console.error("Error verifying instance ownership:", ownedErr);
+            throw new Error("Failed to load workout details");
+          }
+
+          if (!ownedAssignment) {
+            throw new Error("Workout not found");
+          }
+
+          const { loadInstanceWorkoutForCanvas } = await import(
+            "@/lib/programInstance/instanceCanvasLoad"
+          );
+          const { mapInstanceCanvasToSetEntries } = await import(
+            "@/lib/instanceWorkoutBlocksMapper"
+          );
+          const canvas = await loadInstanceWorkoutForCanvas(
+            supabase,
+            assignmentId,
+          );
+
+          if (!canvas) {
+            throw new Error("Workout not found");
+          }
+
+          isInstancePreview = true;
+          instanceWorkoutBlocks = mapInstanceCanvasToSetEntries(canvas);
+          instanceCategory = canvas.category ?? null;
+          instanceEstimatedDuration =
+            canvas.estimated_duration ??
+            instanceRow.estimated_duration ??
+            null;
+          assignmentRow = {
+            id: instanceRow.id,
+            name:
+              canvas.name?.trim() ||
+              instanceRow.name?.trim() ||
+              "Workout",
+            description: canvas.description ?? null,
+            scheduled_date: null,
+            status: "assigned",
+            workout_template_id: null,
+          };
+        }
+
+        if (!assignmentRow) {
+        let { data: legacyAssignmentRow, error: assignmentError } = await supabase
           .from("workout_assignments")
           .select(
             `
@@ -260,10 +346,7 @@ export default function WorkoutDetailsPage() {
           throw new Error("Failed to load workout details");
         }
 
-        if (!assignmentRow) {
-          console.warn(
-            "WorkoutDetailsPage -> assignment not found by ID, trying template fallback"
-          );
+        if (!legacyAssignmentRow) {
           const { data: fallbackAssignment, error: fallbackError } =
             await supabase
               .from("workout_assignments")
@@ -292,16 +375,21 @@ export default function WorkoutDetailsPage() {
           }
 
           if (!fallbackAssignment) {
-            throw new Error("Workout assignment not found");
+            throw new Error("Workout not found");
           }
 
-          assignmentRow = fallbackAssignment;
+          legacyAssignmentRow = fallbackAssignment;
         }
 
-        // Fetch workout template to get category and estimated_duration
-        let category: string | null = null;
-        let estimatedDuration: number | null = null;
-        if (assignmentRow.workout_template_id) {
+        assignmentRow = legacyAssignmentRow;
+        }
+
+        // Fetch workout template to get category and estimated_duration (legacy assignments only)
+        let category: string | null = isInstancePreview ? instanceCategory : null;
+        let estimatedDuration: number | null = isInstancePreview
+          ? instanceEstimatedDuration
+          : null;
+        if (!isInstancePreview && assignmentRow.workout_template_id) {
           const { data: template } = await supabase
             .from("workout_templates")
             .select("category, estimated_duration")
@@ -341,20 +429,29 @@ export default function WorkoutDetailsPage() {
           category,
           estimatedDuration,
           currentWeek,
+          isInstancePreview,
         });
 
-        // Fetch original blocks using workout_template_id from assignment
-        if (!assignmentRow.workout_template_id) {
-          throw new Error("Workout template ID not found in assignment");
-        }
+        let workoutBlocks: Awaited<
+          ReturnType<
+            typeof import("@/lib/workoutBlockService")["WorkoutBlockService"]["getWorkoutBlocks"]
+          >
+        >;
 
-        // Use WorkoutBlockService to fetch blocks (handles RLS properly)
-        const { WorkoutBlockService } = await import(
-          "@/lib/workoutBlockService"
-        );
-        const workoutBlocks = await WorkoutBlockService.getWorkoutBlocks(
-          assignmentRow.workout_template_id
-        );
+        if (instanceWorkoutBlocks) {
+          workoutBlocks = instanceWorkoutBlocks;
+        } else {
+          if (!assignmentRow.workout_template_id) {
+            throw new Error("Workout template ID not found in assignment");
+          }
+
+          const { WorkoutBlockService } = await import(
+            "@/lib/workoutBlockService"
+          );
+          workoutBlocks = await WorkoutBlockService.getWorkoutBlocks(
+            assignmentRow.workout_template_id
+          );
+        }
 
         if (!workoutBlocks || workoutBlocks.length === 0) {
           setBlocks([]);
@@ -1490,6 +1587,7 @@ export default function WorkoutDetailsPage() {
           </main>
 
           <div className={styles.stickyCta}>
+            {assignment.isInstancePreview ? null : (
             <Button
               type="button"
               variant="btn-action"
@@ -1506,6 +1604,7 @@ export default function WorkoutDetailsPage() {
                 Begin Workout
               </span>
             </Button>
+            )}
           </div>
         </ClientPageShell>
       </div>

@@ -1,0 +1,259 @@
+# AUDIT (READ-ONLY) — athlete score recompute-on-load
+**Date:** 2026-07-07  
+**Scope:** Cost, idempotency, stale-set size, existing paths, recommendation  
+**No code / git / migrations**
+
+---
+
+## Part 1 — `calculateAthleteScore` cost & shape
+
+**Source:** `src/lib/athleteScoreService.ts` — single exported callable: `calculateAthleteScore(clientId, supabaseAdmin)`.
+
+### Per-client flow
+
+| Step | What | Tables | Queries (approx.) |
+|------|------|--------|-------------------|
+| 1 | Profile targets | `profiles` | **1** |
+| 2 | Active assignment | `program_assignments` | **1** (`getActiveProgramAssignment`) |
+| Early exit | `no_program` / `paused` | — | **~2 reads total**, no write |
+| 3 | Instance week | `program_assignments`, `program_instance_phases`, optional `profiles.timezone` | **2–3** (`resolveInstanceWeekForAssignment` → `loadInstanceWeekInputs`) |
+| 4 | Schedule + completions | `program_day_assignments`, `program_day_completions` | **2** (parallel in main fn) |
+| 5 | Adherence for current week | Same schedule + completions **again** | **+2** (`fetchCanonicalAdherenceForWeek` duplicates step 4) |
+| Early exit | `no_data` (0 required slots this week) | — | **~7–8 reads**, no write |
+| 6 | Workout log IDs for completed slots | `workout_logs` | **1** |
+| 7 | Execution % | `workout_logs`, `program_day_assignments`, then per log: `workout_set_logs` + `loadInstancePrescriptionProtocolBundle` | **2 + (1 × logs) + (4–5 × unique instance workouts)** |
+| 8 | Recovery (display only) | `daily_wellness_logs` | **1** |
+| 9 | Persist | `athlete_scores` | **1 upsert** |
+
+**Bundle load** (`loadInstancePrescriptionProtocolBundle`) per distinct `program_instance_workout_id`: ~**4–5 reads** (`program_instance_set_entries`, exercises, protocols, prescriptions).
+
+**Computation:** in-process only — adherence %, optional execution average (`computeWorkoutAdherence`), wellness averages, `computeProgramAthleteScore` (pure math). No RPC. CPU is modest; **DB round-trips dominate**, especially execution with multiple completed workouts.
+
+### Query totals (typical)
+
+| Path | Round-trips |
+|------|-------------|
+| Skip: no program / paused | **~2** |
+| Skip: no_data | **~7–8** |
+| Success, 0–1 completed workouts (light) | **~12–16 reads + 1 write** |
+| Success, 2–4 completed workouts, 2–3 unique instance workouts | **~20–35 reads + 1 write** |
+
+**Note:** Schedule + completions are fetched **twice** on the success path (lines 141–150 and again inside `fetchCanonicalAdherenceForWeek`) — avoidable duplication if batching/refactoring later.
+
+### Batching
+
+- **Strictly one-at-a-time today.** No `calculateAthleteScoresForClients()` or batch score API.
+- Related batch helper exists only for **week resolution**: `resolveInstanceWeeksForAssignments` in `programInstanceResolver.ts` (not wired into score calc).
+- Daily cron loops clients sequentially: `for (const client of clients) { await calculateAthleteScore(...) }`.
+
+**Feasibility of recompute-all on list load:** Cheap for clients who **skip** early (~2 queries). Expensive for active-program clients with completions (20–35+ queries each). A coach roster of **N** clients with **A** active programs could mean **~(N−A)×2 + A×25** queries if you recompute everyone — wasteful when most have no program.
+
+---
+
+## Part 2 — Write behavior / idempotency
+
+### Insert vs upsert
+
+**Upsert, not insert-always.**
+
+```ts
+.from("athlete_scores")
+.upsert(rowPayload, { onConflict: "client_id,window_start,window_end" })
+```
+
+**Schema guard** (`migrations/20260217_athlete_scores.sql`):
+
+```sql
+UNIQUE(client_id, window_start, window_end)
+```
+
+`window_start` / `window_end` = current calendar week (client TZ) from `getCurrentWeekBoundsForClient`. **At most one row per client per week window.** Repeated calls in the same week **UPDATE** that row (`calculated_at`, scores, tier refresh) — **no row pile-up** from normal recomputes.
+
+Historical weeks remain as separate rows (one per past window); that is intentional history, not duplicates within a week.
+
+### When writes happen today
+
+| Trigger | Cadence | Who |
+|---------|---------|-----|
+| **Daily cron** `GET /api/cron/daily-sync` | ~1×/day (1 AM cron) | **Every** `profiles` row with `role = 'client'` platform-wide |
+| **Workout discard** `discardWorkoutSession.ts` | On discard completion | That `clientId` only |
+| **Client self-serve** `GET /api/client/athlete-score` | On demand if latest `calculated_at` **> 1 hour** old | Authenticated client only |
+
+Cron skips inside `calculateAthleteScore` do not write (`no_program`, `paused`, `no_data`). Successful path = **one upsert per client per run per week**.
+
+**Coach list** (`GET /api/coach/clients`): **read-only** for scores — `fetchCoachAthleteScoreSummariesByClientIds` (2 batched selects). **No recompute today.**
+
+### Safe to call repeatedly / on GET?
+
+| Concern | Assessment |
+|---------|------------|
+| Duplicate rows | **Low risk** — unique constraint + upsert |
+| Concurrent list loads, same client | Two parallel upserts same key → **last write wins**; same row updated, no duplicate keys |
+| Read skew | Both reads see same inputs; benign race — slightly different score if workout logged between reads |
+| Writes on GET | **Technically safe for data integrity**; **operationally risky** (latency, DB load, coupling, retries doubling work) |
+| Idempotency | **Same week → same row updated**; not “run once ever,” but **deduped per week window** |
+
+**No** once-per-day DB guard beyond the week-window unique key. Client endpoint uses a **1-hour read freshness** check before recomputing; cron has no throttle.
+
+---
+
+## Part 3 — The stale set (coach `b6014e58-f696-4606-bc63-d7707a21d5f1`)
+
+### Staleness rule (list UI)
+
+`computeScoreIsStale` in `coachClientListCardUtils.ts`:
+
+- `true` when `athleteScore` exists, `calculated_at` date **<** `metrics.lastActive` date
+- `false` when `lastActive` is **null** (even if score is months old)
+- `false` when no score row
+
+UI suppresses ring when `scoreIsStale` → shows **"—" / no score"** (not the stale number).
+
+### Eligible for `calculateAthleteScore`
+
+Writes only when **not** skipped:
+
+- Active `program_assignments` row (`status = 'active'`)
+- `pause_status !== 'paused'`
+- Current instance week has **required slots > 0** (`no_data` otherwise)
+
+No-program / paused / no-data clients: recompute is a **cheap skip**, not a fresh score.
+
+### Real picture for coach Horica
+
+**Source:** Confirmed DB read **2026-07-06** documented in `docs/audit-coach-clients-list-collection-card.txt`. **Not re-queried in this audit** (no DB credentials in workspace) — numbers below are from that snapshot; re-confirm before shipping.
+
+| Metric | Value |
+|--------|-------|
+| Roster size | **11** clients, all `active` |
+| Have `athlete_scores` row | **7 / 11** |
+| No score row | **4 / 11** (e t, Luminița, Andreea, generic “Client” ×2) |
+| Active program | **1** — **Client Popescu** `af9325e2-76e7-4df6-8ed7-9effd9c764d8` (“test nou 1”, start 2026-07-01) |
+| Popescu score | **0** / `benched`, `calculated_at` **2026-05-15** |
+| Popescu activity | Workouts **2026-07-01, 2026-07-02** → `lastActive` in July |
+| Popescu `scoreIsStale` | **Yes** (May 15 < July activity) — **prime example** |
+
+**Stale per UI rule (inferred from snapshot):**
+
+| Category | Count | Notes |
+|----------|-------|-------|
+| **`scoreIsStale === true`** | **~1** | Popescu (only client with both old score + newer `lastActive`) |
+| Has score, not stale per rule | **~6** | e.g. Roxana/Alice/Bob — old May scores but `lastActive` null or not after calc date; **UI still shows old ring** |
+| No score, no program | **4** | Recompute skips → still no row |
+| **Would produce new write if recomputed now** | **~1** | Popescu (active, unpaused, has July completions) |
+
+**Bounded?** For this coach: **yes — tiny (1 stale, 1 recompute-eligible).** At scale: stale set tracks **“activity since last calc”** among scored clients — typically **clients who trained after cron missed a day**, not whole roster. Upper bound ≈ clients with active programs who logged activity since last score (often **single digits** per coach), not all 11.
+
+**Caveat:** Staleness rule does **not** flag “old score, no recent activity” (Roxana 100 from May) — only **score date < lastActive**. Recompute-on-load aimed at Popescu-like cases, not refreshing every historical score.
+
+---
+
+## Part 4 — Existing recompute paths
+
+### Callable unit
+
+**Single function:** `calculateAthleteScore(clientId: string, supabaseAdmin: SupabaseClient)`  
+Returns `{ skipped: true, reason }` or `{ skipped: false, ...AthleteScore }`.  
+Helpers: `getLatestAthleteScore`, `getAthleteScoreHistory` (read-only).
+
+**No batch score function.**
+
+### Daily-sync cron
+
+`src/app/api/cron/daily-sync/route.ts`:
+
+1. `runDailyGoalSync()`
+2. `profiles.select('id').eq('role', 'client')` — **all platform clients**
+3. Sequential `calculateAthleteScore(client.id, supabaseAdmin)` per row
+
+Does **not** filter by coach, active program, or staleness. Missed/failed cron day → scores drift until next run or discard/client endpoint.
+
+### Workout-discard path
+
+`src/lib/discardWorkoutSession.ts` (~line 174): after metrics/PR/leaderboard recompute, `await calculateAthleteScore(clientId, supabaseAdmin)` (errors collected in `recomputeWarnings`, non-blocking for discard success).
+
+### On-demand endpoints
+
+| Endpoint | Role | Behavior |
+|----------|------|----------|
+| `GET /api/client/athlete-score` | Client | Recompute if no score or `calculated_at` older than **1 hour** |
+| Coach list / coach detail | — | **No** recompute |
+| Coach admin “refresh score” | — | **Does not exist** |
+
+**Reuse for on-load:** call the same `calculateAthleteScore` per targeted `clientId` with service-role client (as cron/discard do).
+
+---
+
+## Part 5 — Recommendation
+
+### Summary judgment
+
+| Approach | Verdict |
+|----------|---------|
+| Recompute **all** roster clients on list load | **Reject** — mostly cheap skips but wasteful; scales poorly if applied platform-wide |
+| Recompute **only stale** (`scoreIsStale`) + **eligible** (active, unpaused) | **Accept** — small bounded set (Popescu = 1 on sample coach) |
+| **Synchronous** on `GET /api/coach/clients` | **Avoid** for default — adds 20–35+ queries and write latency per eligible client; blocks coach UI |
+| **Async / after-response** | **Prefer** — return current list immediately; refresh scores for next load |
+| **Separate trigger** vs inline | **Prefer** dedicated helper invoked fire-and-forget or short background job; keep list GET read-mostly |
+| Duplicate-row risk | **Low** — upsert + `UNIQUE(client_id, window_start, window_end)` |
+| Concurrency | **Acceptable** — last-write-wins on same row |
+
+### Recommended approach
+
+1. **Target set (intersection):**
+   - `scoreIsStale === true` (already computed on list route), **and**
+   - `hasActiveProgram` / active assignment, **and**
+   - `pauseStatus !== 'paused'`
+   - Optional: cap **e.g. 5 clients per request** to bound worst case.
+
+2. **Execution model: async, non-blocking**
+   - `GET /api/coach/clients` returns immediately with current `athleteScore` + `scoreIsStale`.
+   - After response (or parallel without awaiting): `calculateAthleteScore` for each target ID.
+   - Next list load picks up fresh rows via existing `fetchCoachAthleteScoreSummariesByClientIds`.
+   - On serverless: use `waitUntil` / background task if available; otherwise document that refresh may require **second navigation** unless you add polling.
+
+3. **Throttle (mirror client API)**
+   - Skip recompute if `calculated_at` within last **1 hour** even when stale flag set — avoids refresh storms.
+   - Or: only recompute if stale **and** `calculated_at` older than 1h.
+
+4. **Do not** fold into synchronous list GET without a cap — Popescu-sized coach is fine; 20+ active stale clients is not.
+
+5. **Cron improvement (separate, optional)** — filter cron to clients with active `program_assignments` instead of all `role=client` — reduces platform cost; does not replace on-load stale fix.
+
+6. **No schema change required** for idempotency — existing upsert is sufficient.
+
+### Risks to flag
+
+| Risk | Severity |
+|------|----------|
+| Writes triggered by read traffic | Medium — coach refreshes list repeatedly → repeated upserts same week (mitigate with 1h throttle) |
+| Cost at scale (many coaches × stale clients) | Medium if sync; Low if stale-only + async + cap |
+| Row pile-up | **Low** (confirmed upsert + unique) |
+| Stale rule gaps | Medium — clients with old scores but `lastActive` null still show stale **numbers** (not Popescu’s case) |
+| Background task killed on serverless | Medium — async may not finish; user may need second load |
+| `fetchCoachAthleteScoreSummaries` ordering | Minor — fetches all score rows per client IN clause then picks first seen; works but not “latest per client” in SQL |
+
+### Why this over alternatives
+
+- **Sync recompute-then-return:** Fixes Popescu in one load but violates read-path write hygiene and scales with execution-query cost.
+- **Recompute all:** ~22 wasted skip-queries for Horica’s 10 no-program clients on every load.
+- **Client-only endpoint:** Does not help coach list; Popescu never hits coach recompute unless client opens app.
+- **Stale-only async + throttle:** Matches product goal (fresh ring when activity outran cron), minimal DB work, reuses proven `calculateAthleteScore` + upsert semantics.
+
+---
+
+## Evidence map
+
+| Claim | Source |
+|-------|--------|
+| Query / upsert behavior | `src/lib/athleteScoreService.ts` (read in full) |
+| Unique constraint | `migrations/20260217_athlete_scores.sql` |
+| Cron loop | `src/app/api/cron/daily-sync/route.ts` |
+| Discard path | `src/lib/discardWorkoutSession.ts` |
+| Client on-demand + 1h gate | `src/app/api/client/athlete-score/route.ts` |
+| List stale flag | `coachClientListCardUtils.ts`, `src/app/api/coach/clients/route.ts` |
+| Coach Horica roster / Popescu | `docs/audit-coach-clients-list-collection-card.txt` (DB **2026-07-06**, **not re-run here**) |
+
+---
+
+**End of audit. No code changes. No git.**

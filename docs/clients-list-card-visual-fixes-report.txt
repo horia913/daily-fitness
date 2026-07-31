@@ -1,0 +1,85 @@
+# CLIENTS LIST CARD — visual fixes (match mockup)
+**Date:** 2026-07-06  
+**Mockup:** `design/mockups/coach-04-clients-card-mockup.html`  
+**Scope:** List-mode client cards only — presentation/CSS
+
+---
+
+## 1. Files changed
+
+| Path | Change |
+|------|--------|
+| `src/components/ui/CollectionCard.tsx` | Additive `glowVariant` + `density` props (opt-in) |
+| `src/components/ui/collectionCard.module.css` | `.glowSubtle`, `.cardCompact`, `.sideCompact`, `.body` gap under compact |
+| `src/app/coach/clients/CoachClientListCard.tsx` | Dedicated list ring; stale/null → `—`; meta phrasing; passes `glowVariant` + `density` |
+| `src/app/coach/clients/coachClients.module.css` | `.listCardScoreRing*` layout (centered arc + value) |
+
+**Untouched:** `page.tsx` fetch/filter logic, API route, grid (`CoachClientGridCard`), `CoachClientListScoreChip` (grid), Programs/nutrition roster cards.
+
+---
+
+## 2. Diff table — client list card vs mockup CSS
+
+| Mockup token / rule | Mockup value | Before (list card) | After (list card) |
+|---------------------|--------------|--------------------|-------------------|
+| `.card::after` glow mix | `28%` color-mix, `width: 46%` | Shared Element 16 `32%` / 46% — **too strong on green/red** | **`glowSubtle`:** `14%` mix, `width: 30%`, fade `72%` — client card only |
+| `.card` padding | `20px 22px 18px 26px` | Same (shared) | **`cardCompact`:** `16px 18px 14px 22px` |
+| `.side` layout | `gap: 14px`, stat + actions stacked | `justify-content: space-between` — tall empty band | **`sideCompact`:** `flex-start`, `gap: 10px` |
+| `.ring` size | `48×48` | 48px chip layout / stale label below | **`46×46`** dedicated ring, no sublabel |
+| `.ring .val` | absolute inset, `14px` mono, tier color | Value sometimes mis-positioned (missing inset) | **Centered inside ring** via `.listCardScoreRingValue` |
+| `.ring` arc | `stroke-dashoffset` proportional | Same math, wrong wrapper | **SVG −90° + arc + centered number** |
+| `.nostat` | `—` + `no score` sub | Stale showed `⚠ stale · date` + ring | **Stale + null → `—` / no score** (no marker, no 0) |
+| `.meta` indent | `padding-left: 42px` | ✓ (via `metaIndented`) | ✓ unchanged |
+| `.avatar` | `30×30` | ✓ | ✓ unchanged |
+| `.name` | `18px` | `19px` (shared) | **`18px` under `cardCompact`** |
+| Activity null | `Active —` or omit | `Active Never trained` | **`No recent activity`** |
+| Check-in null | omitted (Luminița) | `Never checked in` when program | **Segment omitted** when no `lastCheckinDate` |
+| Actions order | pause → chevron | ✓ | ✓ unchanged |
+
+---
+
+## 3. Glow value + programs/nutrition/grid confirmation
+
+**Client list card glow (`glowSubtle`):**
+```css
+width: 30%;
+color-mix(in srgb, var(--collection-hue) 14%, transparent);
+transparent 72%;
+```
+
+**Default glow (programs, nutrition, any card without `glowVariant="subtle"`):** unchanged at `32%` mix / `46%` width.
+
+**Confirmation:**
+- Programs / nutrition panels do **not** pass `glowVariant` or `density` → identical to before.
+- Clients **grid** still uses `CoachClientGridCard` + `CoachClientListScoreChip` → unchanged.
+- Only `CoachClientListCard` passes `glowVariant="subtle"` and `density="compact"`.
+
+---
+
+## 4. Fix summaries
+
+### Ring
+- New `ClientListScoreRing` in `CoachClientListCard.tsx` (not the grid chip).
+- 46px ring, 4px stroke, tier-colored arc + **number centered inside** (`position: absolute; inset: 0`).
+
+### Stale / null
+- `CoachClientListScoreStat`: ring only when `athleteScore != null && !scoreIsStale`.
+- Otherwise muted **`—`** + **`no score`** sublabel. No stale warning, no date, no zero ring.
+
+### Density
+- `density="compact"` on client list card: reduced padding, `align-items: flex-start`, side column no longer `space-between`, body gap 8px, name 18px.
+
+### Meta phrasing
+- `lastActive` null → **"No recent activity"** (not "Active Never trained").
+- `lastCheckinDate` null → check-in segment **omitted**.
+
+---
+
+## 5. `tsc` result
+
+```
+npx tsc --noEmit
+exit code: 0
+```
+
+No git commits. No data/logic/fetch changes.

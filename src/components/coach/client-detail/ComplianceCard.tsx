@@ -21,7 +21,7 @@ function pctTone(pct: number): ComplianceCardAccent {
 
 export default function ComplianceCard({
   pct,
-  label = "Compliance",
+  label = "Adherence",
   name = "Client overview",
   accent,
 }: Props) {

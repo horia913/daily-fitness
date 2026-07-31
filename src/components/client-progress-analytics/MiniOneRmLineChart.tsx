@@ -71,17 +71,17 @@ export function MiniOneRmLineChart({
             />
           );
         })}
-        <path d={d} fill="none" stroke="var(--cyan)" strokeWidth={2} strokeLinejoin="round" />
+        <path d={d} fill="none" stroke="var(--fc-accent)" strokeWidth={2} strokeLinejoin="round" />
         {last ? (
           <>
             <circle
               cx={last.x}
               cy={last.y}
               r={6}
-              fill="var(--cyan)"
+              fill="var(--fc-accent)"
               fillOpacity={0.3}
             />
-            <circle cx={last.x} cy={last.y} r={3} fill="var(--cyan)" />
+            <circle cx={last.x} cy={last.y} r={3} fill="var(--fc-accent)" />
           </>
         ) : null}
       </svg>

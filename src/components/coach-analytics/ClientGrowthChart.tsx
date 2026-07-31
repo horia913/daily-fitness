@@ -22,7 +22,7 @@ export function ClientGrowthChart({
       <div className={hub.sectionCard}>
         <div className={hub.sectionHead}>
           <div className={hub.sectionHeadLeft}>
-            <TrendingUp className="size-3 shrink-0" style={{ color: 'var(--cyan)' }} aria-hidden />
+            <TrendingUp className="size-3 shrink-0" style={{ color: 'var(--fc-accent)' }} aria-hidden />
             <span className={hub.sectionTitle}>Client growth</span>
           </div>
           <span className={hub.sectionMeta}>90d</span>
@@ -46,7 +46,7 @@ export function ClientGrowthChart({
     <div className={hub.sectionCard}>
       <div className={hub.sectionHead}>
         <div className={hub.sectionHeadLeft}>
-          <TrendingUp className="size-3 shrink-0" style={{ color: 'var(--cyan)' }} aria-hidden />
+          <TrendingUp className="size-3 shrink-0" style={{ color: 'var(--fc-accent)' }} aria-hidden />
           <span className={hub.sectionTitle}>Client growth</span>
         </div>
         <div className="flex items-center gap-2">
@@ -83,8 +83,8 @@ export function ClientGrowthChart({
             <AreaChart data={series} margin={{ top: 6, right: 8, left: 0, bottom: 2 }}>
               <defs>
                 <linearGradient id="cgFillCoach" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#4FE3E8" stopOpacity={0.4} />
-                  <stop offset="100%" stopColor="#4FE3E8" stopOpacity={0} />
+                  <stop offset="0%" stopColor="var(--fc-group-c)" stopOpacity={0.4} />
+                  <stop offset="100%" stopColor="var(--fc-group-c)" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <XAxis dataKey="label" hide />
@@ -92,7 +92,7 @@ export function ClientGrowthChart({
               <Area
                 type="monotone"
                 dataKey="count"
-                stroke="#4FE3E8"
+                stroke="var(--fc-group-c)"
                 strokeWidth={2}
                 fill="url(#cgFillCoach)"
                 isAnimationActive={false}
@@ -103,8 +103,8 @@ export function ClientGrowthChart({
                   }
                   return (
                     <g>
-                      <circle cx={cx} cy={cy} r={6} fill="rgba(79,227,232,0.2)" />
-                      <circle cx={cx} cy={cy} r={3.5} fill="#4FE3E8" />
+                      <circle cx={cx} cy={cy} r={6} fill="rgba(34, 211, 238, 0.2)" />
+                      <circle cx={cx} cy={cy} r={3.5} fill="var(--fc-group-c)" />
                     </g>
                   )
                 }}

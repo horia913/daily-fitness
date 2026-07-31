@@ -174,7 +174,7 @@ export function RestTimerBar({
                   style={{
                     color: isCompleted
                       ? "var(--fc-status-success)"
-                      : "#22d3ee",
+                      : "var(--fc-group-c)",
                   }}
                 />
               </div>
@@ -214,7 +214,7 @@ export function RestTimerBar({
                 e.stopPropagation();
                 handleSkip();
               }}
-              className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-0 text-cyan-400"
+              className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-group-c)] focus:ring-offset-0 text-[color:var(--fc-group-c)]"
             >
               Skip
             </button>

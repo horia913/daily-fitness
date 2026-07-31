@@ -12,7 +12,6 @@ import {
   Activity,
   ChevronRight,
   User,
-  CreditCard
 } from 'lucide-react'
 
 interface Client {
@@ -62,7 +61,7 @@ export default function ClientDetailModal({ client, onClose, onSelectFunction }:
     {
       id: 'adherence',
       title: 'Client Adherence',
-      description: 'Workout & nutrition compliance',
+      description: 'Workout & nutrition adherence',
       icon: BarChart3,
       iconBg: 'fc-icon-workouts'
     },
@@ -79,13 +78,6 @@ export default function ClientDetailModal({ client, onClose, onSelectFunction }:
       description: 'Sleep, water, steps, cardio',
       icon: Flame,
       iconBg: 'fc-icon-habits'
-    },
-    {
-      id: 'subscription',
-      title: 'Subscription',
-      description: 'Coaching plan and renewal dates',
-      icon: CreditCard,
-      iconBg: 'fc-icon-neutral'
     },
     {
       id: 'analytics',

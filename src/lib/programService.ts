@@ -9,8 +9,8 @@
 import { supabase } from './supabase'
 import {
   getProgramState,
-  getActiveProgramAssignment,
 } from './programStateService'
+import { resolveInstanceWeekForAssignment } from './programInstanceResolver'
 
 export interface ActiveProgram {
   id: string
@@ -43,6 +43,9 @@ export async function getActiveProgram(clientId: string): Promise<ActiveProgram 
     
     if (!state.assignment) return null
 
+    const weekRes = await resolveInstanceWeekForAssignment(supabase, state.assignment.id)
+    const durationWeeks = weekRes?.totalWeeks ?? 0
+
     // Calculate average workouts per week from slots
     let workouts_per_week: number | null = null
     if (state.slots.length > 0) {
@@ -56,7 +59,7 @@ export async function getActiveProgram(clientId: string): Promise<ActiveProgram 
       client_id: state.assignment.client_id,
       start_date: state.assignment.start_date || '',
       total_days: state.assignment.total_days || state.totalSlots,
-      duration_weeks: state.assignment.duration_weeks || 0,
+      duration_weeks: durationWeeks,
       workouts_per_week,
       current_week_number: state.currentWeekNumber,
       current_day_number: state.currentDayNumber,
@@ -108,12 +111,12 @@ export async function getCompleteWeeks(clientId: string): Promise<WeekCompletion
     const uniqueWeeks = [...new Set(state.slots.map(s => s.week_number))].sort((a, b) => a - b)
     
     // Build set of completed schedule IDs for fast lookup
-    const completedScheduleIds = new Set(state.completedSlots.map(c => c.program_schedule_id))
+    const completedScheduleIds = new Set(state.completedSlots.map(c => c.program_day_assignment_id))
 
     return uniqueWeeks.map(weekNum => {
       const slotsInWeek = state.slots.filter(s => s.week_number === weekNum)
       const completedInWeek = slotsInWeek.filter(
-        (s) => s.id != null && completedScheduleIds.has(s.id),
+        (s) => completedScheduleIds.has(s.id),
       ).length
 
       return {

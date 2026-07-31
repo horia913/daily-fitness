@@ -1,36 +1,33 @@
 /* Habit library modal v1 — scoped v6 tokens */
 .root {
-  --bg: #07101a;
-  --card: #0e1f2e;
-  --card-2: #0b1824;
-  --line: rgba(255, 255, 255, 0.08);
-  --line-2: rgba(255, 255, 255, 0.05);
-  --t1: #fff;
-  --t2: rgba(255, 255, 255, 0.65);
-  --t3: rgba(255, 255, 255, 0.42);
-  --t4: rgba(255, 255, 255, 0.26);
-  --cyan: #4fe3e8;
-  --cyan-soft: rgba(79, 227, 232, 0.12);
-  --cyan-dim: rgba(79, 227, 232, 0.18);
-  --lime: #c5ff4a;
-  --lime-2: #7fe89a;
-  --lime-soft: rgba(197, 255, 74, 0.14);
-  --lime-text: #0a1a18;
-  --good: #34d399;
-  --good-soft: rgba(52, 211, 153, 0.12);
-  --good-dim: rgba(52, 211, 153, 0.25);
-  --warning: #f5c242;
-  --warning-soft: rgba(245, 194, 66, 0.12);
-  --warning-dim: rgba(245, 194, 66, 0.28);
+  --bg: var(--fc-bg-deep);
+  --card: var(--fc-surface-card);
+  --card-2: var(--fc-bg-deep);
+  --line: var(--fc-glass-border);
+  --line-2: var(--fc-hairline);
+  --t1: var(--fc-text-primary);
+  --t2: var(--fc-text-dim);
+  --t3: var(--fc-text-subtle);
+  --t4: var(--fc-text-quaternary);
+  --good: var(--fc-status-success);
+  --good-soft: color-mix(in srgb, var(--fc-status-success) 12%, transparent);
+  --good-dim: color-mix(in srgb, var(--fc-status-success) 25%, transparent);
+  --warning: var(--fc-status-warning);
+  --warning-soft: color-mix(in srgb, var(--fc-status-warning) 12%, transparent);
+  --warning-dim: color-mix(in srgb, var(--fc-status-warning) 25%, transparent);
+  --critical: var(--fc-status-error);
+  --critical-soft: color-mix(in srgb, var(--fc-status-error) 12%, transparent);
+  --f-head: var(--f-headline);
+  --f-body: var(--font-body);
+  --f-mono: var(--f-mono);
+  --f-display: var(--f-display);
+
   --purple: #a78bfa;
   --purple-soft: rgba(167, 139, 250, 0.12);
   --purple-dim: rgba(167, 139, 250, 0.22);
   --rose: #f472b6;
   --rose-soft: rgba(244, 114, 182, 0.12);
   --rose-dim: rgba(244, 114, 182, 0.22);
-  --f-head: "Bricolage Grotesque", var(--font-geist-sans, system-ui, sans-serif);
-  --f-body: var(--font-geist-sans, "Geist", system-ui, sans-serif);
-  --f-mono: var(--font-geist-mono, "Geist Mono", ui-monospace, monospace);
 }
 
 .portalRoot {
@@ -48,8 +45,6 @@
   position: absolute;
   inset: 0;
   background: rgba(2, 8, 18, 0.7);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
   opacity: 0;
   animation: habitLibBackdropIn 200ms ease-out forwards;
 }
@@ -111,7 +106,7 @@
   width: 38px;
   height: 4px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--fc-glass-border);
   margin: 8px auto 0;
   flex-shrink: 0;
 }
@@ -194,20 +189,20 @@
   font-family: var(--f-mono);
   font-size: 9px;
   color: var(--t4);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
   padding: 1px 5px;
   border-radius: 6px;
 }
 
 .chipActiveCyan {
-  background: var(--cyan-soft);
-  border-color: var(--cyan-dim);
-  color: var(--cyan);
+  background: var(--fc-accent-dim);
+  border-color: var(--fc-accent-glow);
+  color: var(--fc-accent);
 }
 
 .chipActiveCyan .chipCount {
-  background: rgba(79, 227, 232, 0.16);
-  color: var(--cyan);
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
 }
 
 .chipActiveGood {
@@ -217,19 +212,19 @@
 }
 
 .chipActiveGood .chipCount {
-  background: rgba(52, 211, 153, 0.16);
+  background: color-mix(in srgb, var(--fc-status-success) 16%, transparent);
   color: var(--good);
 }
 
-.chipActiveLime {
-  background: var(--lime-soft);
-  border-color: rgba(197, 255, 74, 0.28);
-  color: var(--lime);
+.chipActiveAction {
+  background: var(--fc-accent-dim);
+  border-color: var(--fc-accent-glow);
+  color: var(--fc-accent);
 }
 
-.chipActiveLime .chipCount {
-  background: rgba(197, 255, 74, 0.14);
-  color: var(--lime);
+.chipActiveAction .chipCount {
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
 }
 
 .chipActivePurple {
@@ -314,20 +309,20 @@
 }
 
 .row:hover:not(.rowAdded) {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--fc-surface-sunken);
   border-color: var(--line);
 }
 
 @media (hover: hover) {
   .rowDefault:hover:not(:focus-visible) {
-    border-color: var(--cyan);
-    box-shadow: 0 0 0 1px var(--cyan-dim);
+    border-color: var(--fc-accent);
+    box-shadow: 0 0 0 1px var(--fc-accent-glow);
   }
 }
 
 .rowAdded {
-  background: rgba(52, 211, 153, 0.04);
-  border-color: rgba(52, 211, 153, 0.18);
+  background: color-mix(in srgb, var(--fc-status-success) 4%, transparent);
+  border-color: color-mix(in srgb, var(--fc-status-success) 18%, transparent);
 }
 
 .rowAdded::before {
@@ -389,9 +384,9 @@
   width: 28px;
   height: 28px;
   border-radius: 9px;
-  background: var(--cyan-soft);
-  border: 1px solid var(--cyan-dim);
-  color: var(--cyan);
+  background: var(--fc-accent-dim);
+  border: 1px solid var(--fc-accent-glow);
+  color: var(--fc-accent);
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -401,7 +396,7 @@
 }
 
 .row:hover .addBtn {
-  background: rgba(79, 227, 232, 0.18);
+  background: var(--fc-accent-glow);
   transform: scale(1.05);
 }
 
@@ -419,9 +414,9 @@
 
 /* Category icon badge colors on rows */
 .tintCyan {
-  background: var(--cyan-soft);
-  color: var(--cyan);
-  border: 1px solid var(--cyan-dim);
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
+  border: 1px solid var(--fc-accent-glow);
 }
 
 .tintGood {
@@ -436,10 +431,10 @@
   border: 1px solid var(--warning-dim);
 }
 
-.tintLime {
-  background: var(--lime-soft);
-  color: var(--lime);
-  border: 1px solid rgba(197, 255, 74, 0.28);
+.tintAction {
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
+  border: 1px solid var(--fc-accent-glow);
 }
 
 .tintPurple {
@@ -455,7 +450,7 @@
 }
 
 .tintMuted {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
   color: var(--t3);
   border: 1px solid var(--line);
 }
@@ -470,7 +465,7 @@
   text-transform: uppercase;
   background: var(--good-soft);
   color: var(--good);
-  border: 1px solid rgba(52, 211, 153, 0.25);
+  border: 1px solid color-mix(in srgb, var(--fc-status-success) 25%, transparent);
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -484,7 +479,7 @@
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--fc-surface-sunken);
   color: var(--t3);
   border: 1px solid var(--line);
   display: inline-flex;
@@ -539,7 +534,7 @@
 
 .footerDotGlow {
   background: var(--good);
-  box-shadow: 0 0 6px var(--good);
+  box-shadow: none;
 }
 
 .footerSub {
@@ -570,7 +565,7 @@
 }
 
 .btnOutline:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--fc-surface-sunken);
   color: var(--t1);
 }
 
@@ -596,9 +591,9 @@
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  color: var(--lime-text);
-  background: linear-gradient(135deg, var(--lime) 0%, var(--lime-2) 100%);
-  box-shadow: 0 4px 16px rgba(197, 255, 74, 0.22);
+  color: var(--fc-ink);
+  background: linear-gradient(135deg, var(--fc-accent) 0%, var(--fc-accent) 100%);
+  box-shadow: 0 4px 16px var(--fc-accent-glow);
 }
 
 .btnPrimary:hover:not(:disabled) {
@@ -623,7 +618,7 @@
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
   color: var(--t3);
   display: grid;
   place-items: center;
@@ -679,7 +674,7 @@
   font-weight: 500;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--cyan);
+  color: var(--fc-accent);
   display: flex;
   align-items: center;
   gap: 5px;
@@ -690,8 +685,7 @@
   height: 5px;
   border-radius: 50%;
   background: currentColor;
-  box-shadow: 0 0 6px currentColor;
-  flex-shrink: 0;
+    flex-shrink: 0;
 }
 
 .modalTitle {
@@ -728,7 +722,7 @@
 
 .modalCloseBtn:hover {
   color: var(--t1);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
 }
 
 .searchBar {
@@ -765,7 +759,7 @@
   width: 18px;
   height: 18px;
   border-radius: 5px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--fc-surface-sunken);
   color: var(--t3);
   border: none;
   display: grid;

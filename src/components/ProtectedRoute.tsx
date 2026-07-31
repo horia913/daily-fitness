@@ -74,7 +74,7 @@ export default function ProtectedRoute({ children, requiredRole, allowedRoles }:
   if (loading) {
     return (
       <div className="min-h-screen fc-app-bg flex flex-col items-center justify-center">
-        <div className="w-8 h-8 rounded-full animate-spin border-2 border-cyan-400 border-t-transparent" />
+        <div className="w-8 h-8 rounded-full animate-spin border-2 border-[color:var(--fc-group-c)] border-t-transparent" />
       </div>
     );
   }
@@ -86,7 +86,7 @@ export default function ProtectedRoute({ children, requiredRole, allowedRoles }:
   if (needsProfileForRole && !profile) {
     return (
       <div className="min-h-screen fc-app-bg flex flex-col items-center justify-center">
-        <div className="w-8 h-8 rounded-full animate-spin border-2 border-cyan-400 border-t-transparent" />
+        <div className="w-8 h-8 rounded-full animate-spin border-2 border-[color:var(--fc-group-c)] border-t-transparent" />
       </div>
     );
   }

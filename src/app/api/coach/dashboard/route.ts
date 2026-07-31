@@ -12,6 +12,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import type { CoachAthleteScoreSummary } from '@/types/coachAthleteScore'
+import { isAthleteScoreCurrent } from '@/lib/athleteScoreFreshness'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -108,6 +109,7 @@ export async function GET() {
 
       for (const row of scoreRows ?? []) {
         if (!latestByClient.has(row.client_id)) {
+          if (!isAthleteScoreCurrent(row.calculated_at)) continue
           latestByClient.set(row.client_id, { score: row.score, tier: row.tier })
         }
       }

@@ -1,0 +1,97 @@
+RESKIN Phase 3 · Part B — protocols onto LiveCard v6
+Date: 2026-07-17
+No git. All four protocol executors wired in one pass.
+
+================================================================================
+1. FILES MODIFIED
+================================================================================
+  src/components/client/workout-execution/blocks/AmrapExecutor.tsx
+  src/components/client/workout-execution/blocks/EmomExecutor.tsx
+  src/components/client/workout-execution/blocks/TabataExecutor.tsx
+  src/components/client/workout-execution/blocks/ForTimeExecutor.tsx
+
+Shared live-card package: unchanged this pass (reused as-is).
+
+================================================================================
+2. DIFF TABLE vs mockup §4
+================================================================================
+AMRAP
+| Mockup piece                              | Status | Notes |
+|-------------------------------------------|--------|-------|
+| Grouped gx = round exercises (reference)  | Yes    | LiveCardGroupedExercise logged + loggedValue from prescription |
+| Heading / in-progress                     | Partial| Heading "Round"; status "● In progress" (no round-count state) |
+| Log: Rounds done + +reps                  | Gap    | Wired Weight + Total Reps (existing amrap_total_reps write) |
+| Glue: "as many rounds as possible" + clock| Yes    | Live timeRemaining |
+
+EMOM
+| Mockup piece                              | Status | Notes |
+|-------------------------------------------|--------|-------|
+| Solo; Minute N of M                       | Yes    | |
+| Primary target (reps×weight / reps-only)  | Yes    | |
+| Log: Weight + Reps + ✓                    | Yes    | Existing per-minute write unchanged |
+| Glue: "next minute" + interval clock      | Yes    | Live timeRemaining |
+| Unit list (Min 1–3 done rows)             | Partial| LoggedSetsList below card (not srow inside group) |
+
+Tabata
+| Mockup piece                              | Status | Notes |
+|-------------------------------------------|--------|-------|
+| Solo; Round N of M                        | Partial| Heading "Round 1 of M" (no per-round progression write) |
+| Target "20 sec work"                      | Yes    | kind: time, unit "sec work" |
+| Log: Reps this round + ✓                  | Gap    | Field shown; ✓ disabled — no per-round reps payload |
+| Open Timer + Complete                     | Yes    | Existing TabataTimerModal + handleComplete |
+| Glue: "20 on · 10 off" + clock            | Yes    | Placeholder 0:WW (live countdown is in modal) |
+
+For time
+| Mockup piece                              | Status | Notes |
+|-------------------------------------------|--------|-------|
+| Grouped gx = round exercises              | Yes    | Reference logged gx rows |
+| Heading Round N of M                      | Yes    | total_sets / protocol rounds |
+| Log: Round split                          | Gap    | Wired Weight + Completed Reps after stop (fortime_total_reps + time) |
+| Glue: "all rounds, fastest time" + clock  | Yes    | Live elapsedSeconds / completionTime |
+| Start/Stop timer                          | Yes    | Kept in LiveCardLog |
+
+================================================================================
+3. CLOCK SOURCE PER PROTOCOL
+================================================================================
+  AMRAP:    live — timeRemaining (in-executor countdown)
+  EMOM:     live — timeRemaining (interval remaining)
+  Tabata:   placeholder — `0:{workSec}` on glue; live timer stays in TabataTimerModal
+  For-time: live — elapsedSeconds (or completionTime when stopped)
+
+No new workout-level timer; page.tsx chrome untouched.
+
+================================================================================
+4. LOG-SHAPE GAPS (not invented)
+================================================================================
+  AMRAP:   write = weight + amrap_total_reps. Mockup rounds/+reps not written.
+  Tabata:  write = Complete (empty loggedSets) via modal/Complete. Per-round reps UI is display-only.
+  For-time: write = fortime_total_reps + fortime_time_taken_sec. Mockup round-split not written.
+
+================================================================================
+5. WIRED VS DEFERRED
+================================================================================
+  Wired:    AmrapExecutor, EmomExecutor, TabataExecutor, ForTimeExecutor
+  Deferred: none (all four in this pass)
+  Escape hatch not needed — solos + grouped both clean enough.
+
+================================================================================
+6. UNTOUCHED CONFIRMATION
+================================================================================
+  - Earlier card types (Straight / Drop / Superset / Giant / Cluster / Rest-pause /
+    Timed / Endurance / Speed): not modified this pass.
+  - Logging write payloads / resolveSetPrescriptionTargets / restore /
+    completeWorkoutService / deriveSetType / standalone path: untouched.
+  - page.tsx header/progress chrome: untouched.
+  - No SetTypeBadge; no DB/SQL/migrations; no git.
+
+================================================================================
+7. TSC
+================================================================================
+  npx tsc --noEmit → 0 errors
+
+================================================================================
+8. BROWSER
+================================================================================
+  Dev server available. Full in-session protocol verify needs a workout containing
+  those block types; structural verify via code + mockup §4 + tsc. UI gallery
+  LiveCard samples still load (shared card unchanged).

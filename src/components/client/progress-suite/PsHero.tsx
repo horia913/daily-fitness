@@ -4,7 +4,8 @@ import { ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import styles from "./progressSuiteV1.module.css";
 
-type Glow = "cyan" | "lime" | "purple";
+/** Hue for the left rail (legacy prop name `glow` kept for call-site compat). */
+type Glow = "cyan" | "action" | "purple";
 
 export function PsHero({
   glow = "cyan",
@@ -24,21 +25,21 @@ export function PsHero({
   eyebrow: string;
   eyebrowColor: string;
   title: string;
-  /** Bricolage 18px instead of 24 */
+  /** Smaller display title */
   titleCompact?: boolean;
   subtitle?: string;
   rightSlot?: React.ReactNode;
   children?: React.ReactNode;
 }) {
-  const glowCls =
+  const railCls =
     glow === "purple"
-      ? styles.psHeroGlowPurple
-      : glow === "lime"
-        ? styles.psHeroGlowLime
-        : styles.psHeroGlowCyan;
+      ? styles.psHeroRailPurple
+      : glow === "action"
+        ? styles.psHeroRailAction
+        : styles.psHeroRailCyan;
 
   return (
-    <div className={cn(styles.psHero, glowCls)}>
+    <div className={cn(styles.psHero, railCls)}>
       <div className={styles.psHeroTop}>
         {onBack ? (
           <button
@@ -47,7 +48,7 @@ export function PsHero({
             onClick={onBack}
             aria-label={backAriaLabel}
           >
-            <ChevronLeft className="h-4 w-4" strokeWidth={2} />
+            <ChevronLeft className="h-3.5 w-3.5" strokeWidth={2} />
           </button>
         ) : null}
         <div className={styles.psHeroMeta}>
@@ -68,14 +69,11 @@ export function PsHero({
             className={cn(
               styles.psHeroTitle,
               titleCompact && styles.psHeroTitleCompact,
-              styles.psFontHeadline,
             )}
           >
             {title}
           </h1>
-          {subtitle ? (
-            <p className={cn(styles.psHeroSub, styles.psFontBody)}>{subtitle}</p>
-          ) : null}
+          {subtitle ? <p className={styles.psHeroSub}>{subtitle}</p> : null}
         </div>
         {rightSlot ? (
           <div className="shrink-0 relative z-[1]">{rightSlot}</div>

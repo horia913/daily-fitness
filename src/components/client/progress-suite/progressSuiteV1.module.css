@@ -1,32 +1,25 @@
 /* Progress Suite v1 — scoped tokens (UI spec) */
 .psV1 {
-  --ps-bg: #07101a;
-  --ps-card: #0e1f2e;
-  --ps-card-2: #0b1824;
-  --ps-card-3: #091420;
-  --ps-line: rgba(255, 255, 255, 0.08);
-  --ps-line-2: rgba(255, 255, 255, 0.05);
-  --ps-t1: #fff;
-  --ps-t2: rgba(255, 255, 255, 0.65);
-  --ps-t3: rgba(255, 255, 255, 0.42);
-  --ps-t4: rgba(255, 255, 255, 0.26);
-  --ps-cyan: #4fe3e8;
-  --ps-cyan-soft: rgba(79, 227, 232, 0.12);
-  --ps-cyan-dim: rgba(79, 227, 232, 0.18);
-  --ps-cyan-bar-end: #34a8ad;
-  --ps-lime: #c5ff4a;
-  --ps-lime-2: #7fe89a;
-  --ps-lime-soft: rgba(197, 255, 74, 0.14);
-  --ps-lime-ring: rgba(197, 255, 74, 0.3);
-  --ps-critical: #ff5a5f;
-  --ps-critical-soft: rgba(255, 90, 95, 0.12);
-  --ps-critical-dim: rgba(255, 90, 95, 0.25);
-  --ps-warning: #f5c242;
-  --ps-warning-soft: rgba(245, 194, 66, 0.12);
-  --ps-warning-dim: rgba(245, 194, 66, 0.25);
-  --ps-good: #34d399;
-  --ps-good-soft: rgba(52, 211, 153, 0.12);
-  --ps-good-dim: rgba(52, 211, 153, 0.25);
+  --ps-bg: var(--fc-bg-deep);
+  --ps-card: var(--fc-surface-card);
+  --ps-card-2: var(--fc-bg-deep);
+  --ps-card-3: var(--fc-bg-deep);
+  --ps-line: var(--fc-glass-border);
+  --ps-line-2: var(--fc-hairline);
+  --ps-t1: var(--fc-text-primary);
+  --ps-t2: var(--fc-text-dim);
+  --ps-t3: var(--fc-text-subtle);
+  --ps-t4: var(--fc-text-quaternary);
+  --ps-chart-bar-end: #34a8ad; /* chart gradient end (not group-c) */
+  --ps-critical: var(--fc-status-error);
+  --ps-critical-soft: color-mix(in srgb, var(--fc-status-error) 12%, transparent);
+  --ps-critical-dim: color-mix(in srgb, var(--fc-status-error) 25%, transparent);
+  --ps-warning: var(--fc-status-warning);
+  --ps-warning-soft: color-mix(in srgb, var(--fc-status-warning) 12%, transparent);
+  --ps-warning-dim: color-mix(in srgb, var(--fc-status-warning) 25%, transparent);
+  --ps-good: var(--fc-status-success);
+  --ps-good-soft: color-mix(in srgb, var(--fc-status-success) 12%, transparent);
+  --ps-good-dim: color-mix(in srgb, var(--fc-status-success) 25%, transparent);
   --ps-purple: #a78bfa;
   --ps-purple-soft: rgba(167, 139, 250, 0.12);
   --ps-purple-dim: rgba(167, 139, 250, 0.25);
@@ -36,11 +29,11 @@
   --ps-pink-ring: rgba(244, 114, 182, 0.3);
   --ps-orange: #fb923c;
   --ps-orange-soft: rgba(251, 146, 60, 0.12);
-  --ps-row-hover: #0f2334;
-  --ps-f-headline: var(--f-headline, "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif);
-  --ps-f-display: var(--f-display, "Big Shoulders Display", ui-sans-serif, system-ui, sans-serif);
-  --ps-f-mono: var(--f-mono, "Geist Mono", ui-monospace, monospace);
-  --ps-f-body: var(--font-geist-sans, "Geist", ui-sans-serif, system-ui, sans-serif);
+  --ps-row-hover: var(--fc-bg-deep);
+  --ps-f-headline: var(--f-headline);
+  --ps-f-display: var(--f-display);
+  --ps-f-mono: var(--f-mono);
+  --ps-f-body: var(--font-body);
 
   color: var(--ps-t1);
   font-family: var(--ps-f-body);
@@ -56,40 +49,29 @@
   font-family: var(--ps-f-mono);
 }
 
-/* UI-1 Hero */
+/* UI-1 Hero — flat, hue left-rail (no glow / gradient wash) */
 .psHero {
   position: relative;
   overflow: hidden;
-  border-radius: 20px;
-  padding: 16px;
+  border-radius: 0;
+  padding: 14px 16px 14px 18px;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  background: linear-gradient(135deg, var(--ps-card), var(--ps-card-2));
-  border: 1px solid var(--ps-line);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--ps-line);
+  border-left: 3px solid var(--fc-accent);
 }
 
-.psHeroGlowCyan::before,
-.psHeroGlowLime::before,
-.psHeroGlowPurple::before {
-  content: "";
-  position: absolute;
-  width: 160px;
-  height: 160px;
-  top: -40px;
-  right: -40px;
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: 0;
+.psHeroRailCyan {
+  border-left-color: var(--fc-accent);
 }
-.psHeroGlowCyan::before {
-  background: radial-gradient(circle, var(--ps-cyan-soft) 0%, transparent 70%);
+.psHeroRailAction {
+  border-left-color: var(--fc-accent);
 }
-.psHeroGlowLime::before {
-  background: radial-gradient(circle, var(--ps-lime-soft) 0%, transparent 70%);
-}
-.psHeroGlowPurple::before {
-  background: radial-gradient(circle, var(--ps-purple-soft) 0%, transparent 70%);
+.psHeroRailPurple {
+  border-left-color: var(--ps-purple);
 }
 
 .psHeroTop {
@@ -101,22 +83,22 @@
 }
 
 .psHeroIconBtn {
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 11px;
-  background: var(--ps-card-2);
-  border: 1px solid var(--ps-line);
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid var(--fc-hairline-strong, var(--ps-line));
   color: var(--ps-t2);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition: color 0.15s, border-color 0.15s;
 }
 .psHeroIconBtn:hover {
   color: var(--ps-t1);
-  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--ps-t3);
 }
 
 .psHeroMeta {
@@ -135,7 +117,6 @@
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
-  box-shadow: 0 0 8px currentColor;
 }
 
 .psEyebrowText {
@@ -148,10 +129,12 @@
 }
 
 .psHeroTitle {
-  font-family: var(--ps-f-headline);
-  font-size: 24px;
-  font-weight: 700;
+  font-family: var(--ps-f-display);
+  font-stretch: 125%;
+  font-size: 22px;
+  font-weight: 800;
   line-height: 1.1;
+  letter-spacing: -0.01em;
   color: var(--ps-t1);
   margin-top: 4px;
 }
@@ -160,7 +143,7 @@
 }
 
 .psHeroSub {
-  font-family: var(--ps-f-body);
+  font-family: var(--ps-f-mono);
   font-size: 12px;
   line-height: 1.4;
   color: var(--ps-t3);
@@ -175,14 +158,14 @@
   gap: 10px;
 }
 
-/* UI-2 Segmented */
+/* UI-2 Segmented — well track, accent tint active, mono labels */
 .psSegWrap {
   display: flex;
   flex-direction: row;
   gap: 3px;
   padding: 3px;
-  background: var(--ps-card-2);
-  border: 1px solid var(--ps-line-2);
+  background: var(--fc-surface-well, #050608);
+  border: 1px solid var(--ps-line);
   border-radius: 12px;
 }
 
@@ -194,14 +177,16 @@
   gap: 4px;
   padding: 7px 10px;
   border-radius: 9px;
-  border: none;
+  border: 1px solid transparent;
   background: transparent;
-  font-family: var(--ps-f-body);
-  font-size: 11.5px;
-  font-weight: 500;
+  font-family: var(--ps-f-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--ps-t3);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 .psSegBtnLabel {
   flex-shrink: 0;
@@ -214,22 +199,25 @@
   letter-spacing: 0;
   padding: 1px 5px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.05);
+  background: transparent;
+  border: 1px solid var(--ps-line);
   color: var(--ps-t3);
 }
 .psSegCountActive {
-  background: var(--ps-cyan-dim);
-  color: var(--ps-cyan);
+  background: color-mix(in srgb, var(--fc-accent) 12%, transparent);
+  border-color: var(--fc-accent);
+  color: var(--fc-accent);
 }
 .psSegBtnActive {
-  background: var(--ps-cyan-soft);
-  color: var(--ps-cyan);
-  box-shadow: inset 0 0 0 1px var(--ps-cyan-dim);
+  background: color-mix(in srgb, var(--fc-accent) 10%, transparent);
+  color: var(--fc-accent);
+  border-color: var(--fc-accent);
+  box-shadow: none;
 }
 
-/* UI-3 Chart card */
+/* UI-3 Chart card — transparent + hairline */
 .psChartCard {
-  background: var(--ps-card);
+  background: transparent;
   border: 1px solid var(--ps-line);
   border-radius: 16px;
   padding: 14px;
@@ -255,8 +243,8 @@
 }
 
 .psIconTileCyan {
-  background: var(--ps-cyan-soft);
-  color: var(--ps-cyan);
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
 }
 .psIconTilePurple {
   background: var(--ps-purple-soft);
@@ -270,9 +258,9 @@
   background: var(--ps-good-soft);
   color: var(--ps-good);
 }
-.psIconTileLime {
-  background: var(--ps-lime-soft);
-  color: var(--ps-lime);
+.psIconTileAction {
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
 }
 .psIconTilePink {
   background: var(--ps-pink-soft);
@@ -309,6 +297,8 @@
 }
 .psChartHeadNum {
   font-family: var(--ps-f-display);
+  font-stretch: 125%;
+  font-stretch: 125%;
   font-size: 22px;
   font-weight: 700;
   color: var(--ps-t1);
@@ -331,10 +321,10 @@
   line-height: 1.2;
 }
 .psSectionEyebrowCyan {
-  color: var(--ps-cyan);
+  color: var(--fc-accent);
 }
-.psSectionEyebrowLime {
-  color: var(--ps-lime);
+.psSectionEyebrowAction {
+  color: var(--fc-accent);
 }
 .psSectionEyebrowPurple {
   color: var(--ps-purple);
@@ -363,7 +353,7 @@
 }
 .psNavRow:hover {
   background: var(--ps-row-hover);
-  border-color: var(--ps-cyan-dim);
+  border-color: var(--fc-accent-glow);
 }
 
 .psNavChevron {
@@ -372,7 +362,7 @@
   transition: color 0.15s;
 }
 .psNavRow:hover .psNavChevron {
-  color: var(--ps-cyan);
+  color: var(--fc-accent);
 }
 
 /* Nav-style row without hover (e.g. Export placeholder) */
@@ -401,14 +391,14 @@
   border: 1px solid;
 }
 .psBadgeCyan {
-  background: var(--ps-cyan-soft);
-  color: var(--ps-cyan);
-  border-color: var(--ps-cyan-dim);
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
+  border-color: var(--fc-accent-glow);
 }
-.psBadgeLime {
-  background: var(--ps-lime-soft);
-  color: var(--ps-lime);
-  border-color: var(--ps-lime-ring);
+.psBadgeAction {
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
+  border-color: var(--fc-accent-glow);
 }
 .psBadgeWarning {
   background: var(--ps-warning-soft);
@@ -469,36 +459,36 @@
   justify-content: space-between;
   padding: 10px 13px;
   border-radius: 11px;
-  background: var(--ps-cyan-soft);
-  border: 1px solid var(--ps-cyan-dim);
+  background: var(--fc-accent-dim);
+  border: 1px solid var(--fc-accent-glow);
   cursor: pointer;
   transition: background 0.15s;
 }
 .psProgCta:hover {
-  background: rgba(79, 227, 232, 0.18);
+  background: var(--fc-accent-glow);
 }
 .psProgCtaLabel {
   font-family: var(--ps-f-body);
   font-size: 11.5px;
   font-weight: 500;
-  color: var(--ps-cyan);
+  color: var(--fc-accent);
 }
 
-/* Month this hero (hub) */
+/* Month this hero (hub) — flat, no glow */
 .psMonthHero {
   position: relative;
   overflow: hidden;
-  border-radius: 20px;
+  border-radius: 16px;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  background: linear-gradient(135deg, var(--ps-card), var(--ps-card-2));
+  background: transparent;
   border: 1px solid var(--ps-line);
 }
 .psMonthSummary {
-  background: var(--ps-card-2);
-  border: 1px solid var(--ps-line-2);
+  background: var(--fc-surface-well, #050608);
+  border: 1px solid var(--ps-line);
   border-radius: 13px;
   padding: 12px 13px;
   display: flex;
@@ -506,21 +496,9 @@
   gap: 7px;
 }
 
-.psMonthHero::before {
-  content: "";
-  position: absolute;
-  width: 180px;
-  height: 180px;
-  top: -40px;
-  right: -40px;
-  border-radius: 50%;
-  pointer-events: none;
-  background: radial-gradient(circle, var(--ps-cyan-soft) 0%, transparent 72%);
-}
-
 .psStatTile {
-  background: rgba(0, 0, 0, 0.18);
-  border: 1px solid var(--ps-line-2);
+  background: var(--fc-surface-tint, rgba(255, 255, 255, 0.035));
+  border: 1px solid var(--ps-line);
   border-radius: 11px;
   padding: 10px 6px;
   display: flex;
@@ -531,7 +509,7 @@
 }
 
 .psQuickTile {
-  background: var(--ps-card);
+  background: transparent;
   border: 1px solid var(--ps-line);
   border-radius: 13px;
   padding: 11px 9px;
@@ -542,7 +520,7 @@
   text-align: center;
 }
 
-/* Full analytics CTA (purple) */
+/* Full analytics CTA (purple) — flat tint, no wash */
 .psAnalyticsCta {
   position: relative;
   overflow: hidden;
@@ -556,22 +534,11 @@
   cursor: pointer;
   text-align: left;
   border: 1px solid var(--ps-purple-dim);
-  background: linear-gradient(135deg, rgba(167, 139, 250, 0.08), var(--ps-card-2));
+  background: color-mix(in srgb, var(--ps-purple) 8%, transparent);
   transition: background 0.15s;
 }
 .psAnalyticsCta:hover {
-  background: linear-gradient(135deg, rgba(167, 139, 250, 0.12), var(--ps-card-2));
-}
-.psAnalyticsCta::before {
-  content: "";
-  position: absolute;
-  width: 120px;
-  height: 120px;
-  top: -30px;
-  right: -30px;
-  border-radius: 50%;
-  pointer-events: none;
-  background: radial-gradient(circle, var(--ps-purple-soft) 0%, transparent 70%);
+  background: color-mix(in srgb, var(--ps-purple) 12%, transparent);
 }
 .psAnalyticsIconSolid {
   position: relative;
@@ -584,7 +551,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #0a0a14;
+  color: var(--fc-ink);
   flex-shrink: 0;
 }
 
@@ -609,8 +576,8 @@
   align-items: stretch;
   gap: 11px;
   padding: 11px 12px;
-  background: var(--ps-card);
-  border: 1px solid var(--ps-line);
+  background: transparent;
+  border: 1px solid var(--fc-hairline);
   border-radius: 13px;
   cursor: pointer;
   text-align: left;
@@ -619,7 +586,7 @@
 }
 .psLogRow:hover {
   background: var(--ps-row-hover);
-  border-color: var(--ps-cyan-dim);
+  border-color: var(--fc-accent-glow);
 }
 .psLogStripe {
   position: absolute;
@@ -628,7 +595,7 @@
   bottom: 14px;
   width: 3px;
   border-radius: 0 3px 3px 0;
-  background: var(--ps-cyan);
+  background: var(--fc-accent);
 }
 .psLogStripeMuted {
   background: var(--ps-t4);
@@ -700,28 +667,17 @@
   margin-left: 6px;
 }
 
-/* Session summary card */
+/* Session summary card — flat hairline, no glow */
 .psSessionCard {
   position: relative;
   overflow: hidden;
-  border-radius: 18px;
+  border-radius: 16px;
   padding: 14px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: linear-gradient(135deg, var(--ps-card), var(--ps-card-2));
+  background: transparent;
   border: 1px solid var(--ps-line);
-}
-.psSessionCard::before {
-  content: "";
-  position: absolute;
-  width: 140px;
-  height: 140px;
-  top: -30px;
-  right: -30px;
-  border-radius: 50%;
-  pointer-events: none;
-  background: radial-gradient(circle, var(--ps-good-soft) 0%, transparent 70%);
 }
 
 .psCompletedBadge {
@@ -742,7 +698,7 @@
 
 /* Exercise block card */
 .psExerciseCard {
-  background: var(--ps-card);
+  background: transparent;
   border: 1px solid var(--ps-line);
   border-radius: 16px;
   padding: 14px;
@@ -772,8 +728,8 @@
   color: var(--ps-t4);
 }
 .psSearchInput:focus {
-  border-color: var(--ps-cyan);
-  box-shadow: 0 0 0 3px var(--ps-cyan-soft);
+  border-color: var(--fc-accent);
+  box-shadow: 0 0 0 3px var(--fc-accent-dim);
 }
 
 /* Accordion row */
@@ -825,7 +781,7 @@
 }
 .psSummaryCard:hover {
   background: var(--ps-row-hover);
-  border-color: var(--ps-cyan-dim);
+  border-color: var(--fc-accent-glow);
 }
 .psSummaryCardHeader {
   display: flex;
@@ -848,7 +804,7 @@
   transition: color 0.15s;
 }
 .psSummaryCard:hover .psSummaryCardChevron {
-  color: var(--ps-cyan);
+  color: var(--fc-accent);
 }
 .psSummaryCardAccentTraining {
   border-left: 3px solid var(--fc-domain-workouts);

@@ -406,7 +406,7 @@ export function getTierColor(tier: AchievementTier): string {
     bronze: 'from-amber-600 to-orange-700',
     silver: 'from-slate-300 to-slate-500',
     gold: 'from-yellow-400 to-yellow-600',
-    platinum: 'from-cyan-400 to-blue-600'
+    platinum: 'from-[color:var(--fc-group-c)] to-blue-600'
   }
   return colors[tier]
 }

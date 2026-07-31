@@ -1,5 +1,11 @@
 import { Camera, Calendar } from 'lucide-react'
 import styles from './clientProfileV1.module.css'
+import {
+  CoachingStatusPill,
+  type CoachingPillState,
+} from './CoachingStatusPill'
+
+export type { CoachingPillState }
 
 function initials(first: string, last: string, fallback: string): string {
   const a = first.trim().charAt(0)
@@ -10,8 +16,6 @@ function initials(first: string, last: string, fallback: string): string {
   const f = fallback.trim().charAt(0)
   return f ? f.toUpperCase() : '?'
 }
-
-export type CoachingPillState = 'active' | 'paused' | 'ended'
 
 export function ProfileHero({
   avatarUrl,
@@ -70,33 +74,18 @@ export function ProfileHero({
             </label>
           )}
         </div>
-        <h1 className={styles.heroName}>{displayName}</h1>
-        <p className={styles.heroEmail}>{displayEmail}</p>
-        <div className={styles.pills}>
-          {memberSinceLabel && (
-            <span className={`${styles.pill} ${styles.pillCyan}`}>
-              <Calendar size={9} strokeWidth={2} aria-hidden />
-              Member since {memberSinceLabel}
-            </span>
-          )}
-          {coachingState === 'active' && (
-            <span className={`${styles.pill} ${styles.pillGood}`}>
-              <span className={styles.pillDot} aria-hidden />
-              Active
-            </span>
-          )}
-          {coachingState === 'paused' && (
-            <span className={`${styles.pill} ${styles.pillWarn}`}>
-              <span className={styles.pillDot} aria-hidden />
-              Paused
-            </span>
-          )}
-          {coachingState === 'ended' && (
-            <span className={`${styles.pill} ${styles.pillMuted}`}>
-              <span className={styles.pillDot} aria-hidden />
-              Ended
-            </span>
-          )}
+        <div className={styles.heroMeta}>
+          <h2 className={styles.heroName}>{displayName}</h2>
+          <p className={styles.heroEmail}>{displayEmail}</p>
+          <div className={styles.pills}>
+            {memberSinceLabel && (
+              <span className={`${styles.pill} ${styles.pillCyan}`}>
+                <Calendar size={9} strokeWidth={2} aria-hidden />
+                Since {memberSinceLabel}
+              </span>
+            )}
+            {coachingState ? <CoachingStatusPill state={coachingState} /> : null}
+          </div>
         </div>
       </div>
     </div>

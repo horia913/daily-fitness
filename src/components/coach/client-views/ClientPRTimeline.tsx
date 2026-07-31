@@ -49,16 +49,29 @@ const RANGE_OPTIONS: PRTimelineTimeRange[] = ["3M", "6M", "1Y", "ALL"];
 export default function ClientPRTimeline({
   clientId,
   prefetched,
+  timeRange: controlledRange,
+  onTimeRangeChange,
+  hideRangeTabs = false,
 }: {
   clientId: string;
   prefetched?: ApiResponse | null;
+  /** When set with onTimeRangeChange, range is controlled by parent (shared Performance control). */
+  timeRange?: PRTimelineTimeRange;
+  onTimeRangeChange?: (r: PRTimelineTimeRange) => void;
+  hideRangeTabs?: boolean;
 }) {
   const [loading, setLoading] = useState(!prefetched);
   const [error, setError] = useState<string | null>(null);
   const [seriesList, setSeriesList] = useState<ChartSeries[]>([]);
   const [selectedSeriesKey, setSelectedSeriesKey] = useState<string | null>(null);
   const [recent, setRecent] = useState<RecentPrItem[]>([]);
-  const [timeRange, setTimeRange] = useState<PRTimelineTimeRange>("1Y");
+  const [internalRange, setInternalRange] = useState<PRTimelineTimeRange>("1Y");
+
+  const timeRange = controlledRange ?? internalRange;
+  const setTimeRange = (r: PRTimelineTimeRange) => {
+    if (onTimeRangeChange) onTimeRangeChange(r);
+    else setInternalRange(r);
+  };
 
   useEffect(() => {
     if (prefetched) {
@@ -151,6 +164,7 @@ export default function ClientPRTimeline({
                 </div>
               </div>
 
+              {!hideRangeTabs ? (
               <div className={sec.rangeRow}>
                 {RANGE_OPTIONS.map((r) => (
                   <button
@@ -163,6 +177,7 @@ export default function ClientPRTimeline({
                   </button>
                 ))}
               </div>
+              ) : null}
 
               <CoachPrV6Chart milestones={selectedSeries.milestones} timeRange={timeRange} />
             </>
@@ -224,7 +239,7 @@ export default function ClientPRTimeline({
                 type="button"
                 className={prStyles.viewAll}
                 onClick={() => {
-                  window.location.href = `/coach/clients/${clientId}/progress`;
+                  window.location.href = `/coach/clients/${clientId}`;
                 }}
               >
                 View all PRs →

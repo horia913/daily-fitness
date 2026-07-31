@@ -1,7 +1,7 @@
 .wrap {
   display: flex;
   gap: 4px;
-  background: var(--fc-glass-soft);
+  background: transparent;
   border: 1px solid var(--fc-divider);
   border-radius: 13px;
   padding: 4px;
@@ -17,7 +17,7 @@
 .tab {
   padding: 7px 11px;
   border-radius: 9px;
-  font-family: var(--font-geist-sans, ui-sans-serif);
+  font-family: var(--font-body);
   font-size: 11.5px;
   font-weight: 500;
   color: var(--fc-text-subtle);
@@ -35,7 +35,7 @@
 }
 
 .tab:hover:not(.tabActive) {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
   color: var(--fc-text-primary);
 }
 

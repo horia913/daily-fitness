@@ -21,7 +21,7 @@ export function ApplySuggestedWeightButton({
       type="button"
       onClick={onApply}
       className={cn(
-        "mb-3.5 inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-[color:var(--fc-glass-border)] bg-white/[0.04] px-3 py-1.5 text-[11.5px] font-semibold text-cyan-400 transition-opacity hover:opacity-95",
+        "mb-3.5 inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-[color:var(--fc-glass-border)] bg-white/[0.04] px-3 py-1.5 text-[11.5px] font-semibold text-[color:var(--fc-group-c)] transition-opacity hover:opacity-95",
         className,
       )}
     >

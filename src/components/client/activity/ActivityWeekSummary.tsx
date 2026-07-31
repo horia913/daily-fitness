@@ -67,7 +67,7 @@ export function ActivityWeekSummary({
             <div className="flex items-center gap-4 border-b border-white/5 py-2">
               <span className="text-xs fc-text-dim flex items-center gap-1">
                 <TrendingUp className="w-3 h-3" />
-                <span className="text-cyan-400 font-bold tabular-nums">{activities.length}</span>
+                <span className="text-[color:var(--fc-group-c)] font-bold tabular-nums">{activities.length}</span>
                 <span>activit{activities.length === 1 ? "y" : "ies"}</span>
               </span>
               <span className="text-xs fc-text-dim flex items-center gap-1">
@@ -107,7 +107,7 @@ export function ActivityWeekSummary({
           {hasMore && (
             <Link
               href="/client/activity"
-              className="mt-0 flex items-center justify-center gap-1 border-t border-white/5 py-2 text-xs font-medium text-cyan-500 transition-colors hover:text-cyan-400"
+              className="mt-0 flex items-center justify-center gap-1 border-t border-white/5 py-2 text-xs font-medium text-[color:var(--fc-group-c)] transition-colors hover:text-[color:var(--fc-group-c)]"
             >
               View all {activities.length} activities
               <ChevronRight className="w-3 h-3" />

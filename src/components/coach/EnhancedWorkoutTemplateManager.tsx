@@ -55,7 +55,7 @@ import WorkoutTemplateService, {
   ExerciseCategory,
 } from "@/lib/workoutTemplateService";
 import { useAuth } from "@/contexts/AuthContext";
-import WorkoutTemplateForm from "@/components/WorkoutTemplateForm";
+import { useRouter } from "next/navigation";
 import WorkoutTemplateDetails from "./WorkoutTemplateDetails";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui/toast-provider";
@@ -85,6 +85,7 @@ export default function EnhancedWorkoutTemplateManager({
   const { getThemeStyles } = useTheme();
   const { addToast } = useToast();
   const { user } = useAuth();
+  const router = useRouter();
   const theme = getThemeStyles();
 
   // State management
@@ -154,7 +155,8 @@ export default function EnhancedWorkoutTemplateManager({
       const { data: assignments, error } = await supabase
         .from("workout_assignments")
         .select("workout_template_id")
-        .eq("coach_id", coachId);
+        .eq("coach_id", coachId)
+        .is("program_assignment_id", null);
 
       if (error) {
         console.error("Error loading template assignment counts:", error);
@@ -501,8 +503,7 @@ export default function EnhancedWorkoutTemplateManager({
   };
 
   const openTemplateBuilder = (template: WorkoutTemplate) => {
-    setSelectedTemplate(template);
-    setShowTemplateBuilder(true);
+    router.push(`/coach/workouts/templates/${template.id}/edit`);
   };
 
   const openTemplateDetails = (template: WorkoutTemplate) => {
@@ -583,7 +584,7 @@ export default function EnhancedWorkoutTemplateManager({
                 Refresh
               </Button>
               <Button
-                onClick={() => setShowCreateForm(true)}
+                onClick={() => router.push('/coach/workouts/templates/create')}
                 style={{
                   backgroundColor: "var(--fc-accent-purple)",
                   borderRadius: "20px",
@@ -871,8 +872,7 @@ export default function EnhancedWorkoutTemplateManager({
                   key={template.id}
                   template={template}
                   onEdit={() => {
-                    setEditingTemplate(template);
-                    setShowCreateForm(true);
+                    router.push(`/coach/workouts/templates/${template.id}/edit`);
                   }}
                   onDelete={() => handleDeleteTemplate(template.id)}
                   onDuplicate={() => handleDuplicateTemplate(template)}
@@ -889,8 +889,7 @@ export default function EnhancedWorkoutTemplateManager({
                   key={template.id}
                   template={template}
                   onEdit={() => {
-                    setEditingTemplate(template);
-                    setShowCreateForm(true);
+                    router.push(`/coach/workouts/templates/${template.id}/edit`);
                   }}
                   onDelete={() => handleDeleteTemplate(template.id)}
                   onDuplicate={() => handleDuplicateTemplate(template)}
@@ -945,7 +944,7 @@ export default function EnhancedWorkoutTemplateManager({
                   : "Try adjusting your search or filter criteria."}
               </p>
               <Button
-                onClick={() => setShowCreateForm(true)}
+                onClick={() => router.push('/coach/workouts/templates/create')}
                 style={{
                   backgroundColor: "var(--fc-accent-purple)",
                   borderRadius: "20px",
@@ -963,37 +962,6 @@ export default function EnhancedWorkoutTemplateManager({
         </div>
       </div>
 
-      {/* Modals */}
-      <WorkoutTemplateForm
-        isOpen={showCreateForm}
-        onClose={() => {
-          setShowCreateForm(false);
-          setEditingTemplate(null);
-        }}
-        onSuccess={() => {
-          setShowCreateForm(false);
-          setEditingTemplate(null);
-          loadData();
-        }}
-        template={editingTemplate}
-      />
-
-      {showTemplateBuilder && editingTemplate && (
-        <WorkoutTemplateForm
-          isOpen={showTemplateBuilder}
-          onClose={() => {
-            setShowTemplateBuilder(false);
-            setEditingTemplate(null);
-          }}
-          onSuccess={() => {
-            loadData();
-            setShowTemplateBuilder(false);
-            setEditingTemplate(null);
-          }}
-          template={editingTemplate}
-        />
-      )}
-
       {showTemplateDetails && selectedTemplate && (
         <WorkoutTemplateDetails
           isOpen={showTemplateDetails}
@@ -1005,8 +973,7 @@ export default function EnhancedWorkoutTemplateManager({
           onEdit={(template) => {
             setShowTemplateDetails(false);
             setSelectedTemplate(null);
-            setEditingTemplate(template as WorkoutTemplate);
-            setShowTemplateBuilder(true);
+            router.push(`/coach/workouts/templates/${template.id}/edit`);
           }}
         />
       )}
@@ -1316,7 +1283,7 @@ function WorkoutTemplateCard({
     "bg-gradient-to-br from-purple-50 to-violet-100 dark:from-purple-900/20 dark:to-violet-900/30",
     "bg-gradient-to-br from-orange-50 to-amber-100 dark:from-orange-900/20 dark:to-amber-900/30",
     "bg-gradient-to-br from-pink-50 to-rose-100 dark:from-pink-900/20 dark:to-rose-900/30",
-    "bg-gradient-to-br from-teal-50 to-cyan-100 dark:from-teal-900/20 dark:to-cyan-900/30",
+    "bg-gradient-to-br from-teal-50 to-[color-mix(in_srgb,var(--fc-group-c)_14%,transparent)] dark:from-teal-900/20 dark:to-[color-mix(in_srgb,var(--fc-group-c)_30%,transparent)]",
     "bg-gradient-to-br from-rose-50 to-pink-100 dark:from-rose-900/20 dark:to-pink-900/30",
     "bg-gradient-to-br from-indigo-50 to-blue-100 dark:from-indigo-900/20 dark:to-blue-900/30",
     "bg-gradient-to-br from-emerald-50 to-green-100 dark:from-emerald-900/20 dark:to-green-900/30",

@@ -37,6 +37,8 @@ import {
  *   - `data-7xl`      : data-dense list / roster / table views (rosters
  *                      with > 6 columns or grids that fill 4 columns at
  *                      ≥1280px). Renders `max-w-7xl`.
+ *   - `canvas-full`   : editing canvases (program station, meal builder).
+ *                      No max-width cap — full viewport width with page-level gutters.
  *   - `form-2xl`      : single-column forms and wizards. Renders `max-w-2xl`.
  *
  * The `className` prop can still override the width on a case-by-case basis
@@ -47,6 +49,7 @@ export type CoachPageShellWidthVariant =
   | "benchmark-5xl"
   | "default-5xl"
   | "data-7xl"
+  | "canvas-full"
   | "form-2xl";
 
 interface CoachPageShellProps {
@@ -61,6 +64,7 @@ const WIDTH_BY_VARIANT: Record<CoachPageShellWidthVariant, string> = {
   "benchmark-5xl": "max-w-5xl",
   "default-5xl": "max-w-5xl",
   "data-7xl": "max-w-7xl",
+  "canvas-full": "max-w-none",
   "form-2xl": "max-w-2xl",
 };
 

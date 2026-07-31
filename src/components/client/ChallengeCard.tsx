@@ -204,7 +204,7 @@ export function ChallengeCard({
                 width: `${progress}%`,
                 background: isEnding
                   ? "linear-gradient(90deg, #ef4444, #f97316)"
-                  : "linear-gradient(90deg, var(--fc-accent-lime), var(--fc-accent-lime-2))",
+                  : "linear-gradient(90deg, var(--fc-accent), var(--fc-accent))",
               }}
             />
           </div>

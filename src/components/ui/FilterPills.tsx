@@ -65,7 +65,7 @@ export function FilterPills<TValue extends string = string>({
                 className="ml-1.5 text-[11px]"
                 style={{
                   color: isActive
-                    ? "var(--fc-accent-cyan)"
+                    ? "var(--fc-accent)"
                     : "var(--fc-text-subtle)",
                 }}
               >

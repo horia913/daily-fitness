@@ -35,7 +35,7 @@ export function CompactGoalCard({ goal }: CompactGoalCardProps) {
       </div>
       <div className="w-full h-1.5 rounded-full overflow-hidden bg-[color:var(--fc-glass-border)]">
         <div
-          className="h-full rounded-full transition-all bg-[color:var(--fc-accent-cyan)]"
+          className="h-full rounded-full transition-all bg-[color:var(--fc-accent)]"
           style={{ width: `${progress}%` }}
         />
       </div>

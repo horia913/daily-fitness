@@ -1,0 +1,263 @@
+AUDIT — execution-screen chrome (read-only)
+Date: 2026-07-17
+Route: /client/workouts/[id]/start
+Mockup: design/mockups/execution-screen-v6-CANONICAL.html §1
+No code changes. No git.
+
+Scope: everything OUTSIDE the LiveCard. Card is already v6.
+
+================================================================================
+1. page.tsx CHROME RENDER TREE (block system path)
+================================================================================
+File: src/app/client/workouts/[id]/start/page.tsx
+Return starts ~L4325.
+
+  ProtectedRoute
+  └─ AnimatedBackground                          (~L4327)
+     ├─ FloatingParticles? (performanceSettings) (~L4328)
+     └─ div.relative.z-10.min-h-screen           (~L4329)
+        ├─ RestTimerOverlay                      (~L4331–4338)  ← page rest overlay
+        └─ ClientPageShell                       (~L4341)
+           │  (default backdrop="info" → AtmosphericBackdrop inside shell)
+           │
+           └─ [useBlockSystem && workoutSetEntries.length > 0] (~L4402)
+              ├─ HEADER ROW (~L4413–4434)
+              │    Back button + ExecProgressSegments (variant="exercises")
+              ├─ spacer h-2 (~L4439)
+              ├─ WorkoutExecutionChromeProvider   (~L4442)
+              │    value={{ hideCompactBack: true }}
+              │    └─ LiveWorkoutSetEntryExecutor  (~L4445)
+              │         → ONE current set-entry only
+              │         → dispatches to block executor (Straight / Super / …)
+              │         → RestTimerModal (inside executor wrapper)
+              └─ Complete Workout button (last block only) (~L4539)
+
+NOT rendered on block path:
+  - Workout title / meta (sets · elapsed · rest) in the header
+  - Multi-group list (done / current / upcoming grp headers)
+  - ClientGlassCard around the live executor (glass cards appear on
+    traditional / empty / completion branches further down the same file)
+
+Fallback when !useBlockSystem or no set entries:
+  Older header (~L4350–4382): IconButton back + "Live Session" eyebrow +
+  assignment.name h1 — then traditional exercise UI.
+
+================================================================================
+2. HEADER
+================================================================================
+Block path (primary):
+  Location: INLINE in page.tsx ~L4413–4434 (not a separate Header component)
+  Structure:
+    - Back (ChevronLeft + "Back") → confirm exit → /client/train
+    - ExecProgressSegments (sibling, right side of flex row)
+  Missing vs mockup §1 .hd:
+    - No "‹ Train" / workout name h1
+    - No meta line (N of M sets · elapsed)
+    - No rest callout in header
+  Styling: Tailwind + zinc / white; no CSS module.
+    Back: text-[13px] font-medium text-zinc-300
+
+Legacy / empty-block header (~L4350–4382):
+  IconButton + Eyebrow "Live Session" + h1 assignment.name
+  Tokens: fc-surface, fc-text-*, --fc-status-success pulse dot
+
+WorkoutExecutionChromeProvider (WorkoutExecutionChromeContext.tsx):
+  Only exposes hideCompactBack — suppresses per-executor compact chevron
+  back when the page already shows the top Back row. Not a group chrome owner.
+
+================================================================================
+3. PROGRESS BAR — ExecProgressSegments
+================================================================================
+File: src/components/client/workout-execution/ui/ExecProgressSegments.tsx
+
+Mounted: page.tsx ~L4429–4433, in the header row (right of Back).
+
+Block path props:
+  variant="exercises"
+  totalExercises = countWorkoutExercises(workoutSetEntries)
+  currentExerciseIndex = getGlobalExerciseIndex(
+    workoutSetEntries, currentSetEntryIndex, currentExerciseIndex)
+
+Behaviour:
+  - One segment per exercise across all set-entries (capped at 24)
+  - Segments ≤ current index: --fc-accent; else --fc-glass-border
+  - Does NOT distinguish mockup done (green) vs now (hue) vs upcoming —
+    current implementation is binary: filled through current vs empty
+  - Alternate variant="sets" exists but is NOT used on this page
+
+Placement: header row only — not above groups in a scroll list.
+
+================================================================================
+4. GROUP HEADERS + SET-ROW LIST  ← KEY FINDING
+================================================================================
+
+### Workout-level group list (mockup §1 .grp / .ghead / .gdot / .gsets / .gcheck)
+  STATUS: NOT IMPLEMENTED.
+
+  page.tsx renders only the CURRENT set-entry via LiveWorkoutSetEntryExecutor.
+  There is no list of:
+    - collapsed done groups (✓✓✓)
+    - upcoming groups as header-only dots
+  No GroupHeader / BlockHeader / ghead component under workout-execution/.
+
+  Closest substitutes today:
+    - ExecProgressSegments (exercise ticks in header)
+    - NavigationControls below the card ("Exercise N of M" + Prev/Next)
+      File: …/ui/NavigationControls.tsx
+      Wired from each executor via onSetEntryChange → page handleSetEntryChange
+    - LiveCard heading ("Set N of M") = unit progress inside the card, not group chrome
+
+### Set-row list (mockup §1 .srow done / pending around the live card)
+  STATUS: EXISTS, but OWNED BY EXECUTORS and mounted INSIDE the card —
+  not as page-level chrome around the card.
+
+  Components:
+    SetRowsListPanel  …/ui/set-rows/SetRowsListPanel.tsx   (L13–57)
+      Panel: "N / M done", fill-remaining, mini progress bar, children
+    SetRowShell       …/ui/set-rows/SetRowShell.tsx
+      One row: title, ✓ log, weight/reps children
+
+  Where mounted (examples):
+    StraightSetExecutor  loggingInputs = SetRowsListPanel of ALL sets
+                         → children of <LiveCardLog> inside <LiveCard>
+                         (~L677–729 construction, ~L792 mount)
+    DropSetExecutor      same pattern (inside LiveCardLog)
+    SupersetExecutor / GiantSetExecutor:
+                         futureRowsPanel = non-active upcoming rounds
+                         → also inside LiveCardLog after gx + glue
+
+  Implication for chrome reskin:
+    Mockup §1 wants srows OUTSIDE / wrapping the live card under a group
+    header. Today those rows live IN the log slot. A chrome reskin that
+    adds page-level group wrappers will need a deliberate move/split of
+    set-row UI — out of scope for this audit, but the ownership is clear.
+
+### Done vs upcoming (current behaviour)
+  Done groups (other set-entries): not shown; only navigable via Prev/Next
+  Current group: full LiveCard (+ internal set rows)
+  Upcoming groups: not shown as dots/headers
+  Sets within current entry: done rows marked in SetRowShell; active logging
+  via LiveCard primary/log (Straight still also lists all sets in the panel)
+
+================================================================================
+5. BACKGROUND & SHELLS — WIRING + BLAST RADIUS
+================================================================================
+On this route (start/page.tsx):
+
+  AnimatedBackground     L4327  — var(--fc-bg-deep) full-screen wrapper
+  FloatingParticles      L4328  — optional; performanceSettings.floatingParticles
+  ClientPageShell        L4341  — fc-page shell + AtmosphericBackdrop (default "info")
+  ClientGlassCard        — NOT wrapping the live block executor;
+                           used on traditional / empty / later branches in same file
+
+Blast radius of retiring on THIS route only:
+  - Safe to replace AnimatedBackground + FloatingParticles + ClientPageShell
+    backdrop with a flat near-black shell for the start page, IF completion
+    modals / traditional branch still get a usable container.
+  - Do NOT delete the components globally: they are used across client/coach
+    routes (train, profile, progress, programs, etc.).
+  - AtmosphericBackdrop is pulled in by ClientPageShell default; retiring
+    the halo means either backdrop={…none} (if supported — verify before
+    coding) or bypassing ClientPageShell on this route.
+  - LiveCard already uses transparent card on --fc-bg-deep-compatible tokens;
+    flat #0A0B0D (--fc-bg-deep in ui-system.css) matches mockup §1 intent.
+
+Uncertain: whether traditional (!useBlockSystem) path is still reachable in
+production. If yes, glass-card styling there is separate from block chrome.
+
+================================================================================
+6. STYLING / TOKENS
+================================================================================
+Design system:
+  src/styles/ui-system.css  (imported via src/app/globals.css)
+  --fc-bg-deep: #0A0B0D  (matches mockup --bg)
+  --fc-hairline, --fc-group-a..d, --fc-accent, --fc-status-success, etc.
+
+Fonts (globals.css + ui-system):
+  --f-display / Archivo, --f-mono / JetBrains Mono — already global
+  LiveCard CSS module (liveCard.module.css) already consumes
+  var(--f-display), var(--fc-*), var(--live-hue)
+
+Chrome styling today:
+  Header / progress / NavigationControls: Tailwind + --fc-* / zinc utilities
+  SetRowsListPanel / SetRowShell: Tailwind + --fc-accent-cyan
+  No dedicated exec-chrome CSS module yet
+
+Token availability for chrome reskin: YES — same globals as LiveCard.
+No need to re-import fonts for the chrome layer.
+
+================================================================================
+7. REST / INTERVAL TIMER — MAP ONLY
+================================================================================
+Page-owned:
+  RestTimerOverlay  src/components/workout/RestTimerOverlay.tsx
+  Mounted page.tsx L4331; driven by page showRestTimer / restTime
+  setShowRestTimer(true) call sites in page.tsx (~2947, 3145, 3297, 3386, 3540)
+  appear tied to traditional logging paths (confirm before timer pass).
+
+Block-path (current LiveCard flow):
+  RestTimerModal    src/components/client/workout-execution/RestTimerModal.tsx
+  Mounted LiveWorkoutSetEntryExecutor.tsx ~L1137–1145
+  Opened via useSetLoggingOrchestrator.shouldOpenRestTimer (~L257–273)
+  after set log when rest_seconds > 0
+
+Unused on this route:
+  RestTimerBar      …/workout-execution/RestTimerBar.tsx (gallery / unused)
+
+LiveCardGlue timer:
+  NOT fed from page.tsx.
+  Protocol executors feed local clocks (AMRAP/EMOM/ForTime live;
+  Tabata placeholder). Superset/Giant glue = static rest copy, no timer prop.
+  Later timer pass: bridge RestTimerModal countdown → LiveCardGlue timer
+  and/or resting status on the card — map ends here.
+
+================================================================================
+8. PROPOSED RESKIN PLAN (mockup §1) — PLAN ONLY, NO CODE
+================================================================================
+Target screen (mockup §1):
+  .hd (back · title · meta · .bar) → group list (done collapse · live grp ·
+  upcoming dots) → flat near-black bg.
+
+Suggested touch list (order):
+
+A. Shell / background (page.tsx + optional thin chrome CSS module)
+   - Flat --fc-bg-deep; drop FloatingParticles on this route
+   - Retire AnimatedBackground / AtmosphericBackdrop halo for start only
+   - Keep ClientPageShell or replace with a minimal exec shell
+
+B. Header (new ExecSessionHeader or inline rewrite in page.tsx ~4413)
+   - Back → "‹ Train"
+   - Workout name (assignment.name)
+   - Meta: sets progress · elapsed (needs session elapsed source —
+     currently NOT on block header; flag as build item)
+   - Rest callout when resting (later; timer pass)
+   - Host ExecProgressSegments restyled as mockup .bar
+     (done=green, now=hue, upcoming=dim) — data model may need
+     segment states beyond today's filled-through-current
+
+C. Group list chrome (NEW — does not exist today)
+   - Page (or thin wrapper) maps workoutSetEntries →:
+       done → collapsed .ghead + ✓✓✓
+       current → .ghead + set-row list + LiveCard slot
+       upcoming → .ghead + set count only
+   - Hue via --fc-group-* / groupIndexToHue (already on LiveCard)
+
+D. Set-row list relocation (design decision in chrome pass)
+   - Move or mirror SetRowsListPanel/SetRowShell OUTSIDE LiveCardLog
+     into the group wrapper (mockup: srows surround live card)
+   - LiveCardLog keeps only the active unit's log fields
+   - Highest-risk part of the chrome reskin; do after header+shell
+
+E. NavigationControls
+   - Likely retire or demote once the group list makes Prev/Next redundant
+
+F. Do NOT touch in chrome pass
+   - LiveCard internals / executors' write paths
+   - RestTimerModal behaviour (visual feed into glue = later timer pass)
+   - Traditional non-block branch unless still production-reachable
+
+Uncertainties to resolve before coding:
+  1. Session elapsed time source for header meta (not on block header today).
+  2. Whether "sets" in meta means set-entries, exercises, or prescribed sets.
+  3. Whether SetRowsListPanel stays inside LiveCardLog during an interim
+     chrome pass or must move in the same PR as group headers.

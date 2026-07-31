@@ -340,7 +340,7 @@ export default function OptimizedExerciseLibrary({}: OptimizedExerciseLibraryPro
   }
 
   const heroStats = [
-    { num: exercises.length, label: 'Exercises', color: 'var(--cyan)' },
+    { num: exercises.length, label: 'Exercises', color: 'var(--fc-accent)' },
     {
       num: publicCount,
       label: 'Public',

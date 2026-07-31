@@ -54,6 +54,8 @@ interface AthleteScoreRingProps {
   placeholder?: boolean;
   /** Dimmed ring for paused program (last score still shown). */
   paused?: boolean;
+  /** Header chip: accent arc + score number only (no tier label / emoji). */
+  scoreOnly?: boolean;
 }
 
 export function AthleteScoreRing({
@@ -65,6 +67,7 @@ export function AthleteScoreRing({
   showTierBelow = false,
   placeholder = false,
   paused = false,
+  scoreOnly = false,
 }: AthleteScoreRingProps) {
   const uid = useId().replace(/:/g, "");
   const size = sizeProp ?? SIZE_PRESET_PX[sizePreset];
@@ -112,8 +115,8 @@ export function AthleteScoreRing({
 
   if (placeholder) {
     const phCenter = size / 2;
-    const phStroke = strokeWidthForTier("benched", size);
-    const phR = Math.max(4, (size - phStroke * 2) / 2);
+    const phStroke = scoreOnly ? 5 : strokeWidthForTier("benched", size);
+    const phR = scoreOnly ? 24 : Math.max(4, (size - phStroke * 2) / 2);
     return (
       <div
         className="as-ring-root relative flex flex-col items-center justify-center mx-auto max-w-full"
@@ -130,7 +133,7 @@ export function AthleteScoreRing({
             cy={phCenter}
             r={phR}
             fill="none"
-            stroke="var(--fc-surface-sunken)"
+            stroke="var(--fc-track)"
             strokeWidth={phStroke}
           />
         </svg>
@@ -138,13 +141,76 @@ export function AthleteScoreRing({
           className="absolute inset-0 flex flex-col items-center justify-center px-1 text-center"
           style={{ width: size, height: size }}
         >
-          <span className="font-extrabold tabular-nums fc-text-dim leading-none" style={{ fontSize: size < 80 ? "0.85rem" : "1.75rem" }}>
+          <span
+            className="tabular-nums fc-text-dim leading-none"
+            style={{
+              fontFamily: scoreOnly ? "var(--f-display)" : undefined,
+              fontWeight: scoreOnly ? 900 : 800,
+              fontSize: scoreOnly ? "18px" : size < 80 ? "0.85rem" : "1.75rem",
+            }}
+          >
             —
           </span>
-          {size >= 80 ? (
+          {!scoreOnly && size >= 80 ? (
             <span className="mt-0.5 text-[10px] fc-text-dim leading-tight px-1">No score yet</span>
           ) : null}
         </div>
+      </div>
+    );
+  }
+
+  if (scoreOnly && score !== null) {
+    const headerCenter = size / 2;
+    const headerR = 24;
+    const headerStroke = 5;
+    const headerCirc = 2 * Math.PI * headerR;
+    const headerOffset = headerCirc - (percentage / 100) * headerCirc;
+    const headerDashOffset = fillActive ? headerOffset : headerCirc;
+
+    return (
+      <div
+        className="as-ring-root relative flex items-center justify-center mx-auto max-w-full"
+        style={{ width: size, height: size, minWidth: 0, opacity: paused ? 0.6 : 1 }}
+      >
+        <svg
+          width={size}
+          height={size}
+          viewBox={`0 0 ${size} ${size}`}
+          className="absolute inset-0 as-ring-gpu transform -rotate-90"
+          aria-hidden
+        >
+          <circle
+            cx={headerCenter}
+            cy={headerCenter}
+            r={headerR}
+            fill="none"
+            stroke="var(--fc-track)"
+            strokeWidth={headerStroke}
+          />
+          <circle
+            cx={headerCenter}
+            cy={headerCenter}
+            r={headerR}
+            fill="none"
+            stroke="var(--fc-accent)"
+            strokeWidth={headerStroke}
+            strokeLinecap="round"
+            strokeDasharray={headerCirc}
+            strokeDashoffset={headerDashOffset}
+            className={animated ? "as-ring-fill-transition" : undefined}
+            style={{ filter: "drop-shadow(0 0 4px var(--fc-accent-glow))" }}
+          />
+        </svg>
+        <span
+          className="relative z-[1] tabular-nums leading-none fc-text-primary"
+          style={{
+            fontFamily: "var(--f-display)",
+            fontWeight: 900,
+            fontSize: "18px",
+          }}
+        >
+          {Math.round(percentage)}
+        </span>
       </div>
     );
   }
@@ -199,7 +265,7 @@ export function AthleteScoreRing({
 
   const labelClass =
     tierKey === "beast_mode"
-      ? "bg-gradient-to-r from-sky-400 via-cyan-200 to-lime-300 bg-clip-text font-semibold text-transparent"
+      ? "bg-gradient-to-r from-sky-400 via-[color-mix(in_srgb,var(--fc-group-c)_35%,white)] to-[color:var(--mastered)] bg-clip-text font-semibold text-transparent"
       : tierKey === "benched" || tierKey === "slipping" || tierKey === "locked_in"
         ? ""
         : "fc-text-dim";
@@ -286,7 +352,7 @@ export function AthleteScoreRing({
             <stop offset="100%" stopColor="#0369A1" stopOpacity="0" />
           </radialGradient>
           <linearGradient id={gidShowFlow} x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#22D3EE" stopOpacity="0.5" />
+            <stop offset="0%" stopColor="var(--fc-group-c)" stopOpacity="0.5" />
             <stop offset="100%" stopColor="#06B6D4" stopOpacity="0.2" />
           </linearGradient>
           <radialGradient

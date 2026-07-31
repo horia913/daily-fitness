@@ -1,0 +1,82 @@
+# CLIENTS LIST CARD — height diagnosis + mockup match
+**Date:** 2026-07-06  
+**Mockup:** `design/mockups/coach-04-clients-card-mockup.html`  
+**Scope:** Presentation/CSS only
+
+---
+
+## 1. Step 1 — exact height sources (root cause)
+
+Prior patches (`align-items: flex-start`, `.body { flex: 0 1 auto }` via `.cardNoStructure`) changed **internal alignment** but not the **card’s outer box** on typical coach viewports. Tracing the full chain:
+
+| # | Source | File + rule | What it did |
+|---|--------|-------------|-------------|
+| **A (primary)** | **Tablet/mobile column stack** | `collectionCard.module.css` `@media (max-width: 1023px)` → `.card { flex-direction: column; gap: 16px }` | Mockup is **always horizontal** (~130px). Shared CollectionCard **stacks body over side** below 1024px, adding body height + 16px gap + side row (~46–100px) → **~50–70px taller** than mockup. Prior `cardNoStructure` only reset `.body` flex; it **did not override** this column breakpoint. |
+| **B (secondary)** | **Global touch-target min-height** | `src/styles/mobile.css` `@media (max-width: 768px)` → `button { min-height: 44px; min-width: 44px }` | Mockup action buttons are **32×32** (`.ib`). `.iconBtn` sets `height: 32px` but **no `min-height` override**, so mobile rule wins → actions row **44px** (+12px on side column). `.kebabBtn` is **28×28** in `coachClients.module.css` → also forced to **44px** on phones. |
+| **C (not the cause)** | CoachClientListCard wrapper | — | **No** `min-height`, `height`, or extra padding on the card wrapper. |
+| **C (not the cause)** | List container / `page.tsx` / `coachClients.module.css` | `.listCol { margin: 0 16px }`, `.listCardStack { gap: 12px }` | **No** leftover `listRowInner` min-height on collection cards. Old row styles (`.listRowWrap`, `.listRowInner`) are **unmounted** from list mode; not applied to `CollectionCard`. |
+| **C (not the cause)** | Structure strip DOM | `CollectionCard.tsx` | Structure markup is **conditional** (`structure?.length > 0`). No empty `.struct` node. |
+| **D (tertiary)** | Default program-row flex | `collectionCard.module.css` `.body { flex: 1 }`, `.side { justify-content: space-between; gap: 16px }` | On wide screens, dead band below meta is **~30–40px** when body cross-stretches to side — mockup accepts this when side drives height (~94px). Not the ~60px inflation; **column stack (A)** was. |
+| **E (removed side effect)** | Auto `.cardNoStructure` on all strip-less cards | Previous patch | Applied to **nutrition** rosters too (unintended). **Removed**; client layout is now opt-in only. |
+
+**CoachClientListCard / score ring / pause menu (measured):**
+- Ring was **46px** (mockup **48px**) — minor, fixed.
+- Pause kebab **28px** (mockup pause **32px**) + mobile **44px** floor — fixed via `.listCardActionBtn` + `.cardClientRoster .iconBtn` overrides.
+
+---
+
+## 2. Files changed + how mockup is matched
+
+| Path | Change |
+|------|--------|
+| `src/components/ui/CollectionCard.tsx` | Additive `rosterVariant="client"` (opt-in). Removed auto `cardNoStructure`. Client roster skips `density="compact"`. |
+| `src/components/ui/collectionCard.module.css` | New `.cardClientRoster` — mockup padding/gaps/body/side/ring actions. **Forces `flex-direction: row` at ≤1023px** for client roster. `.iconBtn` 32px min override inside client roster. Removed `.cardNoStructure`. |
+| `src/app/coach/clients/CoachClientListCard.tsx` | `rosterVariant="client"` (replaces `density="compact"`). Ring **48px**. Pause menu gets `listCardActionBtn`. |
+| `src/app/coach/clients/CoachClientProgramPauseMenu.tsx` | Additive optional `buttonClassName` (presentation). |
+| `src/app/coach/clients/coachClients.module.css` | `.listCardActionBtn` — 32×32, overrides mobile 44px touch min for list card only. |
+
+**Layout outcome:** Card height ≈ `max(body, side) + padding` (~130px mockup target): avatar/name row + meta row + padding; side = ring (48) + gap (14) + actions (32); **no column-stack inflation** on tablet/phone.
+
+---
+
+## 3. Diff table — app client card vs mockup `.card` box model
+
+| Element / property | Mockup (`coach-04-clients-card-mockup.html`) | Before (broken list card) | After (`rosterVariant="client"`) |
+|--------------------|-----------------------------------------------|---------------------------|----------------------------------|
+| **`.card` padding** | `20px 22px 18px 26px` | `16px 18px 14px 22px` (`cardCompact`) | **Match** |
+| **`.card` gap** | `20px` | `14px` compact / `16px` column @≤1023px | **20px**, row at all widths |
+| **`.card` align** | default stretch; height from side | `flex-start` patches; still column @≤1023px | **`flex-start`**; height from content |
+| **`.card` flex-direction @≤1023px** | row (no breakpoint) | **column** (+16px gap) | **row** (client override) |
+| **`.body` flex** | `flex: 1` (width only in row) | `flex: 1`; column grow risk | **`0 1 auto`** |
+| **`.body` gap** | `11px` | `8px` compact | **11px** |
+| **`.toprow` wrap** | no wrap | `flex-wrap: wrap` | **`nowrap`** |
+| **`.name` size** | `18px` | `18px` compact / `19px` default | **18px** |
+| **`.meta` indent** | `padding-left: 42px` | ✓ `metaIndented` | ✓ |
+| **`.side` gap** | `14px` | `10px` / `16px` default | **14px** |
+| **`.side` justify** | `space-between` | `flex-start` (compact / noStructure) | **`space-between`** (mockup) |
+| **`.side` @≤1023px** | column, end-aligned | **row**, full width | **column**, end-aligned (mockup) |
+| **`.ring` size** | `48×48` | `46×46` | **48×48** |
+| **`.actions` / `.ib`** | `32×32`, radius `9px` | `32px` iconBtn + `28px` kebab; **44px** mobile min | **32×32** both (min-height override) |
+| **`.struct`** | absent | absent | absent |
+| **Glow `::after`** | `28%` / 46% width | `14%` / 30% (`glowSubtle`) | unchanged `glowSubtle` |
+
+---
+
+## 4. Programs / nutrition / grid unchanged
+
+| Surface | Confirmation |
+|---------|----------------|
+| **Programs** | No `rosterVariant` → default `.card`, structure strip + column breakpoint unchanged. |
+| **Nutrition** (meal plans, assignments) | No `rosterVariant`; **reverted** auto `.cardNoStructure` → same layout as before collapse patch. |
+| **Clients grid** | `CoachClientGridCard` unchanged; pause menu without `buttonClassName` → grid kebab still 28px (36px @≤767 in existing grid CSS). |
+
+---
+
+## 5. `tsc` result
+
+```
+npx tsc --noEmit
+exit code: 0
+```
+
+No git commits.

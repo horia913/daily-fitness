@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { Check, AlertCircle } from "lucide-react";
+import { Check, AlertCircle, Info } from "lucide-react";
 import { ProgramWeekDayCard } from "@/lib/programWeekStateBuilder";
 import { getCurrentWeekBounds } from "@/lib/clientActivityService";
 
@@ -9,9 +9,14 @@ interface WeekStripProps {
   days: ProgramWeekDayCard[];
   todaySlot: ProgramWeekDayCard | null;
   todayWeekday: number; // 0=Monday, 6=Sunday
-  onDaySelect: (day: ProgramWeekDayCard | null, weekday: number) => void;
+  /** Primary tap on an incomplete workout day — starts directly */
+  onDayStart?: (day: ProgramWeekDayCard) => void;
+  /** Explicit preview affordance (or rest-day tap) */
+  onDayPreview: (day: ProgramWeekDayCard | null, weekday: number) => void;
   selectedScheduleId: string | null;
   selectedRestWeekday: number | null;
+  isStarting?: boolean;
+  startingScheduleId?: string | null;
 }
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -43,9 +48,12 @@ export function WeekStrip({
   days,
   todaySlot,
   todayWeekday,
-  onDaySelect,
+  onDayStart,
+  onDayPreview,
   selectedScheduleId,
   selectedRestWeekday,
+  isStarting = false,
+  startingScheduleId = null,
 }: WeekStripProps) {
   const dateNums = useMemo(() => calendarDatesForCurrentWeek(), []);
 
@@ -80,6 +88,10 @@ export function WeekStrip({
           const isTodaySlot =
             Boolean(day) && isToday && todaySlot?.scheduleId === day!.scheduleId;
           const calNum = dateNums[idx] ?? weekday + 1;
+          const isStartingThis =
+            Boolean(day?.scheduleId) &&
+            isStarting &&
+            startingScheduleId === day!.scheduleId;
 
           if (!day) {
             const isTodayRestColumn = isToday;
@@ -88,12 +100,12 @@ export function WeekStrip({
                 key={weekday}
                 type="button"
                 role="listitem"
-                onClick={() => onDaySelect(null, weekday)}
+                onClick={() => onDayPreview(null, weekday)}
                 className={`min-w-0 flex-1 rounded-[14px] border px-1.5 pt-2.5 pb-3 text-center transition-[box-shadow,border-color,background-color] ${
                   isTodayRestColumn
-                    ? "border-[color:var(--fc-accent-cyan)] bg-[color:var(--fc-surface-elevated)] shadow-[0_0_0_3px_rgba(79,227,232,0.10)]"
+                    ? "border-[color:var(--fc-accent)] bg-[color:var(--fc-surface-elevated)] shadow-[0_0_0_3px_rgba(34, 211, 238, 0.10)]"
                     : isSelected
-                    ? "border-[color:var(--fc-accent-cyan)]/60 bg-[color:var(--fc-surface-card)] shadow-[0_0_0_2px_rgba(79,227,232,0.08)]"
+                    ? "border-[color:var(--fc-accent)]/60 bg-[color:var(--fc-surface-card)] shadow-[0_0_0_2px_rgba(34, 211, 238, 0.08)]"
                     : "border-[color:var(--fc-surface-card-border)] bg-[color:var(--fc-surface-card)]"
                 }`}
               >
@@ -112,7 +124,7 @@ export function WeekStrip({
                 />
                 <p
                   className={`mt-1.5 text-[9.5px] font-medium leading-tight ${
-                    isToday ? "text-[color:var(--fc-accent-cyan)]" : "fc-text-dim"
+                    isToday ? "text-[color:var(--fc-accent)]" : "fc-text-dim"
                   }`}
                 >
                   Rest
@@ -121,66 +133,95 @@ export function WeekStrip({
             );
           }
 
+          const canStart = !isCompleted && Boolean(day.scheduleId);
+
+          const handlePrimaryClick = () => {
+            if (canStart && onDayStart) {
+              onDayStart(day);
+            }
+          };
+
           return (
-            <button
+            <div
               key={day.scheduleId ?? `wk-${weekday}-d${day.dayNumber}`}
-              type="button"
+              className="relative min-w-0 flex-1"
               role="listitem"
-              onClick={() => onDaySelect(day, weekday)}
-              className={`min-w-0 flex-1 rounded-[14px] border px-1.5 pt-2.5 pb-3 text-center transition-[box-shadow,border-color,background-color] ${
-                isMissedSelected
-                  ? "border-red-400 bg-[color-mix(in_srgb,#ef4444_12%,var(--fc-surface-card))] shadow-[0_0_0_2px_rgba(239,68,68,0.28)]"
-                  : isMissed
-                  ? "border-red-500/50 bg-[color-mix(in_srgb,#ef4444_8%,var(--fc-surface-card))]"
-                  : isTodaySlot
-                  ? "border-[color:var(--fc-accent-cyan)] bg-[color:var(--fc-surface-elevated)] shadow-[0_0_0_3px_rgba(79,227,232,0.10)]"
-                  : isSelected
-                  ? "border-[color:var(--fc-accent-cyan)]/60 bg-[color:var(--fc-surface-card)] shadow-[0_0_0_2px_rgba(79,227,232,0.08)]"
-                  : "border-[color:var(--fc-surface-card-border)] bg-[color:var(--fc-surface-card)]"
-              }`}
             >
-              <p className="mb-1 text-[9.5px] font-semibold uppercase tracking-[0.1em] fc-text-dim">
-                {WEEKDAY_LABELS[weekday]}
-              </p>
-              <p
-                className="mb-1 text-lg font-bold leading-none tracking-tight fc-text-primary"
-                style={{ fontFamily: "var(--f-display)" }}
-              >
-                {calNum}
-              </p>
-              <div
-                className={`mx-auto mt-1.5 flex h-[18px] w-[18px] items-center justify-center rounded-full border-[1.5px] ${
-                  isCompleted
-                    ? "border-[color:var(--fc-accent-lime)] bg-[color:var(--fc-accent-lime)] text-[#0e1f2e]"
+              <button
+                type="button"
+                onClick={handlePrimaryClick}
+                disabled={!canStart || isStartingThis}
+                className={`w-full rounded-[14px] border px-1.5 pt-2.5 pb-3 text-center transition-[box-shadow,border-color,background-color] disabled:opacity-70 ${
+                  isMissedSelected
+                    ? "border-red-400 bg-[color-mix(in_srgb,#ef4444_12%,var(--fc-surface-card))] shadow-[0_0_0_2px_rgba(239,68,68,0.28)]"
                     : isMissed
-                    ? "border-red-400/80 bg-transparent"
-                    : "border-[color:var(--fc-surface-card-border)] bg-transparent"
-                }`}
-                aria-hidden
-              >
-                {isCompleted ? (
-                  <Check className="h-2.5 w-2.5 stroke-[3]" stroke="currentColor" />
-                ) : isMissed ? (
-                  <AlertCircle className="h-3 w-3 text-red-400" />
-                ) : null}
-              </div>
-              <p
-                className={`mt-1.5 text-[9.5px] font-medium leading-tight ${
-                  isMissed
-                    ? "text-red-300"
+                    ? "border-red-500/50 bg-[color-mix(in_srgb,#ef4444_8%,var(--fc-surface-card))]"
                     : isTodaySlot
-                    ? "text-[color:var(--fc-accent-cyan)]"
-                    : "fc-text-dim"
-                }`}
+                    ? "border-[color:var(--fc-accent)] bg-[color:var(--fc-surface-elevated)] shadow-[0_0_0_3px_rgba(34, 211, 238, 0.10)]"
+                    : isSelected
+                    ? "border-[color:var(--fc-accent)]/60 bg-[color:var(--fc-surface-card)] shadow-[0_0_0_2px_rgba(34, 211, 238, 0.08)]"
+                    : "border-[color:var(--fc-surface-card-border)] bg-[color:var(--fc-surface-card)]"
+                } ${canStart ? "cursor-pointer" : "cursor-default"}`}
+                aria-label={
+                  canStart
+                    ? `Start ${day.workoutName || "workout"}`
+                    : isCompleted
+                    ? `${day.workoutName || "Workout"} completed`
+                    : day.workoutName || "Workout"
+                }
               >
-                {isMissed ? "Missed" : secondaryLabel(day, weekday, todayWeekday, todaySlot)}
-              </p>
-              {day.isOptional ? (
-                <span className="mt-0.5 block text-[8px] font-medium text-[color:var(--fc-accent-cyan)]">
-                  Optional
-                </span>
-              ) : null}
-            </button>
+                <p className="mb-1 text-[9.5px] font-semibold uppercase tracking-[0.1em] fc-text-dim">
+                  {WEEKDAY_LABELS[weekday]}
+                </p>
+                <p
+                  className="mb-1 text-lg font-bold leading-none tracking-tight fc-text-primary"
+                  style={{ fontFamily: "var(--f-display)" }}
+                >
+                  {calNum}
+                </p>
+                <div
+                  className={`mx-auto mt-1.5 flex h-[18px] w-[18px] items-center justify-center rounded-full border-[1.5px] ${
+                    isCompleted
+                      ? "border-[color:var(--fc-accent)] bg-[color:var(--fc-accent)] text-[#0e1f2e]"
+                      : isMissed
+                      ? "border-red-400/80 bg-transparent"
+                      : "border-[color:var(--fc-surface-card-border)] bg-transparent"
+                  }`}
+                  aria-hidden
+                >
+                  {isCompleted ? (
+                    <Check className="h-2.5 w-2.5 stroke-[3]" stroke="currentColor" />
+                  ) : isMissed ? (
+                    <AlertCircle className="h-3 w-3 text-red-400" />
+                  ) : null}
+                </div>
+                <p
+                  className={`mt-1.5 text-[9.5px] font-medium leading-tight ${
+                    isMissed
+                      ? "text-red-300"
+                      : isTodaySlot
+                      ? "text-[color:var(--fc-accent)]"
+                      : "fc-text-dim"
+                  }`}
+                >
+                  {isMissed ? "Missed" : secondaryLabel(day, weekday, todayWeekday, todaySlot)}
+                </p>
+                {day.isOptional ? (
+                  <span className="mt-0.5 block text-[8px] font-medium text-[color:var(--fc-accent)]">
+                    Optional
+                  </span>
+                ) : null}
+              </button>
+              <button
+                type="button"
+                onClick={() => onDayPreview(day, weekday)}
+                className="absolute right-0.5 top-0.5 rounded-md p-0.5 text-[color:var(--fc-text-dim)] transition-colors hover:bg-white/10 hover:text-[color:var(--fc-accent)]"
+                aria-label={`Preview ${day.workoutName || "workout"} exercises`}
+                title="Preview exercises"
+              >
+                <Info className="h-3 w-3" strokeWidth={2.2} />
+              </button>
+            </div>
           );
         })}
       </div>

@@ -7,6 +7,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { normalizeSetType } from '@/lib/setTypeUtils'
 
 type Row = Record<string, unknown>
 
@@ -24,7 +25,7 @@ function parseIntNum(value: unknown): number | null {
 
 /** Extract (weight, reps) for a given exercise from a set log row by set_type */
 function getWeightRepsForExercise(row: Row, exerciseId: string): { weight: number; reps: number } | null {
-  const blockType = row.set_type as string
+  const blockType = normalizeSetType(row.set_type as string) || (row.set_type as string)
   const w = parseNum(row.weight)
   const r = parseIntNum(row.reps)
 
@@ -54,7 +55,7 @@ function getWeightRepsForExercise(row: Row, exerciseId: string): { weight: numbe
       const er = parseIntNum(el.reps)
       return ew != null && er != null && ew > 0 && er > 0 ? { weight: ew, reps: er } : null
     }
-    case 'dropset':
+    case 'drop_set':
       return row.exercise_id === exerciseId
         ? (() => {
             const wi = parseNum(row.dropset_initial_weight)
@@ -74,7 +75,7 @@ function getWeightRepsForExercise(row: Row, exerciseId: string): { weight: numbe
             return wi != null && ri != null && wi > 0 && ri > 0 ? { weight: wi, reps: ri } : null
           })()
         : null
-    case 'preexhaust':
+    case 'pre_exhaustion':
       if (row.preexhaust_isolation_exercise_id === exerciseId) {
         const wi = parseNum(row.preexhaust_isolation_weight)
         const ri = parseIntNum(row.preexhaust_isolation_reps)
@@ -94,7 +95,7 @@ function getWeightRepsForExercise(row: Row, exerciseId: string): { weight: numbe
       if (row.exercise_id !== exerciseId) return null
       const er = parseIntNum(row.emom_total_reps_this_min)
       return w != null && er != null && w > 0 && er > 0 ? { weight: w, reps: er } : null
-    case 'fortime':
+    case 'for_time':
       if (row.exercise_id !== exerciseId) return null
       const fr = parseIntNum(row.fortime_total_reps) ?? parseIntNum(row.fortime_target_reps)
       return w != null && fr != null && w > 0 && fr > 0 ? { weight: w, reps: fr } : null

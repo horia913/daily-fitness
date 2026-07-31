@@ -1,12 +1,7 @@
 'use client'
 
 import { supabase } from './supabase'
-import { WorkoutTemplateService } from './workoutTemplateService'
-import {
-  TrainingBlock,
-  TrainingBlockGoal,
-  ProgressionProfile,
-} from '@/types/trainingBlock'
+import { TrainingBlock } from '@/types/trainingBlock'
 
 function sortBlocksProgramOrder(blocks: TrainingBlock[]): TrainingBlock[] {
   return [...blocks].sort((a, b) => {
@@ -93,10 +88,8 @@ export class TrainingBlockService {
   static async createTrainingBlock(payload: {
     program_id: string
     name: string
-    goal: TrainingBlockGoal
-    custom_goal_label?: string | null
     duration_weeks: number
-    progression_profile?: ProgressionProfile
+    phase_label?: string | null
     notes?: string | null
     /** Ignored; service assigns the next block_order. */
     block_order?: number
@@ -118,11 +111,9 @@ export class TrainingBlockService {
       .insert({
         program_id: payload.program_id,
         name: payload.name,
-        goal: payload.goal,
-        custom_goal_label: payload.custom_goal_label ?? null,
         duration_weeks: payload.duration_weeks,
         block_order: nextOrder,
-        progression_profile: payload.progression_profile ?? 'none',
+        phase_label: payload.phase_label ?? null,
         notes: payload.notes ?? null,
       })
       .select('*')
@@ -130,26 +121,6 @@ export class TrainingBlockService {
 
     if (error) throw error
     if (!block) throw new Error('createTrainingBlock: insert returned no row')
-
-    const { data: program, error: programError } = await supabase
-      .from('workout_programs')
-      .select('duration_weeks')
-      .eq('id', payload.program_id)
-      .single()
-
-    if (programError) throw programError
-
-    if (program) {
-      const { error: updProgramError } = await supabase
-        .from('workout_programs')
-        .update({
-          duration_weeks: program.duration_weeks + payload.duration_weeks,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', payload.program_id)
-
-      if (updProgramError) throw updProgramError
-    }
 
     return block as TrainingBlock
   }
@@ -161,15 +132,6 @@ export class TrainingBlockService {
     blockId: string,
     updates: Partial<Omit<TrainingBlock, 'id' | 'program_id' | 'created_at'>>,
   ): Promise<TrainingBlock> {
-    const { data: before, error: beforeErr } = await supabase
-      .from('training_blocks')
-      .select('program_id, duration_weeks')
-      .eq('id', blockId)
-      .single()
-
-    if (beforeErr) throw beforeErr
-    if (!before) throw new Error('Training block not found')
-
     const { data, error } = await supabase
       .from('training_blocks')
       .update({ ...updates, updated_at: new Date().toISOString() })
@@ -179,27 +141,6 @@ export class TrainingBlockService {
 
     if (error) throw error
     if (!data) throw new Error('updateTrainingBlock: update returned no row')
-
-    if (
-      typeof updates.duration_weeks === 'number' &&
-      updates.duration_weeks !== before.duration_weeks
-    ) {
-      const delta = updates.duration_weeks - before.duration_weeks
-      const { data: program, error: programErr } = await supabase
-        .from('workout_programs')
-        .select('duration_weeks')
-        .eq('id', before.program_id)
-        .single()
-
-      if (programErr) throw programErr
-
-      if (program) {
-        const newProgramDuration = program.duration_weeks + delta
-        await WorkoutTemplateService.updateProgram(before.program_id, {
-          duration_weeks: newProgramDuration,
-        })
-      }
-    }
 
     return data as TrainingBlock
   }
@@ -216,7 +157,7 @@ export class TrainingBlockService {
       .single()
 
     if (blockErr) throw blockErr
-    if (!block) throw new Error('Block not found')
+    if (!block) throw new Error('Phase not found')
 
     const { error: rulesErr } = await supabase
       .from('program_progression_rules')
@@ -228,20 +169,6 @@ export class TrainingBlockService {
     const { error: delErr } = await supabase.from('training_blocks').delete().eq('id', blockId)
 
     if (delErr) throw delErr
-
-    const { data: program, error: programErr } = await supabase
-      .from('workout_programs')
-      .select('duration_weeks')
-      .eq('id', block.program_id)
-      .single()
-
-    if (programErr) throw programErr
-
-    if (program) {
-      await WorkoutTemplateService.updateProgram(block.program_id, {
-        duration_weeks: Math.max(1, program.duration_weeks - block.duration_weeks),
-      })
-    }
   }
 
   /**

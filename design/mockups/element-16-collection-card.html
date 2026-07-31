@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Element 16 — Collection Card</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root{
+    --bg:#0A0B0D; --card:#0B0C0F; --raised:#101318;
+    --hairline:rgba(255,255,255,.07); --hairline-2:rgba(255,255,255,.12);
+    --accent:#2E7BFF; --good:#22E56A; --warn:#FFB020; --bad:#FF5A4D;
+    --hueA:#2E7BFF; --hueB:#9D6BFF; --hueC:#22D3EE; --hueD:#FFB020;
+    --phase-light:#22E56A; --phase-mod:#FFB020; --phase-hard:#FF5A4D; --phase-deload:#22D3EE;
+    --text:#EEF1F5; --dim:#98A2B3; --subtle:#5C6470;
+    --f-display:'Archivo',sans-serif; --f-body:'Inter',sans-serif; --f-mono:'JetBrains Mono',monospace;
+  }
+  body{ background:var(--bg); color:var(--text); font-family:var(--f-body); -webkit-font-smoothing:antialiased; }
+  .disp{ font-family:var(--f-display); font-stretch:125%; }
+  .page{ max-width:1080px; margin:0 auto; padding:26px 40px 70px; }
+
+  .intro h1{ font-size:26px; font-weight:800; }
+  .intro h1 .b{ color:var(--accent); }
+  .intro p{ font-size:12.5px; line-height:1.7; color:var(--dim); margin-top:10px; }
+  .intro p b{ color:var(--text); }
+
+  .law{ margin:20px 0 8px; border:1px solid rgba(46,123,255,.3); background:rgba(46,123,255,.06); border-radius:12px; padding:16px 18px; }
+  .law .t{ font-family:var(--f-mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); margin-bottom:8px; }
+  .law p{ font-size:12.5px; line-height:1.7; color:var(--text); margin:0; }
+  .law .old{ color:var(--subtle); text-decoration:line-through; }
+
+  .lab{ font-family:var(--f-mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--text); margin:36px 0 4px; }
+  .lab .n{ color:var(--accent); }
+  .desc{ font-family:var(--f-mono); font-size:10px; letter-spacing:.04em; color:var(--subtle); margin-bottom:16px; }
+
+  .stack{ display:flex; flex-direction:column; gap:12px; }
+
+  /* ---- Collection card ---- */
+  .card{ position:relative; display:flex; gap:20px; background:var(--card); border:1px solid rgba(255,255,255,.09);
+    border-radius:16px; padding:20px 22px 18px 26px; overflow:hidden; transition:border-color .15s, background .15s; }
+  .card::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--hue,var(--accent)); z-index:3; }
+  .card::after{ content:""; position:absolute; right:0; top:0; bottom:0; width:46%; z-index:1; pointer-events:none;
+    background:radial-gradient(120% 90% at 100% 50%, color-mix(in srgb, var(--hue,var(--accent)) 32%, transparent), transparent 62%); }
+  .card:hover{ background:var(--raised); border-color:var(--hairline-2); }
+  .card.inactive{ opacity:.58; --hue:var(--subtle); } .card.inactive::after{ opacity:.4; }
+
+  .body{ flex:1; min-width:0; display:flex; flex-direction:column; gap:11px; position:relative; z-index:2; }
+  .toprow{ display:flex; align-items:center; gap:12px; }
+  .name{ font-size:19px; font-weight:700; letter-spacing:-.01em; }
+  .status{ display:inline-flex; align-items:center; gap:6px; font-family:var(--f-mono); font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; padding:4px 9px; border-radius:999px; }
+  .status .d{ width:5px; height:5px; border-radius:50%; }
+  .status.active{ color:var(--good); background:rgba(34,229,106,.1); } .status.active .d{ background:var(--good); }
+  .status.off{ color:var(--dim); background:rgba(255,255,255,.05); } .status.off .d{ background:var(--dim); }
+  .meta{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-family:var(--f-mono); font-size:11px; color:var(--dim); letter-spacing:.03em; }
+  .lvl{ font-family:var(--f-mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; padding:3px 9px; border-radius:6px; border:1px solid var(--hairline-2); color:var(--text); }
+  .meta .sep{ color:var(--subtle); } .meta .v{ color:var(--text); }
+
+  .struct{ max-width:520px; margin-top:3px; }
+  .segs{ display:flex; gap:3px; height:8px; }
+  .seg{ height:100%; border-radius:2px; }
+  .seglabels{ display:flex; gap:3px; margin-top:9px; }
+  .slab{ min-width:0; padding-right:8px; }
+  .slab .pn{ font-size:11px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .slab .pd{ font-family:var(--f-mono); font-size:9.5px; color:var(--subtle); letter-spacing:.04em; margin-top:2px; }
+
+  .side{ display:flex; flex-direction:column; align-items:flex-end; justify-content:space-between; gap:16px; flex-shrink:0; position:relative; z-index:2; }
+  .assigned{ display:flex; align-items:center; gap:11px; }
+  .avatars{ display:flex; }
+  .av{ width:26px; height:26px; border-radius:50%; margin-left:-8px; border:2px solid var(--card); display:flex; align-items:center; justify-content:center; font-family:var(--f-mono); font-size:9.5px; font-weight:700; color:#04122E; }
+  .av:first-child{ margin-left:0; }
+  .acount{ text-align:right; line-height:1.1; }
+  .acount .n{ font-family:var(--f-mono); font-size:19px; font-weight:700; color:var(--hue,var(--accent)); }
+  .acount.zero .n{ color:var(--subtle); }
+  .acount .l{ font-family:var(--f-mono); font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); display:block; margin-top:2px; }
+  .actions{ display:flex; gap:4px; }
+  .ib{ width:32px; height:32px; border-radius:9px; border:1px solid var(--hairline); background:transparent; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--dim); }
+  .ib:hover{ border-color:var(--hairline-2); color:var(--text); }
+  .ib.danger:hover{ color:var(--bad); border-color:rgba(255,90,77,.4); }
+  .i{ width:15px; height:15px; stroke:currentColor; stroke-width:1.8; fill:none; }
+
+  /* score ring for the clients example */
+  .ring{ position:relative; width:46px; height:46px; }
+  .ring svg{ transform:rotate(-90deg); }
+  .ring .v{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:var(--f-mono); font-size:13px; font-weight:700; }
+
+  /* anatomy list */
+  .anat{ margin-top:16px; display:grid; grid-template-columns:1fr 1fr; gap:8px 28px; }
+  .anat .row{ display:flex; gap:10px; font-size:12px; color:var(--dim); line-height:1.5; }
+  .anat .k{ font-family:var(--f-mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--text); min-width:118px; flex-shrink:0; }
+  .anat .opt{ color:var(--warn); }
+
+  .rules{ margin-top:14px; }
+  .rules li{ font-size:12.5px; line-height:1.75; color:var(--dim); margin-left:18px; }
+  .rules li b{ color:var(--text); }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute"><defs>
+  <symbol id="ic-view" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="ic-assign" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></symbol>
+  <symbol id="ic-edit" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/></symbol>
+  <symbol id="ic-del" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></symbol>
+  <symbol id="ic-msg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+</defs></svg>
+
+<div class="page">
+
+  <div class="intro">
+    <h1 class="disp">Element 16 <span class="b">— Collection card</span></h1>
+    <p><b>The governed pattern for roster / collection pages</b> — the coach's list of Programs, Plans, and Clients. Each entity is its own dark item-card in a single-column stack, framed by a colored <b>left rail</b> and a soft <b>right glow</b> in the item's hue, carrying enough detail to act without opening it.</p>
+  </div>
+
+  <div class="law">
+    <div class="t">Law amendment</div>
+    <p><span class="old">Boxes are earned — one card per screen, everything else open rows.</span><br>
+    Boxes are earned. Surfaces exist on: the <b>hero card</b> (one per screen), the <b>collection card</b> (roster pages — Programs / Plans / Clients), the tab bar, button fills, chips, avatar. <b>In-context sub-lists inside a single-item view</b> — exercises within a workout, meals within a plan — <b>stay open rows (Element 06)</b>. Roster pages of top-level entities use <b>collection cards (Element 16)</b>.</p>
+  </div>
+
+  <!-- canonical -->
+  <div class="lab"><span class="n">Anatomy</span> · Programs</div>
+  <div class="desc">The reference instance. Every zone below is fixed except the structure strip, which is optional.</div>
+  <div class="stack">
+    <div class="card" style="--hue:var(--hueA)">
+      <div class="body">
+        <div class="toprow"><span class="name">Hypertrophy Base</span><span class="status active"><span class="d"></span>Active</span></div>
+        <div class="meta"><span class="lvl">Intermediate</span><span class="sep">·</span><span><span class="v">12</span> wks</span><span class="sep">·</span><span>Fixed</span><span class="sep">·</span><span>4 days / wk</span></div>
+        <div class="struct">
+          <div class="segs"><div class="seg" style="flex:4;background:var(--phase-light)"></div><div class="seg" style="flex:5;background:var(--phase-mod)"></div><div class="seg" style="flex:3;background:var(--phase-deload)"></div></div>
+          <div class="seglabels"><div class="slab" style="flex:4"><div class="pn">Foundation</div><div class="pd">4 weeks</div></div><div class="slab" style="flex:5"><div class="pn">Hypertrophy</div><div class="pd">5 weeks</div></div><div class="slab" style="flex:3"><div class="pn">Deload</div><div class="pd">3 weeks</div></div></div>
+        </div>
+      </div>
+      <div class="side">
+        <div class="assigned"><div class="avatars"><span class="av" style="background:var(--hueA)">AP</span><span class="av" style="background:var(--hueB)">MK</span><span class="av" style="background:var(--hueC)">RD</span></div><div class="acount"><span class="n">8</span><span class="l">clients</span></div></div>
+        <div class="actions"><button class="ib"><svg class="i"><use href="#ic-view"/></svg></button><button class="ib"><svg class="i"><use href="#ic-assign"/></svg></button><button class="ib"><svg class="i"><use href="#ic-edit"/></svg></button><button class="ib danger"><svg class="i"><use href="#ic-del"/></svg></button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="anat">
+    <div class="row"><span class="k">Surface</span><span>#0B0C0F, 1px hairline border, 16px radius, 12px gap between cards.</span></div>
+    <div class="row"><span class="k">Left rail</span><span>3px, item hue — the crisp color anchor.</span></div>
+    <div class="row"><span class="k">Right glow</span><span>Radial wash in the item hue over the sparse right zone.</span></div>
+    <div class="row"><span class="k">Title</span><span>Archivo, 19px, 700.</span></div>
+    <div class="row"><span class="k">Status</span><span>Semantic pill (active / inactive). Whole card dims when inactive.</span></div>
+    <div class="row"><span class="k">Meta line</span><span>Mono — level chip · length · schedule · frequency.</span></div>
+    <div class="row"><span class="k">Structure strip <span class="opt">(optional)</span></span><span>Segmented block bar; phase name + duration under each segment.</span></div>
+    <div class="row"><span class="k">Right stat</span><span>The type's headline metric — here assigned clients + avatars, hue-colored, muted at zero.</span></div>
+    <div class="row"><span class="k">Actions</span><span>Ghost icon buttons; destructive tints red on hover.</span></div>
+    <div class="row"><span class="k">Hover</span><span>Surface lifts to #101318, border brightens.</span></div>
+  </div>
+
+  <!-- states -->
+  <div class="lab"><span class="n">States</span></div>
+  <div class="desc">Zero — muted count, no avatars, glow stays. Inactive — dimmed, gray rail, glow suppressed.</div>
+  <div class="stack">
+    <div class="card" style="--hue:var(--hueD)">
+      <div class="body">
+        <div class="toprow"><span class="name">Peaking Block</span><span class="status active"><span class="d"></span>Active</span></div>
+        <div class="meta"><span class="lvl">Advanced</span><span class="sep">·</span><span><span class="v">4</span> wks</span><span class="sep">·</span><span>Fixed</span><span class="sep">·</span><span>4 days / wk</span></div>
+      </div>
+      <div class="side">
+        <div class="assigned"><div class="acount zero"><span class="n">0</span><span class="l">clients</span></div></div>
+        <div class="actions"><button class="ib"><svg class="i"><use href="#ic-view"/></svg></button><button class="ib"><svg class="i"><use href="#ic-assign"/></svg></button><button class="ib"><svg class="i"><use href="#ic-edit"/></svg></button><button class="ib danger"><svg class="i"><use href="#ic-del"/></svg></button></div>
+      </div>
+    </div>
+    <div class="card inactive">
+      <div class="body">
+        <div class="toprow"><span class="name">Old Cut Program</span><span class="status off"><span class="d"></span>Inactive</span></div>
+        <div class="meta"><span class="lvl">Intermediate</span><span class="sep">·</span><span><span class="v">10</span> wks</span><span class="sep">·</span><span>Fixed</span><span class="sep">·</span><span>5 days / wk</span></div>
+      </div>
+      <div class="side">
+        <div class="assigned"><div class="acount zero"><span class="n">0</span><span class="l">clients</span></div></div>
+        <div class="actions"><button class="ib"><svg class="i"><use href="#ic-view"/></svg></button><button class="ib"><svg class="i"><use href="#ic-assign"/></svg></button><button class="ib"><svg class="i"><use href="#ic-edit"/></svg></button><button class="ib danger"><svg class="i"><use href="#ic-del"/></svg></button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- generality -->
+  <div class="lab"><span class="n">Same shell</span> · different content</div>
+  <div class="desc">Illustrative — the shell holds any roster type. Clients gets its own field spec at build time. Here: no structure strip, a score ring as the right stat.</div>
+  <div class="stack">
+    <div class="card" style="--hue:var(--hueC)">
+      <div class="body">
+        <div class="toprow"><span class="name">Andrei Popescu</span><span class="status active"><span class="d"></span>On track</span></div>
+        <div class="meta"><span>Hypertrophy Base</span><span class="sep">·</span><span>Week <span class="v">5</span> of 12</span><span class="sep">·</span><span>Last check-in <span class="v">2d</span></span><span class="sep">·</span><span>Adherence <span class="v">88%</span></span></div>
+      </div>
+      <div class="side">
+        <div class="ring">
+          <svg viewBox="0 0 46 46"><circle cx="23" cy="23" r="19" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="4"/><circle cx="23" cy="23" r="19" fill="none" stroke="var(--good)" stroke-width="4" stroke-linecap="round" stroke-dasharray="119" stroke-dashoffset="24"/></svg>
+          <span class="v" style="color:var(--good)">80</span>
+        </div>
+        <div class="actions"><button class="ib"><svg class="i"><use href="#ic-view"/></svg></button><button class="ib"><svg class="i"><use href="#ic-msg"/></svg></button><button class="ib"><svg class="i"><use href="#ic-edit"/></svg></button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- rules -->
+  <div class="lab"><span class="n">Rules</span></div>
+  <ul class="rules">
+    <li><b>Where it applies:</b> roster / collection pages of top-level entities — Programs, Plans, Clients. Not for sub-lists inside one item.</li>
+    <li><b>Left rail + right glow = the item's hue.</b> Programs cycle the group hues (A/B/C/D); Clients may map hue to status/score.</li>
+    <li><b>Structure strip is optional</b> and content-specific — segmented bar with per-segment labels. Omit when the type has no such structure.</li>
+    <li><b>Phase colors are a fixed intensity scale</b>, not decorative: <span style="color:var(--phase-light);font-weight:700">light / base</span> → <span style="color:var(--phase-mod);font-weight:700">moderate</span> → <span style="color:var(--phase-hard);font-weight:700">hard / peak</span>, and <span style="color:var(--phase-deload);font-weight:700">deload / recovery</span> stands apart. The bar reads as training stress at a glance. (Mapping each real block to a level — by block type, name heuristic, or order — is pinned at build time.)</li>
+    <li><b>Right stat is the type's headline metric</b> — assigned count (Programs), or score ring / adherence (Clients). One number, glanceable.</li>
+    <li><b>Effects budget holds:</b> the glow is ambient (not the CTA glow); the page's one CTA glow still lives on the header's primary action.</li>
+    <li><b>Full-width</b> on desktop; collapses to a stacked layout under 1024px (right zone drops below the body).</li>
+  </ul>
+
+</div>
+
+</body></html>

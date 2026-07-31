@@ -148,6 +148,7 @@ export class PrefetchService {
           )
         `)
         .eq('client_id', userId)
+        .is('program_assignment_id', null)
         .order('scheduled_date', { ascending: true })
 
       if (error) throw error

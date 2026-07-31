@@ -1,4 +1,4 @@
-/* Create exercise modal — extends habit sheet geometry; lime coach accent */
+/* Create exercise modal — extends habit sheet geometry; action coach accent */
 .portalRoot {
   position: fixed;
   inset: 0;
@@ -13,9 +13,7 @@
 .backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(2, 8, 18, 0.7);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: color-mix(in srgb, var(--fc-bg-deep) 70%, transparent);
   animation: coachExBackdropIn 200ms ease-out forwards;
   opacity: 0;
 }
@@ -27,37 +25,30 @@
 }
 
 .root {
-  --bg: #07101a;
-  --card: #0e1f2e;
-  --card-2: #0b1824;
-  --line: rgba(255, 255, 255, 0.08);
-  --line-2: rgba(255, 255, 255, 0.05);
-  --t1: #fff;
-  --t2: rgba(255, 255, 255, 0.65);
-  --t3: rgba(255, 255, 255, 0.42);
-  --t4: rgba(255, 255, 255, 0.26);
-  --cyan: #4fe3e8;
-  --cyan-soft: rgba(79, 227, 232, 0.12);
-  --cyan-dim: rgba(79, 227, 232, 0.18);
-  --lime: #c5ff4a;
-  --lime-2: #7fe89a;
-  --lime-soft: rgba(197, 255, 74, 0.14);
-  --lime-text: #0a1a18;
-  --critical: #ff5a5f;
-  --critical-soft: rgba(255, 90, 95, 0.12);
-  --warning: #f5c242;
-  --warning-soft: rgba(245, 194, 66, 0.12);
-  --warning-dim: rgba(245, 194, 66, 0.28);
+  --bg: var(--fc-bg-deep);
+  --card: var(--fc-surface-card);
+  --card-2: var(--fc-glass-soft);
+  --line: var(--fc-glass-border);
+  --line-2: var(--fc-hairline);
+  --t1: var(--fc-text-primary);
+  --t2: var(--fc-text-dim);
+  --t3: var(--fc-text-subtle);
+  --t4: var(--fc-text-quaternary);
+  --critical: var(--fc-status-error);
+  --critical-soft: color-mix(in srgb, var(--fc-status-error) 14%, transparent);
+  --warning: var(--fc-status-warning);
+  --warning-soft: color-mix(in srgb, var(--fc-status-warning) 14%, transparent);
+  --warning-dim: color-mix(in srgb, var(--fc-status-warning) 30%, transparent);
   --purple: #a78bfa;
   --purple-soft: rgba(167, 139, 250, 0.12);
   --purple-dim: rgba(167, 139, 250, 0.22);
   --rose: #f472b6;
   --rose-soft: rgba(244, 114, 182, 0.12);
   --rose-dim: rgba(244, 114, 182, 0.22);
-  --f-head: "Bricolage Grotesque", var(--font-geist-sans, system-ui, sans-serif);
-  --f-body: var(--font-geist-sans, "Geist", system-ui, sans-serif);
-  --f-mono: var(--font-geist-mono, "Geist Mono", ui-monospace, monospace);
-  color: var(--t1);
+  --f-head: var(--f-headline);
+  --f-body: var(--font-body);
+  --f-mono: var(--f-mono);
+  color: var(--fc-text-primary);
 }
 
 .sheet {
@@ -111,7 +102,7 @@
   width: 38px;
   height: 4px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--fc-glass-highlight);
   margin: 8px auto 0;
   flex-shrink: 0;
 }
@@ -128,24 +119,24 @@
   padding: 12px 16px 16px;
 }
 
-.eyebrowLime {
+.eyebrowAction {
   font-family: var(--f-mono);
   font-size: 9.5px;
   font-weight: 500;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--lime);
+  color: var(--fc-accent);
   display: flex;
   align-items: center;
   gap: 5px;
 }
 
-.eyebrowDotLime {
+.eyebrowDotAction {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: var(--lime);
-  box-shadow: 0 0 6px var(--lime);
+  background: var(--fc-accent);
+  box-shadow: none;
   flex-shrink: 0;
 }
 
@@ -173,11 +164,11 @@
 }
 
 .btnGhost:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
   color: var(--t1);
 }
 
-.btnPrimaryLime {
+.btnPrimaryAction {
   flex: 1;
   min-width: 0;
   display: inline-flex;
@@ -186,20 +177,20 @@
   gap: 8px;
   padding: 11px 14px;
   border-radius: 11px;
-  border: 1px solid rgba(197, 255, 74, 0.35);
-  background: linear-gradient(135deg, var(--lime) 0%, var(--lime-2) 100%);
-  color: var(--lime-text);
+  border: 1px solid color-mix(in srgb, var(--fc-accent) 35%, transparent);
+  background: linear-gradient(135deg, var(--fc-accent) 0%, var(--fc-accent) 100%);
+  color: var(--fc-ink);
   font-family: var(--f-body);
   font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
 }
 
-.btnPrimaryLime:disabled {
+.btnPrimaryAction:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
-.btnPrimaryLime:hover:not(:disabled) {
+.btnPrimaryAction:hover:not(:disabled) {
   filter: brightness(1.05);
 }

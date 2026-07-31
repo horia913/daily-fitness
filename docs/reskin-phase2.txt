@@ -1,0 +1,85 @@
+RESKIN Phase 2 — Cluster + Rest-pause onto LiveCard v6
+Date: 2026-07-17
+No git. Escape hatch: technique pair wired; measurement trio deferred.
+
+================================================================================
+1. FILES MODIFIED
+================================================================================
+  src/components/client/workout-execution/blocks/ClusterSetExecutor.tsx
+  src/components/client/workout-execution/blocks/RestPauseExecutor.tsx
+
+Shared live-card: untouched (formatClusterTechniqueBody / formatRestPauseTechniqueBody
+already existed from Phase 1 — reused, not re-authored).
+
+================================================================================
+2. DIFF TABLE vs execution-screen-v6-CANONICAL.html §2
+================================================================================
+Cluster
+| Mockup piece                              | Status | Notes |
+|-------------------------------------------|--------|-------|
+| Solo .live + hue rail + lhead             | Yes    | Drop/Straight shell |
+| Target 3 × 4 clusters                     | Yes    | reps_per_cluster × clusters_per_set, unit "clusters" |
+| Effort coloured word + RPE                | Yes    | resolveSetPrescriptionTargets.rir → effortFromPrescribedRir |
+| Rest · Tempo · Last strip                 | Yes    | LiveCardStats |
+| .tech Cluster sentence                    | Yes    | formatClusterTechniqueBody(reps, intra rest, clusters) |
+| Log Weight + Clusters done + ✓            | Partial| Existing progressive cluster log kept (Done cluster N → Log set); write path unchanged |
+| No SetTypeBadge / nested PrescriptionCard | Yes    | |
+
+Rest-pause
+| Mockup piece                              | Status | Notes |
+|-------------------------------------------|--------|-------|
+| Solo .live + Primary (N + reps)           | Yes    | reps_only, unit "+ reps" from resolved/prescribed reps |
+| Effort Max / RPE                          | Yes    | |
+| Rest · Tempo · Last                       | Yes    | |
+| .tech Rest-pause sentence                 | Yes    | formatRestPauseTechniqueBody(pause, bursts) from slot config |
+| Log Weight + Total reps + ✓               | Partial| Existing weight + initial reps + pause-attempt UI kept inside LiveCardLog |
+| No SetTypeBadge / nested card             | Yes    | |
+
+Timed / Distance (Endurance & Speed) — DEFERRED (see §5)
+
+================================================================================
+3. ADDITIONS TO LiveCardPrimary / LiveCardLog
+================================================================================
+None this pass. Cluster/Rest-pause reuse existing kinds (reps_weight with unit
+"clusters"; reps_only with unit "+ reps") and existing LiveCardLog children slot.
+
+Next pass (Timed / Endurance / Speed) will need additive:
+  - LiveCardTarget kinds: time (work_seconds → "45 seconds"), distance (distance_meters → "400 metres")
+  - LiveCardStats label variants: Load (Timed), Pace (Distance)
+  - LiveCardLog input variants: time-held; distance + time
+Those are intentionally not started so row types stay identical.
+
+================================================================================
+4. TECHNIQUE-COPY FORMATTERS
+================================================================================
+Reused (already in live-card/LiveCardTechnique.tsx from Phase 1):
+  formatClusterTechniqueBody({ repsPerCluster, intraRest, clustersPerSet })
+  formatRestPauseTechniqueBody({ pauseSeconds, maxPauses })
+Config sources: cluster_sets[0] / slot scalars; rest_pause_sets[0] /
+rest_pause_seconds + max_rest_pauses. Not coach-canvas buildPrescriptionSegments.
+
+================================================================================
+5. WIRED VS DEFERRED
+================================================================================
+Wired:    ClusterSetExecutor, RestPauseExecutor
+Deferred: TimedSetExecutor, EnduranceExecutor, SpeedWorkExecutor
+Reason: escape hatch — measurement trio needs Primary/Log/Stats extensions;
+        stop after verified technique pair rather than half-wire.
+
+================================================================================
+6. UNTOUCHED CONFIRMATION
+================================================================================
+- Row types (Straight / Drop / Superset / Giant): identical — no shared Primary/Log changes
+- Logging write path (logSetToDatabase / orchestrator / API): unchanged; Cluster still
+  progressive cluster-done then one set log; Rest-pause same handleLog payload
+- resolveSetPrescriptionTargets internals: untouched (consumed for effort/tempo/reps)
+- Protocol executors (AMRAP, EMOM, Tabata, ForTime): untouched
+- page.tsx header / progress chrome: untouched
+- restoreWorkoutProgress, completeWorkoutService, deriveSetType, standalone: untouched
+
+================================================================================
+7. tsc
+================================================================================
+npx tsc --noEmit → exit 0
+
+END

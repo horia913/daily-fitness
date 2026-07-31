@@ -64,8 +64,8 @@ export function TrainingRhythmSection({
           <span
             className={v6.sectionIcon}
             style={{
-              background: "var(--cyan-soft)",
-              color: "var(--cyan)",
+              background: "var(--fc-accent-dim)",
+              color: "var(--fc-accent)",
             }}
           >
             <CalendarDays className="h-[13px] w-[13px]" strokeWidth={2} aria-hidden />
@@ -80,7 +80,7 @@ export function TrainingRhythmSection({
       <div className={v6.pairedRow}>
         <div>
           <div className={v6.pairedLabel}>Workouts/wk</div>
-          <div className={v6.pairedNum} style={{ color: "var(--cyan)" }}>
+          <div className={v6.pairedNum} style={{ color: "var(--fc-accent)" }}>
             {data.workoutsPerWeek5Avg.toFixed(1)}
           </div>
           <div className={v6.pairedSub}>5-week avg</div>

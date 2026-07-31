@@ -11,9 +11,24 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getClientMetrics } from '@/lib/coachDashboardService'
 import { fetchCoachAthleteScoreSummariesByClientIds } from '@/lib/coachAthleteScoreSummaries'
 import { fetchCoachClientListTrainingPayload } from '@/lib/coachClientListTrainingStatus'
+import {
+  classifyCoachClientAttention,
+  fetchCoachAttentionSignalsBatch,
+  type CoachAttentionReason,
+  type CoachAttentionLevel,
+} from '@/lib/coachAttention'
+import { calculateAthleteScore } from '@/lib/athleteScoreService'
+import { computeScoreIsStale } from '@/app/coach/clients/coachClientListCardUtils'
+import type { CoachAthleteScoreSummary } from '@/types/coachAthleteScore'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+/** Max stale clients recomputed per list load (bounded write/query cost). */
+const STALE_SCORE_RECOMPUTE_CAP = 5
+
+const ONE_HOUR_MS = 60 * 60 * 1000
 
 type CoachClientProfileRow = {
   id: string
@@ -22,6 +37,104 @@ type CoachClientProfileRow = {
   last_name: string | null
   avatar_url: string | null
   timezone?: string | null
+}
+
+async function fetchActiveMealPlanNamesByClient(
+  db: SupabaseClient,
+  clientIds: string[],
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+  if (clientIds.length === 0) return out
+
+  const { data: assignments, error } = await db
+    .from('meal_plan_assignments')
+    .select('client_id, meal_plan_id, created_at')
+    .in('client_id', clientIds)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('[coach/clients] meal_plan_assignments:', error.message)
+    return out
+  }
+
+  const planIdByClient = new Map<string, string>()
+  for (const row of assignments ?? []) {
+    if (!planIdByClient.has(row.client_id)) {
+      planIdByClient.set(row.client_id, row.meal_plan_id)
+    }
+  }
+
+  const planIds = [...new Set(planIdByClient.values())]
+  if (planIds.length === 0) return out
+
+  const { data: plans, error: plansError } = await db
+    .from('meal_plans')
+    .select('id, name')
+    .in('id', planIds)
+
+  if (plansError) {
+    console.error('[coach/clients] meal_plans:', plansError.message)
+    return out
+  }
+
+  const nameById = new Map((plans ?? []).map((p) => [p.id, p.name as string]))
+  for (const [clientId, planId] of planIdByClient) {
+    const name = nameById.get(planId)
+    if (name) out.set(clientId, name)
+  }
+  return out
+}
+
+function scoreCalculatedBeforeOneHourAgo(calculatedAt: string | undefined): boolean {
+  if (!calculatedAt) return false
+  return Date.now() - new Date(calculatedAt).getTime() >= ONE_HOUR_MS
+}
+
+async function recomputeStaleAthleteScoresForList(
+  clients: Array<{
+    id: string
+    athleteScore: CoachAthleteScoreSummary | null
+    scoreIsStale: boolean
+    hasActiveProgram: boolean
+    pauseStatus: string
+  }>,
+  supabaseAdmin: SupabaseClient,
+): Promise<void> {
+  const targets = clients
+    .filter(
+      (c) =>
+        c.scoreIsStale &&
+        c.hasActiveProgram &&
+        c.pauseStatus !== 'paused' &&
+        scoreCalculatedBeforeOneHourAgo(c.athleteScore?.calculated_at),
+    )
+    .slice(0, STALE_SCORE_RECOMPUTE_CAP)
+
+  for (const client of targets) {
+    try {
+      const result = await calculateAthleteScore(client.id, supabaseAdmin)
+      if ('skipped' in result && result.skipped) {
+        console.warn(
+          `[coach/clients] athlete score recompute skipped for ${client.id}:`,
+          result.reason,
+        )
+        continue
+      }
+      client.athleteScore = {
+        score: result.score,
+        tier: result.tier,
+        paused: client.pauseStatus === 'paused',
+        calculated_at: result.calculated_at,
+      }
+      client.scoreIsStale = false
+    } catch (err) {
+      console.error(
+        `[coach/clients] athlete score recompute failed for ${client.id}:`,
+        err,
+      )
+    }
+  }
 }
 
 export async function GET() {
@@ -64,7 +177,7 @@ export async function GET() {
       await Promise.all([
         supabase
           .from('profiles')
-          .select('id, email, first_name, last_name, avatar_url')
+          .select('id, email, first_name, last_name, avatar_url, timezone')
           .in('id', clientIds),
         getClientMetrics(clientIds, supabase),
         fetchCoachAthleteScoreSummariesByClientIds(scoreSupabase, clientIds),
@@ -88,6 +201,52 @@ export async function GET() {
       profilesById,
     )
 
+    const todayYmd = new Date().toISOString().slice(0, 10)
+    const activeAssignmentIds = [...new Set(
+      [...trainingMap.values()]
+        .map((t) => t.activeProgramAssignmentId)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0),
+    )]
+
+    const nextSessionByClient = new Map<string, string>()
+    if (activeAssignmentIds.length > 0) {
+      const { data: nextRows, error: nextErr } = await scoreSupabase
+        .from('workout_assignments')
+        .select('client_id, scheduled_date, assigned_date')
+        .in('program_assignment_id', activeAssignmentIds)
+        .is('completed_at', null)
+        .or(`scheduled_date.gte.${todayYmd},and(scheduled_date.is.null,assigned_date.gte.${todayYmd})`)
+        .order('scheduled_date', { ascending: true, nullsFirst: false })
+        .order('assigned_date', { ascending: true, nullsFirst: false })
+
+      if (nextErr) {
+        console.error('[coach/clients] next workout_assignments:', nextErr.message)
+      } else {
+        for (const row of nextRows ?? []) {
+          const clientId = row.client_id as string
+          if (nextSessionByClient.has(clientId)) continue
+          const nextDate = (row.scheduled_date as string | null) ?? (row.assigned_date as string | null)
+          if (nextDate) nextSessionByClient.set(clientId, nextDate.slice(0, 10))
+        }
+      }
+    }
+
+    const [mealPlanNameByClient, attentionSignals, notesRes] = await Promise.all([
+      fetchActiveMealPlanNamesByClient(scoreSupabase, clientIds),
+      fetchCoachAttentionSignalsBatch(scoreSupabase, clientIds, profilesById),
+      scoreSupabase
+        .from('coach_client_notes')
+        .select('client_id, note')
+        .eq('coach_id', user.id)
+        .in('client_id', clientIds),
+    ])
+
+    const noteByClient = new Map<string, string>()
+    for (const row of notesRes.data ?? []) {
+      const text = typeof row.note === 'string' ? row.note.trim() : ''
+      if (text) noteByClient.set(row.client_id as string, text)
+    }
+
     console.log('[Coach clients] network calls done')
 
     const clients = clientsData.map((row) => {
@@ -97,6 +256,13 @@ export async function GET() {
         : 'Client'
       const metrics = metricsMap.get(row.client_id)
       const training = trainingMap.get(row.client_id)
+      const athleteScore = athleteScoreMap.get(row.client_id) ?? null
+      const lastActive = metrics?.lastActive ?? null
+      const scoreIsStale = computeScoreIsStale(athleteScore, lastActive)
+      const signals = attentionSignals.get(row.client_id)
+      const verdict = signals
+        ? classifyCoachClientAttention(signals)
+        : ({ level: 'on_track' as CoachAttentionLevel, reasons: [] as CoachAttentionReason[] })
       return {
         id: row.client_id,
         client_id: row.client_id,
@@ -116,7 +282,10 @@ export async function GET() {
               timezone: profile.timezone ?? undefined,
             }
           : undefined,
-        athleteScore: athleteScoreMap.get(row.client_id) ?? null,
+        athleteScore,
+        mealPlanName: mealPlanNameByClient.get(row.client_id) ?? null,
+        scoreIsStale,
+        nextSessionDate: nextSessionByClient.get(row.client_id) ?? null,
         pauseStatus: training?.pauseStatus ?? 'active',
         hasActiveProgram: training?.hasActiveProgram ?? false,
         activeProgramAssignmentId: training?.activeProgramAssignmentId ?? null,
@@ -125,7 +294,11 @@ export async function GET() {
         priorWeekCompletedCount: training?.priorWeekCompletedCount ?? 0,
         currentWeekCompletedCount: training?.currentWeekCompletedCount ?? 0,
         currentWeekScheduledPastCount: training?.currentWeekScheduledPastCount ?? 0,
-        metrics: metrics ?? {
+        attention: {
+          level: verdict.level,
+          reasons: verdict.reasons,
+        },
+        standingNote: noteByClient.get(row.client_id) ?? null,        metrics: metrics ?? {
           clientId: row.client_id,
           lastActive: null,
           workoutsThisWeek: 0,
@@ -150,6 +323,18 @@ export async function GET() {
         },
       }
     })
+
+    for (const client of clients) {
+      // List card must never show legacy persisted score when no active assignment.
+      if (!client.hasActiveProgram) {
+        client.athleteScore = null
+      }
+    }
+
+    if (supabaseServiceKey && supabaseUrl) {
+      const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+      await recomputeStaleAthleteScoresForList(clients, supabaseAdmin)
+    }
 
     return NextResponse.json({ clients })
   } catch (err: unknown) {

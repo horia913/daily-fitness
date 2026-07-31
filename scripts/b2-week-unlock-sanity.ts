@@ -17,8 +17,8 @@ import {
   getClientIanaTimezone,
   getCompletedSlots,
   getProgramScheduleSlotsForAssignment,
-  getTotalWeeksForProgram,
 } from '../src/lib/programStateService'
+import { resolveInstanceWeekForAssignment } from '../src/lib/programInstanceResolver'
 config({ path: '.env.local' })
 
 /** Subset of program_assignments rows used by this script */
@@ -68,7 +68,8 @@ async function main() {
   for (const raw of rows) {
     const a = raw as AssignmentPauseRow
     const tz = await getClientIanaTimezone(sb, a.client_id)
-    const totalWeeks = await getTotalWeeksForProgram(sb, a.program_id)
+    // N = sum of instance phases (canonical resolver), not MAX(schedule week).
+    const totalWeeks = (await resolveInstanceWeekForAssignment(sb, a.id))?.totalWeeks ?? 0
     const slots = await getProgramScheduleSlotsForAssignment(sb, a.program_id, a.id)
     const completed = await getCompletedSlots(sb, a.id)
     const finalUnlocked = computeUnlockedWeekMax(

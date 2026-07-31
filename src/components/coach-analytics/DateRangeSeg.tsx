@@ -18,8 +18,8 @@ export function DateRangeSeg({
 }) {
   return (
     <div
-      className="flex gap-0.5 rounded-[11px] border p-0.5"
-      style={{ background: 'var(--card-2)', borderColor: 'var(--line-2)' }}
+      className="grid grid-cols-4 gap-1.5 rounded-[11px] border p-[5px]"
+      style={{ background: 'var(--card-2)', borderColor: 'var(--line)' }}
     >
       {OPTIONS.map((opt) => {
         const active = value === opt.id
@@ -29,13 +29,16 @@ export function DateRangeSeg({
             type="button"
             onClick={() => onChange(opt.id)}
             className={cn(
-              'flex-1 rounded-lg border-none px-2 py-1.5 text-[11.5px] font-medium transition-colors',
-              active ? 'shadow-[inset_0_0_0_1px_var(--cyan-dim)]' : 'bg-transparent',
+              'rounded-lg border-none px-2 py-[9px] text-center font-bold uppercase transition-colors',
+              active ? undefined : 'bg-transparent',
             )}
             style={{
-              background: active ? 'var(--cyan-soft)' : 'transparent',
-              color: active ? 'var(--cyan)' : 'var(--t3)',
-              fontFamily: 'var(--font-geist-sans, Geist, sans-serif)',
+              fontFamily: 'var(--f-mono, ui-monospace, monospace)',
+              fontSize: '11px',
+              letterSpacing: '0.06em',
+              background: active ? 'var(--fc-accent)' : 'transparent',
+              color: active ? '#fff' : 'var(--t2)',
+              boxShadow: active ? '0 3px 14px -5px var(--fc-accent-glow)' : 'none',
             }}
           >
             {opt.label}

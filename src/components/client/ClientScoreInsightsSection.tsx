@@ -2,14 +2,16 @@
 
 import React, { useEffect, useState } from "react";
 import { AthleteScoreRing, SectionHeader } from "@/components/client-ui";
-import {
-  ScoreBreakdown,
-  type ScoreBreakdownComponent,
-} from "@/components/client-ui/ScoreBreakdown";
+import { ScoreBreakdown } from "@/components/client-ui/ScoreBreakdown";
 import { AlertTriangle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { AthleteScore } from "@/types/athleteScore";
 import { tierForAthleteScoreRow } from "@/lib/clientDashboardPageData";
+import {
+  buildAthleteScoreBreakdownComponents,
+  fetchAthleteScoreWeekTrends,
+  type AthleteScoreWeekTrends,
+} from "@/lib/athleteScoreBreakdown";
 
 export interface ClientScoreInsightsSectionProps {
   userId: string | null;
@@ -37,12 +39,9 @@ export function ClientScoreInsightsSection({
   athleteScore,
   scoreError,
 }: ClientScoreInsightsSectionProps) {
-  const [nutritionOn, setNutritionOn] = useState(false);
   const [hasActiveProgram, setHasActiveProgram] = useState<boolean | null>(null);
   const [paused, setPaused] = useState(false);
-  const [trends, setTrends] = useState<
-    { training: number; recovery: number; nutrition: number; extras: number } | undefined
-  >(undefined);
+  const [trends, setTrends] = useState<AthleteScoreWeekTrends | undefined>(undefined);
 
   const hasScore = athleteScore != null;
   const betweenPrograms = hasActiveProgram === false && hasScore;
@@ -81,125 +80,16 @@ export function ClientScoreInsightsSection({
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
-    (async () => {
-      const [{ data: mpa }, { data: amp }] = await Promise.all([
-        supabase
-          .from("meal_plan_assignments")
-          .select("id")
-          .eq("client_id", userId)
-          .eq("is_active", true)
-          .limit(1)
-          .maybeSingle(),
-        supabase.from("assigned_meal_plans").select("id").eq("client_id", userId).limit(1).maybeSingle(),
-      ]);
-      if (cancelled) return;
-      setNutritionOn(!!(mpa ?? amp));
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [userId]);
-
-  useEffect(() => {
-    if (!userId) return;
-    let cancelled = false;
-    (async () => {
-      const { data: rows } = await supabase
-        .from("athlete_scores")
-        .select(
-          "training_score, recovery_score, nutrition_score, extras_score, calculated_at",
-        )
-        .eq("client_id", userId)
-        .order("window_start", { ascending: false })
-        .limit(2);
-      if (cancelled) return;
-      const r = rows ?? [];
-      if (r.length >= 2) {
-        const a = r[0] as Record<string, unknown>;
-        const b = r[1] as Record<string, unknown>;
-        const d = (k: string) => {
-          const av = a[k];
-          const bv = b[k];
-          if (av == null || bv == null) return 0;
-          return Math.round(Number(av) - Number(bv));
-        };
-        setTrends({
-          training: d("training_score"),
-          recovery: d("recovery_score"),
-          nutrition: d("nutrition_score"),
-          extras: d("extras_score"),
-        });
-      } else {
-        setTrends(undefined);
-      }
-    })();
+    fetchAthleteScoreWeekTrends(userId).then((t) => {
+      if (!cancelled) setTrends(t);
+    });
     return () => {
       cancelled = true;
     };
   }, [userId, athleteScore?.calculated_at]);
 
-  const nutritionConfigured = nutritionOn;
-
-  const breakdown: ScoreBreakdownComponent[] = athleteScore
-    ? [
-        {
-          label: "Training",
-          value: athleteScore.training_score != null ? Math.round(athleteScore.training_score) : null,
-          delta: trends?.training,
-          subRows: [
-            {
-              label: "Completion",
-              value:
-                athleteScore.training_completion_score != null
-                  ? Math.round(athleteScore.training_completion_score)
-                  : null,
-            },
-            {
-              label: "Execution",
-              value:
-                athleteScore.training_execution_score != null
-                  ? Math.round(athleteScore.training_execution_score)
-                  : null,
-            },
-          ],
-        },
-        {
-          label: "Recovery",
-          value: athleteScore.recovery_score != null ? Math.round(athleteScore.recovery_score) : null,
-          delta: trends?.recovery,
-          subRows: [
-            {
-              label: "Sleep",
-              value:
-                athleteScore.recovery_sleep_score != null
-                  ? Math.round(athleteScore.recovery_sleep_score)
-                  : null,
-            },
-            {
-              label: "Steps",
-              value:
-                athleteScore.recovery_steps_score != null
-                  ? Math.round(athleteScore.recovery_steps_score)
-                  : null,
-            },
-          ],
-        },
-        {
-          label: "Nutrition",
-          value: nutritionConfigured ? Math.round(athleteScore.nutrition_score ?? 0) : 0,
-          delta: nutritionConfigured ? trends?.nutrition : undefined,
-          hint: nutritionConfigured ? undefined : "off",
-        },
-        {
-          label: "Extras",
-          value: Math.round(athleteScore.extras_score ?? 0),
-          delta: trends?.extras,
-          hint:
-            (athleteScore.extras_score ?? 0) < 1
-              ? "Log activities to boost your score."
-              : undefined,
-        },
-      ]
+  const breakdown = athleteScore
+    ? buildAthleteScoreBreakdownComponents(athleteScore, trends)
     : [];
 
   return (
@@ -234,6 +124,14 @@ export function ClientScoreInsightsSection({
                   size={200}
                 />
               </div>
+              {athleteScore.training_completion_score != null ? (
+                <p className="mt-3 text-center text-xs fc-text-dim">
+                  Adherence {Math.round(athleteScore.training_completion_score)}
+                  {athleteScore.training_execution_score != null
+                    ? ` × execution (${Math.round(athleteScore.training_execution_score)}%)`
+                    : " · execution pending"}
+                </p>
+              ) : null}
               {betweenPrograms && athleteScore.window_start ? (
                 <p className="mt-3 text-center text-xs fc-text-dim">
                   Between programs · last updated{" "}

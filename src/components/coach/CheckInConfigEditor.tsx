@@ -98,10 +98,10 @@ export function CheckInConfigEditor({ coachId, clientId, onSaved }: CheckInConfi
 
   return (
     <div className="fc-card-shell p-6">
-      <h3 className="text-lg font-semibold fc-text-primary mb-4">Scheduled Check-In settings</h3>
+      <h3 className="text-lg font-semibold fc-text-primary mb-4">Periodical check-in settings</h3>
       <div className="space-y-4">
         <div>
-          <Label className="block text-sm font-medium fc-text-primary mb-2">Scheduled check-in frequency</Label>
+          <Label className="block text-sm font-medium fc-text-primary mb-2">Periodical check-in frequency</Label>
           <select
             value={frequencyDays}
             onChange={(e) => setFrequencyDays(Number(e.target.value))}

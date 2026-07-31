@@ -15,8 +15,8 @@ export function GoalCompletionRing({
   const dash = (pct / 100) * c;
   const gap = c - dash;
   let stroke = "var(--t4)";
-  if (pct >= 100) stroke = "var(--lime)";
-  else if (pct > 0) stroke = "var(--cyan)";
+  if (pct >= 100) stroke = "var(--fc-accent)";
+  else if (pct > 0) stroke = "var(--fc-accent)";
 
   return (
     <div className="flex items-center gap-3">
@@ -45,7 +45,7 @@ export function GoalCompletionRing({
           className="absolute inset-0 flex items-center justify-center text-[16px] font-bold"
           style={{
             fontFamily:
-              '"Big Shoulders Display", var(--font-geist-sans, Geist), sans-serif',
+              'var(--f-display), var(--font-geist-sans, Geist), sans-serif',
             color: stroke,
           }}
         >

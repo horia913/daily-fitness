@@ -1,74 +1,59 @@
-/* Client check-in suite v1 — scoped tokens (canonical spec) */
+/* Client check-in suite — v6 flat (aligned with progress-suite de-chrome) */
 .root {
-  --cs-bg: #07101a;
-  --cs-card: #0e1f2e;
-  --cs-card-2: #0b1824;
-  --cs-card-3: #091420;
-  --cs-line: rgba(255, 255, 255, 0.08);
-  --cs-line-2: rgba(255, 255, 255, 0.05);
-  --cs-t1: #fff;
-  --cs-t2: rgba(255, 255, 255, 0.65);
-  --cs-t3: rgba(255, 255, 255, 0.42);
-  --cs-t4: rgba(255, 255, 255, 0.26);
-  --cs-cyan: #4fe3e8;
-  --cs-cyan-soft: rgba(79, 227, 232, 0.12);
-  --cs-cyan-dim: rgba(79, 227, 232, 0.18);
-  --cs-lime: #c5ff4a;
-  --cs-lime-2: #7fe89a;
-  --cs-lime-soft: rgba(197, 255, 74, 0.14);
-  --cs-critical: #ff5a5f;
-  --cs-critical-soft: rgba(255, 90, 95, 0.12);
-  --cs-critical-dim: rgba(255, 90, 95, 0.25);
-  --cs-warning: #f5c242;
-  --cs-warning-soft: rgba(245, 194, 66, 0.12);
-  --cs-warning-dim: rgba(245, 194, 66, 0.25);
-  --cs-warning-lite: #f8d67a;
-  --cs-warning-lite-soft: rgba(248, 214, 122, 0.12);
-  --cs-good: #34d399;
-  --cs-good-soft: rgba(52, 211, 153, 0.12);
-  --cs-good-dim: rgba(52, 211, 153, 0.25);
-  --cs-purple: #a78bfa;
-  --cs-purple-soft: rgba(167, 139, 250, 0.12);
-  --cs-purple-dim: rgba(167, 139, 250, 0.25);
-  --cs-orange: #fb923c;
-  --cs-orange-soft: rgba(251, 146, 60, 0.12);
-  --cs-lime-text: #0a1a18;
-  --cs-cyan-text: #0a1a26;
+  --cs-bg: var(--fc-bg-deep);
+  --cs-card: var(--fc-surface-card);
+  --cs-card-2: var(--fc-bg-deep);
+  --cs-card-3: var(--fc-bg-deep);
+  --cs-line: var(--fc-glass-border);
+  --cs-line-2: var(--fc-hairline);
+  --cs-t1: var(--fc-text-primary);
+  --cs-t2: var(--fc-text-dim);
+  --cs-t3: var(--fc-text-subtle);
+  --cs-t4: var(--fc-text-quaternary);
+  --cs-critical: var(--fc-status-error);
+  --cs-critical-soft: color-mix(in srgb, var(--fc-status-error) 12%, transparent);
+  --cs-critical-dim: color-mix(in srgb, var(--fc-status-error) 25%, transparent);
+  --cs-warning: var(--fc-status-warning);
+  --cs-warning-soft: color-mix(in srgb, var(--fc-status-warning) 12%, transparent);
+  --cs-warning-dim: color-mix(in srgb, var(--fc-status-warning) 25%, transparent);
+  --cs-warning-lite: var(--fc-status-warning);
+  --cs-warning-lite-soft: color-mix(in srgb, var(--fc-status-warning) 12%, transparent);
+  --cs-good: var(--fc-status-success);
+  --cs-good-soft: color-mix(in srgb, var(--fc-status-success) 12%, transparent);
+  --cs-good-dim: color-mix(in srgb, var(--fc-status-success) 25%, transparent);
+  /* Group hues remapped to v6 semantic / accent family (no stray purple/orange) */
+  --cs-purple: var(--fc-accent);
+  --cs-purple-soft: var(--fc-accent-dim);
+  --cs-purple-dim: var(--fc-accent-glow);
+  --cs-orange: var(--fc-status-warning);
+  --cs-orange-soft: color-mix(in srgb, var(--fc-status-warning) 12%, transparent);
+  --cs-row-hover: var(--fc-surface-tint);
 }
 
 .fontHeadline {
-  font-family: var(--f-headline, "Bricolage Grotesque", sans-serif);
+  font-family: var(--f-headline);
 }
 .fontBody {
-  font-family: var(--font-geist-sans, "Geist", sans-serif);
+  font-family: var(--font-body);
 }
 .fontDisplay {
-  font-family: var(--f-display, "Big Shoulders Display", sans-serif);
+  font-family: var(--f-display);
 }
 .fontMono {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
 }
 
-/* --- Hero (UI-1) --- */
+/* --- Hero — flat left-rail (no glow / gradient) --- */
 .hero {
   position: relative;
-  border-radius: 16px;
-  border: 1px solid var(--cs-line);
-  background: linear-gradient(135deg, var(--cs-card), var(--cs-card-2));
-  padding: 14px 14px 16px;
+  border-radius: 0;
+  border: none;
+  border-bottom: 1px solid var(--cs-line);
+  border-left: 3px solid var(--fc-accent);
+  background: transparent;
+  padding: 14px 16px 14px 18px;
   margin-bottom: 14px;
   overflow: hidden;
-}
-.heroGlowCyan::before {
-  content: "";
-  position: absolute;
-  width: 140px;
-  height: 140px;
-  top: -48px;
-  right: -48px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(79, 227, 232, 0.22) 0%, transparent 70%);
-  pointer-events: none;
 }
 .heroTop {
   display: flex;
@@ -76,22 +61,22 @@
   gap: 10px;
 }
 .heroIconBtn {
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 11px;
-  border: 1px solid var(--cs-line);
-  background: var(--cs-card-2);
+  border-radius: 8px;
+  border: 1px solid var(--fc-hairline-strong, var(--cs-line));
+  background: transparent;
   color: var(--cs-t2);
   cursor: pointer;
-  transition: color 0.15s, background 0.15s;
+  transition: color 0.15s, border-color 0.15s;
 }
 .heroIconBtn:hover {
   color: var(--cs-t1);
-  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--cs-t3);
 }
 .heroMeta {
   flex: 1;
@@ -110,14 +95,14 @@
   flex-shrink: 0;
 }
 .heroEyebrowText {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 .heroTitle {
-  font-family: var(--f-headline, "Bricolage Grotesque", sans-serif);
+  font-family: var(--f-headline);
   font-size: 22px;
   font-weight: 700;
   line-height: 1.15;
@@ -134,7 +119,7 @@
   color: var(--cs-t3);
 }
 
-.limePrimaryBtn {
+.actionPrimaryBtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -143,24 +128,24 @@
   border-radius: 11px;
   border: none;
   cursor: pointer;
-  font-family: var(--font-geist-sans, "Geist", sans-serif);
+  font-family: var(--font-body);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: var(--cs-lime-text);
-  background: linear-gradient(135deg, var(--cs-lime), var(--cs-lime-2));
+  color: var(--fc-ink);
+  background: var(--fc-accent);
   position: relative;
-  transition: filter 0.15s, opacity 0.15s;
+  transition: opacity 0.15s, filter 0.15s;
 }
-.limePrimaryBtn:hover {
-  filter: brightness(1.05);
+.actionPrimaryBtn:hover {
+  filter: brightness(1.06);
 }
-.limePrimaryBtn:disabled {
+.actionPrimaryBtn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-/* --- Section card + stripe (UI-2) --- */
+/* --- Section card + stripe --- */
 .sectionCard {
   position: relative;
   background: var(--cs-card);
@@ -172,7 +157,6 @@
   gap: 11px;
   overflow: hidden;
 }
-/* Accent flush to the left inside the card (full height), with content cleared to the right */
 .sectionCardStripe {
   padding-left: 18px;
 }
@@ -186,10 +170,10 @@
   border-radius: 16px 0 0 16px;
 }
 .stripeCyan::before {
-  background: var(--cs-cyan);
+  background: var(--fc-accent);
 }
 .stripePurple::before {
-  background: var(--cs-purple);
+  background: var(--fc-accent);
 }
 .stripeWarning::before {
   background: var(--cs-warning);
@@ -197,8 +181,8 @@
 .stripeGood::before {
   background: var(--cs-good);
 }
-.stripeLime::before {
-  background: var(--cs-lime);
+.stripeAction::before {
+  background: var(--fc-accent);
 }
 .sectionTitleRow {
   display: flex;
@@ -208,7 +192,7 @@
   padding-left: 4px;
 }
 .sectionTitle {
-  font-family: var(--f-headline, "Bricolage Grotesque", sans-serif);
+  font-family: var(--f-headline);
   font-size: 14px;
   font-weight: 600;
   line-height: 1.2;
@@ -216,7 +200,7 @@
   margin: 0;
 }
 .optHelper {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.08em;
@@ -225,7 +209,7 @@
   flex-shrink: 0;
 }
 
-/* --- Stepper (UI-3) --- */
+/* --- Stepper --- */
 .stepperRow {
   display: flex;
   flex-direction: row;
@@ -243,14 +227,14 @@
   justify-content: center;
   border-radius: 13px;
   border: 1px solid var(--cs-line);
-  background: var(--cs-card-2);
+  background: transparent;
   color: var(--cs-t1);
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s, opacity 0.15s;
 }
 .stepperBtn:hover:not(:disabled) {
-  border-color: var(--cs-cyan-dim);
-  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--fc-accent-glow);
+  background: var(--cs-row-hover);
 }
 .stepperBtn:disabled {
   opacity: 0.3;
@@ -264,7 +248,8 @@
   min-width: 80px;
 }
 .stepperValue {
-  font-family: var(--f-display, "Big Shoulders Display", sans-serif);
+  font-family: var(--f-display);
+  font-stretch: 125%;
   font-size: 32px;
   font-weight: 700;
   line-height: 1;
@@ -276,7 +261,7 @@
   color: var(--cs-t4);
 }
 .stepperUnit {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.12em;
@@ -284,7 +269,7 @@
   color: var(--cs-t3);
 }
 
-/* --- Preset chips (UI-4) --- */
+/* --- Preset chips --- */
 .presetGrid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -294,27 +279,26 @@
   padding: 7px 0;
   border-radius: 10px;
   border: 1px solid var(--cs-line-2);
-  background: var(--cs-card-2);
+  background: transparent;
   color: var(--cs-t2);
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
   cursor: pointer;
-  transition: color 0.15s, background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
 .presetChip:hover {
   color: var(--cs-t1);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--cs-row-hover);
 }
 .presetChipActive {
-  background: var(--cs-cyan-soft);
-  color: var(--cs-cyan);
-  border-color: var(--cs-cyan-dim);
-  box-shadow: inset 0 0 0 1px var(--cs-cyan-dim);
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
+  border-color: var(--fc-accent-glow);
 }
 
-/* --- Scale pills (UI-5) --- */
+/* --- Scale pills (emoji faces kept) --- */
 .scaleGrid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -329,16 +313,16 @@
   padding: 9px 4px;
   border-radius: 11px;
   border: 1px solid var(--cs-line-2);
-  background: var(--cs-card-2);
+  background: transparent;
   cursor: pointer;
-  transition: box-shadow 0.15s, background 0.15s, border-color 0.15s;
+  transition: background 0.15s, border-color 0.15s;
 }
 .scaleEmoji {
   font-size: 14px;
   line-height: 1;
 }
 .scaleLabel {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 9.5px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -348,14 +332,14 @@
   line-height: 1.15;
 }
 
-/* Save CTA (UI-6) */
+/* Save CTA — flat primary */
 .saveCta {
   width: 100%;
   padding: 14px;
   border-radius: 14px;
   border: none;
   cursor: pointer;
-  font-family: var(--font-geist-sans, "Geist", sans-serif);
+  font-family: var(--font-body);
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -363,18 +347,19 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  color: var(--cs-lime-text);
-  background: linear-gradient(135deg, var(--cs-lime), var(--cs-lime-2));
+  color: var(--fc-ink);
+  background: var(--fc-accent);
   transition: opacity 0.15s;
 }
 .saveCta:disabled {
   opacity: 0.5;
-  background: var(--cs-card-2);
+  background: transparent;
+  border: 1px solid var(--cs-line);
   color: var(--cs-t3);
   cursor: not-allowed;
 }
 .saveHelper {
-  font-family: var(--font-geist-sans, "Geist", sans-serif);
+  font-family: var(--font-body);
   font-size: 10.5px;
   line-height: 1.5;
   color: var(--cs-t3);
@@ -383,14 +368,14 @@
   margin-top: 6px;
 }
 
-/* Status pill (UI-7) */
+/* Status pill */
 .statusPill {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 2px 7px;
   border-radius: 5px;
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 8.5px;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -404,12 +389,12 @@
   border-color: var(--cs-good-dim);
 }
 .statusDue {
-  background: var(--cs-warning-soft);
+  background: transparent;
   color: var(--cs-warning);
   border-color: var(--cs-warning-dim);
 }
 
-/* Delta pills (UI-24) */
+/* Delta pills */
 .deltaPill {
   justify-self: end;
   display: inline-flex;
@@ -417,12 +402,12 @@
   gap: 2px;
   padding: 2px 7px;
   border-radius: 5px;
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.06em;
   border: 1px solid var(--cs-line-2);
-  background: var(--cs-card-2);
+  background: transparent;
   color: var(--cs-t3);
 }
 .deltaUp {
@@ -441,7 +426,7 @@
   padding: 0 4px 12px;
 }
 .dailySectionTitle {
-  font-family: var(--f-headline, "Bricolage Grotesque", sans-serif);
+  font-family: var(--f-headline);
   font-size: 18px;
   font-weight: 700;
   line-height: 1.2;
@@ -449,7 +434,7 @@
   margin: 0;
 }
 .dailySectionDate {
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-family: var(--f-mono);
   font-size: 10.5px;
   letter-spacing: 0.04em;
   color: var(--cs-t3);
@@ -470,10 +455,10 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
-  font-family: var(--font-geist-sans, "Geist", sans-serif);
+  font-family: var(--font-body);
   font-size: 11.5px;
   font-weight: 500;
-  color: var(--cs-cyan);
+  color: var(--fc-accent);
   background: transparent;
   border: none;
   cursor: pointer;
@@ -494,9 +479,10 @@
   gap: 14px;
 }
 
+/* History stats — flat hairline (no gradient / glow) */
 .statsHero {
   position: relative;
-  background: linear-gradient(135deg, var(--cs-card), var(--cs-card-2));
+  background: var(--cs-card);
   border: 1px solid var(--cs-line);
   border-radius: 18px;
   padding: 14px;
@@ -505,44 +491,77 @@
   gap: 12px;
   overflow: hidden;
 }
-.statsHero::before {
-  content: "";
-  position: absolute;
-  width: 140px;
-  height: 140px;
-  top: -40px;
-  right: -40px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(79, 227, 232, 0.18) 0%, transparent 70%);
-  pointer-events: none;
-}
 
 .sheetBackdrop {
   background: rgba(0, 0, 0, 0.55) !important;
 }
 
-/* Segmented tab pills (body metrics & similar) */
+.sheetOptionRow {
+  display: flex;
+  width: 100%;
+  cursor: pointer;
+  align-items: center;
+  gap: 10px;
+  border-radius: 13px;
+  border: 1px solid var(--cs-line-2);
+  background: transparent;
+  padding: 12px;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+}
+.sheetOptionRow:hover {
+  background: var(--cs-row-hover);
+  border-color: var(--fc-accent-glow);
+}
+
 .pillTab {
   padding: 7px 11px;
   border-radius: 9px;
   border: 1px solid var(--cs-line-2);
-  background: var(--cs-card-2);
-  font-family: var(--f-mono, "Geist Mono", monospace);
+  background: transparent;
+  font-family: var(--f-mono);
   font-size: 9.5px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--cs-t3);
   cursor: pointer;
-  transition: color 0.15s, background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
 .pillTab:hover {
   color: var(--cs-t1);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--cs-row-hover);
 }
 .pillTabActive {
-  background: var(--cs-cyan-soft);
-  color: var(--cs-cyan);
-  border-color: var(--cs-cyan-dim);
-  box-shadow: inset 0 0 0 1px var(--cs-cyan-dim);
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
+  border-color: var(--fc-accent-glow);
+}
+
+.streakChip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 0 2px;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cs-t3);
+}
+.streakChipValue {
+  font-family: var(--f-display);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--cs-t1);
+}
+.streakChipBest {
+  color: var(--cs-t4);
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-weight: 500;
 }

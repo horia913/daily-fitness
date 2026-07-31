@@ -1,0 +1,241 @@
+POST-WAVE-4 TAIL INVESTIGATION — read-only
+Date: 2026-07-13
+Repro: client af9325e2-76e7-4df6-8ed7-9effd9c764d8 (Popescu)
+       program_assignment 3ffc6a7a-71d0-4fee-ab74-cffc66c327c5
+       start URL assignment 7e0b8908-0218-45d2-8032-5efec7ccda1c
+       closed log 8fa38b17-96ae-47dc-848a-7733fac04587
+       reused session 2c3608de-20bb-4916-b57f-6c5aba9fc0b3
+
+================================================================================
+PART 1 — LEGACY-LOG 404 + STRAGGLER SWEEP
+================================================================================
+
+1.1 Call path (404 repro)
+
+  src/app/client/workouts/[id]/start/page.tsx:4222-4267
+    fetchPreviousPerformance(exerciseId)
+      → dynamic import getExercisePreviousPerformance
+        from src/lib/clientProgressionService.ts
+
+  src/lib/clientProgressionService.ts — getExercisePreviousPerformance:
+    Step 1  L505-511  workout_logs (live) — recent completed logs
+    Step 2  L529-544  workout_set_logs (live) — primary lastWorkout + PB
+    Step 3  L546-611  LEGACY when !lastWorkout:
+              L548-552  .from('workout_exercise_logs')  ← 404 in console
+              L570-575  .from('workout_set_details')
+    Step 4  L614-625  lastSessionForExerciseOnSameAssignment (workout_set_logs)
+
+  Second legacy block (RPE fallback in getPreviousWeekData):
+    L872-885  workout_exercise_logs → workout_set_details
+
+  workout_exercise_assignments: NOT queried. Only a string match in
+    src/lib/groupModel/canvasSave.ts:58-60 (error-message branch).
+
+  Repro chain:
+    start/page.tsx:647-702 closeIncompleteLogsFromPreviousDays
+      → sets workout_logs.completed_at = started_at on stale log 8fa38b17
+    → getExercisePreviousPerformance includes that log in “completed” set
+    → no workout_set_logs rows for the current exercise on that log
+    → Step 3 fires → GET workout_exercise_logs → 404
+    → console: [fetchPreviousPerformance] lastWorkout: null, personalBest: null
+
+  Live data (Popescu): 86 workout_set_logs rows; 24 personal_records rows.
+  Legacy tables were empty pre-drop; nulls today are expected after 404.
+
+1.2 Fix recommendation — SMALLER CHANGE: REMOVE legacy fallback (do not rewire)
+
+  The live path already exists:
+    - lastWorkout + in-session max weight/reps: workout_set_logs (L360-405, L529-544)
+    - Canonical PR dates elsewhere: personal_records via getPrDateKeysByExercise
+      (clientProgressionService.ts:639-667) and complete page
+      (src/app/client/workouts/[id]/complete/page.tsx:73)
+    - user_exercise_metrics: e1RM path in log-set / LiveWorkoutSetEntryExecutor;
+      NOT used by getExercisePreviousPerformance today.
+
+  Smallest correct fix:
+    DELETE Step 3 block (L546-611) and legacy RPE block (L872-895).
+    No rewire to user_exercise_metrics required for the 404.
+
+  Optional follow-up (separate): exclude abandoned logs (completed_at === started_at)
+  from Step 1 query so auto-closed logs do not pollute “last completed” scan.
+
+1.3 Full straggler sweep — src/ grep 2026-07-13
+
+  GRAVEYARD TABLE                          FILE:LINE                          CLASS
+  ---------------------------------------  ---------------------------------  -----------------
+  workout_exercise_logs                    clientProgressionService.ts:549    LIVE-PATH (fix)
+                                           clientProgressionService.ts:874    LIVE-PATH (fix)
+  workout_set_details                      clientProgressionService.ts:571    LIVE-PATH (fix)
+                                           clientProgressionService.ts:882    LIVE-PATH (fix)
+  workout_exercise_assignments             groupModel/canvasSave.ts:58        COMMENT/STRING ONLY
+  sessions                                 schedulingService.ts:54,91,123,    DEAD FILE (zero imports)
+                                           159,181,291,322
+  coach_availability                       schedulingService.ts:209,236,259   DEAD FILE
+  clipcards                                CoachClientSubscriptionSection     DEAD FILE (unmounted;
+                                           .tsx:134,169,197,262,316,334,359  CoachProfileShell has
+                                                                              no subscription tab)
+  assigned_meal_plans                      —                                  ZERO HITS
+  assigned_workouts                        —                                  ZERO HITS
+  clip_cards                               —                                  ZERO HITS
+  clipcard_types                           —                                  ZERO HITS
+  client_workout_block_exercises           enrichWorkoutBlocksPrescribedRir   COMMENT ONLY
+                                           .ts:93
+  booked_sessions                          —                                  ZERO HITS
+  coach_time_slots                         —                                  ZERO HITS
+  meal_plan_items                          —                                  ZERO HITS
+  program_days                             —                                  ZERO HITS
+  daily_workout_cache                      —                                  ZERO HITS
+  leaderboard_titles                       —                                  ZERO HITS
+
+  Related comment-only (not .from queries):
+    workout-execution/types.ts:58          comment re workout_exercise_logs
+    coachDashboardService.ts:904,906       clipcards retired comments
+    validators.ts:283                      clipcards comment
+
+  DROPPED RPC / FUNCTION NAMES (20 in Wave 4; 15 distinct names in w4.txt)
+  FUNCTION                                 FILE:LINE                          CLASS
+  ---------------------------------------  ---------------------------------  -----------------
+  get_client_compliance_scores             ComplianceSnapshot.tsx:111           DEAD FILE
+  get_client_compliance_scores_simple      ComplianceSnapshot.tsx:118           DEAD FILE
+  book_session                             —                                  ZERO HITS in src/
+  book_session_with_clipcard               —                                  ZERO HITS
+  cancel_session                           —                                  ZERO HITS
+  complete_session                         —                                  ZERO HITS
+  add_session_feedback                     —                                  ZERO HITS
+  get_available_time_slots                 —                                  ZERO HITS
+  create_clipcard                          —                                  ZERO HITS
+  extend_clipcard_validity                 —                                  ZERO HITS
+  use_clipcard_session                     —                                  ZERO HITS
+  generate_time_slots_for_date             —                                  ZERO HITS
+  mark_time_slot_unavailable               —                                  ZERO HITS
+  update_booked_sessions_updated_at        —                                  ZERO HITS
+  update_coach_time_slots_updated_at       —                                  ZERO HITS
+
+  Step-1 vs tail reconcile:
+    CoachProfileShell.tsx — subscription tab removed (confirmed unmounted).
+    schedulingService.ts, ComplianceSnapshot.tsx, CoachClientSubscriptionSection.tsx
+    still exist on disk but have ZERO import sites — safe deletes, not live-path.
+
+  ONLY runtime 404 today: clientProgressionService.ts legacy Step 3.
+
+================================================================================
+PART 2 — “DAY 1 COMPLETED” ON MONDAY JUL 13
+================================================================================
+
+2.1 Live completion ledger (program_day_completions)
+
+  assignment 3ffc6a7a…, progression_mode = coach_managed, start_date 2026-07-01,
+  timezone_snapshot Europe/Bucharest
+
+  ROW                                      completed_at (UTC)    week  day  pda_id
+  ---------------------------------------  --------------------  ----  ---  --------
+  d2e689a0-2cd4-47da-ba16-ed27fa303a75     2026-07-01 10:58:33   1     1    8540af68…
+  5b4b035a-ac0a-400c-9c33-b9ca8b936798     2026-07-11 16:01:25   2     8    dbdfd7fb…
+
+  NO row for week 2 day 9 (pda 14df65fb…) — Sunday Jul 12 work.
+
+2.2 Workout sessions + logs (Jul 11–12)
+
+  SESSION                                  status        started (UTC)       pda week/day
+  ---------------------------------------  ------------  ------------------  ------------
+  f58d249c… (completed)                    completed     2026-07-11 15:56:12  w2 d8
+  2c3608de… (reused on start page)         in_progress   2026-07-12 08:08:07  w2 d9
+
+  LOG                                      started_at              completed_at            notes
+  ---------------------------------------  ----------------------  ----------------------  -----
+  3f91aa4c… (real finish Jul 11)           2026-07-11 15:56:12     2026-07-11 16:01:25     paired w/ f58d249c
+  8fa38b17… (auto-closed)                  2026-07-12 08:08:07     2026-07-12 08:08:07     abandoned; no ledger
+
+  Week 2 slots: day 8 (dbdfd7fb…) + day 9 (14df65fb…) only.
+
+2.3 Week model + Train completion derivation
+
+  Calendar week (display/unlock):
+    programWeekCalendar.ts:46-61 computeCurrentProgramWeek
+      → floor(diffCalendarDaysYmd(start_date, today) / 7) + 1
+      → anchored to assignment start_date, NOT ISO calendar Monday.
+    programStateService.ts:629-665 computeUnlockedWeekMax
+      → same calendar derivation; completion does NOT gate unlock.
+
+  On 2026-07-13 (Bucharest): start 2026-07-01 → elapsed 12 days → program week 2.
+
+  Train isCompleted:
+    trainPageDataMapper.ts:187-189 loads program_day_completions
+    L292-331 coach_managed → completedKeysCurrentWeek = all-time completions
+    L333-346 isCompleted = program_day_assignment_id in completedKeys
+
+  UI labels: trainPageDataMapper.ts:338 dayLabel = `Day ${slot.day_number}`
+    → week 2 strip shows “Day 8” and “Day 9”, not “Day 1”.
+
+  WeekStrip.tsx calendar row uses getCurrentWeekBounds() (ISO Mon–Sun dates) for
+  date numbers only; completion checkmarks come from program_day_completions.
+
+2.4 Suspect writers
+
+  closeIncompleteLogsFromPreviousDays — start/page.tsx:647-702
+    WRITES: workout_logs.completed_at = started_at only
+    DOES NOT: program_day_completions
+
+  start-from-progress/route.ts:421-450 (stale session guard)
+    WRITES: workout_sessions.status=completed, workout_logs.completed_at
+    EXPLICIT: “Do NOT write to program_day_completions” (L423-424)
+    DOES NOT: mark day complete at start
+
+  Canonical completion writer:
+    completeWorkoutService.ts:328-337 INSERT program_day_completions
+    (only on real finish via completeWorkout / POST /api/complete-workout)
+
+2.5 VERDICT: (a) CORRECT DISPLAY — expectation mismatch, not bogus ledger
+
+  Evidence:
+    - Sunday Jul 12 session (2c3608de, week 2 day 9) never finished;
+      log 8fa38b17 auto-abandoned; zero program_day_completions row for day 9.
+    - The checkmark the user likely sees is week 2 **Day 8** (first slot in the
+      week-2 strip), legitimately completed **Saturday Jul 11 16:01 UTC**
+      via completeWorkoutService — not Sunday’s abandoned start.
+    - If user reads “Day 1” literally: only week 1 Day 1 is complete (Jul 1);
+      that is also legitimate but unrelated to Jul 12 testing.
+
+  What to expect week-to-week:
+    - Program week rolls every 7 calendar days from assignment start_date
+      (pause offsets apply); not calendar Monday.
+    - Train shows slots for the current program week (week 2 on Jul 13).
+    - A slot shows complete only when program_day_completions has its
+      program_day_assignment_id — finishing/abandoning a workout_log alone
+      is insufficient unless completeWorkout runs.
+
+  NOT verdict (b): no bogus completion row tied to stale-log close or
+  start-from-progress reuse.
+
+================================================================================
+PART 3 — WHERE CHAMPIONS RENDER
+================================================================================
+
+  Data: leaderboardService.ts:139-154 getCurrentChampions()
+         → .from('current_champions') (live view over leaderboard_rankings)
+
+  Mounted UI:
+    Route:     /client/progress/leaderboard
+    Page:      src/app/client/progress/leaderboard/page.tsx:147
+               getCurrentChampions(5) → champions state
+    Render:    ClientLeaderboardPageBody.tsx:203-234
+               “Current Champions” section (Crown icon + chip list)
+
+  Nav entry points:
+    src/app/client/me/page.tsx:59          href /client/progress/leaderboard
+    EnhancedClientWorkouts.tsx:1648        Link to same route
+
+  Coach Insights / coach routes: NO getCurrentChampions or current_champions
+  consumption found — champions are client Progress → Leaderboard only.
+
+  Unmounted? NO — page is wired and champions section renders when rows exist.
+
+================================================================================
+FIX PRIORITY (for post-report implementation)
+================================================================================
+
+  P0  clientProgressionService.ts — remove legacy workout_exercise_logs /
+      workout_set_details fallbacks (stops 404 on every start-page exercise)
+  P1  Delete dead files: schedulingService.ts, ComplianceSnapshot.tsx,
+      CoachClientSubscriptionSection.tsx (zero imports; graveyard tables/RPCs)
+  P2  Optional: filter abandoned workout_logs from previous-performance scan

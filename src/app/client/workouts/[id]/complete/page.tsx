@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
-import { ClientPageShell, SectionHeader, Eyebrow } from "@/components/client-ui";
+import { ClientPageShell, Eyebrow } from "@/components/client-ui";
 import { Button } from "@/components/ui/button";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import {
@@ -39,7 +39,9 @@ import {
   WorkoutSummarySection,
   type TileStat,
 } from "@/components/client-workout-complete";
-import completeStyles from "@/components/client-workout-complete/clientWorkoutCompleteV1.module.css";
+import completeStyles from "@/components/client-workout-complete/clientWorkoutCompleteV6.module.css";
+import type { PrescribedRirMap } from "@/components/client-workout-complete/types";
+import { prescribedKey } from "@/components/client-workout-complete/setLinesFromLogs";
 
 const WORKOUT_LOG_COMPLETION_SELECT =
   "id, started_at, completed_at, total_duration_minutes, total_sets_completed, total_reps_completed, total_weight_lifted, workout_assignment_id, workout_session_id, notes, workout_sessions ( notes )";
@@ -150,6 +152,7 @@ interface WorkoutSetLog {
   reps: number | null;
   set_number: number | null;
   completed_at: string;
+  rpe?: number | null;
 
   // Special type columns
   dropset_initial_weight?: number | null;
@@ -257,6 +260,9 @@ function WorkoutCompleteContent() {
     string | null
   >(null);
   const [personalRecords, setPersonalRecords] = useState<any[]>([]);
+  const [prescribedRirMap, setPrescribedRirMap] = useState<PrescribedRirMap>(
+    new Map(),
+  );
   const [previousLogTotals, setPreviousLogTotals] = useState<{
     total_weight_lifted: number;
     total_sets_completed: number;
@@ -695,6 +701,7 @@ function WorkoutCompleteContent() {
           reps,
           set_number,
           completed_at,
+          rpe,
           dropset_initial_weight,
           dropset_initial_reps,
           dropset_final_weight,
@@ -873,6 +880,120 @@ function WorkoutCompleteContent() {
         .sort((a, b) => a.set_order - b.set_order);
 
       setBlockGroups(blocksArray);
+
+      // Prescribed effort (RIR) for target / yours pairs
+      try {
+        const entryIds = [
+          ...new Set(
+            (sets ?? [])
+              .map((s: any) => s.set_entry_id as string | null)
+              .filter(Boolean) as string[],
+          ),
+        ];
+        const map: PrescribedRirMap = new Map();
+        if (entryIds.length > 0) {
+          // Standalone template path: workout_set_entry_exercises → workout_set_prescriptions
+          const { data: slots } = await supabase
+            .from("workout_set_entry_exercises")
+            .select("id, set_entry_id, exercise_id, rir")
+            .in("set_entry_id", entryIds);
+          const slotIds = (slots ?? []).map((s) => s.id);
+          if (slotIds.length > 0) {
+            const { data: rxRows } = await supabase
+              .from("workout_set_prescriptions")
+              .select("slot_id, set_number, rir")
+              .in("slot_id", slotIds);
+            const slotById = new Map(
+              (slots ?? []).map((s) => [s.id, s] as const),
+            );
+            for (const rx of rxRows ?? []) {
+              const slot = slotById.get(rx.slot_id);
+              if (!slot?.set_entry_id || !slot.exercise_id) continue;
+              const sn = Number(rx.set_number);
+              if (!Number.isFinite(sn)) continue;
+              const rir =
+                rx.rir != null && Number(rx.rir) > 0
+                  ? Number(rx.rir)
+                  : slot.rir != null && Number(slot.rir) > 0
+                    ? Number(slot.rir)
+                    : null;
+              map.set(
+                prescribedKey(slot.set_entry_id, slot.exercise_id, sn),
+                rir,
+              );
+            }
+            // Slot-level rir fallback when no per-set prescriptions
+            for (const slot of slots ?? []) {
+              if (!slot.set_entry_id || !slot.exercise_id) continue;
+              if (slot.rir == null || Number(slot.rir) <= 0) continue;
+              // Only fill gaps — don't overwrite per-set values
+              for (let sn = 1; sn <= 20; sn++) {
+                const k = prescribedKey(
+                  slot.set_entry_id,
+                  slot.exercise_id,
+                  sn,
+                );
+                if (!map.has(k)) map.set(k, Number(slot.rir));
+              }
+            }
+          }
+
+          // Program instance path
+          const { data: pSlots } = await supabase
+            .from("program_instance_set_entry_exercises")
+            .select("id, program_instance_set_entry_id, exercise_id, rir")
+            .in("program_instance_set_entry_id", entryIds);
+          const pSlotIds = (pSlots ?? []).map((s) => s.id);
+          if (pSlotIds.length > 0) {
+            const { data: pRx } = await supabase
+              .from("program_instance_set_prescriptions")
+              .select("slot_id, set_number, rir")
+              .in("slot_id", pSlotIds);
+            const pById = new Map((pSlots ?? []).map((s) => [s.id, s] as const));
+            for (const rx of pRx ?? []) {
+              const slot = pById.get(rx.slot_id);
+              if (!slot?.program_instance_set_entry_id || !slot.exercise_id)
+                continue;
+              const sn = Number(rx.set_number);
+              if (!Number.isFinite(sn)) continue;
+              const rir =
+                rx.rir != null && Number(rx.rir) > 0
+                  ? Number(rx.rir)
+                  : slot.rir != null && Number(slot.rir) > 0
+                    ? Number(slot.rir)
+                    : null;
+              map.set(
+                prescribedKey(
+                  slot.program_instance_set_entry_id,
+                  slot.exercise_id,
+                  sn,
+                ),
+                rir,
+              );
+            }
+            for (const slot of pSlots ?? []) {
+              if (
+                !slot.program_instance_set_entry_id ||
+                !slot.exercise_id ||
+                slot.rir == null ||
+                Number(slot.rir) <= 0
+              )
+                continue;
+              for (let sn = 1; sn <= 20; sn++) {
+                const k = prescribedKey(
+                  slot.program_instance_set_entry_id,
+                  slot.exercise_id,
+                  sn,
+                );
+                if (!map.has(k)) map.set(k, Number(slot.rir));
+              }
+            }
+          }
+        }
+        setPrescribedRirMap(map);
+      } catch (e) {
+        console.warn("[complete] prescribed RIR load failed", e);
+      }
 
     } catch (error) {
       console.error("❌ Error loading blocks and sets:", error);
@@ -1641,7 +1762,7 @@ function WorkoutCompleteContent() {
     return (
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
-          <ClientPageShell className="min-h-screen max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
+          <ClientPageShell className="min-h-screen max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
             <div className="space-y-3 animate-pulse">
               <div className="h-20 w-20 rounded-full mx-auto bg-[color:var(--fc-glass-highlight)]" />
               <div className="h-7 max-w-[200px] rounded-lg mx-auto bg-[color:var(--fc-glass-highlight)]" />
@@ -1662,7 +1783,7 @@ function WorkoutCompleteContent() {
     return (
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
-          <ClientPageShell className="min-h-screen max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden flex items-center justify-center min-h-[60vh]">
+          <ClientPageShell className="min-h-screen max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden flex items-center justify-center min-h-[60vh]">
             <div className="w-full py-8 px-4 text-center">
               <p className="mb-1 text-sm fc-text-dim">{loadError}</p>
               <p className="mb-4 text-xs fc-text-subtle">Try again or return to your workouts.</p>
@@ -1721,7 +1842,7 @@ function WorkoutCompleteContent() {
     return (
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
-          <ClientPageShell className="min-h-screen max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden flex items-center justify-center min-h-[60vh]">
+          <ClientPageShell className="min-h-screen max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden flex items-center justify-center min-h-[60vh]">
             <div className="w-full py-8 px-4 text-center">
               <h3 className="text-sm fc-text-dim font-medium">Workout not found</h3>
               <p className="mt-1 text-xs fc-text-subtle">
@@ -1847,12 +1968,6 @@ function WorkoutCompleteContent() {
   const headlineLabel =
     headlineMode === "volume" ? "Total volume lifted" : "Total reps";
 
-  const confettiLevel =
-    accent === "warning" ? "none" : accent === "lime" ? "full" : "light";
-
-  const heroIcon =
-    accent === "lime" ? "trophy" : accent === "purple" ? "star" : "check";
-
   const prNames = personalRecords
     .map((pr: any) => pr.exercises?.name || pr.exercise?.name)
     .filter(Boolean) as string[];
@@ -1877,9 +1992,9 @@ function WorkoutCompleteContent() {
 
   const prTile: TileStat = {
     value: prCount >= 1 ? prCount : "—",
-    valueTone: prCount >= 1 ? "lime" : "muted",
-    deltaTier: !hasPrev ? "none" : "same",
-    deltaLabel: !hasPrev ? "none" : "same",
+    valueTone: prCount >= 1 ? "warn" : "muted",
+    deltaTier: prCount >= 1 ? "up" : "none",
+    deltaLabel: prCount >= 1 ? "new" : "none",
   };
 
   const setsTile: TileStat = {
@@ -1902,49 +2017,31 @@ function WorkoutCompleteContent() {
     workoutLog as Record<string, unknown> | null
   );
 
-  const onShareSummary = async () => {
-    const title = assignment?.name || "Workout";
-    const prPart =
-      prCount > 0
-        ? `${prCount} new PR${prCount === 1 ? "" : "s"}`
-        : "no new PRs";
-    const body = `${title} · ${formatVolume(curW)} kg lifted · ${prPart} 💪`;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title, text: body });
-        return;
-      }
-    } catch {
-      /* user cancelled or share failed */
-    }
-    try {
-      await navigator.clipboard.writeText(body);
-      addToast({
-        title: "Copied",
-        description: "Workout summary copied to clipboard.",
-        variant: "success",
-        duration: 2500,
-      });
-    } catch {
-      addToast({
-        title: "Share",
-        description: body,
-        variant: "default",
-        duration: 4000,
-      });
-    }
+  const handleSetRpeUpdated = (setLogId: string, rpe: number) => {
+    setBlockGroups((prev) =>
+      prev.map((g) => ({
+        ...g,
+        sets: g.sets.map((s) => (s.id === setLogId ? { ...s, rpe } : s)),
+      })),
+    );
   };
 
   return (
     <ProtectedRoute requiredRole="client">
-      <AnimatedBackground>
-        <ClientPageShell className="min-h-screen max-w-lg mx-auto px-4 pt-6 overflow-x-hidden">
+      <div
+        className="relative min-h-screen w-full"
+        style={{ background: "var(--fc-bg-deep)" }}
+      >
+        <ClientPageShell
+          backdrop="none"
+          className="min-h-screen max-w-lg lg:max-w-3xl mx-auto px-0 pt-0 overflow-x-hidden"
+        >
           <div className={completeStyles.root}>
             <div className={completeStyles.pageStack}>
               <CelebrationHero
                 accent={accent}
-                confetti={confettiLevel}
                 title={heroTitle}
+                workoutName={assignment?.name || "Workout"}
                 durationParts={{ mins: dm, secs: ds }}
                 dayLabel={dayLabelShort}
                 headlineNumber={headlineNumber}
@@ -1952,7 +2049,13 @@ function WorkoutCompleteContent() {
                 headlineLabel={headlineLabel}
                 deltaTier={volDeltaTier}
                 deltaNode={volDeltaNode}
-                icon={heroIcon}
+              />
+
+              <CompleteStatsRow
+                prTile={prTile}
+                setsTile={setsTile}
+                repsTile={repsTile}
+                prHighlight={prCount >= 1}
               />
 
               {prCount >= 1 ? (
@@ -1965,13 +2068,6 @@ function WorkoutCompleteContent() {
                 />
               ) : null}
 
-              <CompleteStatsRow
-                prTile={prTile}
-                setsTile={setsTile}
-                repsTile={repsTile}
-                prHighlight={prCount >= 1}
-              />
-
               {coachNoteText ? (
                 <CoachNoteBlock
                   coachFirstName={coachFirstName}
@@ -1980,7 +2076,7 @@ function WorkoutCompleteContent() {
               ) : null}
 
               {newAchievementsQueue.length > 0 ? (
-                <div className="fc-glass-soft rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2">
+                <div className={completeStyles.programCompact}>
                   <p className="text-xs font-semibold fc-text-primary">
                     New unlocks
                   </p>
@@ -2007,7 +2103,7 @@ function WorkoutCompleteContent() {
                     <div className="mb-1 flex items-center gap-2">
                       <LayoutDashboard
                         className="w-4 h-4"
-                        style={{ color: "var(--fc-accent-cyan)" }}
+                        style={{ color: "var(--fc-accent)" }}
                       />
                       <Eyebrow
                         tone="dim"
@@ -2048,7 +2144,7 @@ function WorkoutCompleteContent() {
                     {nextWorkout.scheduled_date ? (
                       <div
                         className="font-mono text-xs flex-shrink-0"
-                        style={{ color: "var(--fc-accent-cyan)" }}
+                        style={{ color: "var(--fc-accent)" }}
                       >
                         {formatScheduledDate(nextWorkout.scheduled_date)}
                       </div>
@@ -2061,16 +2157,20 @@ function WorkoutCompleteContent() {
                 <WorkoutSummarySection
                   blockGroups={blockGroups}
                   prs={personalRecords}
+                  prescribed={prescribedRirMap}
+                  onSetRpeUpdated={handleSetRpeUpdated}
                 />
               ) : null}
+
+              <StickyActionBar
+                onDone={() => router.push("/client")}
+                onViewPrHistory={() =>
+                  router.push("/client/progress/personal-records")
+                }
+                disabled={completing}
+              />
             </div>
           </div>
-
-          <StickyActionBar
-            onShare={onShareSummary}
-            onDashboard={() => router.push("/client")}
-            disabled={completing}
-          />
         </ClientPageShell>
 
           {newAchievementsQueue.length > 0 && (
@@ -2087,7 +2187,7 @@ function WorkoutCompleteContent() {
               }}
             />
           )}
-      </AnimatedBackground>
+      </div>
     </ProtectedRoute>
   );
 }
@@ -2097,11 +2197,17 @@ export default function WorkoutComplete() {
     <Suspense
       fallback={
         <ProtectedRoute requiredRole="client">
-          <AnimatedBackground>
-            <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
+          <div
+            className="min-h-screen"
+            style={{ background: "var(--fc-bg-deep)" }}
+          >
+            <ClientPageShell
+              backdrop="none"
+              className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden"
+            >
               <PageSkeleton variant="dashboard" />
             </ClientPageShell>
-          </AnimatedBackground>
+          </div>
         </ProtectedRoute>
       }
     >

@@ -109,7 +109,7 @@ export function WellnessRecoverySection({
             className="font-bold leading-none text-[var(--purple)]"
             style={{
               fontFamily:
-                '"Big Shoulders Display", var(--font-geist-sans, Geist), sans-serif',
+                'var(--f-display), var(--font-geist-sans, Geist), sans-serif',
               fontSize: 16,
             }}
           >
@@ -133,7 +133,7 @@ export function WellnessRecoverySection({
             className="font-bold leading-none text-[var(--warning)]"
             style={{
               fontFamily:
-                '"Big Shoulders Display", var(--font-geist-sans, Geist), sans-serif',
+                'var(--f-display), var(--font-geist-sans, Geist), sans-serif',
               fontSize: 16,
             }}
           >
@@ -154,10 +154,10 @@ export function WellnessRecoverySection({
         </div>
         <div className="text-center">
           <div
-            className="font-bold leading-none text-[var(--cyan)]"
+            className="font-bold leading-none text-[var(--fc-accent)]"
             style={{
               fontFamily:
-                '"Big Shoulders Display", var(--font-geist-sans, Geist), sans-serif',
+                'var(--f-display), var(--font-geist-sans, Geist), sans-serif',
               fontSize: 16,
             }}
           >

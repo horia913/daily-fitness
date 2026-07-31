@@ -14,26 +14,26 @@
 
 import { useCallback } from "react";
 import { fetchApi } from "@/lib/apiClient";
-import type { LoggedSet } from "@/types/workoutBlocks";
+import type { LoggedSet } from "@/types/workoutSetEntries";
 
 interface UseUpdateSetRpeArgs {
-  blockId: string;
+  setEntryId: string;
   onSetLogUpsert?: (
-    blockId: string,
+    setEntryId: string,
     entry: LoggedSet,
     opts?: { replaceId?: string },
   ) => void;
 }
 
 export function useUpdateSetRpe({
-  blockId,
+  setEntryId,
   onSetLogUpsert,
 }: UseUpdateSetRpeArgs) {
   return useCallback(
     async (entry: LoggedSet, rpe: number) => {
       const previousRpe = entry.rpe;
       const optimistic: LoggedSet = { ...entry, rpe };
-      onSetLogUpsert?.(blockId, optimistic, { replaceId: entry.id });
+      onSetLogUpsert?.(setEntryId, optimistic, { replaceId: entry.id });
 
       if (entry.id.startsWith("temp-")) return;
 
@@ -53,17 +53,17 @@ export function useUpdateSetRpe({
             });
           }
           const reverted: LoggedSet = { ...entry, rpe: previousRpe };
-          onSetLogUpsert?.(blockId, reverted, { replaceId: entry.id });
+          onSetLogUpsert?.(setEntryId, reverted, { replaceId: entry.id });
         }
       } catch (err) {
         if (process.env.NODE_ENV !== "production") {
           console.error("[useUpdateSetRpe] PATCH error", err);
         }
         const reverted: LoggedSet = { ...entry, rpe: previousRpe };
-        onSetLogUpsert?.(blockId, reverted, { replaceId: entry.id });
+        onSetLogUpsert?.(setEntryId, reverted, { replaceId: entry.id });
       }
     },
-    [blockId, onSetLogUpsert],
+    [setEntryId, onSetLogUpsert],
   );
 }
 

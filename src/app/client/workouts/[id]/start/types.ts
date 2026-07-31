@@ -3,6 +3,8 @@
  * Extracted for maintainability; do not change without updating page.tsx.
  */
 
+import type { Prescription } from '@/lib/groupModel/types'
+
 export interface WorkoutAssignment {
   id: string;
   workout_template_id: string | null;
@@ -48,6 +50,8 @@ export type ClientBlockExerciseRecord = {
   tempo: string | null;
   rest_seconds: number | null;
   notes: string | null;
+  /** Per-set prescriptions from instance canvas (matched by set_number). */
+  prescriptions?: Prescription[];
   time_protocols?: unknown[];
   drop_sets?: unknown[];
   cluster_sets?: unknown[];

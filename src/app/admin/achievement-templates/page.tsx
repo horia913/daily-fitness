@@ -270,7 +270,7 @@ export default function AchievementTemplatesPage() {
       case 'bronze': return 'text-amber-600 bg-amber-600/20';
       case 'silver': return 'text-slate-300 bg-slate-300/20';
       case 'gold': return 'text-yellow-400 bg-yellow-400/20';
-      case 'platinum': return 'text-cyan-300 bg-cyan-300/20';
+      case 'platinum': return 'text-[color-mix(in_srgb,var(--fc-group-c)_70%,white)] bg-[color-mix(in_srgb,var(--fc-group-c)_20%,transparent)]';
       default: return 'text-slate-400 bg-slate-400/20';
     }
   };
@@ -292,7 +292,7 @@ export default function AchievementTemplatesPage() {
       <GlassCard elevation={2} className="fc-card-shell p-6 sm:p-10">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent-cyan)] shrink-0">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
               <Trophy className="w-6 h-6" />
             </div>
             <div>
@@ -493,12 +493,12 @@ export default function AchievementTemplatesPage() {
                   </div>
                   {/* Platinum */}
                   <div>
-                    <label className="block text-sm font-medium text-cyan-300 mb-1">Platinum</label>
+                    <label className="block text-sm font-medium text-[color-mix(in_srgb,var(--fc-group-c)_70%,white)] mb-1">Platinum</label>
                     <input
                       type="number"
                       value={editingTemplate.tier_platinum_threshold || ''}
                       onChange={(e) => updateField('tier_platinum_threshold', e.target.value ? Number(e.target.value) : null)}
-                      className="w-full px-3 py-2 bg-slate-900 border border-cyan-300/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-cyan-300"
+                      className="w-full px-3 py-2 bg-slate-900 border border-[color-mix(in_srgb,var(--fc-group-c)_70%,white)]/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--fc-group-c)_70%,white)]"
                       placeholder="100"
                     />
                   </div>

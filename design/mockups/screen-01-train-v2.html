@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Screen Architecture — TRAIN (expandable days)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Archivo+Expanded:wght@700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root {
+    --bg:#0A0B0D; --surface:#1B1E24; --raised:#22262E;
+    --hairline:rgba(255,255,255,0.07); --border:rgba(255,255,255,0.10);
+    --text:#F7F6F1; --dim:#9B9C90; --mute:#63645B;
+    --accent:#2E7BFF; --accent-dim:rgba(46,123,255,0.16); --accent-glow:rgba(46,123,255,0.30);
+    --good:#22E56A; --good-dim:rgba(34,229,106,0.15);
+    --warn:#FFB020; --warn-dim:rgba(255,176,32,0.15);
+    --bad:#FF5A4D; --bad-dim:rgba(255,90,77,0.15);
+    --track:rgba(255,255,255,0.08);
+  }
+  body { font-family:'Inter',sans-serif; background:#050504; color:var(--text); padding:36px 16px 80px; display:flex; flex-direction:column; align-items:center; gap:22px; }
+  .intro { max-width:640px; width:100%; color:var(--dim); font-size:14px; line-height:1.6; }
+  .intro h1 { color:var(--text); font-family:'Archivo Expanded','Archivo'; font-weight:800; font-size:24px; letter-spacing:-0.5px; margin-bottom:8px; }
+  .intro strong { color:var(--text); } .intro .blue { color:var(--accent); }
+
+  .phone { width:390px; border-radius:30px; overflow:hidden; border:1px solid rgba(255,255,255,0.1); background:var(--bg); position:relative; }
+  .screen { padding:24px 20px 96px; display:flex; flex-direction:column; gap:22px; }
+
+  .hdr { display:flex; align-items:center; gap:13px; }
+  .hdr .avatar { width:44px;height:44px;border-radius:13px;flex-shrink:0;background:var(--surface);display:flex;align-items:center;justify-content:center;font-family:'Archivo';font-weight:800;font-size:17px;color:var(--accent); }
+  .hdr .ht { flex:1; }
+  .hdr .ey { font-family:'JetBrains Mono';font-size:9px;font-weight:600;letter-spacing:1.6px;text-transform:uppercase;color:var(--accent);margin-bottom:3px; }
+  .hdr .ti { font-family:'Archivo Expanded','Archivo';font-weight:800;font-size:28px;letter-spacing:-1px;line-height:.95;color:var(--text); }
+  .hdr .hring { width:56px;height:56px;flex-shrink:0;position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer; }
+  .hdr .hring svg { position:absolute;inset:0;transform:rotate(-90deg); }
+  .hdr .hring .arc { filter:drop-shadow(0 0 4px var(--accent-glow)); }
+  .hdr .hring .v { font-family:'Archivo';font-weight:900;font-size:18px;color:var(--text);line-height:1; }
+
+  .card-hero { background:var(--surface);border-radius:19px;padding:19px;position:relative;overflow:hidden;display:flex;flex-direction:column;gap:12px; }
+  .card-hero::before { content:'';position:absolute;top:-45%;right:-18%;width:190px;height:190px;border-radius:50%;background:radial-gradient(circle,var(--accent-glow) 0%,transparent 70%);pointer-events:none;opacity:.8; }
+  .c-label { font-family:'JetBrains Mono';font-size:9px;font-weight:600;letter-spacing:1.6px;text-transform:uppercase;color:var(--dim); }
+  .c-main { display:flex;align-items:baseline;gap:7px; }
+  .c-big { font-family:'Archivo Expanded','Archivo';font-weight:900;font-size:46px;line-height:.9;letter-spacing:-2px;color:var(--text); }
+  .c-unit { font-family:'Archivo';font-weight:700;font-size:18px;color:var(--accent); }
+  .c-name { font-family:'Archivo';font-weight:800;font-size:18px;color:var(--text);letter-spacing:-0.3px;margin-top:2px; }
+  .c-sub { font-size:13px;color:var(--dim);font-weight:500; }
+  .chip { display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:9px;font-family:'JetBrains Mono';font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;width:fit-content; }
+  .chip.accent { background:var(--accent-dim);color:var(--accent); }
+  .cta { height:54px;border-radius:15px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;gap:9px;font-family:'Archivo';font-weight:800;font-size:15px;letter-spacing:.3px;text-transform:uppercase;cursor:pointer;box-shadow:0 4px 24px var(--accent-glow); }
+
+  .prog .p-row { display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px; }
+  .prog .p-l { font-family:'JetBrains Mono';font-size:9px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--dim); }
+  .prog .p-v { font-family:'Archivo';font-weight:800;font-size:15px;color:var(--text); }
+  .prog .p-v .p-frac { font-size:11px;color:var(--dim);font-weight:600; }
+  .prog .bar { height:8px;border-radius:4px;background:var(--track);overflow:hidden; }
+  .prog .fill { height:100%;border-radius:4px;background:var(--accent);box-shadow:0 0 10px var(--accent-glow); }
+
+  .sec { display:flex; align-items:center; justify-content:space-between; }
+  .sec .st { font-family:'Archivo';font-weight:800;font-size:17px;letter-spacing:-0.3px;color:var(--text);display:flex;align-items:center;gap:9px; }
+  .sec .st::before { content:'';width:3px;height:16px;border-radius:2px;background:var(--accent); }
+  .sec .sl { font-family:'JetBrains Mono';font-size:10px;font-weight:600;color:var(--accent);letter-spacing:.6px;text-transform:uppercase;cursor:pointer; }
+
+  /* 06b EXPANDABLE ROW */
+  .xrow { border-bottom:1px solid var(--hairline); }
+  .list .xrow:first-child { border-top:1px solid var(--hairline); }
+  .xrow .row-head { display:flex;align-items:center;gap:13px;padding:15px 2px;cursor:pointer; }
+  .xrow .n { font-family:'JetBrains Mono';font-weight:700;font-size:13px;width:24px; }
+  .xrow .b { flex:1; }
+  .xrow .t { font-weight:600;font-size:15px;color:var(--text); }
+  .xrow .t.dimmed { color:var(--dim); font-weight:500; font-style:italic; }
+  .xrow .s { font-family:'JetBrains Mono';font-size:10px;color:var(--dim);margin-top:3px;letter-spacing:.4px; }
+  .xrow .chev { color:var(--mute);font-size:13px;transition:transform .18s ease; width:14px; text-align:center; }
+  .xrow.open .chev { transform:rotate(90deg); color:var(--accent); }
+  .pill { display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:8px;font-family:'JetBrains Mono';font-size:9px;font-weight:700;letter-spacing:.7px;text-transform:uppercase; }
+  .pill .pd { width:6px;height:6px;border-radius:50%;background:currentColor; }
+  .pill.good { background:var(--good-dim);color:var(--good); }
+  .pill.warn { background:var(--warn-dim);color:var(--warn); }
+  .pill.warn .pd { box-shadow:0 0 6px var(--warn); }
+  .pill.mute { background:var(--surface);color:var(--mute); }
+
+  .xrow .xbody { max-height:0; overflow:hidden; transition:max-height .22s ease; }
+  .xrow.open .xbody { max-height:400px; }
+  .xrow .xinner { margin:0 0 14px 37px; border-left:2px solid var(--accent-dim); padding-left:14px; display:flex; flex-direction:column; }
+  .xrow .exrow { display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:7px 0; }
+  .xrow .exname { font-size:13.5px; font-weight:500; color:var(--text); }
+  .xrow .exrx { font-family:'JetBrains Mono'; font-size:10.5px; font-weight:600; color:var(--dim); letter-spacing:.3px; white-space:nowrap; }
+  .xrow .xlink { font-family:'JetBrains Mono'; font-size:10px; font-weight:700; color:var(--accent); letter-spacing:.6px; text-transform:uppercase; margin-top:8px; cursor:pointer; }
+
+  .open-block { border-top:1px solid var(--hairline);border-bottom:1px solid var(--hairline);padding:15px 2px; }
+  .open-block .ob-label { font-family:'JetBrains Mono';font-size:9px;font-weight:600;letter-spacing:1.6px;text-transform:uppercase;color:var(--dim);margin-bottom:7px; }
+  .open-block .ob-text { font-size:14px;color:var(--text);line-height:1.55; }
+  .btn2 { height:50px;border-radius:15px;background:transparent;border:1px solid var(--border);color:var(--text);display:flex;align-items:center;justify-content:center;font-family:'Archivo';font-weight:700;font-size:14px;letter-spacing:.3px;text-transform:uppercase;cursor:pointer; }
+
+  .tabbar { position:absolute;left:14px;right:14px;bottom:14px;display:flex;background:var(--surface);border-radius:18px;padding:7px;box-shadow:0 10px 30px rgba(0,0,0,.5); }
+  .tab { flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0 7px;border-radius:12px;cursor:pointer;color:var(--mute); }
+  .tab .ic { font-size:17px;line-height:1; }
+  .tab .tl { font-family:'JetBrains Mono';font-size:8px;font-weight:600;letter-spacing:.8px;text-transform:uppercase; }
+  .tab.active { background:var(--accent-dim);color:var(--accent); }
+
+  .outro { max-width:640px;width:100%;color:var(--mute);font-size:12px;line-height:1.6; }
+  .outro strong { color:var(--dim); }
+</style>
+</head>
+<body>
+
+  <div class="intro">
+    <h1>Screen 01 — <span class="blue">TRAIN</span> · expandable days</h1>
+    <p><strong>New kit variant 06b: expandable row.</strong> Tap a workout day → it opens inline showing that day's exercises + prescriptions (real Day 5: Lower 2 data below — try clicking rows 01 and 02). Rest days don't expand. Chevron rotates + goes accent when open; exercises sit on an accent hairline rule.</p>
+  </div>
+
+  <div class="phone">
+    <div class="screen">
+
+      <div class="hdr">
+        <div class="avatar">C</div>
+        <div class="ht">
+          <div class="ey">Week 1 of 13 · Phase 1</div>
+          <div class="ti">TRAINING</div>
+        </div>
+        <div class="hring">
+          <svg viewBox="0 0 56 56"><circle cx="28" cy="28" r="24" fill="none" stroke="var(--track)" stroke-width="5"/><circle class="arc" cx="28" cy="28" r="24" fill="none" stroke="var(--accent)" stroke-width="5" stroke-dasharray="151" stroke-dashoffset="42" stroke-linecap="round"/></svg>
+          <span class="v">72</span>
+        </div>
+      </div>
+
+      <div class="card-hero">
+        <div class="c-label">Today · Day 3 of 7</div>
+        <div class="c-main"><span class="c-big">40</span><span class="c-unit">MIN</span></div>
+        <div class="c-name">Day 5: Lower 2</div>
+        <div class="c-sub">5 exercises · Program workout</div>
+        <div class="chip accent">◆ Phase 1 · Weeks 1–9</div>
+      </div>
+      <div class="cta">▶ Start workout</div>
+
+      <div class="prog">
+        <div class="p-row"><span class="p-l">This week</span><span class="p-v">50% <span class="p-frac">· 2/4</span></span></div>
+        <div class="bar"><div class="fill" style="width:50%"></div></div>
+      </div>
+
+      <div>
+        <div class="sec"><div class="st">This Week</div><div class="sl">Full program →</div></div>
+        <div class="list" style="margin-top:6px;">
+
+          <!-- done day: expandable -->
+          <div class="xrow" id="x1">
+            <div class="row-head" onclick="tog('x1')">
+              <span class="n" style="color:var(--good)">01</span>
+              <div class="b"><div class="t">Andreea test — Day 1</div><div class="s">60 MIN · 5 EXERCISES</div></div>
+              <span class="pill good"><span class="pd"></span>Done</span>
+              <span class="chev">›</span>
+            </div>
+            <div class="xbody">
+              <div class="xinner">
+                <div class="exrow"><span class="exname">Leg Press Wide Stance</span><span class="exrx">4×10 · 120KG</span></div>
+                <div class="exrow"><span class="exname">Bulgarian Split Squat</span><span class="exrx">3×8 /side</span></div>
+                <div class="exrow"><span class="exname">Romanian Deadlift</span><span class="exrx">3×10 · 80KG</span></div>
+                <div class="exrow"><span class="exname">Cable Glute Kickback</span><span class="exrx">3×12 /side</span></div>
+                <div class="exrow"><span class="exname">Jump Rope</span><span class="exrx">3×60S</span></div>
+                <div class="xlink">Open workout →</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- today: expandable, starts OPEN in the demo -->
+          <div class="xrow open" id="x2">
+            <div class="row-head" onclick="tog('x2')">
+              <span class="n" style="color:var(--warn)">02</span>
+              <div class="b"><div class="t">Day 5: Lower 2</div><div class="s">40 MIN · 5 EXERCISES</div></div>
+              <span class="pill warn"><span class="pd"></span>Today</span>
+              <span class="chev">›</span>
+            </div>
+            <div class="xbody">
+              <div class="xinner">
+                <div class="exrow"><span class="exname">CMJ (OVR Jump)</span><span class="exrx">3×5</span></div>
+                <div class="exrow"><span class="exname">Clean-Grip DL to Mid-Thigh</span><span class="exrx">4×4 · 70KG</span></div>
+                <div class="exrow"><span class="exname">Box Squat (learn tempo)</span><span class="exrx">3×6 · RIR 5</span></div>
+                <div class="exrow"><span class="exname">Calf Raise (ecc focus)</span><span class="exrx">3×12</span></div>
+                <div class="exrow"><span class="exname">Copenhagen Adductor Iso</span><span class="exrx">3×30S /side</span></div>
+                <div class="xlink">Open workout →</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- rest days: NOT expandable -->
+          <div class="xrow">
+            <div class="row-head" style="cursor:default;">
+              <span class="n" style="color:var(--mute)">03</span>
+              <div class="b"><div class="t dimmed">Rest day</div></div>
+              <span class="pill mute">Rest</span>
+              <span class="chev" style="opacity:0;">›</span>
+            </div>
+          </div>
+          <div class="xrow">
+            <div class="row-head" style="cursor:default;">
+              <span class="n" style="color:var(--mute)">04</span>
+              <div class="b"><div class="t dimmed">Rest day</div></div>
+              <span class="pill mute">Rest</span>
+              <span class="chev" style="opacity:0;">›</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="open-block">
+        <div class="ob-label">Coach note</div>
+        <div class="ob-text">Focus on bar speed today. If RPE creeps past 8 on squats, cut the last set.</div>
+      </div>
+
+      <div>
+        <div class="sec"><div class="st">Extra Training</div></div>
+        <div class="list" style="margin-top:6px;">
+          <div class="xrow">
+            <div class="row-head" style="cursor:default;">
+              <span class="n" style="color:var(--accent)">+</span>
+              <div class="b"><div class="t dimmed">No extra workouts assigned</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn2">View full program</div>
+
+    </div>
+
+    <div class="tabbar">
+      <div class="tab"><span class="ic">⌂</span><span class="tl">Home</span></div>
+      <div class="tab"><span class="ic">✓</span><span class="tl">Check-in</span></div>
+      <div class="tab active"><span class="ic">▲</span><span class="tl">Train</span></div>
+      <div class="tab"><span class="ic">◐</span><span class="tl">Fuel</span></div>
+      <div class="tab"><span class="ic">●</span><span class="tl">Me</span></div>
+    </div>
+  </div>
+
+  <div class="outro">
+    <p><strong>06b rules:</strong> expandable rows only where there's content (workout days yes, rest days no chevron). Expanded = chevron rotates to accent, exercises on an accent-tinted left rule, each exercise = name (left) + prescription in mono (right: SETS×REPS · KG · RIR as available). "Open workout →" link at the bottom of the expansion for the full view. One row open at a time (tapping another closes the first) — keeps the list scannable.</p>
+  </div>
+
+  <script>
+    function tog(id){
+      const el = document.getElementById(id);
+      const wasOpen = el.classList.contains('open');
+      document.querySelectorAll('.xrow.open').forEach(r=>r.classList.remove('open'));
+      if(!wasOpen) el.classList.add('open');
+    }
+  </script>
+
+</body>
+</html>

@@ -1,6 +1,6 @@
 .card {
-  background: var(--fc-glass-soft);
-  border: 1px solid var(--fc-glass-border);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 11px;
   padding: 11px;
   display: flex;
@@ -10,7 +10,7 @@
 }
 
 .title {
-  font-family: var(--f-headline, var(--font-geist-sans));
+  font-family: var(--f-headline);
   font-weight: 600;
   font-size: 12.5px;
   color: var(--fc-text-primary);
@@ -28,14 +28,14 @@
   align-items: center;
   padding: 2px 7px;
   border-radius: 999px;
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 9px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   font-weight: 600;
   border: 1px solid var(--fc-glass-border);
   color: var(--fc-text-subtle);
-  background: var(--fc-surface-card);
+  background: transparent;
 }
 
 .pillStatusActive {
@@ -59,13 +59,14 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 11px;
   color: var(--fc-text-primary);
 }
 
 .current {
-  font-family: var(--f-display, var(--font-geist-sans));
+  font-family: var(--f-display);
+  font-stretch: 125%;
   font-weight: 700;
   font-size: 14px;
   flex-shrink: 0;
@@ -74,7 +75,7 @@
 .barTrack {
   flex: 1;
   height: 5px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--fc-track);
   border-radius: 999px;
   overflow: hidden;
 }
@@ -95,7 +96,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 9.5px;
   color: var(--fc-text-subtle);
 }

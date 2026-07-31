@@ -67,6 +67,7 @@ export function useWorkoutAssignments(userId: string) {
             )
           `)
           .eq('client_id', userId)
+          .is('program_assignment_id', null)
           .order('scheduled_date', { ascending: true })
 
         if (assignmentsError) {

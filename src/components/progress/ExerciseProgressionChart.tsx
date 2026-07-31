@@ -154,7 +154,7 @@ export function ExerciseProgressionChart({
               className={cn(
                 "px-2 py-1 rounded-lg text-xs font-medium transition-colors",
                 timeRange === opt.value
-                  ? "bg-[color:var(--fc-domain-workouts)]/20 text-[color:var(--fc-domain-workouts)]"
+                  ? "bg-[color:var(--fc-group-a)]/20 text-[color:var(--fc-group-a)]"
                   : "text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)]"
               )}
             >
@@ -194,8 +194,8 @@ export function ExerciseProgressionChart({
           >
             <defs>
               <linearGradient id={`area-fill-${progression.exerciseId}`} x1="0" x2="0" y1="1" y2="0">
-                <stop offset="0%" stopColor="var(--fc-domain-workouts)" stopOpacity="0.25" />
-                <stop offset="100%" stopColor="var(--fc-domain-workouts)" stopOpacity="0" />
+                <stop offset="0%" stopColor="var(--fc-group-a)" stopOpacity="0.25" />
+                <stop offset="100%" stopColor="var(--fc-group-a)" stopOpacity="0" />
               </linearGradient>
             </defs>
             {/* Grid lines */}
@@ -206,7 +206,7 @@ export function ExerciseProgressionChart({
                 y1={padding.top + chartHeight * (1 - ratio)}
                 x2={padding.left + chartWidth}
                 y2={padding.top + chartHeight * (1 - ratio)}
-                stroke="var(--fc-glass-border)"
+                stroke="var(--fc-hairline)"
                 strokeWidth="0.5"
               />
             ))}
@@ -226,7 +226,7 @@ export function ExerciseProgressionChart({
               <polyline
                 className="progression-line"
                 fill="none"
-                stroke="var(--fc-domain-workouts)"
+                stroke="var(--fc-group-a)"
                 strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -251,8 +251,8 @@ export function ExerciseProgressionChart({
                     cx={x}
                     cy={y}
                     r={isHovered ? 6 : 4}
-                    fill="var(--fc-domain-workouts)"
-                    stroke="var(--fc-bg-base)"
+                    fill="var(--fc-group-a)"
+                    stroke="var(--fc-bg-deep)"
                     strokeWidth="2"
                     className="cursor-pointer"
                     onMouseEnter={() => setHoveredPoint(point)}
@@ -269,7 +269,7 @@ export function ExerciseProgressionChart({
 
           {hoveredPoint && (
             <div
-              className="absolute bottom-0 left-0 right-0 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-xl p-3 text-sm"
+              className="absolute bottom-0 left-0 right-0 rounded-xl border border-[color:var(--fc-hairline)] bg-[color:var(--fc-surface-float)] p-3 text-sm font-[family-name:var(--f-mono)]"
               style={{ zIndex: 10 }}
             >
               <p className="font-semibold text-[color:var(--fc-text-primary)]">

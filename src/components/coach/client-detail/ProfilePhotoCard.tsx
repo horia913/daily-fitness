@@ -4,7 +4,7 @@ import React from "react";
 import { Camera } from "lucide-react";
 import styles from "./ProfilePhotoCard.module.css";
 
-type AvatarVariant = "cyan" | "lime" | "purple";
+type AvatarVariant = "cyan" | "action" | "purple";
 
 type Props = {
   name: string;
@@ -24,8 +24,8 @@ export default function ProfilePhotoCard({
   onEditPhoto,
 }: Props) {
   const avClass =
-    avatarVariant === "lime"
-      ? styles.avatarLime
+    avatarVariant === "action"
+      ? styles.avatarAction
       : avatarVariant === "purple"
         ? styles.avatarPurple
         : styles.avatarCyan;

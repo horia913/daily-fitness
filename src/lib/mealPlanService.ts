@@ -67,32 +67,6 @@ export interface Food {
   updated_at: string
 }
 
-export interface MealItem {
-  id: string
-  meal_plan_id: string
-  food_id: string
-  meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack'
-  quantity: number
-  notes?: string
-  created_at: string
-  food?: Food // populated when fetching
-}
-
-export interface Meal {
-  meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack'
-  day_of_week?: number
-  items: MealItem[]
-  total_calories: number
-  total_protein: number
-  total_carbs: number
-  total_fat: number
-  total_fiber: number
-}
-
-// ============================================================================
-// Meal Options Types
-// ============================================================================
-
 export interface MealOption {
   id: string
   meal_id: string
@@ -169,6 +143,24 @@ export class MealPlanService {
     }
 
     return data || []
+  }
+
+  /** Batch fetch foods by id (recent picks, in-plan quick-pick). */
+  static async getFoodsByIds(ids: string[]): Promise<Food[]> {
+    if (!ids.length) return []
+    const { data, error } = await supabase
+      .from('foods')
+      .select('*')
+      .in('id', ids)
+      .eq('is_active', true)
+
+    if (error) {
+      console.error('Error fetching foods by ids:', error)
+      throw error
+    }
+
+    const byId = new Map((data || []).map((f) => [f.id as string, f as Food]))
+    return ids.map((id) => byId.get(id)).filter((f): f is Food => f != null)
   }
 
   static async createFood(foodData: Omit<Food, 'id' | 'created_at' | 'updated_at'>): Promise<Food> {
@@ -294,163 +286,6 @@ export class MealPlanService {
     }
   }
 
-  // Meal item management methods
-  static async getMealItems(mealPlanId: string): Promise<MealItem[]> {
-    try {
-      const { data, error } = await supabase
-        .from('meal_plan_items')
-        .select(`
-          id,
-          meal_plan_id,
-          food_id,
-          meal_type,
-          quantity,
-          notes,
-          created_at,
-          foods!inner(id, name, brand, serving_size, serving_unit, calories_per_serving, protein, carbs, fat, fiber, sodium, category, created_at, updated_at)
-        `)
-        .eq('meal_plan_id', mealPlanId)
-        .order('created_at', { ascending: true });
-
-      if (error) {
-        console.error('Error fetching meal items:', error);
-        throw error; // Re-throw to be caught by caller or handled by UI
-      }
-
-      // Transform the data to match our interface
-      const transformedData = (data || []).map(item => ({
-        ...item,
-        food: item.foods as unknown as Food
-      })) as MealItem[];
-      
-      return transformedData;
-    } catch (error) {
-      console.error('getMealItems failed:', error);
-      return [];
-    }
-  }
-
-  static async addMealItem(mealPlanId: string, mealItemData: Omit<MealItem, 'id' | 'meal_plan_id' | 'created_at'> & { coach_id: string }): Promise<MealItem | null> {
-    try {
-      const { data, error } = await supabase
-        .from('meal_plan_items')
-        .insert([{
-      meal_plan_id: mealPlanId,
-      food_id: mealItemData.food_id,
-      meal_type: mealItemData.meal_type,
-      quantity: mealItemData.quantity,
-      notes: mealItemData.notes,
-          coach_id: mealItemData.coach_id
-        }])
-        .select('*, foods!inner(*)') // Select all fields including the joined food data
-        .single();
-
-      if (error) {
-        console.error('Error adding meal item:', error);
-        throw error; // Re-throw to be caught by caller or handled by UI
-      }
-      return {
-        ...data,
-        food: data.foods as unknown as Food
-      } as MealItem;
-    } catch (error) {
-      console.error('addMealItem failed:', error);
-      return null;
-    }
-  }
-
-  static async updateMealItem(mealItemId: string, updates: Partial<MealItem>): Promise<MealItem | null> {
-    try {
-      const { data, error } = await supabase
-        .from('meal_plan_items')
-        .update(updates)
-        .eq('id', mealItemId)
-        .select('*, foods!inner(*)') // Select all fields including the joined food data
-        .single();
-
-      if (error) {
-        console.error('Error updating meal item:', error);
-        throw error; // Re-throw to be caught by caller or handled by UI
-      }
-      return {
-        ...data,
-        food: data.foods as unknown as Food
-      } as MealItem;
-    } catch (error) {
-      console.error('updateMealItem failed:', error);
-      return null;
-    }
-  }
-
-  static async deleteMealItem(mealItemId: string): Promise<boolean> {
-    try {
-      const { error } = await supabase
-        .from('meal_plan_items')
-        .delete()
-        .eq('id', mealItemId);
-
-      if (error) {
-        console.error('Error deleting meal item:', error);
-        throw error; // Re-throw to be caught by caller or handled by UI
-      }
-      return true;
-    } catch (error) {
-      console.error('deleteMealItem failed:', error);
-      return false;
-    }
-  }
-
-  // Calculate meal totals from food items
-  static calculateMealTotals(items: MealItem[]): Omit<Meal, 'meal_type' | 'day_of_week' | 'items'> {
-    return items.reduce((totals, item) => {
-      if (!item.food) return totals
-      
-      const multiplier = item.quantity / item.food.serving_size
-      return {
-        total_calories: totals.total_calories + (item.food.calories_per_serving * multiplier),
-        total_protein: totals.total_protein + (item.food.protein * multiplier),
-        total_carbs: totals.total_carbs + (item.food.carbs * multiplier),
-        total_fat: totals.total_fat + (item.food.fat * multiplier),
-        total_fiber: totals.total_fiber + (item.food.fiber * multiplier)
-      }
-    }, {
-      total_calories: 0,
-      total_protein: 0,
-      total_carbs: 0,
-      total_fat: 0,
-      total_fiber: 0
-    })
-  }
-
-  // Get meals grouped by type and day
-  static async getMeals(mealPlanId: string): Promise<Meal[]> {
-    const items = await this.getMealItems(mealPlanId)
-    
-    // Group items by meal_type and day_of_week
-    const groupedMeals = new Map<string, MealItem[]>()
-    
-    items.forEach(item => {
-      // Group by meal_type only since we removed day_of_week
-      const key = item.meal_type
-      if (!groupedMeals.has(key)) {
-        groupedMeals.set(key, [])
-      }
-      groupedMeals.get(key)!.push(item)
-    })
-    
-    // Convert to Meal objects with calculated totals
-    return Array.from(groupedMeals.entries()).map(([meal_type, mealItems]) => {
-      const totals = this.calculateMealTotals(mealItems)
-      
-      return {
-        meal_type: meal_type as 'breakfast' | 'lunch' | 'dinner' | 'snack',
-        day_of_week: undefined, // We removed day_of_week support
-        items: mealItems,
-        ...totals
-      }
-    })
-  }
-
   // Meal Plan Assignment functions (Phase N4: multiple active assignments per client allowed; optional label)
   static async assignMealPlanToClients(
     mealPlanId: string,
@@ -515,6 +350,70 @@ export class MealPlanService {
   // ============================================================================
   // Meal Options Methods
   // ============================================================================
+
+  /**
+   * Create a meal with its first default option (options-first).
+   */
+  static async createMeal(
+    mealPlanId: string,
+    data: { name: string; meal_type: string; order_index: number },
+  ): Promise<{ meal: { id: string; name: string; meal_type: string; order_index: number }; defaultOption: MealOption }> {
+    const { data: meal, error: mealError } = await supabase
+      .from('meals')
+      .insert({
+        meal_plan_id: mealPlanId,
+        name: data.name,
+        meal_type: data.meal_type,
+        order_index: data.order_index,
+      })
+      .select('id, name, meal_type, order_index')
+      .single()
+
+    if (mealError || !meal) {
+      console.error('Error creating meal:', mealError)
+      throw mealError ?? new Error('Failed to create meal')
+    }
+
+    const { data: defaultOption, error: optError } = await supabase
+      .from('meal_options')
+      .insert([{ meal_id: meal.id, name: 'Option 1', order_index: 0 }])
+      .select()
+      .single()
+
+    if (optError || !defaultOption) {
+      console.error('Error creating default meal option:', optError)
+      await supabase.from('meals').delete().eq('id', meal.id)
+      throw optError ?? new Error('Failed to create default meal option')
+    }
+
+    return { meal, defaultOption }
+  }
+
+  /**
+   * Update meal metadata / order.
+   */
+  static async updateMeal(
+    mealId: string,
+    updates: Partial<{ name: string; meal_type: string; order_index: number }>,
+  ): Promise<void> {
+    const { error } = await supabase.from('meals').update(updates).eq('id', mealId)
+    if (error) {
+      console.error('Error updating meal:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Delete a meal (cascades options and food items).
+   */
+  static async deleteMeal(mealId: string): Promise<boolean> {
+    const { error } = await supabase.from('meals').delete().eq('id', mealId)
+    if (error) {
+      console.error('Error deleting meal:', error)
+      return false
+    }
+    return true
+  }
 
   /**
    * Get all options for a meal

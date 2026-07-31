@@ -42,12 +42,12 @@ const TYPE_STYLES: Record<
   density: {
     label: "DENSITY",
     className:
-      "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-200",
+      "bg-[color-mix(in_srgb,var(--fc-group-c)_14%,transparent)] text-[color-mix(in_srgb,var(--fc-group-c)_55%,black)] dark:bg-[color-mix(in_srgb,var(--fc-group-c)_30%,transparent)] dark:text-[color-mix(in_srgb,var(--fc-group-c)_35%,white)]",
   },
   density_training: {
     label: "DENSITY",
     className:
-      "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-200",
+      "bg-[color-mix(in_srgb,var(--fc-group-c)_14%,transparent)] text-[color-mix(in_srgb,var(--fc-group-c)_55%,black)] dark:bg-[color-mix(in_srgb,var(--fc-group-c)_30%,transparent)] dark:text-[color-mix(in_srgb,var(--fc-group-c)_35%,white)]",
   },
   giant_set: {
     label: "GIANT SET",
@@ -81,7 +81,7 @@ const TYPE_STYLES: Record<
   for_time: {
     label: "FOR TIME",
     className:
-      "bg-lime-100 text-lime-700 dark:bg-lime-900/30 dark:text-lime-300",
+      "bg--[#ecfccb] text--[#4d7c0f] dark:bg--[#365314]/30 dark:text--[#bef264]",
   },
 };
 

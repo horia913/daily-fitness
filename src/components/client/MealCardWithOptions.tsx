@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   Camera,
   CheckCircle,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   X,
@@ -13,6 +14,7 @@ import {
   Sun,
   Moon,
   Leaf,
+  Cookie,
   type LucideIcon,
 } from 'lucide-react'
 import { IconButton } from '@/components/client-ui'
@@ -95,9 +97,9 @@ const FUEL_MEAL_ICON: Record<
     colorVar: 'var(--fc-meal-dinner)',
   },
   snack: {
-    Icon: Leaf,
-    softVar: 'var(--fc-meal-lunch-soft)',
-    colorVar: 'var(--fc-meal-lunch)',
+    Icon: Cookie,
+    softVar: 'var(--fc-meal-snack-soft, var(--fc-meal-lunch-soft))',
+    colorVar: 'var(--fc-meal-snack, var(--fc-meal-lunch))',
   },
 }
 
@@ -116,6 +118,10 @@ interface MealCardWithOptionsProps {
   onOpenMealDetails?: () => void
   /** When food row has an id, parent can navigate to food detail. */
   onFoodClick?: (foodId: string) => void
+  /** Fuel hub: click header to collapse/expand body. */
+  collapsible?: boolean
+  /** Initial open state when `collapsible` is true. Defaults to true. */
+  defaultExpanded?: boolean
 }
 
 // ============================================================================
@@ -131,6 +137,8 @@ export default function MealCardWithOptions({
   onAddPhoto,
   onOpenMealDetails,
   onFoodClick,
+  collapsible = false,
+  defaultExpanded = true,
 }: MealCardWithOptionsProps) {
   const isFuelMode = !!onMarkComplete
   const { isDark, getThemeStyles } = useTheme()
@@ -144,8 +152,15 @@ export default function MealCardWithOptions({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  
+  const [expanded, setExpanded] = useState(defaultExpanded)
+  const showBody = !collapsible || expanded
+
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const toggleExpanded = () => {
+    if (!collapsible) return
+    setExpanded((prev) => !prev)
+  }
 
   // Determine if meal has options or is legacy
   const hasOptions = meal.options && meal.options.length > 0
@@ -322,7 +337,7 @@ export default function MealCardWithOptions({
   const fuelMacroStatRow = (t: MacroTotals) => (
     <div className={fuelMeal.macroLine}>
       <div className={fuelMeal.stat}>
-        <span className={fuelMeal.statVal} style={{ color: "var(--fc-accent-lime)" }}>
+        <span className={fuelMeal.statVal} style={{ color: "var(--fc-accent)" }}>
           {Math.round(t.calories)}
         </span>
         <span className={fuelMeal.statLbl}>kcal</span>
@@ -375,7 +390,20 @@ export default function MealCardWithOptions({
         {meal.logged ? (
           isFuelMode ? (
           <>
-            <div className={fuelMeal.headRow}>
+            <button
+              type="button"
+              className={cn(fuelMeal.headRow, fuelMeal.headRowButton)}
+              onClick={toggleExpanded}
+              aria-expanded={collapsible ? expanded : undefined}
+              aria-label={
+                collapsible
+                  ? expanded
+                    ? `Collapse ${meal.name}`
+                    : `Expand ${meal.name}`
+                  : undefined
+              }
+              style={collapsible ? undefined : { pointerEvents: "none" }}
+            >
               <div
                 className={fuelMeal.mealIconWrap}
                 style={{
@@ -389,19 +417,19 @@ export default function MealCardWithOptions({
                 <h3 className={fuelMeal.mealTitle}>{meal.name}</h3>
                 <p className={fuelMeal.mealMeta}>{macroMetaLine(completedTotals)}</p>
               </div>
-              <span className={cn(fuelMeal.statusPill, fuelMeal.statusPillLogged)}>Logged</span>
-            </div>
-            {onOpenMealDetails && (
-              <div className="px-4 pb-1 -mt-1">
-                <button
-                  type="button"
-                  onClick={onOpenMealDetails}
-                  className="text-xs font-semibold text-[color:var(--fc-accent-cyan)] hover:underline min-h-[40px] px-0"
-                >
-                  Details
-                </button>
+              <div className={fuelMeal.headActions}>
+                <span className={cn(fuelMeal.statusPill, fuelMeal.statusPillLogged)}>Logged</span>
+                {collapsible ? (
+                  <ChevronDown
+                    className={cn(fuelMeal.headChevron, expanded && fuelMeal.headChevronOpen)}
+                    strokeWidth={2.2}
+                    aria-hidden
+                  />
+                ) : null}
               </div>
-            )}
+            </button>
+            {showBody ? (
+              <>
             <div className={fuelMeal.divider} />
             {meal.loggedOptionId && hasOptions && completedOption?.name && (
               <p className="px-4 pt-3 text-xs text-[color:var(--fc-text-dim)]">{completedOption.name}</p>
@@ -416,7 +444,7 @@ export default function MealCardWithOptions({
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="text-xs font-semibold text-[color:var(--fc-accent-cyan)] hover:underline min-h-[40px] px-1"
+                        className="text-xs font-semibold text-[color:var(--fc-accent)] hover:underline min-h-[40px] px-1"
                       >
                         Replace
                       </button>
@@ -472,6 +500,8 @@ export default function MealCardWithOptions({
                 </Button>
               ) : null}
             </div>
+              </>
+            ) : null}
           </>
           ) : (
           <>
@@ -488,7 +518,7 @@ export default function MealCardWithOptions({
                     <button
                       type="button"
                       onClick={onOpenMealDetails}
-                      className="shrink-0 text-xs font-semibold text-[color:var(--fc-accent-cyan)] hover:underline min-h-[44px] px-1"
+                      className="shrink-0 text-xs font-semibold text-[color:var(--fc-accent)] hover:underline min-h-[44px] px-1"
                     >
                       Details
                     </button>
@@ -515,7 +545,7 @@ export default function MealCardWithOptions({
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
                 <div className="absolute bottom-4 left-4 flex items-center gap-2">
-                  <div className="bg-cyan-500/15 backdrop-blur-md border border-cyan-500/35 text-cyan-400 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
+                  <div className="bg-[color-mix(in_srgb,var(--fc-group-c)_15%,transparent)] backdrop-blur-md border border-[color-mix(in_srgb,var(--fc-group-c)_35%,transparent)] text-[color:var(--fc-group-c)] px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
                     <CheckCircle className="w-3 h-3" />
                     Logged
                   </div>
@@ -610,7 +640,7 @@ export default function MealCardWithOptions({
                     <button
                       type="button"
                       onClick={onOpenMealDetails}
-                      className="shrink-0 text-xs font-semibold text-[color:var(--fc-accent-cyan)] hover:underline min-h-[44px] px-1"
+                      className="shrink-0 text-xs font-semibold text-[color:var(--fc-accent)] hover:underline min-h-[44px] px-1"
                     >
                       Details
                     </button>
@@ -637,7 +667,7 @@ export default function MealCardWithOptions({
                   </Button>
                   
                   <div className="flex-1 text-center">
-                    <Badge className="bg-[color:var(--fc-accent-cyan)]/10 text-[color:var(--fc-accent-cyan)]">
+                    <Badge className="bg-[color:var(--fc-accent)]/10 text-[color:var(--fc-accent)]">
                       {currentOption?.name || 'Default'}
                     </Badge>
                     <div className="text-xs text-[color:var(--fc-text-subtle)] mt-1">
@@ -663,7 +693,7 @@ export default function MealCardWithOptions({
                       key={idx}
                       className={`w-2 h-2 rounded-full transition-colors ${
                         idx === selectedOptionIndex
-                          ? 'bg-[color:var(--fc-accent-cyan)]'
+                          ? 'bg-[color:var(--fc-accent)]'
                           : 'bg-[color:var(--fc-glass-highlight)]'
                       }`}
                     />
@@ -724,7 +754,20 @@ export default function MealCardWithOptions({
           </>
         ) : (
           <>
-            <div className={fuelMeal.headRow}>
+            <button
+              type="button"
+              className={cn(fuelMeal.headRow, fuelMeal.headRowButton)}
+              onClick={toggleExpanded}
+              aria-expanded={collapsible ? expanded : undefined}
+              aria-label={
+                collapsible
+                  ? expanded
+                    ? `Collapse ${meal.name}`
+                    : `Expand ${meal.name}`
+                  : undefined
+              }
+              style={collapsible ? undefined : { pointerEvents: "none" }}
+            >
               <div
                 className={fuelMeal.mealIconWrap}
                 style={{
@@ -738,19 +781,19 @@ export default function MealCardWithOptions({
                 <h3 className={fuelMeal.mealTitle}>{meal.name}</h3>
                 <p className={fuelMeal.mealMeta}>{macroMetaLine(currentTotals)}</p>
               </div>
-              <span className={fuelMeal.statusPill}>Not logged</span>
-            </div>
-            {onOpenMealDetails && (
-              <div className="px-4 pb-1 -mt-1">
-                <button
-                  type="button"
-                  onClick={onOpenMealDetails}
-                  className="text-xs font-semibold text-[color:var(--fc-accent-cyan)] hover:underline min-h-[40px] px-0"
-                >
-                  Details
-                </button>
+              <div className={fuelMeal.headActions}>
+                <span className={fuelMeal.statusPill}>Not logged</span>
+                {collapsible ? (
+                  <ChevronDown
+                    className={cn(fuelMeal.headChevron, expanded && fuelMeal.headChevronOpen)}
+                    strokeWidth={2.2}
+                    aria-hidden
+                  />
+                ) : null}
               </div>
-            )}
+            </button>
+            {showBody ? (
+              <>
             <div className={fuelMeal.divider} />
             {hasOptions && meal.options.length > 1 && (
               <div className={fuelMeal.carousel}>
@@ -835,16 +878,17 @@ export default function MealCardWithOptions({
               {onMarkComplete && (
                 <Button
                   type="button"
-                  variant="btn-action"
                   onClick={() => onMarkComplete(meal.id, currentOption?.id ?? null)}
                   disabled={showPhotoPreview}
-                  className="w-full min-h-[44px] gap-1.5 py-3 text-[13px] font-bold tracking-[0.06em] uppercase"
+                  className="w-full min-h-[44px] gap-1.5 py-3 text-[13px] font-bold tracking-[0.06em] uppercase rounded-[14px] bg-[color:var(--fc-status-success)] text-[#08120A] hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
                 >
                   <CheckCircle className="h-4 w-4 shrink-0" />
                   Mark Complete
                 </Button>
               )}
             </div>
+              </>
+            ) : null}
           </>
         )}
       </div>
@@ -891,7 +935,7 @@ export default function MealCardWithOptions({
               />
               {hasOptions && currentOption && (
                 <div className="absolute top-3 left-3">
-                  <Badge className="bg-[color:var(--fc-accent-cyan)]/90 text-white backdrop-blur-sm">
+                  <Badge className="bg-[color:var(--fc-accent)]/90 text-white backdrop-blur-sm">
                     {currentOption.name}
                   </Badge>
                 </div>

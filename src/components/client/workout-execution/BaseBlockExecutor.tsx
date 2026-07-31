@@ -10,14 +10,14 @@ import { NavigationControls } from "./ui/NavigationControls";
 import { ProgressionNudge } from "./ui/ProgressionNudge";
 import { ExerciseActionButtons } from "./ui/ExerciseActionButtons";
 import { LastSessionSetsSection } from "./ui/LastSessionSetsSection";
-import { BaseBlockExecutorProps } from "./types";
+import { BaseSetEntryExecutorProps } from "./types";
 import {
-  WorkoutBlockType,
-  WorkoutBlockExercise,
-  WORKOUT_BLOCK_CONFIGS,
-} from "@/types/workoutBlocks";
+  SetType,
+  WorkoutSetEntryExercise,
+  WORKOUT_SET_TYPE_CONFIGS,
+} from "@/types/workoutSetEntries";
 
-interface BaseBlockExecutorLayoutProps extends BaseBlockExecutorProps {
+interface BaseBlockExecutorLayoutProps extends BaseSetEntryExecutorProps {
   exerciseName: string;
   prescriptionItems?: PrescriptionItem[];
   /** Keep 2 columns even with 5+ items (e.g. speed work). */
@@ -36,7 +36,7 @@ interface BaseBlockExecutorLayoutProps extends BaseBlockExecutorProps {
   /** Right side of LOG SET row (set navigator). */
   logNavRight?: React.ReactNode;
   showNavigation?: boolean;
-  currentExercise?: WorkoutBlockExercise;
+  currentExercise?: WorkoutSetEntryExercise;
   showRestTimer?: boolean;
   progressionSuggestion?:
     | import("@/lib/clientProgressionService").ProgressionSuggestion
@@ -47,7 +47,7 @@ interface BaseBlockExecutorLayoutProps extends BaseBlockExecutorProps {
 }
 
 export function BaseBlockExecutorLayout({
-  block,
+  liveSetEntry,
   exerciseName,
   prescriptionItems = [],
   prescriptionGridMode = "default",
@@ -63,10 +63,10 @@ export function BaseBlockExecutorLayout({
   showNavigation = true,
   currentExercise,
   showRestTimer: _showRestTimer = false,
-  allBlocks = [],
-  currentBlockIndex = 0,
+  allSetEntries = [],
+  currentSetEntryIndex = 0,
   currentExerciseIndex = 0,
-  onBlockChange,
+  onSetEntryChange,
   onVideoClick,
   onAlternativesClick,
   onRestTimerClick: _onRestTimerClick,
@@ -104,26 +104,26 @@ export function BaseBlockExecutorLayout({
     return undefined;
   };
 
-  const totalBlocks = allBlocks.length || 1;
-  const canGoPrevious = currentBlockIndex > 0;
-  const canGoNext = currentBlockIndex < totalBlocks - 1;
+  const totalSetEntries = allSetEntries.length || 1;
+  const canGoPrevious = currentSetEntryIndex > 0;
+  const canGoNext = currentSetEntryIndex < totalSetEntries - 1;
   const handlePrevious = () => {
-    if (onBlockChange && canGoPrevious) {
-      onBlockChange(currentBlockIndex - 1);
+    if (onSetEntryChange && canGoPrevious) {
+      onSetEntryChange(currentSetEntryIndex - 1);
     }
   };
 
   const handleNext = () => {
-    if (onBlockChange && canGoNext) {
-      onBlockChange(currentBlockIndex + 1);
+    if (onSetEntryChange && canGoNext) {
+      onSetEntryChange(currentSetEntryIndex + 1);
     }
   };
 
-  const setType = (block.block.set_type as WorkoutBlockType) || "straight_set";
+  const setType = (liveSetEntry.setEntry.set_type as SetType) || "straight_set";
   const typeDisplay = (
-    WORKOUT_BLOCK_CONFIGS[setType]?.name ?? "Straight Set"
+    WORKOUT_SET_TYPE_CONFIGS[setType]?.name ?? "Straight Set"
   ).toUpperCase();
-  const blockExercises = block.block.exercises ?? [];
+  const blockExercises = liveSetEntry.setEntry.exercises ?? [];
   const exerciseCount = blockExercises.length || 1;
   const exercisePos = (currentExerciseIndex ?? 0) + 1;
   const multiExerciseHint =
@@ -152,7 +152,7 @@ export function BaseBlockExecutorLayout({
 
   const resolvedPrescriptionItems = prescriptionItems;
   const resolvedCoachNotes = normalizeNoteValue(
-    coachNotes ?? block.block.set_notes ?? instructions,
+    coachNotes ?? liveSetEntry.setEntry.set_notes ?? instructions,
   );
   const resolvedFormCues = normalizeNoteValue(
     formCues ??
@@ -192,7 +192,7 @@ export function BaseBlockExecutorLayout({
       suggestion={progressionSuggestion}
       previousPerformance={previousPerfForExercise}
       previousSessionSetNumber={currentSet}
-      showPreviousSession={exerciseCount === 1}
+      showPreviousSession={false}
       onApplySuggestion={onApplySuggestion}
     />
   ) : undefined;
@@ -222,7 +222,7 @@ export function BaseBlockExecutorLayout({
           titleActions={
             exerciseCount === 1 && currentExercise ? (
               <ExerciseActionButtons
-                exercise={currentExercise as WorkoutBlockExercise}
+                exercise={currentExercise as WorkoutSetEntryExercise}
                 onVideoClick={onVideoClick}
                 onAlternativesClick={onAlternativesClick}
               />
@@ -245,8 +245,8 @@ export function BaseBlockExecutorLayout({
 
         {showNavigation && (
           <NavigationControls
-            currentBlock={currentBlockIndex + 1}
-            totalBlocks={totalBlocks}
+            currentBlock={currentSetEntryIndex + 1}
+            totalBlocks={totalSetEntries}
             onPrevious={handlePrevious}
             onNext={handleNext}
             canGoPrevious={canGoPrevious}

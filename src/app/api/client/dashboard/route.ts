@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { PerfCollector } from '@/lib/perfUtils'
+import { nullIfStaleAthleteScore } from '@/lib/athleteScoreFreshness'
 
 export async function GET(request: NextRequest) {
   const perf = new PerfCollector('/api/client/dashboard')
@@ -53,8 +54,15 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    const payload = (data ?? {}) as Record<string, unknown>
+    if (payload && typeof payload === 'object' && 'athleteScore' in payload) {
+      payload.athleteScore = nullIfStaleAthleteScore(
+        payload.athleteScore as { calculated_at?: string | null } | null,
+      )
+    }
+
     perf.logSummary()
-    const response = NextResponse.json(data ?? {})
+    const response = NextResponse.json(payload)
     Object.entries(perf.getHeaders()).forEach(([key, value]) => {
       response.headers.set(key, value)
     })

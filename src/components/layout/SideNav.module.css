@@ -6,8 +6,6 @@
   min-height: 100vh;
   border-right: 1px solid var(--fc-glass-border);
   background: var(--fc-glass-base);
-  backdrop-filter: blur(var(--fc-blur-nav));
-  -webkit-backdrop-filter: blur(var(--fc-blur-nav));
 }
 
 .brand {
@@ -47,7 +45,7 @@
 }
 
 .row:hover:not(.rowActive) {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
   color: var(--fc-text-primary);
 }
 
@@ -99,7 +97,7 @@
 }
 
 .avatarLink:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fc-surface-sunken);
 }
 
 .avatar {

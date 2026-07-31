@@ -3,82 +3,46 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Bell } from 'lucide-react'
-import { notificationService } from '@/lib/notifications'
 import NotificationCenter from './NotificationCenter'
 import { usePathname } from 'next/navigation'
 import { isLiveWorkoutRoute } from '@/lib/workoutMode'
-import { isPushNotificationsEnabled } from '@/lib/pushNotificationsEnabled'
+import { getUnreadNotificationCount } from '@/lib/inAppNotificationService'
 
 export default function NotificationBell() {
-  if (!isPushNotificationsEnabled()) {
-    return null
-  }
-  return <NotificationBellInner />
-}
-
-function NotificationBellInner() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [showNotificationCenter, setShowNotificationCenter] = useState(false)
-  const [permissionGranted, setPermissionGranted] = useState(false)
   const pathname = usePathname()
 
   useEffect(() => {
     if (isLiveWorkoutRoute(pathname)) {
       return
     }
-    // Initialize the service for browser environment
-    notificationService.initialize()
-    
-    // Check notification permission
-    setPermissionGranted(notificationService.canSendNotifications())
-    
-    // Load initial unread count
-    updateUnreadCount()
-    
-    // Set up interval to check for new notifications
-    const interval = setInterval(updateUnreadCount, 5000)
-    
+
+    const updateUnreadCount = async () => {
+      const count = await getUnreadNotificationCount()
+      setUnreadCount(count)
+    }
+
+    void updateUnreadCount()
+    const interval = setInterval(() => void updateUnreadCount(), 15_000)
     return () => clearInterval(interval)
   }, [pathname])
-
-  const updateUnreadCount = async () => {
-    const count = await notificationService.getUnreadCount()
-    setUnreadCount(count)
-  }
-
-  const handleBellClick = async () => {
-    if (!permissionGranted) {
-      try {
-        if ('Notification' in window) {
-          const permission = await Notification.requestPermission()
-          setPermissionGranted(permission === 'granted')
-          
-          if (permission === 'granted') {
-            // Send a welcome notification
-            new Notification('🔔 Notifications Enabled!', {
-              body: "You'll now receive notifications from your coach.",
-            })
-            updateUnreadCount()
-          }
-        }
-      } catch (error) {
-        console.error('Error requesting notification permission:', error)
-      }
-    }
-    
-    setShowNotificationCenter(true)
-  }
 
   return (
     <>
       <Button
         variant="ghost"
         size="sm"
-        onClick={handleBellClick}
+        onClick={() => setShowNotificationCenter(true)}
         className="relative p-2 z-50 fc-btn fc-btn-ghost fc-press"
-        title={permissionGranted ? 'Notifications' : 'Enable Notifications'}
+        title="Notifications"
+        aria-label={
+          unreadCount > 0
+            ? `Notifications, ${unreadCount} unread`
+            : 'Notifications'
+        }
       >
-        <Bell className={`w-5 h-5 ${permissionGranted ? 'fc-text-primary' : 'fc-text-subtle'}`} />
+        <Bell className="w-5 h-5 fc-text-primary" />
         {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 fc-pill fc-pill-glass fc-text-error text-[10px] min-w-[18px] h-[18px] flex items-center justify-center p-0">
             {unreadCount > 99 ? '99+' : unreadCount}
@@ -88,7 +52,10 @@ function NotificationBellInner() {
 
       <NotificationCenter
         isOpen={showNotificationCenter}
-        onClose={() => setShowNotificationCenter(false)}
+        onClose={() => {
+          setShowNotificationCenter(false)
+          void getUnreadNotificationCount().then(setUnreadCount)
+        }}
       />
     </>
   )

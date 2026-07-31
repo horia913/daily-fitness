@@ -31,7 +31,7 @@ export function ActivityTypeRow({
           className="h-full rounded-full"
           style={{
             width: `${Math.max(2, Math.min(100, pctOfTotal))}%`,
-            background: "linear-gradient(90deg, var(--cyan), var(--lime-2, #bef264))",
+            background: "linear-gradient(90deg, var(--fc-accent), var(--fc-accent))",
           }}
         />
       </div>
@@ -39,7 +39,7 @@ export function ActivityTypeRow({
         className="w-[18px] shrink-0 text-right text-[13px] font-bold text-[var(--t1)]"
         style={{
           fontFamily:
-            '"Big Shoulders Display", var(--font-geist-sans, Geist), sans-serif',
+            'var(--f-display), var(--font-geist-sans, Geist), sans-serif',
         }}
       >
         {count}

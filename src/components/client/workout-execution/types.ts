@@ -1,15 +1,15 @@
 // Common types for workout execution components
 
 import {
-  LiveWorkoutBlock,
+  LiveWorkoutSetEntry,
   LoggedSet,
-  WorkoutBlockExercise,
-} from "@/types/workoutBlocks";
+  WorkoutSetEntryExercise,
+} from "@/types/workoutSetEntries";
 
-export interface BaseBlockExecutorProps {
-  block: LiveWorkoutBlock;
-  onBlockComplete: (blockId: string, loggedSets: LoggedSet[]) => void;
-  onNextBlock: () => void;
+export interface BaseSetEntryExecutorProps {
+  liveSetEntry: LiveWorkoutSetEntry;
+  onSetEntryComplete: (setEntryId: string, loggedSets: LoggedSet[]) => void;
+  onNextSetEntry: () => void;
   e1rmMap?: Record<string, number>;
   onE1rmUpdate?: (exerciseId: string, e1rm: number) => void;
   /** Session-level last performed weight per exercise (sticky default) */
@@ -19,9 +19,9 @@ export interface BaseBlockExecutorProps {
   onWeightLogged?: (exerciseId: string, weight: number) => void;
   sessionId?: string | null;
   assignmentId?: string;
-  allBlocks?: LiveWorkoutBlock[];
-  currentBlockIndex?: number;
-  onBlockChange?: (blockIndex: number) => void;
+  allSetEntries?: LiveWorkoutSetEntry[];
+  currentSetEntryIndex?: number;
+  onSetEntryChange?: (setEntryIndex: number) => void;
   currentExerciseIndex?: number;
   onExerciseIndexChange?: (index: number) => void;
   logSetToDatabase: (
@@ -55,7 +55,7 @@ export interface BaseBlockExecutorProps {
   progressionSuggestionsMap?: Map<string, import("@/lib/clientProgressionService").ProgressionSuggestion>;
   /**
    * Previous performance map (keyed by exerciseId). Contains lastWorkout + personalBest data
-   * fetched from workout_exercise_logs → workout_set_details.
+   * fetched from workout_set_logs via clientProgressionService.
    */
   previousPerformanceMap?: Map<string, {
     lastWorkout: {
@@ -75,12 +75,12 @@ export interface BaseBlockExecutorProps {
   allowSetEditDelete?: boolean;
   /** Register callback to replace last temp id with real set_log_id when golden sync succeeds. */
   registerSetLogIdResolved?: (fn: (set_log_id: string) => void) => void;
-  /** Upsert a set into the block's existingSetLogs so history persists when navigating blocks. replaceId = temp id to replace when real id arrives. */
-  onSetLogUpsert?: (blockId: string, setEntry: LoggedSet, options?: { replaceId?: string }) => void;
-  /** Logged sets for this block (parent-owned source of truth). When provided, executors sync from this so history persists across block navigation. */
+  /** Upsert a set into the set entry's existingSetLogs so history persists when navigating set entries. replaceId = temp id to replace when real id arrives. */
+  onSetLogUpsert?: (setEntryId: string, setEntry: LoggedSet, options?: { replaceId?: string }) => void;
+  /** Logged sets for this set entry (parent-owned source of truth). When provided, executors sync from this so history persists across set-entry navigation. */
   loggedSets?: LoggedSet[];
   /** Called after a set is successfully updated via PATCH so parent can replace the set in its store. */
-  onSetEditSaved?: (blockId: string, updatedSet: LoggedSet) => void;
+  onSetEditSaved?: (setEntryId: string, updatedSet: LoggedSet) => void;
   /** Latest body weight (kg) for % BW display on speed work; from body_metrics. */
   clientBodyWeightKg?: number | null;
 }
@@ -93,4 +93,3 @@ export interface LogButtonProps {
   gradient?: string;
   icon?: React.ReactNode;
 }
-

@@ -5,6 +5,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 // here (e.g. custom JWT claims or a profiles lookup) to block /coach vs /client URL mixing at the edge.
 
 export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -50,13 +51,19 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Refresh session if expired - required for App Router
-  // This writes refreshed session cookies to the response
-  try {
-    await supabase.auth.getUser()
-  } catch (err) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn('[middleware] supabase.auth.getUser failed (request continues):', err)
+  // Cron endpoints are header-authenticated (CRON_SECRET) and do not require
+  // browser session refresh. Skipping avoids noisy refresh-token errors when
+  // stale auth cookies are present.
+  const isCronRoute = pathname.startsWith('/api/cron/')
+
+  // Refresh session if expired - required for App Router auth paths.
+  if (!isCronRoute) {
+    try {
+      await supabase.auth.getUser()
+    } catch (err) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[middleware] supabase.auth.getUser failed (request continues):', err)
+      }
     }
   }
 
@@ -69,8 +76,9 @@ export async function middleware(request: NextRequest) {
     )
     const hasSbCookies = supabaseCookieNames.length > 0
     
-    console.log(`[middleware] ${request.nextUrl.pathname}`, {
+    console.log(`[middleware] ${pathname}`, {
       timestamp: new Date().toISOString(),
+      isCronRoute,
       cookieNames: supabaseCookieNames.length > 0 ? supabaseCookieNames : 'none',
       hasSbCookies,
       totalCookies: cookieNames.length,

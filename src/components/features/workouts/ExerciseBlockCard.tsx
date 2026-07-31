@@ -552,7 +552,7 @@ export default function ExerciseBlockCard({
           : cn(wt.exExpandedWrap, wt.exExpandedWrapGood);
 
   const subLetterClass = (() => {
-    if (accent === "cyan") return cn(wt.subLetter, "bg-[var(--cyan-soft)] text-[var(--cyan)]");
+    if (accent === "cyan") return cn(wt.subLetter, "bg-[var(--fc-accent-dim)] text-[var(--fc-accent)]");
     if (accent === "purple")
       return cn(wt.subLetter, "bg-[var(--purple-soft)] text-[var(--purple)]");
     if (accent === "warning")
@@ -708,7 +708,7 @@ export default function ExerciseBlockCard({
       className={`fc-card-shell border border-[color:var(--fc-glass-border)] transition-all duration-200 fc-hover-rise w-full ${
         compact ? "rounded-lg p-3" : "rounded-2xl p-3 sm:p-5"
       } ${draggable ? "cursor-move" : ""} ${
-        isCollapsible && isExpanded ? "ring-2 ring-[color:var(--fc-accent-cyan)]/30" : ""
+        isCollapsible && isExpanded ? "ring-2 ring-[color:var(--fc-accent)]/30" : ""
       }`}
     >
       <div

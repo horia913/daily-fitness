@@ -9,8 +9,11 @@ import {
   type CSSProperties,
 } from "react";
 import { createPortal } from "react-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { MoreVertical } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { fetchApi } from "@/lib/apiClient";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   Dialog,
@@ -54,11 +57,15 @@ function computeMenuPosition(
 export function CoachClientProgramPauseMenu({
   client,
   onPatch,
+  buttonClassName,
 }: {
   client: Client;
   onPatch: (patch: Partial<Client>) => void;
+  buttonClassName?: string;
 }) {
   const { addToast } = useToast();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [menuOpen, setMenuOpen] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
   const [resumeOpen, setResumeOpen] = useState(false);
@@ -197,6 +204,9 @@ export function CoachClientProgramPauseMenu({
         addToast({ variant: "destructive", title: msg });
         return;
       }
+      await queryClient.invalidateQueries({
+        queryKey: ["coach-home-triage", user?.id],
+      });
       addToast({
         variant: "success",
         title: `${client.name}'s program paused.`,
@@ -231,6 +241,9 @@ export function CoachClientProgramPauseMenu({
         });
         return;
       }
+      await queryClient.invalidateQueries({
+        queryKey: ["coach-home-triage", user?.id],
+      });
       addToast({
         variant: "success",
         title: `${client.name}'s program resumed.`,
@@ -295,7 +308,7 @@ export function CoachClientProgramPauseMenu({
         <button
           ref={btnRef}
           type="button"
-          className={styles.kebabBtn}
+          className={cn(styles.kebabBtn, buttonClassName)}
           aria-label="Client actions"
           aria-haspopup="menu"
           aria-expanded={menuOpen}

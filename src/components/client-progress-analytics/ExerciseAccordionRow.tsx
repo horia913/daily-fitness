@@ -36,7 +36,7 @@ function variantStyles(v: Variant): { box: string; Icon: typeof Dumbbell } {
   switch (v) {
     case "cardio":
       return {
-        box: "bg-[rgba(163,230,53,0.12)] text-[var(--lime)] border border-[rgba(163,230,53,0.22)]",
+        box: "bg-[rgba(163,230,53,0.12)] text-[var(--fc-accent)] border border-[rgba(163,230,53,0.22)]",
         Icon: Activity,
       };
     case "mobility":
@@ -56,7 +56,7 @@ function variantStyles(v: Variant): { box: string; Icon: typeof Dumbbell } {
       };
     default:
       return {
-        box: "bg-[rgba(79,227,232,0.1)] text-[var(--cyan)] border border-[var(--cyan-dim)]",
+        box: "bg-[color:var(--fc-group-c-soft)] text-[var(--fc-accent)] border border-[var(--fc-accent-glow)]",
         Icon: Dumbbell,
       };
   }
@@ -124,7 +124,7 @@ export function ExerciseAccordionRow({
         <ChevronDown
           className={cn(
             "h-3 w-3 shrink-0 text-[var(--t4)] transition-transform",
-            expanded && "rotate-180 text-[var(--cyan)]",
+            expanded && "rotate-180 text-[var(--fc-accent)]",
           )}
           aria-hidden
         />
@@ -134,7 +134,7 @@ export function ExerciseAccordionRow({
           {loading ? (
             <div className="flex justify-center py-6">
               <div
-                className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--cyan)] border-t-transparent"
+                className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--fc-accent)] border-t-transparent"
                 aria-hidden
               />
             </div>
@@ -153,7 +153,7 @@ export function ExerciseAccordionRow({
                       className="text-[24px] font-bold leading-none text-[var(--t1)]"
                       style={{
                         fontFamily:
-                          '"Big Shoulders Display", var(--font-geist-sans, Geist), sans-serif',
+                          'var(--f-display), var(--font-geist-sans, Geist), sans-serif',
                       }}
                     >
                       {progression.currentOneRM}
@@ -169,10 +169,10 @@ export function ExerciseAccordionRow({
                     Progress
                   </div>
                   <span
-                    className="text-[18px] font-bold leading-none text-[var(--cyan)]"
+                    className="text-[18px] font-bold leading-none text-[var(--fc-accent)]"
                     style={{
                       fontFamily:
-                        '"Big Shoulders Display", var(--font-geist-sans, Geist), sans-serif',
+                        'var(--f-display), var(--font-geist-sans, Geist), sans-serif',
                     }}
                   >
                     {sinceLabel}

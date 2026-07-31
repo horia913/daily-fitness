@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Coach Home — Dashboard (open)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Archivo+Expanded:wght@700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root {
+    --bg:#0A0B0D; --surface:#1B1E24; --raised:#22262E;
+    --hairline:rgba(255,255,255,0.07); --border:rgba(255,255,255,0.10);
+    --text:#F7F6F1; --dim:#9B9C90; --mute:#63645B;
+    --accent:#2E7BFF; --accent-dim:rgba(46,123,255,0.16); --accent-glow:rgba(46,123,255,0.30);
+    --good:#22E56A; --good-dim:rgba(34,229,106,0.15);
+    --warn:#FFB020; --warn-dim:rgba(255,176,32,0.15);
+    --bad:#FF5A4D; --bad-dim:rgba(255,90,77,0.15);
+    --track:rgba(255,255,255,0.08);
+  }
+  body { font-family:'Inter',sans-serif; background:#050504; color:var(--text); padding:28px 12px 60px; display:flex; flex-direction:column; align-items:center; gap:14px; }
+  .note { max-width:1360px; width:100%; color:var(--dim); font-size:13px; line-height:1.55; }
+  .note b { color:var(--text); } .note .blue { color:var(--accent); }
+  .frame { width:1360px; background:var(--bg); border:1px solid rgba(255,255,255,0.1); border-radius:18px; overflow:hidden; display:flex; min-height:780px; }
+  .sidebar { width:188px; flex-shrink:0; background:#0D0F13; border-right:1px solid var(--hairline); padding:20px 12px; display:flex; flex-direction:column; gap:3px; }
+  .logo { font-family:'Archivo Expanded','Archivo'; font-weight:900; font-size:15px; letter-spacing:-0.5px; padding:0 10px 18px; }
+  .ni { display:flex; align-items:center; gap:9px; padding:9px 10px; border-radius:10px; color:var(--dim); font-size:13px; font-weight:600; cursor:pointer; }
+  .ni.on { background:var(--accent-dim); color:var(--accent); }
+  .ni .ic { width:16px; text-align:center; font-size:13px; }
+  .coach { margin-top:auto; display:flex; align-items:center; gap:8px; padding:8px 10px; color:var(--mute); font-size:12px; }
+  .coach .cav { width:26px; height:26px; border-radius:8px; background:var(--raised); display:flex; align-items:center; justify-content:center; font-family:'Archivo'; font-weight:800; font-size:11px; color:var(--accent); }
+  .main { flex:1; padding:26px 32px 36px; overflow:auto; }
+  .eyebrow { font-family:'JetBrains Mono'; font-size:9px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:var(--accent); }
+  .h1 { font-family:'Archivo Expanded','Archivo'; font-weight:800; font-size:27px; letter-spacing:-1px; }
+  .h1 .thin { color:var(--dim); }
+  .sub { font-family:'JetBrains Mono'; font-size:11px; color:var(--dim); letter-spacing:0.3px; }
+  .cta { height:40px; padding:0 16px; border-radius:12px; background:var(--accent); color:#fff; display:inline-flex; align-items:center; gap:7px; font-family:'Archivo'; font-weight:800; font-size:12px; letter-spacing:0.3px; text-transform:uppercase; box-shadow:0 4px 20px var(--accent-glow); cursor:pointer; white-space:nowrap; }
+  .ghost { height:40px; padding:0 14px; border-radius:12px; background:transparent; border:1px solid var(--border); color:var(--text); display:inline-flex; align-items:center; gap:7px; font-family:'Archivo'; font-weight:700; font-size:12px; letter-spacing:0.3px; text-transform:uppercase; cursor:pointer; white-space:nowrap; }
+  .chip { display:inline-flex; align-items:center; gap:5px; padding:5px 11px; border-radius:8px; font-family:'JetBrains Mono'; font-size:9.5px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; cursor:pointer; }
+  .chip.on { background:var(--accent-dim); color:var(--accent); }
+  .chip.off { background:var(--surface); color:var(--dim); }
+  .pill { display:inline-flex; align-items:center; gap:5px; padding:4px 9px; border-radius:7px; font-family:'JetBrains Mono'; font-size:8.5px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; }
+  .pill .pd { width:5px; height:5px; border-radius:50%; background:currentColor; }
+  .pill.good { background:var(--good-dim); color:var(--good); }
+  .pill.warn { background:var(--warn-dim); color:var(--warn); }
+  .pill.bad { background:var(--bad-dim); color:var(--bad); }
+  .pill.mute { background:var(--surface); color:var(--mute); }
+  .sect { font-family:'Archivo'; font-weight:800; font-size:14px; display:flex; align-items:center; gap:8px; }
+  .sect::before { content:''; width:3px; height:13px; border-radius:2px; background:var(--accent); }
+  .mono { font-family:'JetBrains Mono'; }
+  /* open stat strip (replaces surface tiles) */
+  .statstrip { display:grid; grid-template-columns:repeat(6,1fr); border-top:1px solid var(--hairline); border-bottom:1px solid var(--hairline); margin:22px 0 26px; }
+  .stat { padding:16px 0 15px 22px; border-left:1px solid var(--hairline); }
+  .stat:first-child { border-left:none; padding-left:2px; }
+  .stat .sv { font-family:'Archivo Expanded','Archivo'; font-weight:900; font-size:30px; letter-spacing:-1.5px; line-height:1; }
+  .stat .sv .sden { font-size:14px; color:var(--mute); font-weight:700; letter-spacing:-0.5px; }
+  .stat .sl { font-family:'JetBrains Mono'; font-size:8.5px; font-weight:600; letter-spacing:0.9px; text-transform:uppercase; color:var(--dim); margin-top:7px; }
+  /* open table */
+  .thead { padding:0 2px 10px; border-bottom:1px solid var(--hairline); }
+  .th { font-family:'JetBrains Mono'; font-size:8.5px; font-weight:600; letter-spacing:1px; text-transform:uppercase; color:var(--dim); }
+  .trow { align-items:center; padding:0 2px; border-bottom:1px solid var(--hairline); cursor:pointer; }
+  .trow:hover { background:rgba(255,255,255,0.015); }
+  .tname { font-family:'Archivo'; font-weight:800; font-size:14.5px; letter-spacing:-0.2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tmono { font-family:'JetBrains Mono'; font-size:11px; font-weight:600; letter-spacing:0.3px; color:var(--dim); }
+  .icb { height:32px; width:34px; border-radius:9px; background:transparent; border:1px solid var(--border); color:var(--dim); display:inline-flex; align-items:center; justify-content:center; font-size:11.5px; cursor:pointer; }
+  .ghost.sm { height:32px; font-size:10px; padding:0 12px; }
+
+  .queues { display:grid; grid-template-columns:1fr 1.45fr 1fr; gap:30px; align-items:start; }
+  .qhead { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+  .qcount { font-family:'JetBrains Mono'; font-size:9px; font-weight:700; padding:3px 8px; border-radius:6px; }
+  .qrow { display:flex; align-items:center; gap:10px; padding:11px 2px; border-bottom:1px solid var(--hairline); cursor:pointer; }
+  .qlist .qrow:first-child { border-top:1px solid var(--hairline); margin-top:10px; }
+  .qav { width:30px; height:30px; border-radius:9px; background:var(--raised); display:flex; align-items:center; justify-content:center; font-family:'Archivo'; font-weight:800; font-size:11px; color:var(--accent); flex-shrink:0; }
+  .qb { flex:1; min-width:0; }
+  .qn { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .qs { font-family:'JetBrains Mono'; font-size:9px; color:var(--dim); margin-top:2px; letter-spacing:0.3px; }
+  .qd { font-family:'JetBrains Mono'; font-size:10.5px; font-weight:700; letter-spacing:0.3px; white-space:nowrap; }
+  .qchev { color:var(--mute); font-size:13px; }
+  .allclear { display:flex; align-items:center; gap:9px; padding:12px 2px; border-top:1px solid var(--hairline); border-bottom:1px solid var(--hairline); margin-top:10px; }
+  .allclear .ac-ic { color:var(--good); font-size:13px; }
+  .allclear .ac-t { font-size:12px; color:var(--dim); }
+  .viewall { font-family:'JetBrains Mono'; font-size:9.5px; font-weight:700; color:var(--accent); letter-spacing:0.5px; text-transform:uppercase; padding:12px 2px 0; cursor:pointer; }
+</style></head>
+<body>
+<div class="note"><b>Coach Home — open version.</b> The surface tiles are now an <b>open stat strip</b> (numbers on the background, hairline-divided) per the open-by-default law. Queues stay as open columns. The only surfaces left: avatars, chips, buttons — all earned.</div>
+<div class="frame">
+  <div class="sidebar">
+    <div class="logo">DailyFitness</div>
+    <div class="ni on"><span class="ic">⌂</span>Home</div>
+    <div class="ni"><span class="ic">◉</span>Clients</div>
+    <div class="ni"><span class="ic">▲</span>Training</div>
+    <div class="ni"><span class="ic">◐</span>Nutrition</div>
+    <div class="ni"><span class="ic">▥</span>Insights</div>
+    <div class="coach"><span class="cav">N</span>Coach</div>
+  </div>
+  <div class="main">
+
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;">
+      <div>
+        <div class="eyebrow">12 in action queues</div>
+        <div class="h1" style="margin-top:5px;">Evening, <span class="thin">Coach.</span></div>
+        <div class="sub" style="margin-top:7px;">Thursday, July 2 &nbsp;·&nbsp; 0/11 trained today &nbsp;·&nbsp; 0 checked in</div>
+      </div>
+      <div class="ghost">▥ Roster insights</div>
+    </div>
+
+    <!-- OPEN ROSTER STAT STRIP -->
+    <div class="statstrip">
+      <div class="stat"><div class="sv">0<span class="sden">/11</span></div><div class="sl">Trained today</div></div>
+      <div class="stat"><div class="sv">0<span class="sden">/11</span></div><div class="sl">Checked in</div></div>
+      <div class="stat"><div class="sv" style="color:var(--warn)">1</div><div class="sl">Need attention</div></div>
+      <div class="stat"><div class="sv" style="color:var(--bad)">11</div><div class="sl">Inactive check-ins</div></div>
+      <div class="stat"><div class="sv" style="color:var(--mute)">0</div><div class="sl">Behind on program</div></div>
+      <div class="stat"><div class="sv" style="color:var(--mute)">0</div><div class="sl">Flagged</div></div>
+    </div>
+
+    <div class="queues">
+      <div>
+        <div class="qhead"><span class="sect">Need attention</span><span class="qcount" style="background:var(--warn-dim);color:var(--warn)">1</span></div>
+        <div class="qlist">
+          <div class="qrow">
+            <span class="qav">CP</span>
+            <div class="qb"><div class="qn">Client Popescu</div><div class="qs">ADHERENCE 1/2 THIS WEEK</div></div>
+            <span class="qd" style="color:var(--warn)">50%</span><span class="qchev">›</span>
+          </div>
+        </div>
+        <div class="qhead" style="margin-top:30px;"><span class="sect">Behind on program</span><span class="qcount" style="background:var(--surface);color:var(--mute)">0</span></div>
+        <div class="allclear"><span class="ac-ic">✓</span><span class="ac-t">No clients behind on program pace</span></div>
+        <div class="qhead" style="margin-top:30px;"><span class="sect">Flagged</span><span class="qcount" style="background:var(--surface);color:var(--mute)">0</span></div>
+        <div class="allclear"><span class="ac-ic">✓</span><span class="ac-t">No high-stress check-ins</span></div>
+      </div>
+      <div>
+        <div class="qhead"><span class="sect">Inactive check-ins</span><span class="qcount" style="background:var(--bad-dim);color:var(--bad)">11</span></div>
+        <div class="qlist">
+          <div class="qrow"><span class="qav">ET</span><div class="qb"><div class="qn">e t</div><div class="qs">NEVER CHECKED IN</div></div><span class="qd" style="color:var(--bad)">Never</span><span class="qchev">›</span></div>
+          <div class="qrow"><span class="qav">LD</span><div class="qb"><div class="qn">Luminita Dejeu</div><div class="qs">NEVER CHECKED IN</div></div><span class="qd" style="color:var(--bad)">Never</span><span class="qchev">›</span></div>
+          <div class="qrow"><span class="qav">DP</span><div class="qb"><div class="qn">Dan Persona</div><div class="qs">NEVER CHECKED IN</div></div><span class="qd" style="color:var(--bad)">Never</span><span class="qchev">›</span></div>
+          <div class="qrow"><span class="qav">EP</span><div class="qb"><div class="qn">Eve Persona</div><div class="qs">NEVER CHECKED IN</div></div><span class="qd" style="color:var(--bad)">Never</span><span class="qchev">›</span></div>
+          <div class="qrow"><span class="qav">AM</span><div class="qb"><div class="qn">Andreea Moldovan</div><div class="qs">NEVER CHECKED IN</div></div><span class="qd" style="color:var(--bad)">Never</span><span class="qchev">›</span></div>
+          <div class="qrow"><span class="qav">RM</span><div class="qb"><div class="qn">Roxana Micu</div><div class="qs">LAST CHECK-IN</div></div><span class="qd" style="color:var(--bad)">58d ago</span><span class="qchev">›</span></div>
+          <div class="qrow"><span class="qav">CP</span><div class="qb"><div class="qn">Client Popescu</div><div class="qs">LAST CHECK-IN</div></div><span class="qd" style="color:var(--warn)">46d ago</span><span class="qchev">›</span></div>
+          <div class="qrow"><span class="qav">AP</span><div class="qb"><div class="qn">Alice Persona</div><div class="qs">LAST CHECK-IN</div></div><span class="qd" style="color:var(--warn)">46d ago</span><span class="qchev">›</span></div>
+        </div>
+        <div class="viewall">View all 11 →</div>
+      </div>
+      <div>
+        <div class="qhead"><span class="sect">Today</span></div>
+        <div class="qlist">
+          <div class="qrow"><span class="qav" style="color:var(--good)">▲</span><div class="qb"><div class="qn">Sessions scheduled</div><div class="qs">ACROSS ROSTER</div></div><span class="qd">4</span></div>
+          <div class="qrow"><span class="qav" style="color:var(--good)">✓</span><div class="qb"><div class="qn">Completed</div><div class="qs">SO FAR TODAY</div></div><span class="qd" style="color:var(--mute)">0</span></div>
+          <div class="qrow"><span class="qav" style="color:var(--accent)">◔</span><div class="qb"><div class="qn">Check-ins due</div><div class="qs">DAILY</div></div><span class="qd">11</span></div>
+        </div>
+        <div class="qhead" style="margin-top:30px;"><span class="sect">Quick actions</span></div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px;">
+          <div class="ghost" style="justify-content:flex-start;">＋ Add client</div>
+          <div class="ghost" style="justify-content:flex-start;">▲ Create program</div>
+          <div class="ghost" style="justify-content:flex-start;">▥ Open roster insights</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

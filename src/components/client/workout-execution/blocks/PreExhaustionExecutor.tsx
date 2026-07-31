@@ -24,8 +24,8 @@ import { LogSetButton } from "../ui/LogSetButton";
 import { parseRepsTarget } from "@/lib/workout/parseRepsTarget";
 import { LargeInput } from "../ui/LargeInput";
 import logPairStyles from "../ui/logWeightRepsPair.module.css";
-import { BaseBlockExecutorProps } from "../types";
-import { LoggedSet } from "@/types/workoutBlocks";
+import { BaseSetEntryExecutorProps } from "../types";
+import { LoggedSet } from "@/types/workoutSetEntries";
 import { LoggedSetsList, type LoggedSetRow } from "../ui/LoggedSetsList";
 import { useUpdateSetRpe } from "../hooks/useUpdateSetRpe";
 import { appendTargetEffortItem } from "../appendTargetEffortItem";
@@ -39,20 +39,21 @@ import {
 import { fetchApi } from "@/lib/apiClient";
 import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
 import { parseWeightKgInput } from "@/lib/parseWeightKgInput";
+import { resolveRestSeconds } from "../live-card";
 
 export function PreExhaustionExecutor({
-  block,
-  onBlockComplete,
-  onNextBlock,
+  liveSetEntry,
+  onSetEntryComplete,
+  onNextSetEntry,
   e1rmMap = {},
   onE1rmUpdate,
   lastPerformedWeightByExerciseId = {},
   lastSessionWeightByExerciseId = {},
   sessionId,
   assignmentId,
-  allBlocks = [],
-  currentBlockIndex = 0,
-  onBlockChange,
+  allSetEntries = [],
+  currentSetEntryIndex = 0,
+  onSetEntryChange,
   currentExerciseIndex = 0,
   onExerciseIndexChange,
   logSetToDatabase,
@@ -71,18 +72,18 @@ export function PreExhaustionExecutor({
   onSetLogUpsert,
   onSetEditSaved,
   loggedSets,
-}: BaseBlockExecutorProps) {
+}: BaseSetEntryExecutorProps) {
   const { addToast } = useToast();
-  const isolationExercise = block.block.exercises?.[0];
-  const compoundExercise = block.block.exercises?.[1];
-  const totalSets = block.block.total_sets || 1;
-  const completedSets = block.completedSets || 0;
+  const isolationExercise = liveSetEntry.setEntry.exercises?.[0];
+  const compoundExercise = liveSetEntry.setEntry.exercises?.[1];
+  const totalSets = liveSetEntry.setEntry.total_sets || 1;
+  const completedSets = liveSetEntry.completedSets || 0;
   const currentSetNumber = completedSets + 1;
 
   /** Parent-owned logged sets; single source of truth. Persists across block navigation. */
   const loggedSetsList = loggedSets ?? [];
 
-  const restBetween = block.block.rest_seconds || 15;
+  const restBetween = resolveRestSeconds(liveSetEntry.setEntry.rest_seconds);
 
   const [isolationWeight, setIsolationWeight] = useState("");
   const [isolationReps, setIsolationReps] = useState("");
@@ -128,11 +129,11 @@ export function PreExhaustionExecutor({
       const tempId = tempEntries[0].id;
       tempEntries.forEach((oldEntry) => {
         const newEntry = { ...oldEntry, id: set_log_id };
-        onSetLogUpsert?.(block.block.id, newEntry, { replaceId: tempId });
+        onSetLogUpsert?.(liveSetEntry.setEntry.id, newEntry, { replaceId: tempId });
       });
     });
     return () => {};
-  }, [registerSetLogIdResolved, onSetLogUpsert, block.block.id]);
+  }, [registerSetLogIdResolved, onSetLogUpsert, liveSetEntry.setEntry.id]);
   useEffect(() => {
     if (viewingSetIndex > loggedSetsList.length)
       setViewingSetIndex(loggedSetsList.length);
@@ -284,7 +285,7 @@ export function PreExhaustionExecutor({
     compoundExercise?.reps,
   ]);
 
-  const exercisesPre = block.block.exercises ?? [];
+  const exercisesPre = liveSetEntry.setEntry.exercises ?? [];
   const titleExercisePre =
     exercisesPre[currentExerciseIndex ?? 0] ??
     isolationExercise ??
@@ -370,7 +371,7 @@ export function PreExhaustionExecutor({
     });
   }
 
-  const instructions = block.block.set_notes || undefined;
+  const instructions = liveSetEntry.setEntry.set_notes || undefined;
 
   const maxViewableSet =
     loggedSetsList.length === 0
@@ -404,7 +405,7 @@ export function PreExhaustionExecutor({
       if (process.env.NODE_ENV !== "production") {
         console.log("[SAVE EDITS guard]", {
           executor: "PreExhaustionExecutor",
-          blockTypeFromUI: block.block.set_type,
+          blockTypeFromUI: liveSetEntry.setEntry.set_type,
           editingSetId,
           isSavingEdit,
           timestamp: Date.now(),
@@ -436,7 +437,7 @@ export function PreExhaustionExecutor({
     }
     setIsSavingEdit(true);
     try {
-      const payload = buildSetEditPatchPayload(block.block.set_type, {
+      const payload = buildSetEditPatchPayload(liveSetEntry.setEntry.set_type, {
         set_number: editDraft.set_number,
         preexhaust_isolation_exercise_id:
           isolationExercise?.exercise_id ?? undefined,
@@ -451,7 +452,7 @@ export function PreExhaustionExecutor({
         console.log("[SAVE EDITS]", {
           executor: "PreExhaustionExecutor",
           setId: editingSetId,
-          blockTypeFromUI: block.block.set_type,
+          blockTypeFromUI: liveSetEntry.setEntry.set_type,
           payloadKeys: Object.keys(payload),
         });
       }
@@ -471,7 +472,7 @@ export function PreExhaustionExecutor({
           };
         });
         const toUpsert = next.filter((s) => s.set_number === setNum);
-        toUpsert.forEach((e) => onSetEditSaved?.(block.block.id, e));
+        toUpsert.forEach((e) => onSetEditSaved?.(liveSetEntry.setEntry.id, e));
         setEditingSetId(null);
         setEditDraft(null);
         addToast({ title: "Set updated", variant: "success", duration: 2000 });
@@ -539,7 +540,7 @@ export function PreExhaustionExecutor({
     try {
       // Log pre-exhaustion as a single call with both exercises
       const logData: any = {
-        set_type: "preexhaust",
+        set_type: "pre_exhaustion",
         set_number: completedSets + 1,
         isLastSet: currentSetNumber >= totalSets,
       };
@@ -570,7 +571,7 @@ export function PreExhaustionExecutor({
           {
             id: setLogId,
             exercise_id: isolationExercise.exercise_id,
-            set_entry_id: block.block.id,
+            set_entry_id: liveSetEntry.setEntry.id,
             set_number: setNumber,
             weight_kg: isolationWeightNum,
             reps_completed: isolationRepsNum,
@@ -579,14 +580,14 @@ export function PreExhaustionExecutor({
           {
             id: setLogId,
             exercise_id: compoundExercise.exercise_id,
-            set_entry_id: block.block.id,
+            set_entry_id: liveSetEntry.setEntry.id,
             set_number: setNumber,
             weight_kg: compoundWeightNum,
             reps_completed: compoundRepsNum,
             completed_at: new Date(),
           } as LoggedSet,
         ];
-        newEntries.forEach((e) => onSetLogUpsert?.(block.block.id, e));
+        newEntries.forEach((e) => onSetLogUpsert?.(liveSetEntry.setEntry.id, e));
         setViewingSetIndex(0);
 
         addToast({
@@ -610,7 +611,7 @@ export function PreExhaustionExecutor({
         onSetComplete?.(newCompletedSets);
 
         if (newCompletedSets >= totalSets) {
-          onBlockComplete(block.block.id, updatedLoggedSets);
+          onSetEntryComplete(liveSetEntry.setEntry.id, updatedLoggedSets);
         }
       } else {
         addToast({
@@ -630,7 +631,7 @@ export function PreExhaustionExecutor({
   ].sort((a, b) => a - b);
 
   const updateSetRpe = useUpdateSetRpe({
-    blockId: block.block.id,
+    setEntryId: liveSetEntry.setEntry.id,
     onSetLogUpsert,
   });
   const loggedSetRows: LoggedSetRow[] = setNumbersLogged.map((setNum) => {
@@ -707,7 +708,7 @@ export function PreExhaustionExecutor({
         <div className="mb-4">
           <h4
             className="font-semibold text-lg"
-            style={{ color: "var(--fc-accent-cyan)" }}
+            style={{ color: "var(--fc-accent)" }}
           >
             Isolation:{" "}
             {isolationExercise?.exercise?.name || "Isolation Exercise"}
@@ -961,16 +962,16 @@ export function PreExhaustionExecutor({
   return (
     <BaseBlockExecutorLayout
       {...{
-        block,
-        onBlockComplete,
-        onNextBlock,
+  liveSetEntry,
+        onSetEntryComplete,
+        onNextSetEntry,
         e1rmMap,
         onE1rmUpdate,
         sessionId,
         assignmentId,
-        allBlocks,
-        currentBlockIndex,
-        onBlockChange,
+        allSetEntries,
+        currentSetEntryIndex,
+        onSetEntryChange,
         currentExerciseIndex,
         onExerciseIndexChange,
         logSetToDatabase,
@@ -993,7 +994,7 @@ export function PreExhaustionExecutor({
       aboveStickyContent={aboveStickyContent}
       showNavigation={true}
       currentExercise={titleExercisePre}
-      showRestTimer={!!block.block.rest_seconds}
+      showRestTimer={!!liveSetEntry.setEntry.rest_seconds}
     />
   );
 }

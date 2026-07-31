@@ -11,9 +11,9 @@ const ACCENT: Record<
   { eyebrow: string; glow: string; pulseShadow: string }
 > = {
   cyan: {
-    eyebrow: 'var(--cyan)',
-    glow: 'var(--cyan-soft)',
-    pulseShadow: '0 0 6px var(--cyan)',
+    eyebrow: 'var(--fc-accent)',
+    glow: 'var(--fc-accent-dim)',
+    pulseShadow: '0 0 6px var(--fc-accent)',
   },
   warning: {
     eyebrow: 'var(--warning)',

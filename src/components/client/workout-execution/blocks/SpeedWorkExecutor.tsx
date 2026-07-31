@@ -1,29 +1,47 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Hash, Route, Gauge, Timer, Weight, Flame } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
-import { BaseBlockExecutorLayout } from "../BaseBlockExecutor";
 import { LargeInput } from "../ui/LargeInput";
-import { BaseBlockExecutorProps } from "../types";
-import type { PrescriptionItem } from "../ui/PrescriptionCard";
-import { LogSetButton } from "../ui/LogSetButton";
-import { LoggedSet } from "@/types/workoutBlocks";
+import { BaseSetEntryExecutorProps } from "../types";
+import { useWorkoutExecutionChrome } from "../WorkoutExecutionChromeContext";
+import { NavigationControls } from "../ui/NavigationControls";
+import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
+import { LastSessionSetsSection } from "../ui/LastSessionSetsSection";
+import { ProgressionNudge } from "../ui/ProgressionNudge";
+import { LoggedSet } from "@/types/workoutSetEntries";
 import { LoggedSetsList, type LoggedSetRow } from "../ui/LoggedSetsList";
 import { useUpdateSetRpe } from "../hooks/useUpdateSetRpe";
-import { appendTargetEffortItem } from "../appendTargetEffortItem";
 import { useLoggingReset } from "../hooks/useLoggingReset";
-import logPairStyles from "../ui/logWeightRepsPair.module.css";
+import { resolveSetPrescriptionTargets } from "../ui/set-rows/resolveSetPrescriptionTargets";
+import {
+  LiveCard,
+  LiveCardExerciseName,
+  LiveCardPrimary,
+  LiveCardStats,
+  LiveCardNote,
+  LiveCardLog,
+  LiveCardLogDistanceTime,
+  LiveCardLogButton,
+  effortFromPrescribedRir,
+  formatLiveRest,
+  resolveRestSeconds,
+  formatLiveLastDistance,
+  formatLiveLastDuration,
+  groupIndexToHue,
+  type LiveCardTarget,
+} from "../live-card";
 
 export function SpeedWorkExecutor({
-  block,
-  onBlockComplete,
-  onNextBlock,
+  liveSetEntry,
+  onSetEntryComplete,
+  onNextSetEntry,
   sessionId,
   assignmentId,
-  allBlocks = [],
-  currentBlockIndex = 0,
-  onBlockChange,
+  allSetEntries = [],
+  currentSetEntryIndex = 0,
+  onSetEntryChange,
   currentExerciseIndex = 0,
   onExerciseIndexChange,
   logSetToDatabase,
@@ -40,36 +58,44 @@ export function SpeedWorkExecutor({
   clientBodyWeightKg,
   onWorkoutBack,
   previousPerformanceMap,
-}: BaseBlockExecutorProps) {
+}: BaseSetEntryExecutorProps) {
   const { addToast } = useToast();
-  const currentExercise = block.block.exercises?.[currentExerciseIndex];
+  const currentExercise = liveSetEntry.setEntry.exercises?.[currentExerciseIndex];
   const loggedSetsList = loggedSetsProp ?? [];
 
   const exOrder = currentExercise?.exercise_order ?? 1;
   const speedRow =
     (currentExercise as any)?.speed_sets?.[0] ||
-    block.block.speed_sets?.find(
+    liveSetEntry.setEntry.speed_sets?.find(
       (s: any) =>
         s.exercise_id === currentExercise?.exercise_id &&
         (s.exercise_order ?? 1) === exOrder,
     ) ||
-    block.block.speed_sets?.[0];
+    liveSetEntry.setEntry.speed_sets?.[0];
 
-  const totalIntervals = speedRow?.intervals ?? block.block.total_sets ?? 1;
-  const distanceM = speedRow?.distance_meters ?? 0;
-  const restSec = speedRow?.rest_seconds ?? block.block.rest_seconds ?? 120;
+  const totalIntervals =
+    speedRow?.intervals ?? liveSetEntry.setEntry.total_sets ?? 1;
+  const nextIntervalNum = loggedSetsList.length + 1;
+  const completed = loggedSetsList.length >= totalIntervals;
+
+  const targets = resolveSetPrescriptionTargets(
+    currentExercise,
+    Math.min(nextIntervalNum, totalIntervals),
+    liveSetEntry.setEntry.reps_per_set,
+  );
+  const distanceM =
+    targets.distance_meters ?? speedRow?.distance_meters ?? 0;
+  const restSec = resolveRestSeconds(
+    speedRow?.rest_seconds,
+    currentExercise?.rest_seconds,
+    liveSetEntry.setEntry.rest_seconds,
+  );
   const loadPctBw =
     speedRow?.load_pct_bw ?? (speedRow as any)?.load_percent_bw ?? null;
-  const maxSpeedPct =
-    speedRow?.target_speed_pct ?? (speedRow as any)?.max_speed_percent ?? null;
-  const maxHrPct =
-    speedRow?.target_hr_pct ?? (speedRow as any)?.max_hr_percent ?? null;
 
-  const suggestedLoadKg =
-    clientBodyWeightKg != null && loadPctBw != null
-      ? Math.round((clientBodyWeightKg * loadPctBw) / 100)
-      : null;
-
+  const [distanceStr, setDistanceStr] = useState(
+    distanceM > 0 ? String(Math.round(distanceM)) : "",
+  );
   const [timeSec, setTimeSec] = useState("");
   const [hrAvg, setHrAvg] = useState("");
   const [isLoggingSet, setIsLoggingSet] = useState(false);
@@ -88,72 +114,18 @@ export function SpeedWorkExecutor({
       if (idx === -1) return;
       const oldEntry = list[idx];
       const newEntry = { ...oldEntry, id: set_log_id };
-      onSetLogUpsert?.(block.block.id, newEntry, { replaceId: oldEntry.id });
+      onSetLogUpsert?.(liveSetEntry.setEntry.id, newEntry, { replaceId: oldEntry.id });
     });
     return () => {};
-  }, [registerSetLogIdResolved, onSetLogUpsert, block.block.id]);
+  }, [registerSetLogIdResolved, onSetLogUpsert, liveSetEntry.setEntry.id]);
 
-  const nextIntervalNum = loggedSetsList.length + 1;
-  const completed = loggedSetsList.length >= totalIntervals;
-
-  const prescriptionItems: PrescriptionItem[] = [
-    { icon: Hash, label: "Intervals", value: totalIntervals },
-  ];
-  if (distanceM > 0) {
-    if (distanceM >= 1000) {
-      prescriptionItems.push({
-        icon: Route,
-        label: "Distance",
-        value: Number((distanceM / 1000).toFixed(1)),
-        unit: "km",
-      });
-    } else {
-      prescriptionItems.push({
-        icon: Route,
-        label: "Distance",
-        value: Math.round(distanceM),
-        unit: "m",
-      });
-    }
-  }
-  if (maxSpeedPct != null) {
-    prescriptionItems.push({
-      icon: Gauge,
-      label: "Target speed",
-      value: maxSpeedPct,
-      unit: "% max",
-    });
-  } else if (maxHrPct != null) {
-    prescriptionItems.push({
-      icon: Gauge,
-      label: "Target HR",
-      value: maxHrPct,
-      unit: "% max",
-    });
-  }
-  prescriptionItems.push({
-    icon: Timer,
-    label: "Recovery",
-    value: restSec,
-    unit: "s",
-  });
-  if (loadPctBw != null) {
-    prescriptionItems.push({
-      icon: Weight,
-      label: "Load",
-      value: loadPctBw,
-      unit: "% BW",
-    });
-  }
-  appendTargetEffortItem(
-    prescriptionItems,
-    currentExercise ? (currentExercise as { rir?: unknown }).rir : undefined,
-    Flame,
-  );
+  useEffect(() => {
+    if (distanceM > 0) setDistanceStr(String(Math.round(distanceM)));
+  }, [distanceM, nextIntervalNum]);
 
   const instructions =
     currentExercise?.notes ||
-    block.block.set_notes ||
+    liveSetEntry.setEntry.set_notes ||
     speedRow?.notes ||
     undefined;
 
@@ -189,7 +161,7 @@ export function SpeedWorkExecutor({
         const loggedSet: LoggedSet = {
           id: result.set_log_id || `temp-${nextIntervalNum}-${Date.now()}`,
           exercise_id: currentExercise.exercise_id,
-          set_entry_id: block.block.id,
+          set_entry_id: liveSetEntry.setEntry.id,
           set_number: nextIntervalNum,
           actual_time_seconds: t,
           ...(hrNum != null && Number.isFinite(hrNum)
@@ -197,11 +169,14 @@ export function SpeedWorkExecutor({
             : {}),
           completed_at: new Date(),
         } as LoggedSet;
-        onSetLogUpsert?.(block.block.id, loggedSet);
+        onSetLogUpsert?.(liveSetEntry.setEntry.id, loggedSet);
         setTimeSec("");
         setHrAvg("");
         if (nextIntervalNum >= totalIntervals) {
-          onBlockComplete(block.block.id, [...loggedSetsList, loggedSet]);
+          onSetEntryComplete(liveSetEntry.setEntry.id, [
+            ...loggedSetsList,
+            loggedSet,
+          ]);
         }
       } else {
         addToast({
@@ -214,17 +189,12 @@ export function SpeedWorkExecutor({
     }
   };
 
-  const exerciseName = currentExercise?.exercise?.name || "Speed work";
-
   const tParsed = parseInt(String(timeSec).trim(), 10);
   const speedLogReady =
-    !isLoggingSet &&
-    !completed &&
-    Number.isFinite(tParsed) &&
-    tParsed > 0;
+    !isLoggingSet && !completed && Number.isFinite(tParsed) && tParsed > 0;
 
   const updateSetRpe = useUpdateSetRpe({
-    blockId: block.block.id,
+    setEntryId: liveSetEntry.setEntry.id,
     onSetLogUpsert,
   });
   const loggedSetRows: LoggedSetRow[] = loggedSetsList
@@ -250,95 +220,172 @@ export function SpeedWorkExecutor({
       <LoggedSetsList rows={loggedSetRows} label="Logged intervals" />
     ) : null;
 
-  return (
-    <BaseBlockExecutorLayout
-      block={block}
-      exerciseName={exerciseName}
-      prescriptionItems={prescriptionItems}
-      prescriptionGridMode="two-column-only"
-      instructions={instructions}
-      onVideoClick={onVideoClick}
-      onAlternativesClick={onAlternativesClick}
-      onRestTimerClick={onRestTimerClick}
-      progressionSuggestion={progressionSuggestion}
-      onBlockComplete={onBlockComplete}
-      onNextBlock={onNextBlock}
-      allBlocks={allBlocks}
-      currentBlockIndex={currentBlockIndex}
-      onBlockChange={onBlockChange}
-      currentExerciseIndex={currentExerciseIndex}
-      onExerciseIndexChange={onExerciseIndexChange}
-      sessionId={sessionId}
-      assignmentId={assignmentId}
-      logSetToDatabase={logSetToDatabase}
-      calculateSuggestedWeight={calculateSuggestedWeight}
-      formatTime={formatTimeProp}
-      loggingInputs={
-        <div className="space-y-4">
-          <div className="rounded-lg border border-white/5 bg-white/[0.02] p-3 text-center">
-            <p className="text-sm text-muted-foreground">Interval</p>
-            <p className="text-2xl font-bold tabular-nums">
-              {Math.min(nextIntervalNum, totalIntervals)} of {totalIntervals}
-            </p>
-            {completed && (
-              <p className="mt-2 text-sm text-green-600 dark:text-green-400">
-                All intervals complete
-              </p>
-            )}
-          </div>
+  const activeEffort = effortFromPrescribedRir(targets.rir);
+  const liveTarget: LiveCardTarget =
+    distanceM > 0
+      ? {
+          kind: "distance",
+          meters:
+            distanceM >= 1000
+              ? Number((distanceM / 1000).toFixed(1))
+              : Math.round(distanceM),
+          unit: distanceM >= 1000 ? "km" : "metres",
+        }
+      : { kind: "distance", meters: "—", unit: "metres" };
 
-          <div className={`w-full min-w-0 ${logPairStyles.pair}`}>
-            <div className="flex min-h-0 min-w-0 flex-col">
-              <LargeInput
-                label="Time"
-                unit="s"
-                inputType="decimal"
-                value={timeSec}
-                onChange={setTimeSec}
-                placeholder="0"
-                min="1"
-                step="1"
-                showStepper
-                stepAmount={1}
-                hint="Interval time in seconds"
+  const lastLogged = loggedSetsList[loggedSetsList.length - 1];
+  const lastLabel =
+    formatLiveLastDuration(lastLogged?.actual_time_seconds) ??
+    formatLiveLastDistance(distanceM > 0 ? distanceM : null);
+
+  const paceOrLoadLabel =
+    loadPctBw != null
+      ? `${loadPctBw}% BW${
+          clientBodyWeightKg != null
+            ? ` · ~${Math.round((clientBodyWeightKg * loadPctBw) / 100)} kg`
+            : ""
+        }`
+      : null;
+  const middleLabel = loadPctBw != null ? "Load" : "Pace";
+
+  const chrome = useWorkoutExecutionChrome();
+  const hideCompactBack = chrome?.hideCompactBack ?? false;
+  const totalSetEntries = allSetEntries.length || 1;
+  const canGoPrevious = currentSetEntryIndex > 0;
+  const canGoNext = currentSetEntryIndex < totalSetEntries - 1;
+  const prevPerf =
+    currentExercise?.exercise_id && previousPerformanceMap
+      ? (previousPerformanceMap.get(currentExercise.exercise_id) ?? null)
+      : null;
+
+  const nudgeDist = (delta: number) => {
+    const cur = parseFloat(distanceStr || "0");
+    const next = Math.max(0, (isNaN(cur) ? 0 : cur) + delta);
+    setDistanceStr(String(Math.round(next)));
+  };
+  const nudgeTime = (delta: number) => {
+    const cur = parseInt(timeSec || "0", 10);
+    const next = Math.max(0, (isNaN(cur) ? 0 : cur) + delta);
+    setTimeSec(String(next));
+  };
+
+  return (
+    <>
+      <div className="flex flex-col border-b border-white/5">
+        <div className="flex flex-col gap-3 px-0 pb-2 pt-1 sm:px-1">
+          {onWorkoutBack && !hideCompactBack ? (
+            <button
+              type="button"
+              onClick={onWorkoutBack}
+              className="-ml-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/10 hover:text-white active:scale-95"
+              aria-label="Back"
+            >
+              <ChevronLeft className="h-5 w-5" aria-hidden />
+            </button>
+          ) : null}
+
+          <LiveCard
+            hue={groupIndexToHue(currentSetEntryIndex)}
+            heading={`Interval ${Math.min(nextIntervalNum, totalIntervals)} of ${totalIntervals}`}
+            status={completed ? "complete" : "logging"}
+          >
+            <div>
+              <LiveCardExerciseName
+                name={currentExercise?.exercise?.name || "Speed work"}
+                endSlot={
+                  currentExercise ? (
+                    <ExerciseActionButtons
+                      exercise={currentExercise}
+                      onVideoClick={onVideoClick}
+                      onAlternativesClick={onAlternativesClick}
+                    />
+                  ) : undefined
+                }
               />
             </div>
-            <div className="flex min-h-0 min-w-0 flex-col">
-              <LargeInput
-                label="Avg HR"
-                unit="bpm"
-                inputType="decimal"
-                value={hrAvg}
-                onChange={setHrAvg}
-                placeholder="—"
-                min="0"
-                showStepper
-                stepAmount={1}
-                hint="Optional average heart rate"
+            <LiveCardPrimary target={liveTarget} effort={activeEffort} />
+            <LiveCardStats
+              rest={formatLiveRest(restSec)}
+              tempo={paceOrLoadLabel}
+              last={lastLabel}
+              middleLabel={middleLabel}
+            />
+            {instructions ? (
+              <LiveCardNote>{instructions}</LiveCardNote>
+            ) : null}
+            <LiveCardLog>
+              {!completed ? (
+                <div className="flex flex-col gap-3">
+
+                  <LiveCardLogDistanceTime
+                    distance={distanceStr}
+                    time={timeSec}
+                    distanceLabel="Distance"
+                    timeLabel="Time"
+                    onDistanceChange={setDistanceStr}
+                    onTimeChange={setTimeSec}
+                    onDistanceIncrement={() => nudgeDist(1)}
+                    onDistanceDecrement={() => nudgeDist(-1)}
+                    onTimeIncrement={() => nudgeTime(1)}
+                    onTimeDecrement={() => nudgeTime(-1)}
+                    disabled={isLoggingSet}
+                  />
+                  <LiveCardLogButton
+                    disabled={!speedLogReady}
+                    onClick={() => void handleLog()}
+                  />
+                  <LargeInput
+                    label="Avg HR"
+                    unit="bpm"
+                    inputType="decimal"
+                    value={hrAvg}
+                    onChange={setHrAvg}
+                    placeholder="—"
+                    min="0"
+                    showStepper
+                    stepAmount={1}
+                    hint="Optional average heart rate"
+                  />
+                </div>
+              ) : (
+                <p className="text-sm text-[color:var(--fc-status-success)]">
+                  All intervals complete
+                </p>
+              )}
+            </LiveCardLog>
+          </LiveCard>
+
+          {progressionSuggestion || prevPerf?.lastWorkout ? (
+            <div className="mx-4">
+              <ProgressionNudge
+                suggestion={progressionSuggestion}
+                previousPerformance={prevPerf}
+                showPreviousSession={false}
               />
             </div>
-          </div>
+          ) : null}
+
+          {aboveStickyContent}
+
+          <NavigationControls
+            currentBlock={currentSetEntryIndex + 1}
+            totalBlocks={totalSetEntries}
+            onPrevious={() => {
+              if (onSetEntryChange && canGoPrevious) {
+                onSetEntryChange(currentSetEntryIndex - 1);
+              }
+            }}
+            onNext={() => {
+              if (onSetEntryChange && canGoNext) {
+                onSetEntryChange(currentSetEntryIndex + 1);
+              }
+            }}
+            canGoPrevious={canGoPrevious}
+            canGoNext={canGoNext}
+          />
         </div>
-      }
-      logButton={
-        <LogSetButton
-          onClick={handleLog}
-          ready={speedLogReady}
-          loading={isLoggingSet}
-          label={
-            completed
-              ? "Completed"
-              : `Log interval ${nextIntervalNum}`
-          }
-        />
-      }
-      aboveStickyContent={aboveStickyContent}
-      currentSet={Math.min(nextIntervalNum, totalIntervals)}
-      totalSets={totalIntervals}
-      progressLabel="Interval"
-      currentExercise={currentExercise as any}
-      onWorkoutBack={onWorkoutBack}
-      previousPerformanceMap={previousPerformanceMap}
-    />
+        <LastSessionSetsSection lastWorkout={prevPerf?.lastWorkout ?? null} />
+      </div>
+    </>
   );
 }

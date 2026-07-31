@@ -5,14 +5,19 @@ import Link from "next/link";
 import { AlertTriangle, MessageCircle, Phone, Settings } from "lucide-react";
 import type { AttentionLevel } from "@/lib/coachClientAttention";
 import styles from "./ClientHeaderCard.module.css";
+import { CoachStandingNote } from "./CoachStandingNote";
 
 type Props = {
   clientId: string;
   name: string;
   email: string;
   initials: string;
-  /** 0–100 weekly workout adherence vs goal, or null if unknown */
-  adherencePct: number | null;
+  /** Instance program adherence: completed / scheduled required workouts this week */
+  programAdherence?: { completed: number; scheduled: number } | null;
+  /** Fallback when completed/scheduled counts are unavailable (e.g. check-ins hub) */
+  adherencePct?: number | null;
+  /** Program progress week X of N */
+  progress?: { currentWeek: number; totalWeeks: number } | null;
   streakDays: number;
   alertCount: number;
   trainedToday: boolean;
@@ -23,6 +28,9 @@ type Props = {
   onMessage: () => void;
   /** When set, overrides auto flag (critical left-stripe + alert bar). */
   flagged?: boolean;
+  /** Private standing coach note; omit to hide the note row (e.g. check-ins hub). */
+  standingNote?: string | null;
+  onStandingNoteSaved?: (note: string | null) => void;
 };
 
 function adherencePillVariant(pct: number | null): "good" | "warn" | "crit" | "muted" {
@@ -37,7 +45,9 @@ export default function ClientHeaderCard({
   name,
   email,
   initials,
-  adherencePct,
+  programAdherence,
+  adherencePct: adherencePctProp,
+  progress,
   streakDays,
   alertCount,
   trainedToday,
@@ -46,13 +56,20 @@ export default function ClientHeaderCard({
   phone,
   onMessage,
   flagged: flaggedProp,
+  standingNote,
+  onStandingNoteSaved,
 }: Props) {
-  const pct = adherencePct;
-  const adVariant = adherencePillVariant(pct);
+  const adherencePct =
+    programAdherence && programAdherence.scheduled > 0
+      ? Math.round((programAdherence.completed / programAdherence.scheduled) * 100)
+      : adherencePctProp != null && !Number.isNaN(adherencePctProp)
+        ? Math.round(adherencePctProp)
+        : null;
+  const adVariant = adherencePillVariant(adherencePct);
   const flagged =
     flaggedProp !== undefined
       ? flaggedProp
-      : attentionLevel === "urgent" || (pct != null && pct < 40);
+      : attentionLevel === "urgent" || (adherencePct != null && adherencePct < 40);
 
   const avatarTone: "default" | "healthy" | "varied" =
     attentionLevel === "good" && trainedToday
@@ -78,9 +95,18 @@ export default function ClientHeaderCard({
   const streakPillVariant =
     streakDays > 7 ? ("good" as const) : ("muted" as const);
 
+  const toneClass =
+    flagged || attentionLevel === "urgent"
+      ? styles.toneCrit
+      : attentionLevel === "warning"
+        ? styles.toneWarn
+        : attentionLevel === "good"
+          ? styles.toneGood
+          : styles.toneMuted;
+
   return (
     <article
-      className={`${styles.card} ${flagged ? styles.flagged : ""}`}
+      className={`${styles.card} ${toneClass} ${flagged ? styles.flagged : ""}`}
       data-flagged={flagged ? "1" : "0"}
     >
       <div className={styles.inner}>
@@ -135,9 +161,16 @@ export default function ClientHeaderCard({
         </div>
 
         <div className={styles.pillRow}>
-          {pct != null ? (
+          {programAdherence && programAdherence.scheduled > 0 ? (
             <span className={pillClass(adVariant)}>
-              {Math.round(pct)}% adherence
+              Adherence {programAdherence.completed}/{programAdherence.scheduled}
+            </span>
+          ) : adherencePct != null ? (
+            <span className={pillClass(adVariant)}>Adherence {adherencePct}%</span>
+          ) : null}
+          {progress && progress.totalWeeks > 0 ? (
+            <span className={pillClass("muted")}>
+              Progress W{progress.currentWeek}/{progress.totalWeeks}
             </span>
           ) : null}
           <span className={pillClass(streakPillVariant)}>{streakDays}d streak</span>
@@ -161,6 +194,16 @@ export default function ClientHeaderCard({
               <span> · {attentionDetail}</span>
             </p>
           </div>
+        ) : attentionDetail ? (
+          <p className={styles.reasonLine}>{attentionDetail}</p>
+        ) : null}
+
+        {standingNote !== undefined ? (
+          <CoachStandingNote
+            clientId={clientId}
+            initialNote={standingNote}
+            onSaved={onStandingNoteSaved}
+          />
         ) : null}
       </div>
     </article>

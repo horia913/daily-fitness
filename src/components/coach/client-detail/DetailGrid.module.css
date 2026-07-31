@@ -13,7 +13,7 @@
   align-items: center;
   gap: 10px;
   padding: 11px 12px;
-  background: var(--fc-surface-card);
+  background: transparent;
 }
 
 .icon {
@@ -30,9 +30,9 @@
   color: var(--fc-set-type-straight);
 }
 
-.iconLime {
-  background: color-mix(in srgb, var(--fc-accent-lime) 18%, transparent);
-  color: var(--fc-accent-lime-2);
+.iconAction {
+  background: var(--fc-accent-dim);
+  color: var(--fc-accent);
 }
 
 .iconGood {
@@ -61,7 +61,7 @@
 }
 
 .label {
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 9.5px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -70,7 +70,7 @@
 }
 
 .value {
-  font-family: var(--font-geist-sans, ui-sans-serif);
+  font-family: var(--font-body);
   font-size: 12.5px;
   font-weight: 500;
   color: var(--fc-text-primary);

@@ -1,0 +1,66 @@
+# COACH HOME — Full-width report
+**Date:** 2026-07-06  
+**Route:** `/coach` → `src/app/coach/page.tsx`
+
+---
+
+## 1. Files changed
+
+| Path | Change |
+|------|--------|
+| `src/app/coach/page.tsx` | Shell `data-7xl` → `canvas-full` |
+| `src/components/coach/home/coachHomePage.module.css` | Queue grid rebalance for full-width |
+| `src/components/coach/CoachHomeTriage.tsx` | Loading skeleton wrapped in `.page` (gutter parity) |
+
+**Not changed:** `CoachPageShell.tsx`, API/triage logic, `CoachHomeQueues.tsx` behavior, other coach routes.
+
+---
+
+## 2. Shell variant
+
+**Before:** `CoachPageShell widthVariant="data-7xl"` (`max-w-7xl` ≈ 1280px cap)  
+**After:** `CoachPageShell widthVariant="canvas-full"` (`max-w-none`) + `className="!p-0"`
+
+Matches Programs list (`src/app/coach/programs/page.tsx`) exactly.
+
+Page gutters come from `coachHomePage.module.css` `.page` — same rhythm as Programs (`26px 20px` → `28px` @640 → `32px` @1024).
+
+---
+
+## 3. How the layout fills (rebalance)
+
+| Region | Full-width behavior |
+|--------|---------------------|
+| **Header** | Full width within gutters; eyebrow + greeting + ghost CTA unchanged |
+| **Stat strip** | 6-column grid @≥1024px — **spreads across full canvas** (intentional open strip) |
+| **Queue grid (cols 1–2)** | `minmax(0, 1fr)` / `minmax(0, 1.45fr)` — **absorb extra width** on wide screens |
+| **Today / Quick actions (col 3)** | **Capped** `minmax(260px, 20rem)` @1024, `minmax(280px, 22rem)` @1280 — prevents ghost buttons and Today rows from stretching awkwardly wide |
+| **Gap @1280+** | `clamp(30px, 2.5vw, 48px)` — uses horizontal space between columns without over-spacing rows |
+
+Multi-column structure preserved: Need attention / Behind / Flagged | Inactive check-ins | Today + Quick actions.
+
+**Eyebrow judgment:** On ultrawide monitors with sparse queue data, columns 1–2 can feel horizontally roomy (long hairline rows, few items) — same density trade-off as Programs cards on a wide roster. Column 3 cap avoids the worst stretch. Stat strip six-across is the intended “dashboard at a glance” scan line; no cap added there.
+
+---
+
+## 4. `<1024px` stacking
+
+**Unchanged:**
+- `.queues` remains `flex-direction: column` below 1024px (30px gap)
+- Stat strip: 2 columns mobile, 3 @640px, 6 @1024px
+- `min-w-0` on columns and queue rows; ellipsis on names preserved
+- No new horizontal overflow introduced
+
+---
+
+## 5. TypeScript
+
+```
+npx tsc --noEmit → exit 0
+```
+
+---
+
+## Logic / data
+
+No fetch, handler, routing, or triage API changes. Presentation/CSS only.

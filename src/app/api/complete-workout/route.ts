@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
       }
       response.program_day = {
         program_assignment_id: result.programProgression.programAssignmentId,
-        program_schedule_id: result.programProgression.programScheduleId,
+        program_day_assignment_id: result.programProgression.programDayAssignmentId,
       }
     }
 

@@ -5,11 +5,7 @@
   padding: 14px;
   border-radius: 18px;
   border: 1px solid var(--fc-glass-border);
-  background: linear-gradient(
-    135deg,
-    var(--fc-surface-card) 0%,
-    rgba(52, 211, 153, 0.06) 100%
-  );
+  background: transparent;
 }
 
 .iconWrap {
@@ -34,7 +30,7 @@
 }
 
 .kicker {
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -43,7 +39,7 @@
 }
 
 .name {
-  font-family: var(--f-headline, var(--font-geist-sans));
+  font-family: var(--f-headline);
   font-weight: 600;
   font-size: 14px;
   color: var(--fc-text-primary);
@@ -56,7 +52,8 @@
 }
 
 .pctNum {
-  font-family: var(--f-display, var(--font-geist-sans));
+  font-family: var(--f-display);
+  font-stretch: 125%;
   font-weight: 700;
   font-size: 24px;
   line-height: 1;
@@ -77,7 +74,7 @@
 
 .pctLabel {
   margin-top: 4px;
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 9px;
   letter-spacing: 0.1em;
   text-transform: uppercase;

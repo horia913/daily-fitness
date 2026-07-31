@@ -1,8 +1,8 @@
 'use client'
 
 function rankColor(rank: number): string {
-  if (rank === 1) return 'var(--lime)'
-  if (rank === 2) return 'var(--cyan)'
+  if (rank === 1) return 'var(--fc-accent)'
+  if (rank === 2) return 'var(--fc-accent)'
   if (rank === 3) return 'var(--purple)'
   return 'var(--t3)'
 }
@@ -87,7 +87,7 @@ export function RankingRow({
       <span
         className="shrink-0 text-[14px] font-bold leading-none"
         style={{
-          fontFamily: 'var(--f-display, "Big Shoulders Display", sans-serif)',
+          fontFamily: 'var(--f-display, var(--f-display), sans-serif)',
           color: pctColor(pct, empty),
         }}
       >

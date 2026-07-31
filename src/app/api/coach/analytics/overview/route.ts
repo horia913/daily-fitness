@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getPeriodBounds } from '@/lib/metrics/period'
-import { computeCurrentProgramWeekForAssignment } from '@/lib/programWeekCalendar'
+import { resolveInstanceWeeksForAssignments } from '@/lib/programInstanceResolver'
 
 function getPeriodForParam(period: string) {
   const now = new Date()
@@ -231,7 +231,7 @@ export async function GET(request: NextRequest) {
       supabase
         .from('program_assignments')
         .select(
-          'id, client_id, program_id, name, start_date, duration_weeks, status, progression_mode, pause_status, paused_at, pause_accumulated_days, timezone_snapshot, updated_at'
+          'id, client_id, program_id, name, start_date, status, progression_mode, pause_status, paused_at, pause_accumulated_days, timezone_snapshot, updated_at'
         )
         .in('client_id', clientIds)
         .eq('status', 'active')
@@ -397,7 +397,6 @@ export async function GET(request: NextRequest) {
       program_id: string
       name: string | null
       start_date: string | null
-      duration_weeks: number | null
       pause_status: string | null
       paused_at: string | null
       pause_accumulated_days: number | null
@@ -422,6 +421,14 @@ export async function GET(request: NextRequest) {
       pcts: number[]
       weekLabels: string[]
     }
+    // Canonical Week X of N (N = sum of instance phases, X = resolver in the
+    // client's timezone, clamped to N). Replaces the old UTC computation and the
+    // hardcoded duration fallback of 12.
+    const weekByAssign = await resolveInstanceWeeksForAssignments(
+      supabase,
+      uniqueAssigns.map((r) => r.id),
+    )
+
     const byProg = new Map<string, ProgramAgg>()
     for (const row of uniqueAssigns) {
       const pid = row.program_id
@@ -431,11 +438,12 @@ export async function GET(request: NextRequest) {
       }
       const g = byProg.get(pid)!
       g.clients.push(row)
-      const { week } = computeCurrentProgramWeekForAssignment(row, 'UTC')
-      const dw = row.duration_weeks && row.duration_weeks > 0 ? row.duration_weeks : 12
-      const pct = Math.min(100, Math.round((week / dw) * 100))
+      const wk = weekByAssign.get(row.id)
+      const week = wk?.currentWeek ?? 1
+      const dw = wk?.totalWeeks ?? 0
+      const pct = dw > 0 ? Math.min(100, Math.round((week / dw) * 100)) : 0
       g.pcts.push(pct)
-      g.weekLabels.push(`W${week}/${dw}`)
+      g.weekLabels.push(dw > 0 ? `W${week}/${dw}` : `W${week}`)
     }
 
     const inferType = (name: string) => {
@@ -456,7 +464,7 @@ export async function GET(request: NextRequest) {
           avgProgress,
           clientCount: g.clients.length,
           weekStatus: g.weekLabels[0] ?? '—',
-          color: 'bg-[color:var(--fc-accent-cyan)]',
+          color: 'bg-[color:var(--fc-accent)]',
         }
       })
       .sort((a, b) => b.clientCount - a.clientCount)

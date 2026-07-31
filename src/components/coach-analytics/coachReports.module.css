@@ -1,0 +1,127 @@
+/* Coach reports — two-column desktop layout (matches design/mockups/coach-reports.html) */
+
+.layout {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.rail {
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.tplGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 9px;
+}
+
+.secGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.clientTriggerMiss {
+  border-color: color-mix(in srgb, var(--fc-status-warning) 45%, transparent) !important;
+}
+
+.clientRequiredHint {
+  font-family: var(--f-mono, ui-monospace, monospace);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fc-status-warning);
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.sectionsCount {
+  font-family: var(--f-mono, ui-monospace, monospace);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--fc-accent);
+  border: 1px solid color-mix(in srgb, var(--fc-accent) 40%, transparent);
+  background: var(--fc-accent-dim);
+  border-radius: 999px;
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+
+.previewBox {
+  border: 1px dashed var(--line-2);
+  border-radius: 12px;
+  padding: 22px 16px;
+  text-align: center;
+}
+
+.previewEyebrow {
+  font-family: var(--f-mono, ui-monospace, monospace);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--t4);
+}
+
+.previewBody {
+  font-size: 11.5px;
+  color: var(--t3);
+  margin-top: 7px;
+  line-height: 1.5;
+}
+
+/* Mobile: keep Generate reachable while scrolling */
+.railGen {
+  position: sticky;
+  bottom: 6px;
+  z-index: 20;
+}
+
+@media (min-width: 640px) {
+  .tplGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 372px;
+    gap: 18px;
+    align-items: start;
+  }
+
+  .rail {
+    position: sticky;
+    top: 18px;
+  }
+
+  .tplGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .secGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+  }
+
+  /* Mobile sticky-bottom bar becomes in-flow summary card on desktop */
+  .railGen {
+    position: static !important;
+    bottom: auto !important;
+    z-index: auto !important;
+  }
+}

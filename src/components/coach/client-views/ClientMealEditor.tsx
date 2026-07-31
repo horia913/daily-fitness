@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React, { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -136,7 +136,7 @@ export default function ClientMealEditor({
         <div>
           <h2 className="text-lg font-bold fc-text-primary">Customize client meals</h2>
           <p className="text-xs fc-text-dim mt-0.5">
-            Swaps and portions apply only to this assignment — the master meal plan is unchanged.
+            Swaps and portions apply only to this assignment â€” the master meal plan is unchanged.
           </p>
         </div>
         {open ? <ChevronUp className="w-5 h-5 fc-text-dim" /> : <ChevronDown className="w-5 h-5 fc-text-dim" />}
@@ -172,19 +172,19 @@ export default function ClientMealEditor({
           </div>
 
           {loading ? (
-            <p className="text-sm fc-text-dim py-4 text-center">Loading…</p>
+            <p className="text-sm fc-text-dim py-4 text-center">Loadingâ€¦</p>
           ) : (
             <ul className="space-y-3">
               {lines.map((line) => (
                 <li
                   key={line.key}
-                  className="fc-glass-soft rounded-xl border border-[color:var(--fc-glass-border)] p-3 text-sm"
+                  className="bg-transparent rounded-xl border border-[color:var(--fc-glass-border)] p-3 text-sm"
                 >
                   <div className="flex flex-wrap justify-between gap-2">
                     <div>
                       <span className="font-medium fc-text-primary">{line.food_name}</span>
                       <span className="fc-text-dim ml-2">
-                        {line.quantity ?? '—'} {line.unit ?? ''}
+                        {line.quantity ?? 'â€”'} {line.unit ?? ''}
                       </span>
                       <div className="text-xs fc-text-dim mt-1">{mealName(line.meal_id)}</div>
                       {line.isAddedByOverride && <span className="fc-pill fc-pill-glass fc-text-info text-[10px] mt-1 inline-block">Added</span>}
@@ -295,23 +295,23 @@ export default function ClientMealEditor({
             </ul>
           )}
 
-          <div className="fc-glass-soft rounded-xl border border-[color:var(--fc-glass-border)] p-4 space-y-3">
+          <div className="bg-transparent rounded-xl border border-[color:var(--fc-glass-border)] p-4 space-y-3">
             <h4 className="text-sm font-semibold fc-text-primary">Food search (copy ID for swap)</h4>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 fc-text-dim" />
-              <Input className="pl-9" value={foodQuery} onChange={(e) => setFoodQuery(e.target.value)} placeholder="Search foods…" />
+              <Input className="pl-9" value={foodQuery} onChange={(e) => setFoodQuery(e.target.value)} placeholder="Search foodsâ€¦" />
             </div>
             <ul className="max-h-40 overflow-y-auto space-y-1 text-xs">
               {foodHits.map((f) => (
                 <li key={f.id} className="flex justify-between gap-2 fc-text-dim">
                   <span className="fc-text-primary truncate">{f.name}</span>
-                  <code className="shrink-0 select-all">{f.id.slice(0, 8)}…</code>
+                  <code className="shrink-0 select-all">{f.id.slice(0, 8)}â€¦</code>
                 </li>
               ))}
             </ul>
           </div>
 
-          <div className="fc-glass-soft rounded-xl border border-[color:var(--fc-glass-border)] p-4 space-y-2">
+          <div className="bg-transparent rounded-xl border border-[color:var(--fc-glass-border)] p-4 space-y-2">
             <h4 className="text-sm font-semibold fc-text-primary">Add food to a meal</h4>
             <select
               value={addMealId}

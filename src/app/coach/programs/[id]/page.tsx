@@ -21,12 +21,18 @@ import {
   Coffee,
   ChevronLeft,
   ChevronRight,
+  Copy,
 } from "lucide-react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { TrainingBlockService } from "@/lib/trainingBlockService";
-import { TrainingBlock, TRAINING_BLOCK_GOALS } from "@/types/trainingBlock";
+import { TrainingBlock } from "@/types/trainingBlock";
+import { phaseTypeDisplayLabel } from "@/lib/programs/periodizationStyles";
+import { ribbonBlockColor } from "@/lib/programs/periodizationRibbonColors";
 import { cn } from "@/lib/utils";
 import { getCategoryAccent } from "@/lib/workoutCategoryColors";
+import { sumTrainingBlockWeeks } from "@/lib/programs/stationBlockWeeks";
+import { useToast } from "@/components/ui/toast-provider";
+import { fetchApi } from "@/lib/apiClient";
 
 function templateCategoryString(t: WorkoutTemplate | undefined): string {
   if (!t) return "";
@@ -48,6 +54,7 @@ interface Program {
   target_audience: string;
   is_public?: boolean; // Optional - not in database schema
   is_active: boolean;
+  periodization_style?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -70,6 +77,7 @@ function displayDaySlotForScheduleRow(s: any): number | null {
 function ProgramDetailsContent() {
   const params = useParams();
   const router = useRouter();
+  const { addToast } = useToast();
   const programId = useMemo(() => String(params?.id || ""), [params]);
   const { performanceSettings } = useTheme();
 
@@ -79,6 +87,7 @@ function ProgramDetailsContent() {
     {}
   );
   const [loading, setLoading] = useState(true);
+  const [duplicating, setDuplicating] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState(1);
   const [trainingBlocks, setTrainingBlocks] = useState<TrainingBlock[]>([]);
   const [activeDetailBlockId, setActiveDetailBlockId] = useState<string | null>(null);
@@ -203,7 +212,8 @@ function ProgramDetailsContent() {
 
   const dayNames = ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Day 7"];
   const activeDetailBlock = trainingBlocks.find((b) => b.id === activeDetailBlockId) ?? null;
-  const totalWeeks = activeDetailBlock?.duration_weeks ?? program?.duration_weeks ?? 1;
+  const phaseTotalWeeks = sumTrainingBlockWeeks(trainingBlocks);
+  const totalWeeks = activeDetailBlock?.duration_weeks ?? (phaseTotalWeeks || 1);
 
   // Cumulative week offset before the active block — converts the relative selectedWeek
   // (1..totalWeeks shown in the UI) to the absolute week_number stored in program_schedule.
@@ -233,12 +243,9 @@ function ProgramDetailsContent() {
     return rowBlock === activeDetailBlockId;
   });
 
-  const GOAL_COLORS_DETAIL: Record<string, string> = {
-    hypertrophy: "#06b6d4", strength: "#f97316", power: "#ef4444",
-    peaking: "#a855f7", accumulation: "#3b82f6", conditioning: "#22c55e",
-    deload: "#6b7280", general_fitness: "#14b8a6", sport_specific: "#eab308",
-    custom: "#8b5cf6",
-  };
+
+  const blockTimelineColor = (block: TrainingBlock, index: number) =>
+    ribbonBlockColor(index, trainingBlocks.length);
 
   const difficultyBadgeClass =
     program.difficulty_level === "beginner"
@@ -259,12 +266,47 @@ function ProgramDetailsContent() {
               <ArrowLeft className="w-4 h-4 shrink-0" />
               Programs
             </Link>
-            <Link href={`/coach/programs/${program.id}/edit`}>
-              <Button size="sm" className="fc-btn fc-btn-primary h-9 font-semibold">
-                <Edit className="w-4 h-4 mr-1.5" />
-                Edit Program
-              </Button>
-            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link href={`/coach/programs/${program.id}/edit`}>
+                <Button size="sm" className="fc-btn fc-btn-primary h-9 font-semibold">
+                  <Edit className="w-4 h-4 mr-1.5" />
+                  Edit Program
+                </Button>
+              </Link>
+              <Button
+              size="sm"
+              variant="outline"
+              className="fc-btn fc-btn-secondary h-9 font-semibold"
+              disabled={duplicating}
+              onClick={async () => {
+                setDuplicating(true);
+                try {
+                  const res = await fetchApi(`/api/coach/programs/${program.id}/duplicate`, {
+                    method: "POST",
+                    credentials: "include",
+                  });
+                  const data = await res.json().catch(() => ({}));
+                  if (!res.ok) {
+                    throw new Error((data as { error?: string }).error || "Duplicate failed");
+                  }
+                  const newId = (data as { programId?: string }).programId;
+                  if (!newId) throw new Error("No program id returned");
+                  addToast({ title: "Program duplicated" });
+                  router.push(`/coach/programs/${newId}/edit`);
+                } catch (e) {
+                  addToast({
+                    title: e instanceof Error ? e.message : "Duplicate failed",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setDuplicating(false);
+                }
+              }}
+            >
+              <Copy className="w-4 h-4 mr-1.5" />
+              {duplicating ? "Duplicating…" : "Duplicate"}
+            </Button>
+            </div>
           </nav>
 
           <header className="space-y-2">
@@ -286,23 +328,28 @@ function ProgramDetailsContent() {
                 {program.name}
               </h1>
 
-              {/* Training block: single = goal badge, multi = timeline */}
-              {trainingBlocks.length === 1 && trainingBlocks[0] && (
+              {/* Training block: single = phase type badge, multi = timeline */}
+              {trainingBlocks.length === 1 && trainingBlocks[0] && (() => {
+                const phaseLabel = phaseTypeDisplayLabel(trainingBlocks[0], {
+                  periodizationStyle: program.periodization_style,
+                });
+                if (!phaseLabel) return null;
+                const blockColor = blockTimelineColor(trainingBlocks[0], 0);
+                return (
                 <div className="flex items-center gap-2 mb-2 mt-2">
                   <span
                     className="px-2.5 py-1 rounded-full text-xs font-semibold"
                     style={{
-                      background: `${GOAL_COLORS_DETAIL[trainingBlocks[0].goal]}20`,
-                      color: GOAL_COLORS_DETAIL[trainingBlocks[0].goal],
-                      border: `1px solid ${GOAL_COLORS_DETAIL[trainingBlocks[0].goal]}40`,
+                      background: `${blockColor}20`,
+                      color: blockColor,
+                      border: `1px solid ${blockColor}40`,
                     }}
                   >
-                    Goal: {trainingBlocks[0].goal === "custom" && trainingBlocks[0].custom_goal_label
-                      ? trainingBlocks[0].custom_goal_label
-                      : TRAINING_BLOCK_GOALS[trainingBlocks[0].goal]}
+                    {phaseLabel}
                   </span>
                 </div>
-              )}
+                );
+              })()}
               {trainingBlocks.length > 1 && (() => {
                 // Compute absolute start/end weeks for each block
                 let offset = 0;
@@ -320,7 +367,10 @@ function ProgramDetailsContent() {
                     <div className="flex flex-wrap gap-2 items-center">
                       {trainingBlocks.map((block, idx) => {
                         const isActive = block.id === activeDetailBlockId;
-                        const blockColor = GOAL_COLORS_DETAIL[block.goal];
+                        const blockColor = blockTimelineColor(block, idx);
+                        const phaseLabel = phaseTypeDisplayLabel(block, {
+                          periodizationStyle: program.periodization_style,
+                        });
                         const { startWeek, endWeek } = blockRanges[idx];
                         return (
                           <React.Fragment key={block.id}>
@@ -343,7 +393,7 @@ function ProgramDetailsContent() {
                                   : undefined
                               }
                             >
-                              {block.name} · Wks {startWeek}–{endWeek}
+                              {phaseLabel ? `${phaseLabel} · ` : ''}{block.name} · Wks {startWeek}–{endWeek}
                             </button>
                             {idx < trainingBlocks.length - 1 && (
                               <ChevronRight className="w-3 h-3 fc-text-dim" />
@@ -388,21 +438,21 @@ function ProgramDetailsContent() {
                 type="button"
                 variant="outline"
                 size="icon"
-                className="min-w-11 min-h-11 rounded-xl fc-surface border border-[color:var(--fc-glass-border)] text-[color:var(--fc-accent-cyan)] hover:bg-[color-mix(in_srgb,var(--fc-accent-cyan)_10%,transparent)]"
+                className="min-w-11 min-h-11 rounded-xl fc-surface border border-[color:var(--fc-glass-border)] text-[color:var(--fc-accent)] hover:bg-[color-mix(in_srgb,var(--fc-accent)_10%,transparent)]"
                 onClick={() => setSelectedWeek((prev) => Math.max(1, prev - 1))}
                 disabled={selectedWeek === 1}
                 aria-label="Previous week"
               >
                 <ChevronLeft className="w-5 h-5" />
               </Button>
-              <span className="text-lg font-bold rounded-xl px-4 py-1.5 bg-[color-mix(in_srgb,var(--fc-accent-cyan)_15%,transparent)] text-[color:var(--fc-accent-cyan)] tabular-nums">
+              <span className="text-lg font-bold rounded-xl px-4 py-1.5 bg-[color-mix(in_srgb,var(--fc-accent)_15%,transparent)] text-[color:var(--fc-accent)] tabular-nums">
                 Week {selectedWeek} of {totalWeeks}
               </span>
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
-                className="min-w-11 min-h-11 rounded-xl fc-surface border border-[color:var(--fc-glass-border)] text-[color:var(--fc-accent-cyan)] hover:bg-[color-mix(in_srgb,var(--fc-accent-cyan)_10%,transparent)]"
+                className="min-w-11 min-h-11 rounded-xl fc-surface border border-[color:var(--fc-glass-border)] text-[color:var(--fc-accent)] hover:bg-[color-mix(in_srgb,var(--fc-accent)_10%,transparent)]"
                 onClick={() => setSelectedWeek((prev) => Math.min(totalWeeks, prev + 1))}
                 disabled={selectedWeek === totalWeeks}
                 aria-label="Next week"
@@ -451,11 +501,11 @@ function ProgramDetailsContent() {
                             {label}
                           </span>
                         </div>
-                        <div className="text-sm truncate fc-text-dim transition-colors group-hover:text-[color:var(--fc-accent-cyan)]">
+                        <div className="text-sm truncate fc-text-dim transition-colors group-hover:text-[color:var(--fc-accent)]">
                           {templateName}
                         </div>
                       </div>
-                      <ChevronRight className="w-4 h-4 shrink-0 text-[color:color-mix(in_srgb,var(--fc-accent-cyan)_80%,transparent)] transition-colors group-hover:text-[color:var(--fc-accent-cyan)]" aria-hidden />
+                      <ChevronRight className="w-4 h-4 shrink-0 text-[color:color-mix(in_srgb,var(--fc-accent)_80%,transparent)] transition-colors group-hover:text-[color:var(--fc-accent)]" aria-hidden />
                     </Link>
                   );
                 }

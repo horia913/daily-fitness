@@ -1,0 +1,277 @@
+# AUDIT (READ-ONLY) — Program blocks / phases for collection-card structure strip
+**Date:** 2026-07-05  
+**Purpose:** Determine what `training_blocks` carries so the Programs list can drive the Element 16 structure strip (name + duration + `--phase-*` color).  
+**Ground truth:** Live Supabase DB (service-role queries, 2026-07-05) + PostgREST OpenAPI catalog. Repo CSV/schema snapshot is stale for `training_blocks`.
+
+---
+
+## Method
+
+- **Schema:** PostgREST OpenAPI export from live project (`/rest/v1/?Accept=application/openapi+json`) — reflects current `information_schema` for exposed tables. Direct `information_schema` SQL was not callable via REST (no general-purpose SQL RPC); OpenAPI is the live catalog mirror used here.
+- **Rows:** `training_blocks` + `workout_programs` queried via Supabase JS (service role).
+- **Code cross-check:** `src/types/trainingBlock.ts`, `src/lib/programs/periodizationStyles.ts`, migrations (esp. `20260705_step12_final_gated_drop.sql`).
+
+---
+
+## PART 1 — Schema (`public.training_blocks`)
+
+### Current columns (live DB — confirmed)
+
+| column | type | nullable | default | notes |
+|--------|------|----------|---------|-------|
+| `id` | `uuid` | NO | `gen_random_uuid()` | PK |
+| `program_id` | `uuid` | NO | — | FK → `workout_programs.id` ON DELETE CASCADE |
+| `name` | `text` | NO | — | Coach-facing block/phase **title** |
+| `duration_weeks` | `integer` | NO | `4` | Segment width in weeks |
+| `block_order` | `integer` | NO | `1` | **Sequence / ordering** column |
+| `phase_label` | `text` | YES | — | Coach-editable phase **type** (free text; not a DB enum) |
+| `notes` | `text` | YES | — | Optional; **0 rows populated** in live data |
+| `created_at` | `timestamptz` | YES | `now()` | Tie-break sort when `block_order` ties |
+| `updated_at` | `timestamptz` | YES | `now()` | |
+
+**Index:** `idx_training_blocks_program` on `(program_id, block_order)` (from migration).
+
+### Retired columns (post–Step 12 — NOT in live DB)
+
+Dropped by `20260705_step12_final_gated_drop.sql` (confirmed absent from OpenAPI):
+
+| column | was |
+|--------|-----|
+| `goal` | TEXT NOT NULL DEFAULT `'custom'` — enum-like in app (`hypertrophy`, `strength`, `deload`, …) |
+| `custom_goal_label` | TEXT nullable |
+| `progression_profile` | TEXT DEFAULT `'none'` |
+
+**Implication:** The old explicit “goal/intensity” signal on blocks is **gone**. `phase_label` is the intended replacement for phase **type**, but it is nullable free text with no CHECK constraint.
+
+### FK to program
+
+```
+training_blocks.program_id → workout_programs.id (ON DELETE CASCADE)
+```
+
+Related program-level field (not on block, but used by station UI for phase-type presets):
+
+| table | column | type | notes |
+|-------|--------|------|-------|
+| `workout_programs` | `periodization_style` | `text` nullable | App enum: `block`, `linear_4`, `hsp_peak`, `gpp_spp`, `seasonal`, `custom` — drives **UI presets** in `periodizationStyles.ts`, not stored per block |
+
+### Block-level fields relevant to structure strip
+
+| Need | Column | Present? |
+|------|--------|----------|
+| Label / name | `name` | ✓ always populated |
+| Phase type (text) | `phase_label` | ✓ column exists; **almost always NULL** in live data |
+| Duration | `duration_weeks` | ✓ always populated |
+| Order | `block_order` | ✓ |
+| Intensity enum | `goal` | ✗ **dropped** |
+| Notes | `notes` | ✓ column; unused in data |
+
+---
+
+## PART 2 — Real rows
+
+### Target program: `d505a552-ead9-4bf6-9068-1d5209f1398c` (“test nou 1”)
+
+Coach: `b6014e58-f696-4606-bc63-d7707a21d5f1`  
+`workout_programs.periodization_style`: **null**
+
+| block_order | name | phase_label | duration_weeks | notes |
+|-------------|------|-------------|----------------|-------|
+| 1 | Block 1 | *(null)* | 9 | null |
+| 2 | Phase 2 | **test** | 4 | null |
+
+**Total weeks (blocks):** 13. Two segments; only second has a `phase_label` (non-standard string `"test"`).
+
+---
+
+### Additional coach programs (same coach `b6014e58-…`)
+
+**Coach has 20 programs; 20 have ≥1 block (23 block rows total).**
+
+#### A. `27d4e0b4-fca2-42a1-b94f-763970195e19` (“test nou 2”) — only program with `periodization_style` set
+
+`periodization_style`: **`linear_4`** (preset: Foundation / Accumulation / Intensification / Realization)
+
+| block_order | name | phase_label | duration_weeks |
+|-------------|------|-------------|----------------|
+| 1 | Block 1 | *(null)* | 8 |
+
+**Note:** Periodization style is set at program level, but blocks were **not** expanded or labeled with preset phase names — still a **single** generic block.
+
+#### B. `77231524-d10e-4b8d-97f7-e6bc7405851c` (“TS 4-Week Program”) — only other **multi-block** program for this coach
+
+| block_order | name | phase_label | duration_weeks |
+|-------------|------|-------------|----------------|
+| 1 | TS 4-Week Program - Phase 1 | *(null)* | 4 |
+| 2 | 1 | *(null)* | 4 |
+| 3 | 2 | *(null)* | 4 |
+
+Names are legacy seed + numeric placeholders; no phase labels.
+
+#### C. `c663975b-d8ba-4afa-a564-228f49ebcb7e` (“Roxi Test 1”) — single block, somewhat meaningful name
+
+| block_order | name | phase_label | duration_weeks |
+|-------------|------|-------------|----------------|
+| 1 | Hypertrophy 1 | *(null)* | 4 |
+
+#### D. Typical single-block pattern (majority)
+
+Examples: `Block 1` (8 programs), `{Program name} - Phase 1` (11 programs), `Glute Hypertrophy 1 - Phase 1`, etc. — all `phase_label` null.
+
+---
+
+### Global block distribution (all coaches, live DB)
+
+| metric | value |
+|--------|-------|
+| Total `training_blocks` rows | 23 |
+| Programs with blocks | 20 |
+| Single-block programs | **18** (90%) |
+| Multi-block programs | **2** (10%) |
+| Max blocks per program | 3 |
+| Rows with non-null `phase_label` | **1** / 23 (`"test"` only) |
+| Rows with non-null `notes` | **0** |
+
+**Multi-block programs (global):** only `d505a552-…` (2 blocks) and `77231524-…` (3 blocks).
+
+---
+
+## PART 3 — The phase signal (decision input)
+
+### 3.1 Explicit intensity / phase field?
+
+| Field | Status |
+|-------|--------|
+| `goal` / `progression_profile` | **Retired** — not queryable |
+| `phase_label` | **Exists** — free-text `text`, nullable, **no enum**. Distinct live values: **`["test"]` only** (1 row). |
+| `workout_programs.periodization_style` | Program-level preset selector; **does not auto-sync** to block rows. Only 1/20 coach programs set (`linear_4`); that program still has 1 unnamed block. |
+
+**Conclusion:** There is **no reliable explicit intensity field** populated in production data. `phase_label` is the designed hook but is effectively empty.
+
+### 3.2 Are block names meaningful?
+
+**Live name patterns (23 rows):**
+
+| pattern | count | examples |
+|---------|-------|----------|
+| Generic `Block 1` | 8 | Block 1 |
+| Auto-seed `… - Phase 1` | 11 | `test 1 - Phase 1`, `Glute Hypertrophy 1 - Phase 1` |
+| Numeric only | 2 | `1`, `2` |
+| Partially meaningful | 2–3 | `Hypertrophy 1`, `Phase 2` |
+| Keyword-rich (foundation/deload/peak/…) in name+label | 3 | includes `Hypertrophy 1`; no deload/foundation/peak in DB |
+
+Names are **mostly generic** or program-title echoes, not consistent training-phase vocabulary.
+
+### 3.3 Segment order column
+
+**`block_order`** (integer, NOT NULL). App also tie-breaks on `created_at` when orders collide (`TrainingBlockService`).
+
+### 3.4 Single vs multi-block prevalence
+
+- **Most programs (90%) are single-block** — one segment spanning full program length.
+- Multi-block authoring is rare in live data; when present, labels are often unstructured.
+
+---
+
+## PART 4 — Recommendation
+
+### 4.1 Can the structure strip work as designed?
+
+**Partially — with fallbacks, not as the mockup implies out of the box.**
+
+| strip ingredient | data reality |
+|------------------|--------------|
+| **Duration** (`flex` width) | ✓ Always available (`duration_weeks`) |
+| **Segment label** | △ `name` always present but often generic; `phase_label` almost never set |
+| **Intensity color** (`--phase-light/mod/hard/deload`) | ✗ No populated enum; retired `goal`; names rarely encode intensity |
+
+**As designed** (Foundation → Hypertrophy → Peak → Deload with semantic colors) works only when coaches **name blocks** or **set `phase_label`** with recognizable phase words — **not true for current data**.
+
+**Pragmatic build behavior:**
+
+1. **Multi-block (≥2 blocks):** Show strip with durations; label from `phase_label ?? cleaned name`; color from hybrid mapper below.
+2. **Single-block:** **Omit strip** (Element 16: optional) **or** show one muted segment (duration only, neutral/`--phase-light`) — mockup strip adds little when 90% are one blob.
+3. **Unstructured multi-block** (numeric names, null labels): Still show proportional bar; use order-based colors + generic labels (`Phase 1`, `Phase 2`) rather than fake semantic names.
+
+### 4.2 Best block → phase-color signal (recommended hybrid)
+
+**Priority order** (first match wins):
+
+1. **`phase_label` keyword heuristic** (when non-null)  
+   Map case-insensitive tokens:  
+   - `--phase-deload`: deload, recovery, taper, unload  
+   - `--phase-hard`: peak, intensification, realization, power, competition, max  
+   - `--phase-mod`: hypertrophy, accumulation, strength, build, spp  
+   - `--phase-light`: foundation, gpp, base, offseason, anatomical  
+
+2. **`name` keyword heuristic** (same dictionary on `name` if `phase_label` empty)  
+   Catches `Hypertrophy 1`, `Phase 2` only when keyword matches.
+
+3. **`periodization_style` + `block_order` preset slot** (when program has preset style **and** block count matches preset length)  
+   Example `linear_4` block 1→Foundation→light, 2→Accumulation→mod, 3→Intensification→hard, 4→Realization→hard.  
+   **Only applies when** coach has created N blocks aligned with preset — **not** today’s data (test nou 2 has 1 block).
+
+4. **Order-based ramp** (fallback for multi-block, no keyword hit)  
+   - 1 block: light (or omit strip)  
+   - 2 blocks: light → mod (or mod → hard)  
+   - 3+ blocks: light → mod → hard (last segment hard unless deload keyword)  
+   - If last block name/label matches deload → `--phase-deload`  
+
+**Why hybrid:** Explicit field is the right long-term signal but **unpopulated**; `goal` is gone; names are **sparse**; order ramp gives a readable bar for unstructured multi-block without lying about phase names.
+
+**Do not** resurrect `goal` or require coaches to fill new fields for list v1.
+
+### 4.3 Fallback when signal is weak
+
+| situation | strip behavior |
+|-----------|----------------|
+| **0 blocks** (edge) | Omit strip; total weeks from `getMasterProgramTotalWeeksBatch` still on meta line |
+| **1 block, generic name** | **Omit structure strip** (recommended) — card meta already shows total weeks |
+| **1 block, meaningful name** (e.g. “Hypertrophy 1”) | Optional single segment: name + `{n} weeks`, color from name heuristic or `--phase-mod` default |
+| **Multi-block, all generic** | Show bar + `Phase {block_order}` labels + order-based colors |
+| **`phase_label` nonsense** (e.g. `"test"`) | Treat as free text label only; color falls through to order ramp |
+
+### Display label for strip segment (under bar)
+
+Use existing station convention (`formatPhaseDisplayName` / `clientPhaseChipLabel` logic):
+
+```
+displayLabel = phase_label?.trim() || name (strip " - Phase 1" suffix) || `Phase ${block_order}`
+```
+
+Never show raw `"Block 1"` if `periodization_style` is preset and order maps to preset name — **future** when data is aligned.
+
+---
+
+## Summary table for Programs list build
+
+| data point | source | list fetch today? |
+|------------|--------|-------------------|
+| Blocks per program | `training_blocks` WHERE `program_id` ORDER `block_order` | **Not** on `GET /api/coach/programs` — **add** batch fetch or extend API |
+| Total weeks | `SUM(duration_weeks)` | ✓ already via `getMasterProgramTotalWeeksBatch` |
+| Phase colors | **Derive** in UI — not a DB column | N/A |
+| Periodization preset | `workout_programs.periodization_style` | Include in list API for mapper |
+
+---
+
+## Confirming vs inferring
+
+| claim | status |
+|-------|--------|
+| Column list / dropped `goal` | **Confirmed** — live OpenAPI + migration |
+| Row samples for cited UUIDs | **Confirmed** — live query |
+| Global 18/20 single-block | **Confirmed** — live aggregate |
+| `phase_label` enum | **Confirmed absent** — free text; only `"test"` in DB |
+| `information_schema` direct SQL | **Not run** — OpenAPI used as live catalog equivalent |
+| Coaches will fill `phase_label` over time | **Inferring** — column + station UI exist; adoption not evidenced |
+
+---
+
+## Files referenced (read-only)
+
+- `migrations/20260228_phase2_training_blocks.sql` — original table  
+- `migrations/20260705_step12_final_gated_drop.sql` — drop `goal` / keep `phase_label`  
+- `src/lib/programs/periodizationStyles.ts` — preset phase names  
+- `src/types/trainingBlock.ts` — app type  
+
+**No code, git, or migrations changed.**

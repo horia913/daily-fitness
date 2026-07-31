@@ -184,83 +184,97 @@ export async function sendNotification({
   return results
 }
 
-// Notification service for frontend components
+import {
+  deleteNotification,
+  getUnreadNotificationCount,
+  listNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  type InAppNotification,
+} from '@/lib/inAppNotificationService'
+
+function toNotificationData(n: InAppNotification): NotificationData {
+  const typeKey = n.type_key
+  let type: NotificationData['type'] = 'general'
+  if (typeKey.includes('workout') || typeKey.includes('program')) type = 'workout'
+  else if (typeKey.includes('achievement') || typeKey.includes('pr')) type = 'achievement'
+  else if (typeKey.includes('checkin') || typeKey.includes('note')) type = 'session'
+  else if (typeKey.includes('due') || typeKey.includes('missed')) type = 'reminder'
+
+  return {
+    id: n.id,
+    title: n.title,
+    message: n.body ?? '',
+    timestamp: new Date(n.created_at),
+    read: n.read_at != null,
+    type,
+  }
+}
+
+/** Frontend notification service — in-app feed backed by `notifications` table. */
 export const notificationService = {
   initialize(): void {
-    // Initialize the notification service
-    console.log('Notification service initialized')
+    // no-op (push init lives in OneSignalProvider)
   },
-  
+
   canSendNotifications(): boolean {
-    // Check if notifications are supported and permission is granted
     if (typeof window === 'undefined') return false
     return 'Notification' in window && Notification.permission === 'granted'
   },
-  
+
   async getNotifications(): Promise<NotificationData[]> {
-    // This would typically fetch from your database
-    // For now, return empty array as we're just setting up OneSignal
-    return []
+    const rows = await listNotifications({ limit: 80 })
+    return rows.map(toNotificationData)
   },
-  
+
   async getUnreadCount(): Promise<number> {
-    // This would typically fetch from your database
-    // For now, return 0 as we're just setting up OneSignal
-    return 0
+    return getUnreadNotificationCount()
   },
-  
+
   async requestPermission(): Promise<{ granted: boolean }> {
     if (typeof window === 'undefined') return { granted: false }
     if (!('Notification' in window)) return { granted: false }
-    
+
     const permission = await Notification.requestPermission()
     return { granted: permission === 'granted' }
   },
-  
+
   async sendWorkoutReminder(workoutName: string, scheduledTime: string): Promise<void> {
-    // This would send a workout reminder notification
     console.log('Sending workout reminder:', workoutName, scheduledTime)
   },
-  
+
   async sendAchievementNotification(achievementName: string, description: string): Promise<void> {
-    // This would send an achievement notification
     console.log('Sending achievement notification:', achievementName, description)
   },
-  
+
   async sendWorkoutCompleteNotification(workoutName: string, duration: number): Promise<void> {
-    // This would send a workout complete notification
     console.log('Sending workout complete notification:', workoutName, duration)
   },
-  
+
   async sendMessageNotification(senderName: string, message: string): Promise<void> {
-    // Deprecated - messaging moved to WhatsApp
     console.log('Message notifications disabled - use WhatsApp for coach-client communication')
   },
-  
+
   async sendGoalReminder(goalName: string, progress: string): Promise<void> {
-    // This would send a goal reminder notification
     console.log('Sending goal reminder:', goalName, progress)
   },
-  
+
   async sendNotification(params: { type: string; title: string; body: string; userId: string }): Promise<void> {
-    // This would send a generic notification
     console.log('Sending notification:', params)
   },
-  
+
   async markAsRead(notificationId: string): Promise<void> {
-    // This would update your database
-    console.log('Marking notification as read:', notificationId)
+    await markNotificationRead(notificationId)
   },
-  
+
   async markAllAsRead(): Promise<void> {
-    // This would update your database
-    console.log('Marking all notifications as read')
+    await markAllNotificationsRead()
   },
-  
+
   async clearAllNotifications(): Promise<void> {
-    // This would clear all notifications from database
-    console.log('Clearing all notifications')
-  }
+    const rows = await listNotifications({ limit: 200 })
+    await Promise.all(rows.map((n) => deleteNotification(n.id)))
+  },
 }
 
 // Notification templates

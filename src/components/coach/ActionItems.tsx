@@ -1,6 +1,6 @@
 /**
  * @deprecated This component uses hardcoded placeholder data and is not currently used.
- * Alerts are now handled directly in the coach dashboard page via getMorningBriefing().
+ * Coach attention alerts come from classifyCoachClientAttention (Briefing / clients list / Overview).
  * This file is kept for reference but should not be imported or used.
  */
 

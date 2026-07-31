@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Coach — Clients grid</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root{
+    --bg:#0A0B0D; --card:#0B0C0F; --raised:#101318;
+    --hairline:rgba(255,255,255,.07); --hairline-2:rgba(255,255,255,.12);
+    --accent:#2E7BFF; --good:#22E56A; --warn:#FFB020; --bad:#FF5A4D;
+    --text:#EEF1F5; --dim:#98A2B3; --subtle:#5C6470;
+    --f-display:'Archivo',sans-serif; --f-body:'Inter',sans-serif; --f-mono:'JetBrains Mono',monospace;
+  }
+  body{ background:var(--bg); color:var(--text); font-family:var(--f-body); -webkit-font-smoothing:antialiased; }
+  .disp{ font-family:var(--f-display); font-stretch:125%; }
+  .page{ max-width:1200px; margin:0 auto; padding:24px 40px 70px; }
+  .note{ font-size:12.5px; line-height:1.65; color:var(--dim); border-left:2px solid var(--accent); padding-left:14px; margin-bottom:22px; }
+  .note b{ color:var(--text); }
+
+  .grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+  .gcard{ position:relative; background:var(--card); border:1px solid rgba(255,255,255,.09); border-radius:16px; padding:18px 20px 16px 24px; overflow:hidden; }
+  .gcard::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--hue,var(--subtle)); z-index:3; }
+  .gcard::after{ content:""; position:absolute; right:0; top:0; width:55%; height:60%; z-index:1; pointer-events:none; background:radial-gradient(90% 100% at 100% 0%, color-mix(in srgb, var(--hue,var(--subtle)) 14%, transparent), transparent 65%); }
+  .gcard.inactive{ opacity:.6; --hue:var(--subtle); }
+
+  .ghead{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; position:relative; z-index:2; }
+  .who{ display:flex; align-items:center; gap:11px; min-width:0; }
+  .avatar{ width:34px; height:34px; border-radius:50%; background:var(--raised); border:1px solid var(--hairline-2); display:flex; align-items:center; justify-content:center; font-family:var(--f-mono); font-size:12px; font-weight:700; color:var(--dim); flex-shrink:0; }
+  .nm{ min-width:0; }
+  .nm .n{ font-size:16px; font-weight:700; letter-spacing:-.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .nm .e{ font-family:var(--f-mono); font-size:10px; color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+  .status{ display:inline-flex; align-items:center; gap:6px; font-family:var(--f-mono); font-size:9px; letter-spacing:.1em; text-transform:uppercase; padding:4px 9px; border-radius:999px; flex-shrink:0; }
+  .status .d{ width:5px; height:5px; border-radius:50%; }
+  .status.good{ color:var(--good); background:rgba(34,229,106,.1); } .status.good .d{ background:var(--good); }
+  .status.mute{ color:var(--dim); background:rgba(255,255,255,.05); } .status.mute .d{ background:var(--dim); }
+
+  .gbody{ display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-top:16px; position:relative; z-index:2; }
+  .stats{ display:flex; flex-direction:column; gap:7px; flex:1; }
+  .srow{ display:flex; align-items:center; justify-content:space-between; gap:12px; font-family:var(--f-mono); font-size:11px; }
+  .srow .k{ color:var(--dim); letter-spacing:.04em; }
+  .srow .v{ color:var(--text); } .srow .v.warnv{ color:var(--warn); } .srow .v.dimv{ color:var(--dim); }
+
+  .ringwrap{ text-align:center; flex-shrink:0; }
+  .ring{ position:relative; width:54px; height:54px; }
+  .ring svg{ transform:rotate(-90deg); }
+  .ring .val{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:var(--f-mono); font-size:15px; font-weight:700; }
+  .ringwrap .tier{ font-family:var(--f-mono); font-size:8px; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); margin-top:5px; }
+  .noscore{ width:54px; height:54px; display:flex; align-items:center; justify-content:center; font-family:var(--f-mono); font-size:22px; font-weight:700; color:var(--subtle); }
+  .noscore-l{ font-family:var(--f-mono); font-size:8px; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); margin-top:5px; }
+
+  .gfoot{ margin-top:16px; padding-top:12px; border-top:1px solid var(--hairline); font-family:var(--f-mono); font-size:11px; color:var(--dim); letter-spacing:.03em; position:relative; z-index:2; display:flex; align-items:center; gap:8px; }
+  .gfoot .ic{ color:var(--subtle); } .gfoot .v{ color:var(--text); } .gfoot.none{ color:var(--dim); }
+
+  @media (max-width:900px){ .grid{ grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="note"><b>Grid view — harmonized.</b> The existing rich grid card (stats + ring + program), moved into the collection-card dark language: hue <b>left rail</b> + a soft corner glow (attention color), tier-colored score ring, and the <b>same staleness rule</b> as the list — Popescu's stale score shows "—", not the old 0. Toggle stays; this is what grid mode becomes.</div>
+
+  <div class="grid">
+
+    <!-- Popescu: on track, stale score suppressed -->
+    <div class="gcard" style="--hue:var(--good)">
+      <div class="ghead">
+        <div class="who"><span class="avatar">CP</span><div class="nm"><div class="n">Client Popescu</div><div class="e">client@test.com</div></div></div>
+        <span class="status good"><span class="d"></span>On track</span>
+      </div>
+      <div class="gbody">
+        <div class="stats">
+          <div class="srow"><span class="k">Last activity</span><span class="v">3d ago</span></div>
+          <div class="srow"><span class="k">Last check-in</span><span class="v warnv">19w ago</span></div>
+          <div class="srow"><span class="k">Workouts / wk</span><span class="v">2</span></div>
+        </div>
+        <div class="ringwrap"><div class="noscore">—</div><div class="noscore-l">no score</div></div>
+      </div>
+      <div class="gfoot"><span class="ic">▦</span><span class="v">test nou 1</span> · Week 1 of 13</div>
+    </div>
+
+    <!-- e t: no program, no score -->
+    <div class="gcard" style="--hue:var(--subtle)">
+      <div class="ghead">
+        <div class="who"><span class="avatar">ET</span><div class="nm"><div class="n">e t</div><div class="e">testfinal@test.com</div></div></div>
+        <span class="status mute"><span class="d"></span>No program</span>
+      </div>
+      <div class="gbody">
+        <div class="stats">
+          <div class="srow"><span class="k">Last activity</span><span class="v dimv">Never</span></div>
+          <div class="srow"><span class="k">Last check-in</span><span class="v dimv">Never</span></div>
+          <div class="srow"><span class="k">Workouts / wk</span><span class="v dimv">0</span></div>
+        </div>
+        <div class="ringwrap"><div class="noscore">—</div><div class="noscore-l">no score</div></div>
+      </div>
+      <div class="gfoot none"><span class="ic">▦</span>No program</div>
+    </div>
+
+    <!-- Roxana: 100 beast_mode (not stale — no recent activity) -->
+    <div class="gcard" style="--hue:var(--subtle)">
+      <div class="ghead">
+        <div class="who"><span class="avatar">RM</span><div class="nm"><div class="n">Roxana Micu</div><div class="e">roxanamicu98@gmail.com</div></div></div>
+        <span class="status mute"><span class="d"></span>No program</span>
+      </div>
+      <div class="gbody">
+        <div class="stats">
+          <div class="srow"><span class="k">Last activity</span><span class="v dimv">Never</span></div>
+          <div class="srow"><span class="k">Last check-in</span><span class="v">8w ago</span></div>
+          <div class="srow"><span class="k">Workouts / wk</span><span class="v dimv">0</span></div>
+        </div>
+        <div class="ringwrap">
+          <div class="ring"><svg viewBox="0 0 54 54"><circle cx="27" cy="27" r="22" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="4"/><circle cx="27" cy="27" r="22" fill="none" stroke="#0369A1" stroke-width="4" stroke-linecap="round" stroke-dasharray="138" stroke-dashoffset="0"/></svg><span class="val" style="color:#0369A1">100</span></div>
+          <div class="tier">Beast Mode</div>
+        </div>
+      </div>
+      <div class="gfoot none"><span class="ic">▦</span>No program</div>
+    </div>
+
+    <!-- Bob: 73 showing_up -->
+    <div class="gcard" style="--hue:var(--subtle)">
+      <div class="ghead">
+        <div class="who"><span class="avatar">BP</span><div class="nm"><div class="n">Bob Persona</div><div class="e">bob.test@dailyfitness.app</div></div></div>
+        <span class="status mute"><span class="d"></span>No program</span>
+      </div>
+      <div class="gbody">
+        <div class="stats">
+          <div class="srow"><span class="k">Last activity</span><span class="v dimv">Never</span></div>
+          <div class="srow"><span class="k">Last check-in</span><span class="v dimv">Never</span></div>
+          <div class="srow"><span class="k">Workouts / wk</span><span class="v dimv">0</span></div>
+        </div>
+        <div class="ringwrap">
+          <div class="ring"><svg viewBox="0 0 54 54"><circle cx="27" cy="27" r="22" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="4"/><circle cx="27" cy="27" r="22" fill="none" stroke="#06B6D4" stroke-width="4" stroke-linecap="round" stroke-dasharray="138" stroke-dashoffset="37"/></svg><span class="val" style="color:#06B6D4">73</span></div>
+          <div class="tier">Showing Up</div>
+        </div>
+      </div>
+      <div class="gfoot none"><span class="ic">▦</span>No program</div>
+    </div>
+
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,36 @@
+ONE-PAGE WORKOUT VIEW — Step 1 (display only)
+Date: 2026-07-19
+
+1. Files modified / created
+Created:
+- src/components/client/workout-execution/ExecGroupList.tsx
+- src/components/client/workout-execution/execGroupList.module.css
+- src/components/client/workout-execution/execGroupListHelpers.ts
+
+Modified:
+- src/app/client/workouts/[id]/start/page.tsx
+  (wraps the existing LiveWorkoutSetEntryExecutor in ExecGroupList)
+
+2. How the group list is built
+- Renders every entry in `workoutSetEntries` in order.
+- Position vs `currentSetEntryIndex`:
+  - index < current → done: muted header (hue dot + name + ✓ per completed set). No set lines.
+  - index === current → header (dot + name + “N sets”) + `currentSlot` (the one live executor).
+  - index > current → upcoming: header + one thin SetUnitRow per set with that set’s target.
+
+3. Upcoming per-set targets
+- `formatUpcomingSetTargetSummary` calls `resolveSetPrescriptionTargets(exercise, setNumber, reps_per_set)` for each set 1…N — same per-set path as the live card (not a single flattened target).
+- Solo: e.g. `8 × 60 kg` / `8 reps` / timed / distance.
+- Grouped (superset / giant / pre-exhaustion): e.g. `A1 4×100 · A2 8×68 · A3 10`.
+
+4. Only current group renders an executor
+- Confirmed: `currentSlot` is a single `LiveWorkoutSetEntryExecutor` for `workoutSetEntries[currentSetEntryIndex]`. Done/upcoming are display-only.
+
+5. Scroll-to-current
+- Ref on the current group; `scrollIntoView({ block: "start" })` on load (`behavior: "auto"`) and on `currentIndex` change (`smooth`), deferred one rAF. `scroll-margin-top` on the current group.
+
+6. Untouched
+- Logging / write paths, set-advance fix, NavigationControls, live card internals/layout, rest timer, `resolveSetPrescriptionTargets` itself. Headers not tappable (step 2). No pre-start/START. No git.
+
+7. tsc
+- `node node_modules/typescript/bin/tsc --noEmit` → exit 0.

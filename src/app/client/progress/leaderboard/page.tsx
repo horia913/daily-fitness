@@ -3,49 +3,79 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "@/contexts/ThemeContext";
-import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
-import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import {
   ClientLeaderboardPageBody,
-  type LiftSet,
   type MetricType,
 } from "@/components/client/progress/ClientLeaderboardPageBody";
 import {
   getLeaderboard,
   getLeaderboardBySex,
   getCurrentChampions,
+  resolveLeaderboardExerciseId,
+  updateLeaderboardVisibility,
   type LeaderboardEntry,
-  LeaderboardType,
-  TimeWindow,
+  type LeaderboardVisibility,
+  type LeaderboardType,
+  type TimeWindow,
 } from "@/lib/leaderboardService";
 import { supabase } from "@/lib/supabase";
 
+function normalizeLeaderboardVisibility(raw: unknown): LeaderboardVisibility {
+  const v = String(raw ?? "public").toLowerCase();
+  if (v === "anonymous" || v === "hidden") return v;
+  return "public";
+}
+
 function LeaderboardPageContent() {
   const { user } = useAuth();
-  const { performanceSettings } = useTheme();
+
+  /** `?from=workouts` — entered from the Train area, so back returns there. */
+  const [backHref, setBackHref] = useState("/client/me");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("from") === "workouts") {
+      setBackHref("/client/workouts");
+    }
+  }, []);
 
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>(
-    []
+    [],
   );
   const [loading, setLoading] = useState(true);
   const [timeWindow, setTimeWindow] = useState<TimeWindow>("this_month");
-  const [liftSet, setLiftSet] = useState<LiftSet>("A");
-  const [activeExercise, setActiveExercise] = useState<string>("Squat");
+  const [activeExercise, setActiveExercise] = useState<string>("Bench Press");
   const [metricType, setMetricType] = useState<MetricType>("1rm");
   const [sexFilter, setSexFilter] = useState<"all" | "M" | "F">("all");
   const [customExerciseId, setCustomExerciseId] = useState<string | null>(null);
   const [customExerciseName, setCustomExerciseName] = useState<string | null>(
-    null
+    null,
   );
   const [showExerciseSearch, setShowExerciseSearch] = useState(false);
-  const [exerciseSearchResults, setExerciseSearchResults] = useState<any[]>(
-    []
-  );
+  const [exerciseSearchResults, setExerciseSearchResults] = useState<
+    Array<{ id: string; name: string; category?: string }>
+  >([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [champions, setChampions] = useState<any[]>([]);
+  const [champions, setChampions] = useState<
+    Array<{ name?: string; category?: string; score?: number | string }>
+  >([]);
+  const [visibility, setVisibility] =
+    useState<LeaderboardVisibility>("public");
+  const [savingVisibility, setSavingVisibility] = useState(false);
+
+  const loadVisibility = useCallback(async () => {
+    if (!user?.id) return;
+    const { data } = await supabase
+      .from("profiles")
+      .select("leaderboard_visibility")
+      .eq("id", user.id)
+      .maybeSingle();
+    setVisibility(
+      normalizeLeaderboardVisibility(data?.leaderboard_visibility),
+    );
+  }, [user?.id]);
 
   const loadLeaderboardData = useCallback(async () => {
     setLoading(true);
@@ -68,29 +98,9 @@ function LeaderboardPageContent() {
         effectiveTimeWindow = "all_time";
       }
 
-      let exerciseId: string | undefined;
-      if (customExerciseId) {
-        exerciseId = customExerciseId;
-      } else {
-        const { data: exactMatch } = await supabase
-          .from("exercises")
-          .select("id")
-          .ilike("name", activeExercise)
-          .limit(1)
-          .maybeSingle();
-
-        if (exactMatch?.id) {
-          exerciseId = exactMatch.id;
-        } else {
-          const { data: fuzzyMatch } = await supabase
-            .from("exercises")
-            .select("id")
-            .ilike("name", `%${activeExercise}%`)
-            .limit(1)
-            .maybeSingle();
-          exerciseId = fuzzyMatch?.id;
-        }
-      }
+      const exerciseId = customExerciseId
+        ? customExerciseId
+        : await resolveLeaderboardExerciseId(activeExercise);
 
       if (!exerciseId && metricType !== "tonnage") {
         setLeaderboardData([]);
@@ -102,25 +112,29 @@ function LeaderboardPageContent() {
           ? await getLeaderboard(
               leaderboardType,
               exerciseId,
-              effectiveTimeWindow
+              effectiveTimeWindow,
             )
           : await getLeaderboardBySex(
               leaderboardType,
               exerciseId,
               effectiveTimeWindow,
-              sexFilter
+              sexFilter,
             );
       setLeaderboardData(data);
     } catch (error) {
       console.error("Error loading leaderboard:", error);
       setLoadError(
-        error instanceof Error ? error.message : "Failed to load leaderboard"
+        error instanceof Error ? error.message : "Failed to load leaderboard",
       );
       setLeaderboardData([]);
     } finally {
       setLoading(false);
     }
   }, [timeWindow, activeExercise, metricType, customExerciseId, sexFilter]);
+
+  useEffect(() => {
+    void loadVisibility();
+  }, [loadVisibility]);
 
   useEffect(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -144,7 +158,9 @@ function LeaderboardPageContent() {
   }, [loadLeaderboardData]);
 
   useEffect(() => {
-    getCurrentChampions(5).then(setChampions).catch(() => setChampions([]));
+    getCurrentChampions(5)
+      .then(setChampions)
+      .catch(() => setChampions([]));
   }, []);
 
   const handleExerciseSearch = async (query: string) => {
@@ -163,7 +179,11 @@ function LeaderboardPageContent() {
     setExerciseSearchResults(data || []);
   };
 
-  const selectCustomExercise = (exercise: any) => {
+  const selectCustomExercise = (exercise: {
+    id: string;
+    name: string;
+    category?: string;
+  }) => {
     setCustomExerciseId(exercise.id);
     setCustomExerciseName(exercise.name);
     setShowExerciseSearch(false);
@@ -178,40 +198,55 @@ function LeaderboardPageContent() {
 
   const onRetry = () => {
     setLoadError(null);
-    loadLeaderboardData();
+    void loadLeaderboardData();
+  };
+
+  const onVisibilityChange = async (next: LeaderboardVisibility) => {
+    if (!user?.id || next === visibility) return;
+    setSavingVisibility(true);
+    try {
+      const ok = await updateLeaderboardVisibility(user.id, next);
+      if (!ok) return;
+      setVisibility(next);
+      await loadLeaderboardData();
+      getCurrentChampions(5)
+        .then(setChampions)
+        .catch(() => setChampions([]));
+    } finally {
+      setSavingVisibility(false);
+    }
   };
 
   return (
-    <AnimatedBackground>
-      {performanceSettings?.floatingParticles && <FloatingParticles />}
-      <ClientLeaderboardPageBody
-        userId={user?.id}
-        leaderboardData={leaderboardData}
-        champions={champions}
-        loading={loading}
-        loadError={loadError}
-        onRetry={onRetry}
-        timeWindow={timeWindow}
-        setTimeWindow={setTimeWindow}
-        sexFilter={sexFilter}
-        setSexFilter={setSexFilter}
-        metricType={metricType}
-        setMetricType={setMetricType}
-        liftSet={liftSet}
-        setLiftSet={setLiftSet}
-        activeExercise={activeExercise}
-        setActiveExercise={setActiveExercise}
-        customExerciseId={customExerciseId}
-        customExerciseName={customExerciseName}
-        clearCustomExercise={clearCustomExercise}
-        showExerciseSearch={showExerciseSearch}
-        setShowExerciseSearch={setShowExerciseSearch}
-        exerciseSearchResults={exerciseSearchResults}
-        searchQuery={searchQuery}
-        handleExerciseSearch={handleExerciseSearch}
-        selectCustomExercise={selectCustomExercise}
-      />
-    </AnimatedBackground>
+    <ClientLeaderboardPageBody
+      userId={user?.id}
+      leaderboardData={leaderboardData}
+      champions={champions}
+      loading={loading}
+      loadError={loadError}
+      onRetry={onRetry}
+      timeWindow={timeWindow}
+      setTimeWindow={setTimeWindow}
+      sexFilter={sexFilter}
+      setSexFilter={setSexFilter}
+      metricType={metricType}
+      setMetricType={setMetricType}
+      activeExercise={activeExercise}
+      setActiveExercise={setActiveExercise}
+      customExerciseId={customExerciseId}
+      customExerciseName={customExerciseName}
+      clearCustomExercise={clearCustomExercise}
+      showExerciseSearch={showExerciseSearch}
+      setShowExerciseSearch={setShowExerciseSearch}
+      exerciseSearchResults={exerciseSearchResults}
+      searchQuery={searchQuery}
+      handleExerciseSearch={handleExerciseSearch}
+      selectCustomExercise={selectCustomExercise}
+      backHref={backHref}
+      visibility={visibility}
+      savingVisibility={savingVisibility}
+      onVisibilityChange={(next) => void onVisibilityChange(next)}
+    />
   );
 }
 

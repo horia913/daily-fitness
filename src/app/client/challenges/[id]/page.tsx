@@ -41,7 +41,6 @@ function ChallengeDetailContent() {
   const [submitVideo, setSubmitVideo] = useState<File | null>(null);
   const [submitWeight, setSubmitWeight] = useState("");
   const [submitReps, setSubmitReps] = useState("");
-  const [submitNotes, setSubmitNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -148,7 +147,6 @@ function ChallengeDetailContent() {
         setSubmitVideo(null);
         setSubmitWeight("");
         setSubmitReps("");
-        setSubmitNotes("");
         await refreshSubmissions();
         loadChallenge();
       } else {
@@ -166,7 +164,7 @@ function ChallengeDetailContent() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
+          <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
             <PageSkeleton variant="dashboard" />
           </ClientPageShell>
         </AnimatedBackground>
@@ -179,7 +177,7 @@ function ChallengeDetailContent() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
+          <ClientPageShell className="max-w-lg lg:max-w-3xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
             {loadError ? (
               <GlassCard elevation={2} className="fc-card-shell p-6 text-center">
                 <p className="text-sm font-semibold text-[color:var(--fc-text-primary)] mb-3">
@@ -228,8 +226,6 @@ function ChallengeDetailContent() {
         setSubmitWeight={setSubmitWeight}
         submitReps={submitReps}
         setSubmitReps={setSubmitReps}
-        submitNotes={submitNotes}
-        setSubmitNotes={setSubmitNotes}
         submitting={submitting}
         handleSubmitProof={handleSubmitProof}
         getSubmissionForCategory={getSubmissionForCategory}

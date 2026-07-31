@@ -1,32 +1,29 @@
 "use client";
 
 import React from "react";
-import { Home, Share2 } from "lucide-react";
-import styles from "./clientWorkoutCompleteV1.module.css";
+import styles from "./clientWorkoutCompleteV6.module.css";
 
 export function StickyActionBar(props: {
-  onShare: () => void;
-  onDashboard: () => void;
+  onDone: () => void;
+  onViewPrHistory: () => void;
   disabled?: boolean;
 }) {
   return (
-    <div className={styles.stickyBar}>
+    <div className={styles.cta}>
       <button
         type="button"
-        className={styles.btnOutline}
-        onClick={props.onShare}
-        aria-label="Share workout summary"
+        className={styles.btn}
+        onClick={props.onDone}
+        disabled={props.disabled}
       >
-        <Share2 size={15} aria-hidden />
+        Done
       </button>
       <button
         type="button"
-        className={styles.btnPrimary}
-        onClick={props.onDashboard}
-        disabled={props.disabled}
+        className={styles.btn2}
+        onClick={props.onViewPrHistory}
       >
-        <Home size={14} aria-hidden />
-        Back to dashboard
+        View PR history
       </button>
     </div>
   );

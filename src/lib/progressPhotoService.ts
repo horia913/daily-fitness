@@ -6,7 +6,7 @@
  */
 
 import { supabase } from "./supabase";
-import { getLatestMeasurement } from "./measurementService";
+import { getLatestClientWeight } from "./metrics/body";
 
 const STORAGE_BUCKET = "progress-photos";
 const MAX_IMAGE_SIZE = 1200; // Max width/height in pixels
@@ -443,8 +443,8 @@ export async function getLatestWeightForPhoto(
   clientId: string
 ): Promise<number | null> {
   try {
-    const latest = await getLatestMeasurement(clientId);
-    return latest?.weight_kg ?? null;
+    const latest = await getLatestClientWeight(clientId);
+    return latest?.weightKg ?? null;
   } catch (error) {
     console.error("Error fetching latest weight:", error);
     return null;

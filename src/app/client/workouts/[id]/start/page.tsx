@@ -2,10 +2,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
-import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -47,7 +45,9 @@ import { fetchApi } from "@/lib/apiClient";
 import { useToast } from "@/components/ui/toast-provider";
 import { AchievementUnlockModal } from "@/components/ui/AchievementUnlockModal";
 import type { Achievement } from "@/components/ui/AchievementCard";
-import LiveWorkoutBlockExecutor from "@/components/client/LiveWorkoutBlockExecutor";
+import LiveWorkoutSetEntryExecutor from "@/components/client/LiveWorkoutSetEntryExecutor";
+import { ExecGroupList } from "@/components/client/workout-execution/ExecGroupList";
+import { getGroupTotalSets } from "@/components/client/workout-execution/execGroupListHelpers";
 import {
   PRCelebrationModal,
 } from "@/components/client/workout-execution/ui/PRCelebrationModal";
@@ -57,13 +57,15 @@ import {
   countWorkoutExercises,
   getGlobalExerciseIndex,
 } from "@/components/client/workout-execution/ui/ExecProgressSegments";
+import { groupIndexToHue } from "@/components/client/workout-execution/live-card";
 import { enrichWorkoutBlocksPrescribedRir } from "@/lib/enrichWorkoutBlocksPrescribedRir";
 import { WorkoutExecutionChromeProvider } from "@/components/client/workout-execution/WorkoutExecutionChromeContext";
+import { fetchPersonalRecords } from "@/lib/personalRecords";
 import {
-  WorkoutBlock,
-  LiveWorkoutBlock,
+  WorkoutSetEntry,
+  LiveWorkoutSetEntry,
   LoggedSet,
-} from "@/types/workoutBlocks";
+} from "@/types/workoutSetEntries";
 import {
   fetchE1RMs,
   calculateSuggestedWeight,
@@ -75,15 +77,22 @@ import type {
   ClientBlockRecord,
   ClientBlockExerciseRecord,
 } from "./types";
+import { ConfirmActionDialog } from "@/components/client-ui";
 import { isValidUuid } from "./utils";
 import { PreviousPerformanceCard } from "./components/PreviousPerformanceCard";
 import { mapWorkoutBlocksRpcToSetEntries } from "@/lib/workoutBlocksRpcMapper";
 import { collectExerciseIdsDeep } from "@/lib/collectExerciseIdsDeep";
+import {
+  abandonOtherInProgressSessions,
+  closeStaleInProgressSessionsForClient,
+} from "@/lib/workoutSessionLifecycle";
 export default function LiveWorkout() {
   const params = useParams();
+  const searchParams = useSearchParams();
+  const explicitStartIntent = searchParams.get("start") === "1";
   const assignmentId = params.id as string;
   const { addToast } = useToast();
-  const { isDark, getThemeStyles, performanceSettings } = useTheme();
+  const { getThemeStyles } = useTheme();
 
   const [assignment, setAssignment] = useState<WorkoutAssignment | null>(null);
   const [exercises, setExercises] = useState<TemplateExercise[]>([]);
@@ -91,10 +100,13 @@ export default function LiveWorkout() {
   const [currentSet, setCurrentSet] = useState(1);
   const [workoutStarted, setWorkoutStarted] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [pendingExitConfirm, setPendingExitConfirm] = useState(false);
   const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
   /** True once blocks + exercises are loaded; allows showing "Loading exercises..." after assignment is resolved */
   const [contentReady, setContentReady] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  /** False until loadAssignment finishes resume/restore — blocks premature startWorkout. */
+  const [sessionResolutionDone, setSessionResolutionDone] = useState(false);
   const [workoutLogId, setWorkoutLogId] = useState<string | null>(null); // Store restored workout_log_id
   const [currentSetData, setCurrentSetData] = useState({
     weight: 0,
@@ -106,7 +118,7 @@ export default function LiveWorkout() {
 
   // Rest Timer State
   const [showRestTimer, setShowRestTimer] = useState(false);
-  const [restTime, setRestTime] = useState(60);
+  const [restTime, setRestTime] = useState(0);
 
   // Exercise Display Enhancements
   const [showExerciseImage, setShowExerciseImage] = useState(false);
@@ -114,16 +126,16 @@ export default function LiveWorkout() {
   const [showClusterTimer, setShowClusterTimer] = useState(false);
 
   // Workout Block System
-  const [workoutBlocks, setWorkoutBlocks] = useState<LiveWorkoutBlock[]>([]);
+  const [workoutSetEntries, setWorkoutSetEntries] = useState<LiveWorkoutSetEntry[]>([]);
   /** Parent-owned logged sets keyed by set_entry_id so history persists when navigating set entries. */
-  const [loggedSetsByBlockId, setLoggedSetsByBlockId] = useState<
+  const [loggedSetsBySetEntryId, setLoggedSetsBySetEntryId] = useState<
     Record<string, LoggedSet[]>
   >({});
-  const [currentBlockIndex, setCurrentBlockIndex] = useState(0);
+  const [currentSetEntryIndex, setCurrentSetEntryIndex] = useState(0);
   const [useBlockSystem, setUseBlockSystem] = useState(false);
-  const workoutBlocksRef = useRef<LiveWorkoutBlock[]>([]);
-  const currentBlockIndexRef = useRef(0);
-  const completedBlockRef = useRef<Set<string>>(new Set());
+  const workoutSetEntriesRef = useRef<LiveWorkoutSetEntry[]>([]);
+  const currentSetEntryIndexRef = useRef(0);
+  const completedSetEntryRef = useRef<Set<string>>(new Set());
   const loadInProgressRef = useRef(false);
   const loadIdRef = useRef(0);
 
@@ -132,7 +144,7 @@ export default function LiveWorkout() {
 
   // Workout Completion State
   const [showWorkoutCompletion, setShowWorkoutCompletion] = useState(false);
-  const [isLastBlockComplete, setIsLastBlockComplete] = useState(false);
+  const [isLastSetEntryComplete, setIsLastSetEntryComplete] = useState(false);
   const [isCompletingWorkout, setIsCompletingWorkout] = useState(false);
   const isCompletingWorkoutRef = useRef(false);
   const completionStartedAtRef = useRef<number | null>(null);
@@ -145,9 +157,19 @@ export default function LiveWorkout() {
     weightComparison: "",
   });
   const [workoutStartTime, setWorkoutStartTime] = useState(() => Date.now());
+  const [elapsedLabel, setElapsedLabel] = useState("0:00");
+  /** UI gate: false = pre-start summary; true = live execution. Resume skips the gate. */
+  const [hasStarted, setHasStarted] = useState(false);
+  // Pre-start summary extras (migrated from the retired /details page)
+  const [estimatedDurationMin, setEstimatedDurationMin] = useState<number | null>(
+    null,
+  );
+  const [personalRecordsForPR, setPersonalRecordsForPR] = useState<any[]>(
+    [],
+  );
   const [totalWeightLifted, setTotalWeightLifted] = useState(0);
   // Ref to prevent multiple timeout calls for block advancement
-  const blockAdvanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+  const setEntryAdvanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
   // Exercise details lookup for nested items (giant set, etc.)
@@ -197,12 +219,35 @@ export default function LiveWorkout() {
 
   // DIAGNOSTIC: Tab return loading audit
   useEffect(() => {
-    workoutBlocksRef.current = workoutBlocks;
-  }, [workoutBlocks]);
+    workoutSetEntriesRef.current = workoutSetEntries;
+  }, [workoutSetEntries]);
 
   useEffect(() => {
-    currentBlockIndexRef.current = currentBlockIndex;
-  }, [currentBlockIndex]);
+    currentSetEntryIndexRef.current = currentSetEntryIndex;
+  }, [currentSetEntryIndex]);
+
+  // Elapsed clock — only ticks after START (or resume). Pre-start stays at 0:00.
+  useEffect(() => {
+    const formatElapsed = (ms: number) => {
+      const totalSec = Math.max(0, Math.floor(ms / 1000));
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      if (h > 0) {
+        return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+      }
+      return `${m}:${String(s).padStart(2, "0")}`;
+    };
+    if (!hasStarted) {
+      setElapsedLabel("0:00");
+      return;
+    }
+    const tick = () =>
+      setElapsedLabel(formatElapsed(Date.now() - workoutStartTime));
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [workoutStartTime, hasStarted]);
 
   // Helper: Persist workout progress to workout_sessions (lightweight, non-blocking)
   const persistSessionProgress = async (
@@ -249,22 +294,22 @@ export default function LiveWorkout() {
 
   // Persist progress when block index changes (debounced via navigation events)
   useEffect(() => {
-    if (sessionId && isValidUuid(sessionId) && workoutBlocks.length > 0) {
-      const currentBlock = workoutBlocks[currentBlockIndex];
-      const globalExerciseIndex = currentBlock?.currentExerciseIndex ?? 0;
+    if (sessionId && isValidUuid(sessionId) && workoutSetEntries.length > 0) {
+      const currentSetEntry = workoutSetEntries[currentSetEntryIndex];
+      const globalExerciseIndex = currentSetEntry?.currentExerciseIndex ?? 0;
 
       // Calculate total exercises across all blocks
-      const totalExercises = workoutBlocks.reduce((total, block) => {
-        return total + (block.block.exercises?.length || 1);
+      const totalExercises = workoutSetEntries.reduce((total, entry) => {
+        return total + (entry.setEntry.exercises?.length || 1);
       }, 0);
 
       persistSessionProgress(
-        currentBlockIndex,
+        currentSetEntryIndex,
         globalExerciseIndex,
         totalExercises,
       );
     }
-  }, [currentBlockIndex, sessionId, workoutBlocks.length]);
+  }, [currentSetEntryIndex, sessionId, workoutSetEntries.length]);
 
   // Helper function to get suggested weight display text
   const getSuggestedWeightText = (
@@ -293,7 +338,7 @@ export default function LiveWorkout() {
   };
 
   // Workout Block Handlers
-  const handleBlockComplete = (blockId: string, loggedSets: LoggedSet[]) => {
+  const handleSetEntryComplete = (setEntryId: string, loggedSets: LoggedSet[]) => {
     const hadLogId = !!workoutLogId;
     const assignmentIdForApi = assignment?.id || assignmentId;
 
@@ -304,7 +349,7 @@ export default function LiveWorkout() {
       body: JSON.stringify({
         workout_log_id: workoutLogId || undefined,
         workout_assignment_id: assignmentIdForApi,
-        workout_set_entry_id: blockId,
+        workout_set_entry_id: setEntryId,
       }),
     })
       .then((r) => r.json())
@@ -315,20 +360,20 @@ export default function LiveWorkout() {
       .catch((err) => console.error("block-complete failed", err));
 
     // Update block completion status
-    setWorkoutBlocks((prev) => {
-      const updated = prev.map((block) =>
-        block.block.id === blockId ? { ...block, isCompleted: true } : block,
+    setWorkoutSetEntries((prev) => {
+      const updated = prev.map((entry) =>
+        entry.setEntry.id === setEntryId ? { ...entry, isCompleted: true } : entry,
       );
 
       // Check if all blocks are now completed
-      const allCompleted = updated.every((block) => block.isCompleted);
+      const allCompleted = updated.every((entry) => entry.isCompleted);
       const completedCount = updated.filter(
-        (block) => block.isCompleted,
+        (entry) => entry.isCompleted,
       ).length;
 
       // Only show completion when ALL blocks are complete
       if (allCompleted) {
-        setIsLastBlockComplete(true);
+        setIsLastSetEntryComplete(true);
       }
 
       return updated;
@@ -336,57 +381,61 @@ export default function LiveWorkout() {
 
     // AUTO-ADVANCE: Move to next block or show completion
     // Clear any existing timeout to prevent multiple calls
-    if (blockAdvanceTimeoutRef.current) {
-      clearTimeout(blockAdvanceTimeoutRef.current);
+    if (setEntryAdvanceTimeoutRef.current) {
+      clearTimeout(setEntryAdvanceTimeoutRef.current);
     }
 
-    // Move setTimeout OUTSIDE of setWorkoutBlocks to prevent multiple timeouts
+    // Move setTimeout OUTSIDE of setWorkoutSetEntries to prevent multiple timeouts
     // Capture current values to avoid stale closures
-    const currentIdx = currentBlockIndexRef.current;
-    const totalBlocks = workoutBlocksRef.current.length;
+    const currentIdx = currentSetEntryIndexRef.current;
+    const totalSetEntries = workoutSetEntriesRef.current.length;
 
-    blockAdvanceTimeoutRef.current = setTimeout(() => {
+    setEntryAdvanceTimeoutRef.current = setTimeout(() => {
       // Use functional update to get latest state
-      setCurrentBlockIndex((latestIdx) => {
-        const isLastBlock = latestIdx >= workoutBlocksRef.current.length - 1;
-        if (!isLastBlock) {
+      setCurrentSetEntryIndex((latestIdx) => {
+        const isLastSetEntry = latestIdx >= workoutSetEntriesRef.current.length - 1;
+        if (!isLastSetEntry) {
           return latestIdx + 1;
         } else {
           return latestIdx;
         }
       });
-      blockAdvanceTimeoutRef.current = null;
+      setEntryAdvanceTimeoutRef.current = null;
     }, 1500); // Small delay for UX
   };
 
-  const handleNextBlock = () => {
-    if (currentBlockIndex < workoutBlocks.length - 1) {
-      setCurrentBlockIndex((prev) => prev + 1);
+  const handleNextSetEntry = () => {
+    if (currentSetEntryIndex < workoutSetEntries.length - 1) {
+      setCurrentSetEntryIndex((prev) => prev + 1);
     } else {
-      // All blocks completed, finish workout
-      setShowWorkoutCompletion(true);
+      // Last block — same write + redirect as the Complete Workout CTA (no in-page modal).
+      void completeWorkout();
     }
   };
 
   // Handle block change
-  const handleBlockChange = (blockIndex: number) => {
-    setCurrentBlockIndex(blockIndex);
+  const handleSetEntryChange = (setEntryIndex: number) => {
+    if (setEntryAdvanceTimeoutRef.current) {
+      clearTimeout(setEntryAdvanceTimeoutRef.current);
+      setEntryAdvanceTimeoutRef.current = null;
+    }
+    setCurrentSetEntryIndex(setEntryIndex);
     // Reset exercise index to 0 when changing blocks
-    setWorkoutBlocks((prev) =>
-      prev.map((block, idx) =>
-        idx === blockIndex ? { ...block, currentExerciseIndex: 0 } : block,
+    setWorkoutSetEntries((prev) =>
+      prev.map((entry, idx) =>
+        idx === setEntryIndex ? { ...entry, currentExerciseIndex: 0 } : entry,
       ),
     );
   };
 
-  // Upsert a logged set so history persists when navigating blocks. Single source of truth: loggedSetsByBlockId.
+  // Upsert a logged set so history persists when navigating blocks. Single source of truth: loggedSetsBySetEntryId.
   const handleSetLogUpsert = (
-    blockId: string,
+    setEntryId: string,
     setEntry: LoggedSet,
     options?: { replaceId?: string },
   ) => {
-    setLoggedSetsByBlockId((prev) => {
-      const list = prev[blockId] ?? [];
+    setLoggedSetsBySetEntryId((prev) => {
+      const list = prev[setEntryId] ?? [];
       const replaceId = options?.replaceId;
       let next: LoggedSet[];
       if (replaceId != null) {
@@ -404,13 +453,13 @@ export default function LiveWorkout() {
           next = [...list, setEntry];
         }
       }
-      return { ...prev, [blockId]: next };
+      return { ...prev, [setEntryId]: next };
     });
     // Keep block.existingSetLogs in sync for any code that reads from block
-    setWorkoutBlocks((prev) =>
-      prev.map((block) => {
-        if (block.block.id !== blockId) return block;
-        const list = block.existingSetLogs ?? [];
+    setWorkoutSetEntries((prev) =>
+      prev.map((entry) => {
+        if (entry.setEntry.id !== setEntryId) return entry;
+        const list = entry.existingSetLogs ?? [];
         const replaceId = options?.replaceId;
         let next: LoggedSet[];
         if (replaceId != null) {
@@ -428,111 +477,111 @@ export default function LiveWorkout() {
             next = [...list, setEntry];
           }
         }
-        return { ...block, existingSetLogs: next };
+        return { ...entry, existingSetLogs: next };
       }),
     );
   };
 
   // Replace a set in the store after successful PATCH edit. Match by id only (workout_set_logs.id).
-  const handleSetEditSaved = (blockId: string, updatedSet: LoggedSet) => {
-    setLoggedSetsByBlockId((prev) => {
-      const list = prev[blockId] ?? [];
+  const handleSetEditSaved = (setEntryId: string, updatedSet: LoggedSet) => {
+    setLoggedSetsBySetEntryId((prev) => {
+      const list = prev[setEntryId] ?? [];
       const idx = list.findIndex((s) => s.id === updatedSet.id);
       if (idx < 0) return prev;
       const next = list.map((s, i) => (i === idx ? updatedSet : s));
-      return { ...prev, [blockId]: next };
+      return { ...prev, [setEntryId]: next };
     });
-    setWorkoutBlocks((prev) =>
-      prev.map((block) => {
-        if (block.block.id !== blockId) return block;
-        const list = block.existingSetLogs ?? [];
+    setWorkoutSetEntries((prev) =>
+      prev.map((entry) => {
+        if (entry.setEntry.id !== setEntryId) return entry;
+        const list = entry.existingSetLogs ?? [];
         const idx = list.findIndex((s) => s.id === updatedSet.id);
-        if (idx < 0) return block;
+        if (idx < 0) return entry;
         const next = list.map((s, i) => (i === idx ? updatedSet : s));
-        return { ...block, existingSetLogs: next };
+        return { ...entry, existingSetLogs: next };
       }),
     );
   };
 
   // Handle set logged - update completedSets in workout blocks state
-  const handleSetLogged = (blockId: string, newCompletedSets: number) => {
-    const currentBlock = workoutBlocksRef.current.find(
-      (block) => block.block.id === blockId,
+  const handleSetLogged = (setEntryId: string, newCompletedSets: number) => {
+    const currentSetEntry = workoutSetEntriesRef.current.find(
+      (entry) => entry.setEntry.id === setEntryId,
     );
-    if (!currentBlock) {
-      setWorkoutBlocks((prev) =>
-        prev.map((block) =>
-          block.block.id === blockId
-            ? { ...block, completedSets: newCompletedSets }
-            : block,
+    if (!currentSetEntry) {
+      setWorkoutSetEntries((prev) =>
+        prev.map((entry) =>
+        entry.setEntry.id === setEntryId
+            ? { ...entry, completedSets: newCompletedSets }
+            : entry,
         ),
       );
       return;
     }
 
-    const exercises = currentBlock.block.exercises || [];
-    const currentExIndex = currentBlock.currentExerciseIndex || 0;
+    const exercises = currentSetEntry.setEntry.exercises || [];
+    const currentExIndex = currentSetEntry.currentExerciseIndex || 0;
     const currentExercise = exercises[currentExIndex];
     const totalSetsForExercise =
-      currentExercise?.sets || currentBlock.block.total_sets || 1;
+      currentExercise?.sets || currentSetEntry.setEntry.total_sets || 1;
 
     const isLastExercise = currentExIndex >= exercises.length - 1;
     const isExerciseComplete = newCompletedSets >= totalSetsForExercise;
 
-    setWorkoutBlocks((prev) =>
-      prev.map((block) =>
-        block.block.id === blockId
+    setWorkoutSetEntries((prev) =>
+      prev.map((entry) =>
+        entry.setEntry.id === setEntryId
           ? {
-              ...block,
+              ...entry,
               completedSets: newCompletedSets,
               isCompleted:
-                isExerciseComplete && isLastExercise ? true : block.isCompleted,
+                isExerciseComplete && isLastExercise ? true : entry.isCompleted,
             }
-          : block,
+          : entry,
       ),
     );
 
     if (!isExerciseComplete || !isLastExercise) return;
 
-    if (completedBlockRef.current.has(blockId)) return;
-    completedBlockRef.current.add(blockId);
+    if (completedSetEntryRef.current.has(setEntryId)) return;
+    completedSetEntryRef.current.add(setEntryId);
 
-    if (blockAdvanceTimeoutRef.current) {
-      clearTimeout(blockAdvanceTimeoutRef.current);
+    if (setEntryAdvanceTimeoutRef.current) {
+      clearTimeout(setEntryAdvanceTimeoutRef.current);
     }
 
-    blockAdvanceTimeoutRef.current = setTimeout(() => {
-      setCurrentBlockIndex((latestIdx) => {
-        const isLastBlock = latestIdx >= workoutBlocksRef.current.length - 1;
-        if (!isLastBlock) {
+    setEntryAdvanceTimeoutRef.current = setTimeout(() => {
+      setCurrentSetEntryIndex((latestIdx) => {
+        const isLastSetEntry = latestIdx >= workoutSetEntriesRef.current.length - 1;
+        if (!isLastSetEntry) {
           return latestIdx + 1;
         }
-        setIsLastBlockComplete(true);
+        setIsLastSetEntryComplete(true);
         return latestIdx;
       });
-      blockAdvanceTimeoutRef.current = null;
+      setEntryAdvanceTimeoutRef.current = null;
     }, 500);
   };
 
   // Handle exercise complete - advance to next exercise within a block
-  const handleExerciseComplete = (blockId: string) => {
-    setWorkoutBlocks((prev) =>
-      prev.map((block) => {
-        if (block.block.id !== blockId) return block;
+  const handleExerciseComplete = (setEntryId: string) => {
+    setWorkoutSetEntries((prev) =>
+      prev.map((entry) => {
+        if (entry.setEntry.id !== setEntryId) return entry;
 
-        const currentExIndex = block.currentExerciseIndex || 0;
-        const exercises = block.block.exercises || [];
+        const currentExIndex = entry.currentExerciseIndex || 0;
+        const exercises = entry.setEntry.exercises || [];
 
         if (currentExIndex < exercises.length - 1) {
           // Advance to next exercise, reset sets
           return {
-            ...block,
+            ...entry,
             currentExerciseIndex: currentExIndex + 1,
             completedSets: 0,
           };
         } else {
-          // All exercises done, mark block complete
-          return { ...block, isCompleted: true };
+          // All exercises done, mark set entry complete
+          return { ...entry, isCompleted: true };
         }
       }),
     );
@@ -641,8 +690,8 @@ export default function LiveWorkout() {
   };
 
   /**
-   * Close incomplete workout_logs from previous calendar days
-   * Called on page load to clean up stale sessions
+   * Close incomplete workout_logs and stale in_progress sessions from previous calendar days.
+   * Called on page load to clean up abandoned attempts.
    */
   const closeIncompleteLogsFromPreviousDays = async (
     workoutAssignmentId: string,
@@ -656,6 +705,17 @@ export default function LiveWorkout() {
         now.getDate(),
       );
       const todayStartISO = todayStart.toISOString();
+
+      // Stale in_progress sessions (client-wide, same day cutoff as logs)
+      const closedSessions = await closeStaleInProgressSessionsForClient(
+        userId,
+        todayStartISO,
+      );
+      if (closedSessions > 0) {
+        console.log(
+          `🔒 Abandoned ${closedSessions} stale workout_session(s) from before today`,
+        );
+      }
 
       // Find all incomplete logs for this assignment from previous days
       const { data: oldLogs, error } = await supabase
@@ -765,21 +825,27 @@ export default function LiveWorkout() {
    */
   const restoreWorkoutProgress = async (
     workoutLogId: string,
-    workoutBlocks: any[],
+    workoutSetEntries: any[],
     userId: string,
     prefetched?: {
       setLogs?: any[];
-      blockCompletions?: { workout_set_entry_id: string }[];
+      blockCompletions?: {
+        workout_set_entry_id?: string | null;
+        program_instance_set_entry_id?: string | null;
+      }[];
       startedAt?: string | null;
     },
   ): Promise<{
-    currentBlockIndex: number;
-    workoutBlocksWithProgress: LiveWorkoutBlock[];
+    currentSetEntryIndex: number;
+    workoutSetEntriesWithProgress: LiveWorkoutSetEntry[];
     workoutStartTime: number;
   } | null> => {
     try {
       let setLogs: any[];
-      let blockCompletions: { workout_set_entry_id: string }[];
+      let blockCompletions: {
+        workout_set_entry_id?: string | null;
+        program_instance_set_entry_id?: string | null;
+      }[];
       let startedAt: string | null = null;
 
       if (prefetched?.setLogs != null && prefetched?.blockCompletions != null) {
@@ -798,7 +864,7 @@ export default function LiveWorkout() {
             }),
             supabase
               .from("workout_set_entry_completions")
-              .select("workout_set_entry_id")
+              .select("workout_set_entry_id, program_instance_set_entry_id")
               .eq("workout_log_id", workoutLogId),
             supabase
               .from("workout_logs")
@@ -841,9 +907,15 @@ export default function LiveWorkout() {
         }
       }
 
-      const completedBlockIds = new Set(
-        (blockCompletions || []).map(
-          (r: { workout_set_entry_id: string }) => r.workout_set_entry_id,
+      const completedSetEntryIds = new Set(
+        (blockCompletions || []).flatMap(
+          (r: {
+            workout_set_entry_id?: string | null;
+            program_instance_set_entry_id?: string | null;
+          }) =>
+            [r.workout_set_entry_id, r.program_instance_set_entry_id].filter(
+              (id): id is string => typeof id === "string" && id.length > 0,
+            ),
         ),
       );
 
@@ -852,12 +924,12 @@ export default function LiveWorkout() {
         : Date.now();
 
       if (!setLogs || setLogs.length === 0) {
-        if (completedBlockIds.size === 0) {
+        if (completedSetEntryIds.size === 0) {
           console.log("No set logs and no block completions - starting fresh");
           return null;
         }
         console.log(
-          `📊 No set logs; restoring from ${completedBlockIds.size} block completion(s)`,
+          `📊 No set logs; restoring from ${completedSetEntryIds.size} block completion(s)`,
         );
       } else {
         console.log(
@@ -918,21 +990,20 @@ export default function LiveWorkout() {
       }
 
       // Restore progress in workout blocks
-      let currentBlockIndex = 0;
-      let foundIncompleteBlock = false;
+      let currentSetEntryIndex = 0;
+      let foundIncompleteSetEntry = false;
 
-      const workoutBlocksWithProgress = workoutBlocks.map(
-        (block: any, index) => {
-          // Handle both WorkoutBlock[] (block.id) and LiveWorkoutBlock[] (block.block.id)
-          const blockId = block.block?.id || block.id;
-          const blockData = block.block || block;
-          const blockSetsCounts = setsByBlock.get(blockId);
+      const workoutSetEntriesWithProgress = workoutSetEntries.map(
+        (entry: any, index) => {
+          const setEntryId = entry.setEntry?.id || entry.id;
+          const blockData = entry.setEntry || entry;
+          const blockSetsCounts = setsByBlock.get(setEntryId);
           const completedByBlockCompletionRecord =
-            completedBlockIds.has(blockId);
+            completedSetEntryIds.has(setEntryId);
 
           // Build existing set logs for this block (for navigation/edit in executor)
           const blockSetLogs = (setLogs || []).filter(
-            (s: any) => s.set_entry_id === blockId,
+            (s: any) => s.set_entry_id === setEntryId,
           );
           const blockTypeForRestore = blockData.set_type;
           const sorted = [...blockSetLogs].sort((a: any, b: any) => {
@@ -949,7 +1020,7 @@ export default function LiveWorkout() {
             reps_completed?: number;
             completed_at: Date;
           }>;
-          if (blockTypeForRestore === "preexhaust") {
+          if (blockTypeForRestore === "pre_exhaustion") {
             existingSetLogs = sorted.flatMap((s: any) => {
               const setNum = s.set_number ?? s.round_number ?? 0;
               const completedAt = s.completed_at
@@ -1045,14 +1116,14 @@ export default function LiveWorkout() {
           if (!blockSetsCounts || blockSetsCounts.size === 0) {
             // No set logs for this block: either completed via block-completion record (e.g. timer-only) or incomplete
             if (completedByBlockCompletionRecord) {
-              if (!foundIncompleteBlock) {
-                currentBlockIndex = Math.min(
+              if (!foundIncompleteSetEntry) {
+                currentSetEntryIndex = Math.min(
                   index + 1,
-                  workoutBlocks.length - 1,
+                  workoutSetEntries.length - 1,
                 );
               }
               return {
-                block: blockData,
+                setEntry: blockData,
                 currentExerciseIndex: 0,
                 currentSetIndex: 0,
                 isCompleted: true,
@@ -1068,12 +1139,12 @@ export default function LiveWorkout() {
               };
             }
             // No sets and no completion record - incomplete
-            if (!foundIncompleteBlock) {
-              currentBlockIndex = index;
-              foundIncompleteBlock = true;
+            if (!foundIncompleteSetEntry) {
+              currentSetEntryIndex = index;
+              foundIncompleteSetEntry = true;
             }
             return {
-              block: blockData,
+              setEntry: blockData,
               currentExerciseIndex: 0,
               currentSetIndex: 0,
               isCompleted: false,
@@ -1088,7 +1159,7 @@ export default function LiveWorkout() {
 
           // Check each exercise in the block to determine progress
           const exercises = blockData.exercises || [];
-          let blockCompletedSets = 0;
+          let setEntryCompletedSets = 0;
           let currentExerciseIndex = 0;
           let blockIsCompleted = true;
           const blockType = blockData.set_type;
@@ -1120,23 +1191,23 @@ export default function LiveWorkout() {
                 ? completedSetsForExercise >= 1
                 : normalizedCompletedSets >= totalSetsForExercise;
 
-            blockCompletedSets = Math.max(
-              blockCompletedSets,
+            setEntryCompletedSets = Math.max(
+              setEntryCompletedSets,
               normalizedCompletedSets,
             );
 
-            if (!isExerciseComplete && !foundIncompleteBlock) {
+            if (!isExerciseComplete && !foundIncompleteSetEntry) {
               // Found the incomplete exercise/block
-              currentBlockIndex = index;
+              currentSetEntryIndex = index;
               currentExerciseIndex = i;
-              foundIncompleteBlock = true;
+              foundIncompleteSetEntry = true;
               blockIsCompleted = false;
             }
           }
 
           // For blocks with multiple exercises (superset, giant_set, pre_exhaustion)
           // Check if all exercises in the current "set" are complete
-          if (exercises.length > 1 && !foundIncompleteBlock) {
+          if (exercises.length > 1 && !foundIncompleteSetEntry) {
             const allExercisesComplete = exercises.every((ex: any) => {
               const exerciseId = ex.exercise_id;
               const exerciseData = blockSetsCounts.get(exerciseId);
@@ -1162,7 +1233,7 @@ export default function LiveWorkout() {
 
             if (!allExercisesComplete) {
               blockIsCompleted = false;
-              if (!foundIncompleteBlock) {
+              if (!foundIncompleteSetEntry) {
                 // Find first incomplete exercise
                 for (let i = 0; i < exercises.length; i++) {
                   const ex = exercises[i];
@@ -1172,7 +1243,7 @@ export default function LiveWorkout() {
                   const totalSetsForExercise =
                     ex.sets !== null && ex.sets !== undefined
                       ? ex.sets
-                      : block.block.total_sets || 1;
+                      : blockData.total_sets || 1;
                   const normalizedCompletedSets =
                     blockType &&
                     ["amrap", "emom", "tabata", "for_time"].includes(blockType)
@@ -1189,9 +1260,9 @@ export default function LiveWorkout() {
                       : normalizedCompletedSets >= totalSetsForExercise;
 
                   if (!isExerciseComplete) {
-                    currentBlockIndex = index;
+                    currentSetEntryIndex = index;
                     currentExerciseIndex = i;
-                    foundIncompleteBlock = true;
+                    foundIncompleteSetEntry = true;
                     break;
                   }
                 }
@@ -1205,8 +1276,8 @@ export default function LiveWorkout() {
 
           // If this block is completed and we haven't found an incomplete block yet,
           // advance the restore cursor to the next block.
-          if (blockIsCompleted && !foundIncompleteBlock) {
-            currentBlockIndex = Math.min(index + 1, workoutBlocks.length - 1);
+          if (blockIsCompleted && !foundIncompleteSetEntry) {
+            currentSetEntryIndex = Math.min(index + 1, workoutSetEntries.length - 1);
           }
 
           // Determine current set index from max set number logged
@@ -1261,8 +1332,8 @@ export default function LiveWorkout() {
           }
 
           return {
-            block: blockData,
-            completedSets: blockCompletedSets,
+            setEntry: blockData,
+            completedSets: setEntryCompletedSets,
             currentExerciseIndex,
             currentSetIndex,
             isCompleted: blockIsCompleted,
@@ -1273,35 +1344,35 @@ export default function LiveWorkout() {
       );
 
       // If all blocks are complete, set to last block
-      if (!foundIncompleteBlock && workoutBlocks.length > 0) {
-        currentBlockIndex = workoutBlocks.length - 1;
+      if (!foundIncompleteSetEntry && workoutSetEntries.length > 0) {
+        currentSetEntryIndex = workoutSetEntries.length - 1;
       }
 
       console.log("📊 Restored workout progress:", {
-        currentBlockIndex,
-        totalBlocks: workoutBlocks.length,
-        blocksWithProgress: workoutBlocksWithProgress.map((b, i) => ({
+        currentSetEntryIndex,
+        totalSetEntries: workoutSetEntries.length,
+        blocksWithProgress: workoutSetEntriesWithProgress.map((b, i) => ({
           blockIndex: i,
-          blockId: b.block.id,
-          blockType: b.block.set_type,
+          setEntryId: b.setEntry.id,
+          blockType: b.setEntry.set_type,
           completedSets: b.completedSets,
           currentExerciseIndex: b.currentExerciseIndex,
           currentSetIndex: b.currentSetIndex,
           isCompleted: b.isCompleted,
           exercises:
-            b.block.exercises?.map((ex: any) => ({
+            b.setEntry.exercises?.map((ex: any) => ({
               exerciseId: ex.exercise_id,
               exerciseName: ex.exercise?.name,
               sets: ex.sets,
               loggedSets:
-                setsByBlock.get(b.block.id)?.get(ex.exercise_id)?.count || 0,
+                setsByBlock.get(b.setEntry.id)?.get(ex.exercise_id)?.count || 0,
             })) || [],
         })),
       });
 
       return {
-        currentBlockIndex,
-        workoutBlocksWithProgress,
+        currentSetEntryIndex,
+        workoutSetEntriesWithProgress,
         workoutStartTime,
       };
     } catch (error) {
@@ -1458,21 +1529,24 @@ export default function LiveWorkout() {
     }
   };
 
-  // Auto-start workout when assignment and exercises are loaded
+  // Auto-start workout when assignment and exercises are loaded (after resume settles)
   useEffect(() => {
+    if (!sessionResolutionDone) return;
     if (assignment && exercises.length > 0 && !sessionId) {
       startWorkout().catch((error) => {
         console.error("Error starting workout:", error);
       });
     }
-  }, [assignment, exercises, sessionId]);
+  }, [assignment, exercises, sessionId, sessionResolutionDone]);
 
   const loadAssignment = async () => {
     if (loadInProgressRef.current) return;
     loadInProgressRef.current = true;
+    setSessionResolutionDone(false);
     const loadId = ++loadIdRef.current;
     const isStale = () => loadId !== loadIdRef.current;
     setContentReady(false);
+    setHasStarted(false);
     setLoading(true);
     setLoadingStartedAt(Date.now());
 
@@ -1551,7 +1625,10 @@ export default function LiveWorkout() {
               id,
               program_assignment_id,
               day_number,
+              week_number,
+              program_day,
               workout_template_id,
+              program_instance_workout_id,
               workout_assignment_id,
               name,
               description,
@@ -1573,32 +1650,31 @@ export default function LiveWorkout() {
             // Guardrail: check canonical program_day_completions ledger — the single
             // source of truth for completion. DO NOT use program_day_assignments.is_completed
             // (stale legacy field). See programStateService.ts for authoritative comment.
+            const { data: completionEntry } = await supabase
+              .from("program_day_completions")
+              .select("id")
+              .eq("program_assignment_id", activeProgramAssignment.id)
+              .eq("program_day_assignment_id", programDayAssignment.id)
+              .maybeSingle();
+
+            if (completionEntry) {
+              addToast({
+                title: "Workout Already Completed",
+                description:
+                  "This program workout has already been completed.",
+                variant: "default",
+              });
+              window.location.href = "/client/train";
+              return;
+            }
+
+            // Resolve master program_schedule.id for progression rules only (separate table).
             const { data: scheduleSlot } = await supabase
               .from("program_schedule")
               .select("id, week_number")
               .eq("program_id", activeProgramAssignment.program_id)
               .eq("day_number", programDayAssignment.day_number)
               .maybeSingle();
-
-            if (scheduleSlot) {
-              const { data: completionEntry } = await supabase
-                .from("program_day_completions")
-                .select("id")
-                .eq("program_assignment_id", activeProgramAssignment.id)
-                .eq("program_schedule_id", scheduleSlot.id)
-                .maybeSingle();
-
-              if (completionEntry) {
-                addToast({
-                  title: "Workout Already Completed",
-                  description:
-                    "This program workout has already been completed.",
-                  variant: "default",
-                });
-                window.location.href = "/client/train";
-                return;
-              }
-            }
 
             // Check if day_type is workout (not rest/assessment)
             if (programDayAssignment.day_type !== "workout") {
@@ -1726,12 +1802,15 @@ export default function LiveWorkout() {
               programDayAssignment.id;
             (resolvedAssignment as any).program_assignment_id =
               activeProgramAssignment.id;
+            (resolvedAssignment as any).program_instance_workout_id =
+              programDayAssignment.program_instance_workout_id ?? null;
+            const wn =
+              (programDayAssignment as { week_number?: number | null }).week_number ??
+              scheduleSlot?.week_number;
+            (resolvedAssignment as any).current_week =
+              typeof wn === "number" && Number.isFinite(wn) ? wn : 1;
             if (scheduleSlot?.id) {
               (resolvedAssignment as any).program_schedule_id = scheduleSlot.id;
-              const wn = (scheduleSlot as { week_number?: number | null })
-                .week_number;
-              (resolvedAssignment as any).current_week =
-                typeof wn === "number" && Number.isFinite(wn) ? wn : 1;
             }
           }
         }
@@ -1772,17 +1851,14 @@ export default function LiveWorkout() {
         }
       }
 
-      // Train hub often opens /start with workout_assignments.id. Program-day URL sets
-      // program_assignment_id above; this bridge covers the assignment-id path when
-      // program_day_assignments.workout_assignment_id points at this assignment.
-      if (
-        resolvedAssignment &&
-        !(resolvedAssignment as { program_assignment_id?: string })
-          .program_assignment_id
-      ) {
+      // Train hub opens /start with workout_assignments.id — always bridge instance
+      // context from program_day_assignments (instance workout id lives on pda, not wa).
+      if (resolvedAssignment?.id) {
         const { data: dayRows, error: dayLinkError } = await supabase
           .from("program_day_assignments")
-          .select("id, program_assignment_id, day_number")
+          .select(
+            "id, program_assignment_id, day_number, week_number, program_instance_workout_id",
+          )
           .eq("workout_assignment_id", resolvedAssignment.id)
           .order("updated_at", { ascending: false })
           .limit(1);
@@ -1807,34 +1883,37 @@ export default function LiveWorkout() {
             );
           }
           if (paRow?.program_id != null) {
+            const ra = resolvedAssignment as {
+              program_assignment_id?: string;
+              program_day_assignment_id?: string;
+              program_instance_workout_id?: string | null;
+              current_week?: number;
+              program_schedule_id?: string;
+            };
+            ra.program_assignment_id =
+              ra.program_assignment_id ?? dayLink.program_assignment_id;
+            ra.program_day_assignment_id = dayLink.id;
+            ra.program_instance_workout_id =
+              dayLink.program_instance_workout_id ?? null;
+            const wn = dayLink.week_number;
+            ra.current_week =
+              typeof wn === "number" && Number.isFinite(wn) ? wn : 1;
             const { data: slotRow } = await supabase
               .from("program_schedule")
-              .select("id, week_number")
+              .select("id")
               .eq("program_id", paRow.program_id)
               .eq("day_number", dayLink.day_number)
               .maybeSingle();
-            (
-              resolvedAssignment as { program_assignment_id?: string }
-            ).program_assignment_id = dayLink.program_assignment_id;
-            (
-              resolvedAssignment as { program_day_assignment_id?: string }
-            ).program_day_assignment_id = dayLink.id;
             if (slotRow?.id) {
-              (
-                resolvedAssignment as { program_schedule_id?: string }
-              ).program_schedule_id = slotRow.id;
-              const wn = (slotRow as { week_number?: number | null })
-                .week_number;
-              (resolvedAssignment as { current_week?: number }).current_week =
-                typeof wn === "number" && Number.isFinite(wn) ? wn : 1;
+              ra.program_schedule_id = slotRow.id;
             }
             console.log(
               "[loadAssignment] linked program context from workout_assignment_id:",
               {
-                program_assignment_id: dayLink.program_assignment_id,
-                program_schedule_id: (slotRow as { id?: string } | null)?.id,
-                current_week: (resolvedAssignment as { current_week?: number })
-                  .current_week,
+                program_assignment_id: ra.program_assignment_id,
+                program_day_assignment_id: dayLink.id,
+                program_instance_workout_id: ra.program_instance_workout_id,
+                current_week: ra.current_week,
               },
             );
           }
@@ -1855,82 +1934,100 @@ export default function LiveWorkout() {
       // Show assignment and header immediately so the screen doesn't stall on blocks load
       if (isStale()) return;
       setAssignment(combinedAssignment);
+      // Pre-start summary extras (description, notes, estimated duration, PR chips).
+      // Keep non-blocking so we still render the gate quickly.
+      setEstimatedDurationMin(null);
+      void (async () => {
+        try {
+          const templateId = combinedAssignment.workout_template_id;
+          if (!templateId) return;
+          const { data: tplRow } = await supabase
+            .from("workout_templates")
+            .select("estimated_duration")
+            .eq("id", templateId)
+            .maybeSingle();
+          if (!isStale()) {
+            setEstimatedDurationMin(tplRow?.estimated_duration ?? null);
+          }
+        } catch {
+          /* non-blocking */
+        }
+      })();
+
+      void (async () => {
+        try {
+          const userId = user.id;
+          const prs = await fetchPersonalRecords(userId);
+          if (!isStale()) setPersonalRecordsForPR(prs ?? []);
+        } catch {
+          /* non-blocking */
+        }
+      })();
       setLoading(false);
       setLoadingStartedAt(null);
 
       // Program-day resolution attaches program_assignment_id without DB is_program_assignment.
-      // Treat that as a program workout so we load progression blocks + enrich client rules RIR.
       const isProgramAssignment =
         (resolvedAssignment as any).is_program_assignment === true ||
         Boolean((resolvedAssignment as any).program_assignment_id);
-      let workoutBlocks: any[] = [];
-      /** Raw RPC payload (template path only); used to collect exercise_ids from nested tables. */
+      let workoutSetEntries: any[] = [];
+      /** Raw RPC payload (standalone template path); used to collect exercise_ids from nested tables. */
       let rpcRawBlocks: unknown = null;
 
       if (isProgramAssignment) {
-        // Load blocks from client_program_progression_rules
-        const { ProgramProgressionService } =
-          await import("@/lib/programProgressionService");
-        const programAssignmentId = (resolvedAssignment as any)
-          .program_assignment_id;
-        const currentWeek = (resolvedAssignment as any).current_week || 1;
-        const templateId = (resolvedAssignment as any).workout_template_id;
-        const programScheduleId = (resolvedAssignment as any)
-          .program_schedule_id;
+        const programInstanceWorkoutId = (resolvedAssignment as {
+          program_instance_workout_id?: string | null;
+        }).program_instance_workout_id;
 
-        console.log("Loading blocks from progression rules:", {
-          programAssignmentId,
-          currentWeek,
-          programScheduleId,
-          templateId,
+        console.log("Loading blocks from program instance workout:", {
+          program_assignment_id: (resolvedAssignment as { program_assignment_id?: string })
+            .program_assignment_id,
+          program_instance_workout_id: programInstanceWorkoutId,
         });
 
-        workoutBlocks =
-          await ProgramProgressionService.getClientProgressionBlocksForTemplate(
-            programAssignmentId,
-            currentWeek,
-            templateId,
-          );
+        if (!programInstanceWorkoutId) {
+          addToast({
+            title: "Workout not configured",
+            description:
+              "This program day is missing instance workout content. Please contact your coach.",
+            variant: "destructive",
+          });
+          window.location.href = "/client/train";
+          return;
+        }
 
-        // Debug: Log sets values from loaded blocks
+        const { loadWorkoutBlocksByContentId } = await import(
+          "@/lib/loadWorkoutBlocksByContentId"
+        );
+        workoutSetEntries = await loadWorkoutBlocksByContentId(
+          supabase,
+          programInstanceWorkoutId,
+          { preferInstance: true },
+        );
+
         console.log(
           "🔢 [Page] Loaded workout blocks with sets:",
-          workoutBlocks.map((block) => ({
+          workoutSetEntries.map((block) => ({
             blockOrder: block.set_order,
             blockType: block.set_type,
             exercises: block.exercises?.map((ex: any) => ({
               exercise_id: ex.exercise_id,
               sets: ex.sets,
               reps: ex.reps,
+              rir: ex.rir,
             })),
           })),
         );
 
-        if (!workoutBlocks || workoutBlocks.length === 0) {
-          console.warn(
-            `[workout-start] No progression rules found for template ${templateId}, falling back to base template`,
-          );
-          const { data: rpcBlocksFallback, error: rpcFallbackError } =
-            await supabase.rpc("get_workout_blocks", {
-              p_template_id: templateId,
-            });
-          if (rpcFallbackError) {
-            console.error(
-              "[start] get_workout_blocks RPC error (no progression fallback):",
-              rpcFallbackError,
-            );
-            throw new Error(
-              rpcFallbackError.message ||
-                "Failed to load workout blocks from template",
-            );
-          }
-          rpcRawBlocks = rpcBlocksFallback ?? null;
-          workoutBlocks = mapWorkoutBlocksRpcToSetEntries(
-            rpcBlocksFallback ?? [],
-          );
-          if (!workoutBlocks || workoutBlocks.length === 0) {
-            throw new Error("No workout blocks found for this template");
-          }
+        if (!workoutSetEntries || workoutSetEntries.length === 0) {
+          addToast({
+            title: "Workout content unavailable",
+            description:
+              "Could not load exercises for this program workout. Please contact your coach.",
+            variant: "destructive",
+          });
+          window.location.href = "/client/train";
+          return;
         }
       } else {
         // Regular workout assignment - load blocks from template
@@ -1949,44 +2046,34 @@ export default function LiveWorkout() {
           throw new Error(rpcError.message || "Failed to load workout blocks");
         }
         rpcRawBlocks = rpcBlocks ?? null;
-        workoutBlocks = mapWorkoutBlocksRpcToSetEntries(rpcBlocks ?? []);
+        workoutSetEntries = mapWorkoutBlocksRpcToSetEntries(rpcBlocks ?? []);
 
-        if (!workoutBlocks || workoutBlocks.length === 0) {
+        if (!workoutSetEntries || workoutSetEntries.length === 0) {
           throw new Error("No workout blocks found for this template");
         }
       }
 
-      const blockIdsForRir = workoutBlocks
-        .map((b: { id?: string }) => b.id)
-        .filter((id): id is string => Boolean(id));
-      try {
-        await enrichWorkoutBlocksPrescribedRir(supabase, workoutBlocks, {
-          blockIds: blockIdsForRir,
-          programAssignmentId: isProgramAssignment
-            ? ((resolvedAssignment as { program_assignment_id?: string | null })
-                .program_assignment_id ?? null)
-            : null,
-          programScheduleId: isProgramAssignment
-            ? ((resolvedAssignment as { program_schedule_id?: string | null })
-                .program_schedule_id ?? null)
-            : null,
-          weekNumber: isProgramAssignment
-            ? Number(
-                (resolvedAssignment as { current_week?: number | null })
-                  .current_week ?? 1,
-              )
-            : null,
-          workoutAssignmentId: combinedAssignment.id,
-        });
-      } catch (e) {
-        console.warn("[loadAssignment] enrichWorkoutBlocksPrescribedRir:", e);
+      // Program instance prescriptions (pisp via get_instance_workout_canvas) already
+      // include RIR — skip cppr/master overlay. Standalone assignments still enrich.
+      if (!isProgramAssignment) {
+        const blockIdsForRir = workoutSetEntries
+          .map((b: { id?: string }) => b.id)
+          .filter((id): id is string => Boolean(id));
+        try {
+          await enrichWorkoutBlocksPrescribedRir(supabase, workoutSetEntries, {
+            blockIds: blockIdsForRir,
+            workoutAssignmentId: combinedAssignment.id,
+          });
+        } catch (e) {
+          console.warn("[loadAssignment] enrichWorkoutBlocksPrescribedRir:", e);
+        }
       }
 
       console.log(
-        "[DEBUG] Post-enrichment workoutBlocks:",
+        "[DEBUG] Post-enrichment workoutSetEntries:",
         JSON.stringify(
-          workoutBlocks.map((b: { id?: string; exercises?: unknown[] }) => ({
-            blockId: b.id,
+          workoutSetEntries.map((b: { id?: string; exercises?: unknown[] }) => ({
+            setEntryId: b.id,
             exercises: (b.exercises ?? []).map(
               (e: Record<string, unknown>) => ({
                 id: e.id,
@@ -2013,8 +2100,8 @@ export default function LiveWorkout() {
         current_week: (resolvedAssignment as any).current_week,
       });
 
-      // Convert WorkoutBlock[] to ClientBlockRecord[] format
-      const clientBlocks: ClientBlockRecord[] = workoutBlocks.map((block) => ({
+      // Convert WorkoutSetEntry[] to ClientBlockRecord[] format
+      const clientBlocks: ClientBlockRecord[] = workoutSetEntries.map((block) => ({
         id: block.id,
         set_order: block.set_order,
         set_type: block.set_type,
@@ -2040,6 +2127,9 @@ export default function LiveWorkout() {
           rest_seconds: ex.rest_seconds ?? null,
           load_percentage: (ex as any).load_percentage ?? null,
           notes: ex.notes ?? null,
+          prescriptions: Array.isArray(ex.prescriptions)
+            ? ex.prescriptions
+            : undefined,
           time_protocols: ex.time_protocols ?? [], // Exercise-level time protocols for tabata/amrap/emom/etc
           // Preserve special set data
           drop_sets: ex.drop_sets ?? [],
@@ -2053,7 +2143,7 @@ export default function LiveWorkout() {
       const exerciseIds = Array.from(
         new Set(
           [
-            ...collectExerciseIdsDeep(workoutBlocks),
+            ...collectExerciseIdsDeep(workoutSetEntries),
             ...(rpcRawBlocks != null
               ? collectExerciseIdsDeep(rpcRawBlocks)
               : []),
@@ -2063,7 +2153,7 @@ export default function LiveWorkout() {
 
       console.log(
         "[loadAssignment] exercise ids by block (set_type + exercise_ids)",
-        workoutBlocks.map((block) => ({
+        workoutSetEntries.map((block) => ({
           set_type: block.set_type,
           exercise_ids: collectExerciseIdsDeep(block),
         })),
@@ -2126,7 +2216,7 @@ export default function LiveWorkout() {
         return {};
       };
 
-      const workoutBlocksConverted: WorkoutBlock[] = clientBlocks.map(
+      const workoutBlocksConverted: WorkoutSetEntry[] = clientBlocks.map(
         (block: ClientBlockRecord) => {
           const blockType = (block.set_type as any) || "straight_set";
           const blockParameters = safeParse(block.block_parameters);
@@ -2164,6 +2254,7 @@ export default function LiveWorkout() {
                   exercise.rest_seconds ?? block.rest_seconds ?? undefined,
                 load_percentage: (exercise as any).load_percentage ?? undefined,
                 notes: exercise.notes ?? undefined,
+                prescriptions: exercise.prescriptions,
                 time_protocols: exercise.time_protocols ?? [], // For tabata/amrap/emom/for_time blocks
                 exercise: exercise.exercise_id
                   ? {
@@ -2225,7 +2316,7 @@ export default function LiveWorkout() {
             time_protocols: block.time_protocols ?? [], // Full array for tabata/amrap/emom/for_time
             created_at: now,
             updated_at: now,
-          } as WorkoutBlock;
+          } as WorkoutSetEntry;
         },
       );
 
@@ -2245,7 +2336,7 @@ export default function LiveWorkout() {
                     ? block.total_sets
                     : undefined,
               reps: exercise.reps ?? block.reps_per_set ?? "",
-              rest_seconds: exercise.rest_seconds ?? block.rest_seconds ?? 60,
+              rest_seconds: exercise.rest_seconds ?? block.rest_seconds ?? undefined,
               load_percentage: (exercise as any).load_percentage ?? undefined,
               notes: exercise.notes ?? "",
               exercise_type: exerciseType,
@@ -2300,8 +2391,8 @@ export default function LiveWorkout() {
       }
 
       if (workoutBlocksConverted.length > 0) {
-        // Block UI: set workoutBlocks before useBlockSystem so a stale abort never
-        // leaves useBlockSystem=true with workoutBlocks=[] (broken Traditional branch).
+        // Block UI: set workoutSetEntries before useBlockSystem so a stale abort never
+        // leaves useBlockSystem=true with workoutSetEntries=[] (broken Traditional branch).
 
         // ========================================================================
         // WORKOUT SESSION RESUMPTION LOGIC
@@ -2314,8 +2405,8 @@ export default function LiveWorkout() {
         );
 
         let restoredProgress: {
-          currentBlockIndex: number;
-          workoutBlocksWithProgress: LiveWorkoutBlock[];
+          currentSetEntryIndex: number;
+          workoutSetEntriesWithProgress: LiveWorkoutSetEntry[];
           workoutStartTime: number;
         } | null = null;
 
@@ -2334,17 +2425,20 @@ export default function LiveWorkout() {
               started_at?: string;
               assignment_id?: string;
               program_assignment_id?: string;
-              program_schedule_id?: string;
+              program_day_assignment_id?: string;
             } | null;
             activeLog?: {
               id: string;
               started_at?: string;
               workout_session_id?: string;
               program_assignment_id?: string;
-              program_schedule_id?: string;
+              program_day_assignment_id?: string;
             } | null;
             setLogs?: any[];
-            blockCompletions?: { workout_set_entry_id: string }[];
+            blockCompletions?: {
+        workout_set_entry_id?: string | null;
+        program_instance_set_entry_id?: string | null;
+      }[];
             dayCompletions?: string[];
             coachId?: string | null;
           } = {};
@@ -2364,11 +2458,11 @@ export default function LiveWorkout() {
           }
 
           // Guard: if this program slot is already in dayCompletions, redirect
-          const scheduleId = sessionData.activeLog?.program_schedule_id;
+          const dayAssignmentId = sessionData.activeLog?.program_day_assignment_id;
           const dayCompletions = Array.isArray(sessionData.dayCompletions)
             ? sessionData.dayCompletions
             : [];
-          if (scheduleId && dayCompletions.includes(scheduleId)) {
+          if (dayAssignmentId && dayCompletions.includes(dayAssignmentId)) {
             addToast({
               title: "Workout Already Completed",
               description:
@@ -2418,16 +2512,18 @@ export default function LiveWorkout() {
               if (isStale()) return;
               // Set restored workout start time
               setWorkoutStartTime(restoredProgress.workoutStartTime);
+              // Skip START gate — already in progress (set logs / block completions)
+              setHasStarted(true);
 
               // Set restored blocks with progress
               const progress = restoredProgress;
-              setWorkoutBlocks(progress.workoutBlocksWithProgress);
+              setWorkoutSetEntries(progress.workoutSetEntriesWithProgress);
               setUseBlockSystem(true);
               setContentReady(true);
               // Seed parent-owned logged sets so they persist when navigating blocks
-              setLoggedSetsByBlockId((prev) => {
+              setLoggedSetsBySetEntryId((prev) => {
                 const next = { ...prev };
-                progress.workoutBlocksWithProgress.forEach((b) => {
+                progress.workoutSetEntriesWithProgress.forEach((b) => {
                   const id = b.block?.id;
                   if (id && b.existingSetLogs?.length)
                     next[id] = b.existingSetLogs;
@@ -2435,14 +2531,14 @@ export default function LiveWorkout() {
                 return next;
               });
               // Only show completion when ALL blocks are complete
-              setIsLastBlockComplete(
-                progress.workoutBlocksWithProgress.every(
+              setIsLastSetEntryComplete(
+                progress.workoutSetEntriesWithProgress.every(
                   (block) => block.isCompleted,
                 ),
               );
 
               // Set restored current block index
-              setCurrentBlockIndex(progress.currentBlockIndex);
+              setCurrentSetEntryIndex(progress.currentSetEntryIndex);
 
               // Store workout_log_id so we know we have an active session
               setWorkoutLogId(activeLog.id);
@@ -2470,7 +2566,7 @@ export default function LiveWorkout() {
               console.log("✅ Workout session restored successfully:", {
                 workoutLogId: activeLog.id,
                 workoutSessionId: activeLog.workout_session_id,
-                currentBlockIndex: restoredProgress.currentBlockIndex,
+                currentSetEntryIndex: restoredProgress.currentSetEntryIndex,
                 startedAt: new Date(
                   restoredProgress.workoutStartTime,
                 ).toISOString(),
@@ -2498,21 +2594,21 @@ export default function LiveWorkout() {
         // If no progress was restored, initialize blocks normally
         if (!restoredProgress) {
           if (isStale()) return;
-          const liveBlocks: LiveWorkoutBlock[] = workoutBlocksConverted.map(
-            (block) => ({
-              block,
+          const liveSetEntries: LiveWorkoutSetEntry[] = workoutBlocksConverted.map(
+            (setEntry) => ({
+              setEntry,
               currentExerciseIndex: 0,
               currentSetIndex: 0,
               isCompleted: false,
               completedSets: 0,
               totalSets:
-                block.total_sets ||
-                (block.exercises && block.exercises[0]?.sets) ||
+                setEntry.total_sets ||
+                (setEntry.exercises && setEntry.exercises[0]?.sets) ||
                 1,
               existingSetLogs: [],
             }),
           );
-          setWorkoutBlocks(liveBlocks);
+          setWorkoutSetEntries(liveSetEntries);
           setUseBlockSystem(true);
           setContentReady(true);
         }
@@ -2580,6 +2676,7 @@ export default function LiveWorkout() {
       if (!isStale()) {
         setLoading(false);
         setLoadingStartedAt(null);
+        setSessionResolutionDone(true);
       }
       loadInProgressRef.current = false;
     }
@@ -2588,7 +2685,7 @@ export default function LiveWorkout() {
   // Load progression suggestions for exercises in the workout
   const loadProgressionSuggestions = async (
     workoutAssignmentId: string,
-    blocks: WorkoutBlock[],
+    blocks: WorkoutSetEntry[],
     exerciseMeta: Map<
       string,
       {
@@ -2683,6 +2780,7 @@ export default function LiveWorkout() {
         currentWeekNumber,
         exerciseIds,
         exerciseNames,
+        blocks,
       );
 
       setProgressionSuggestions(suggestions);
@@ -2717,8 +2815,14 @@ export default function LiveWorkout() {
             .maybeSingle();
 
           if (existingSession && !existingError) {
-            // Reuse existing session
+            await abandonOtherInProgressSessions(
+              user.id,
+              existingSession.id,
+              supabase,
+            );
             setSessionId(existingSession.id);
+            // Train START intent: immediately enter live execution UI.
+            if (explicitStartIntent) setHasStarted(true);
             console.log(
               "✅ Reusing existing workout session:",
               existingSession.id,
@@ -2742,11 +2846,14 @@ export default function LiveWorkout() {
             .single();
 
           if (error) throw error;
+          await abandonOtherInProgressSessions(user.id, data.id, supabase);
           setSessionId(data.id);
+          if (explicitStartIntent) setHasStarted(true);
           console.log("✅ Created new workout session:", data.id);
         } catch (dbError) {
           console.log("Database not ready, using localStorage fallback");
           setSessionId(Date.now().toString());
+          if (explicitStartIntent) setHasStarted(true);
         }
       }
     } catch (error) {
@@ -2940,7 +3047,7 @@ export default function LiveWorkout() {
       return;
     }
 
-    setRestTime(currentExercise.rest_seconds || 60);
+    setRestTime(currentExercise.rest_seconds || 0);
     setShowRestTimer(true);
     setIsLoggingSet(false);
   };
@@ -3138,7 +3245,7 @@ export default function LiveWorkout() {
     }
 
     // Start rest timer
-    setRestTime(currentExercise.rest_seconds || 60);
+    setRestTime(currentExercise.rest_seconds || 0);
     setShowRestTimer(true);
     setIsLoggingSet(false);
   };
@@ -3290,7 +3397,7 @@ export default function LiveWorkout() {
     }
 
     // Start rest timer
-    setRestTime(currentExercise.rest_seconds || 60);
+    setRestTime(currentExercise.rest_seconds || 0);
     setShowRestTimer(true);
     setIsLoggingSet(false);
   };
@@ -3379,7 +3486,7 @@ export default function LiveWorkout() {
       setCurrentSetData({ weight: 0, reps: 0 });
     } else {
       // More sets in this exercise — show rest timer
-      setRestTime(currentExercise.rest_seconds || 60);
+      setRestTime(currentExercise.rest_seconds || 0);
       setShowRestTimer(true);
       setCurrentSetData({ weight: 0, reps: 0 });
     }
@@ -3533,7 +3640,7 @@ export default function LiveWorkout() {
       // Background save continues below
     } else {
       // Start rest timer
-      setRestTime(current.rest_seconds || 60);
+      setRestTime(current.rest_seconds || 0);
       setShowRestTimer(true);
     }
 
@@ -3911,7 +4018,7 @@ export default function LiveWorkout() {
     personalBest: null,
     loading: false,
   });
-  // Cache of previous performance per exercise (passed to LiveWorkoutBlockExecutor)
+  // Cache of previous performance per exercise (passed to LiveWorkoutSetEntryExecutor)
   const [previousPerformanceMap, setPreviousPerformanceMap] = useState<
     Map<string, any>
   >(new Map());
@@ -4209,7 +4316,7 @@ export default function LiveWorkout() {
   ]);
 
   // NOTE: fetchPreviousPerformance is now triggered via onExerciseChanged on
-  // LiveWorkoutBlockExecutor, which tracks currentExercise correctly by index.
+  // LiveWorkoutSetEntryExecutor, which tracks currentExercise correctly by index.
   // The old useEffect here was dead code because currentExercise in the start
   // page scope no longer reflects the executor's currentExerciseIndex.
 
@@ -4321,9 +4428,10 @@ export default function LiveWorkout() {
 
   return (
     <ProtectedRoute requiredRole="client">
-      <AnimatedBackground>
-        {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 min-h-screen pb-[var(--fc-bottom-safe-area)]">
+      <div
+        className="relative min-h-screen w-full min-w-0 pb-[var(--fc-bottom-safe-area)]"
+        style={{ background: "var(--fc-bg-deep)" }}
+      >
           {/* Rest Timer Overlay */}
           <RestTimerOverlay
             isActive={showRestTimer}
@@ -4336,15 +4444,16 @@ export default function LiveWorkout() {
           />
 
           <ClientPageShell
+            backdrop="none"
             className={
-              useBlockSystem && workoutBlocks.length > 0
+              useBlockSystem && workoutSetEntries.length > 0
                 ? "max-w-2xl mx-auto flex min-h-screen flex-col gap-3 pb-[var(--fc-bottom-safe-area)] pt-[calc(env(safe-area-inset-top,0px)+12px)] sm:gap-4"
                 : "max-w-2xl mx-auto flex min-h-screen flex-col gap-5 pb-[var(--fc-bottom-safe-area)]"
             }
             style={{ gap: "var(--fc-gap-sections)" }}
           >
             {/* Block system: back + title live in BaseBlockExecutorLayout */}
-            {(!useBlockSystem || workoutBlocks.length === 0) && (
+            {(!useBlockSystem || workoutSetEntries.length === 0) && (
               <div className="flex items-center gap-3 mb-3">
                 <IconButton
                   variant="filled"
@@ -4396,145 +4505,244 @@ export default function LiveWorkout() {
                   This may take a few seconds.
                 </p>
               </div>
-            ) : useBlockSystem && workoutBlocks.length > 0 ? (
+            ) : useBlockSystem && workoutSetEntries.length > 0 ? (
               <>
                 {(() => {
-                  const totalExercises = countWorkoutExercises(workoutBlocks);
-                  const globalExerciseIndex = getGlobalExerciseIndex(
-                    workoutBlocks,
-                    currentBlockIndex,
-                    workoutBlocks[currentBlockIndex]?.currentExerciseIndex ?? 0,
+                  const totalExercises = countWorkoutExercises(workoutSetEntries);
+                  const totalSets = workoutSetEntries.reduce(
+                    (sum, entry) => sum + getGroupTotalSets(entry),
+                    0,
                   );
+                  const globalExerciseIndex = getGlobalExerciseIndex(
+                    workoutSetEntries,
+                    currentSetEntryIndex,
+                    workoutSetEntries[currentSetEntryIndex]?.currentExerciseIndex ?? 0,
+                  );
+                  const progressCurrent = Math.min(
+                    globalExerciseIndex + 1,
+                    Math.max(1, totalExercises),
+                  );
+                  const progressTotal = Math.max(1, totalExercises);
 
                   return (
-                    <div className="flex items-center justify-between px-5 pb-1 pt-3.5">
+                    <header className="border-b border-[color:var(--fc-hairline)] px-[18px] pb-[11px] pt-[15px]">
                       <button
                         type="button"
-                        onClick={() => {
-                          if (
-                            typeof window !== "undefined" &&
-                            window.confirm("Exit workout? Progress is saved.")
-                          ) {
-                            window.location.href = "/client/train";
-                          }
-                        }}
-                        className="flex cursor-pointer items-center gap-1.5 text-[13px] font-medium text-zinc-300 transition-colors hover:text-white"
+                        onClick={() => setPendingExitConfirm(true)}
+                        className="font-[family-name:var(--f-mono)] text-[10px] uppercase tracking-[0.12em] text-[color:var(--fc-text-subtle,#5C6470)] transition-colors hover:text-[color:var(--fc-text-primary)]"
                       >
-                        <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />
-                        Back
+                        ‹ Train
                       </button>
-                      <ExecProgressSegments
-                        variant="exercises"
-                        totalExercises={Math.max(1, totalExercises)}
-                        currentExerciseIndex={globalExerciseIndex}
-                      />
-                    </div>
+                      <h1
+                        className="mt-[7px] mb-1 truncate text-[20px] font-extrabold leading-tight text-[color:var(--fc-text-primary)]"
+                        style={{
+                          fontFamily:
+                            "var(--f-display, var(--font-display, ui-sans-serif))",
+                          fontStretch: "125%",
+                        }}
+                      >
+                        {assignment?.name || "Workout"}
+                      </h1>
+                      {hasStarted ? (
+                        <>
+                          <div className="font-[family-name:var(--f-mono)] text-[10.5px] text-[color:var(--fc-text-dim,#98A2B3)]">
+                            <span className="font-semibold text-[color:var(--fc-text-primary)]">
+                              {progressCurrent}
+                            </span>
+                            {" of "}
+                            {progressTotal}
+                            {" · "}
+                            <span className="font-semibold text-[color:var(--fc-text-primary)]">
+                              {elapsedLabel}
+                            </span>
+                            {" elapsed"}
+                          </div>
+                          <ExecProgressSegments
+                            className="mt-[9px]"
+                            variant="exercises"
+                            totalExercises={progressTotal}
+                            currentExerciseIndex={globalExerciseIndex}
+                            currentHue={groupIndexToHue(currentSetEntryIndex)}
+                          />
+                        </>
+                      ) : (
+                        <div className="font-[family-name:var(--f-mono)] text-[10.5px] text-[color:var(--fc-text-dim,#98A2B3)]">
+                          <span className="font-semibold text-[color:var(--fc-text-primary)]">
+                            {totalSets}
+                          </span>
+                          {" sets · "}
+                          <span className="font-semibold text-[color:var(--fc-text-primary)]">
+                            {totalExercises}
+                          </span>
+                          {" exercises"}
+                          {estimatedDurationMin != null ? (
+                            <>
+                              {" · "}
+                              <span className="font-semibold text-[color:var(--fc-text-primary)]">
+                                ~{estimatedDurationMin} min
+                              </span>
+                            </>
+                          ) : null}
+                        </div>
+                      )}
+                    </header>
                   );
                 })()}
 
-                {/* Flow gap below fixed progress bar so first content isn’t tight to the track */}
-                <div className="h-2 w-full shrink-0" aria-hidden />
+                {!hasStarted &&
+                (assignment?.description || assignment?.notes) ? (
+                  <div className="px-[18px] pb-3 pt-1">
+                    {assignment?.description ? (
+                      <p className="text-xs fc-text-dim leading-relaxed">
+                        {assignment.description}
+                      </p>
+                    ) : null}
+                    {assignment?.notes ? (
+                      <p className="mt-1 text-xs fc-text-dim leading-relaxed">
+                        {assignment.notes}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 <div className="w-full">
-                  <WorkoutExecutionChromeProvider
-                    value={{ hideCompactBack: true }}
-                  >
-                    <LiveWorkoutBlockExecutor
-                      block={workoutBlocks[currentBlockIndex]}
-                      onBlockComplete={handleBlockComplete}
-                      onNextBlock={handleNextBlock}
-                      onSetLogUpsert={handleSetLogUpsert}
-                      onSetEditSaved={handleSetEditSaved}
-                      loggedSets={(() => {
-                        const block = workoutBlocks[currentBlockIndex];
-                        if (!block?.block?.id) return [];
-                        return (
-                          loggedSetsByBlockId[block.block.id] ??
-                          block.existingSetLogs ??
-                          []
-                        );
-                      })()}
-                      allowSetEditDelete={true}
-                      e1rmMap={e1rmMap}
-                      onE1rmUpdate={(exerciseId, e1rm) => {
-                        setE1rmMap((prev) => ({
-                          ...prev,
-                          [exerciseId]: e1rm,
-                        }));
-                      }}
-                      lastPerformedWeightByExerciseId={
-                        lastPerformedWeightByExerciseId
-                      }
-                      lastSessionWeightByExerciseId={
-                        lastSessionWeightByExerciseId
-                      }
-                      onWeightLogged={(exerciseId: string, weight: number) => {
-                        setLastPerformedWeightByExerciseId((prev) => ({
-                          ...prev,
-                          [exerciseId]: weight,
-                        }));
-                      }}
-                      sessionId={sessionId}
-                      assignmentId={assignment?.id || assignmentId}
-                      allBlocks={workoutBlocks}
-                      currentBlockIndex={currentBlockIndex}
-                      onBlockChange={handleBlockChange}
-                      onSetLogged={handleSetLogged}
-                      onExerciseComplete={handleExerciseComplete}
-                      progressionSuggestions={progressionSuggestions}
-                      previousPerformanceMap={previousPerformanceMap}
-                      onExerciseChanged={(exerciseId) =>
-                        fetchPreviousPerformance(exerciseId).catch((err) =>
-                          console.error(
-                            "Error fetching previous performance:",
-                            err,
-                          ),
-                        )
-                      }
-                      onPRDetected={(pr) => setPrCelebrationData(pr)}
-                      onAchievementsUnlocked={(achievements, context) => {
-                        const mapped: Achievement[] = achievements.map((a) => ({
-                          id: a.templateId,
-                          name: a.templateName ?? "Achievement",
-                          description:
-                            a.description ??
-                            (a.nextTier
-                              ? `Next: ${(a.nextTier as { label?: string })?.label} — ${a.currentMetricValue ?? 0}/${(a.nextTier as { threshold?: number })?.threshold ?? 0}`
-                              : ""),
-                          icon: a.templateIcon ?? "🏆",
-                          tier: (a.tier ?? null) as Achievement["tier"],
-                          unlocked: true,
-                        }));
-                        const deferForPr =
-                          prCelebrationData != null ||
-                          context?.prDetectedThisSync === true;
-                        if (deferForPr) {
-                          pendingAchievementsRef.current = [
-                            ...pendingAchievementsRef.current,
-                            ...mapped,
-                          ];
-                        } else {
-                          setNewAchievementsQueue((prev) => [
-                            ...prev,
-                            ...mapped,
-                          ]);
-                          setAchievementModalIndex(0);
-                        }
-                      }}
-                      onExitWorkout={() => {
-                        if (
-                          typeof window !== "undefined" &&
-                          window.confirm("Exit workout? Progress is saved.")
-                        ) {
-                          window.location.href = "/client/train";
-                        }
-                      }}
-                      clientBodyWeightKg={clientBodyWeightKg}
-                    />
-                  </WorkoutExecutionChromeProvider>
+                  <ExecGroupList
+                    entries={workoutSetEntries}
+                    currentIndex={currentSetEntryIndex}
+                    preStart={!hasStarted}
+                    onSelectGroup={
+                      hasStarted ? handleSetEntryChange : undefined
+                    }
+                    getExercisePreviousBest={(exerciseName: string) => {
+                      const key = exerciseName?.toLowerCase?.().trim();
+                      if (!key) return null;
+                      const hit = personalRecordsForPR.find(
+                        (p: any) =>
+                          String(p?.exerciseName ?? "")
+                            .toLowerCase()
+                            .trim() === key,
+                      );
+                      if (!hit) return null;
+                      if (!Number.isFinite(hit.weight) || !Number.isFinite(hit.reps)) return null;
+                      if (Number(hit.weight) <= 0 || Number(hit.reps) <= 0) return null;
+                      return { weight: Number(hit.weight), reps: Number(hit.reps) };
+                    }}
+                    currentSlot={
+                      hasStarted ? (
+                      <WorkoutExecutionChromeProvider
+                        value={{
+                          hideCompactBack: true,
+                          hideNavigationControls: true,
+                        }}
+                      >
+                        <LiveWorkoutSetEntryExecutor
+                          liveSetEntry={workoutSetEntries[currentSetEntryIndex]}
+                          onSetEntryComplete={handleSetEntryComplete}
+                          onNextSetEntry={handleNextSetEntry}
+                          onSetLogUpsert={handleSetLogUpsert}
+                          onSetEditSaved={handleSetEditSaved}
+                          loggedSets={(() => {
+                            const entry = workoutSetEntries[currentSetEntryIndex];
+                            if (!entry?.setEntry?.id) return [];
+                            return (
+                              loggedSetsBySetEntryId[entry.setEntry.id] ??
+                              entry.existingSetLogs ??
+                              []
+                            );
+                          })()}
+                          allowSetEditDelete={true}
+                          e1rmMap={e1rmMap}
+                          onE1rmUpdate={(exerciseId, e1rm) => {
+                            setE1rmMap((prev) => ({
+                              ...prev,
+                              [exerciseId]: e1rm,
+                            }));
+                          }}
+                          lastPerformedWeightByExerciseId={
+                            lastPerformedWeightByExerciseId
+                          }
+                          lastSessionWeightByExerciseId={
+                            lastSessionWeightByExerciseId
+                          }
+                          onWeightLogged={(exerciseId: string, weight: number) => {
+                            setLastPerformedWeightByExerciseId((prev) => ({
+                              ...prev,
+                              [exerciseId]: weight,
+                            }));
+                          }}
+                          sessionId={sessionId}
+                          assignmentId={assignment?.id || assignmentId}
+                          allBlocks={workoutSetEntries}
+                          currentSetEntryIndex={currentSetEntryIndex}
+                          onSetEntryChange={handleSetEntryChange}
+                          onSetLogged={handleSetLogged}
+                          onExerciseComplete={handleExerciseComplete}
+                          progressionSuggestions={progressionSuggestions}
+                          previousPerformanceMap={previousPerformanceMap}
+                          onExerciseChanged={(exerciseId) =>
+                            fetchPreviousPerformance(exerciseId).catch((err) =>
+                              console.error(
+                                "Error fetching previous performance:",
+                                err,
+                              ),
+                            )
+                          }
+                          onPRDetected={(pr) => setPrCelebrationData(pr)}
+                          onAchievementsUnlocked={(achievements, context) => {
+                            const mapped: Achievement[] = achievements.map((a) => ({
+                              id: a.templateId,
+                              name: a.templateName ?? "Achievement",
+                              description:
+                                a.description ??
+                                (a.nextTier
+                                  ? `Next: ${(a.nextTier as { label?: string })?.label} — ${a.currentMetricValue ?? 0}/${(a.nextTier as { threshold?: number })?.threshold ?? 0}`
+                                  : ""),
+                              icon: a.templateIcon ?? "🏆",
+                              tier: (a.tier ?? null) as Achievement["tier"],
+                              unlocked: true,
+                            }));
+                            const deferForPr =
+                              prCelebrationData != null ||
+                              context?.prDetectedThisSync === true;
+                            if (deferForPr) {
+                              pendingAchievementsRef.current = [
+                                ...pendingAchievementsRef.current,
+                                ...mapped,
+                              ];
+                            } else {
+                              setNewAchievementsQueue((prev) => [
+                                ...prev,
+                                ...mapped,
+                              ]);
+                              setAchievementModalIndex(0);
+                            }
+                          }}
+                          onExitWorkout={() => setPendingExitConfirm(true)}
+                          clientBodyWeightKg={clientBodyWeightKg}
+                        />
+                      </WorkoutExecutionChromeProvider>
+                      ) : null
+                    }
+                  />
+                  {!hasStarted ? (
+                    <div className="px-[18px] pb-8 pt-4">
+                      <Button
+                        type="button"
+                        variant="fc-primary"
+                        className="h-14 w-full text-base font-bold uppercase tracking-[0.08em]"
+                        onClick={() => {
+                          setWorkoutStartTime(Date.now());
+                          setHasStarted(true);
+                        }}
+                      >
+                        Start
+                      </Button>
+                    </div>
+                  ) : null}
                   {/* Complete Workout Button - Only show on last block when complete */}
-                  {isLastBlockComplete &&
-                    currentBlockIndex === workoutBlocks.length - 1 && (
+                  {hasStarted &&
+                    isLastSetEntryComplete &&
+                    currentSetEntryIndex === workoutSetEntries.length - 1 && (
                       <div className="mt-6">
                         <Button
                           type="button"
@@ -4620,7 +4828,7 @@ export default function LiveWorkout() {
                             className="flex items-center"
                             style={{ gap: "12px" }}
                           >
-                            <div className="w-14 h-14 rounded-[18px] bg-[color:var(--fc-accent-cyan)] flex items-center justify-center">
+                            <div className="w-14 h-14 rounded-[18px] bg-[color:var(--fc-accent)] flex items-center justify-center">
                               <Target className="w-8 h-8 text-white" />
                             </div>
                             <div>
@@ -4635,7 +4843,7 @@ export default function LiveWorkout() {
 
                           {/* Summary Info */}
                           <div className="grid grid-cols-2 gap-3">
-                            <div className="rounded-xl p-4 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border-2 border-blue-200 dark:border-blue-700">
+                            <div className="rounded-xl p-4 bg-gradient-to-br from-blue-50 to-[color-mix(in_srgb,var(--fc-group-c)_8%,transparent)] dark:from-blue-900/20 dark:to-[color-mix(in_srgb,var(--fc-group-c)_20%,transparent)] border-2 border-blue-200 dark:border-blue-700">
                               <div
                                 className={`text-sm ${theme.textSecondary} mb-1`}
                               >
@@ -4667,9 +4875,9 @@ export default function LiveWorkout() {
                           </div>
 
                           {/* Exercise Details */}
-                          <div className="rounded-xl p-4 bg-[color:var(--fc-glass-highlight)] border-2 border-[color:var(--fc-accent-cyan)]">
+                          <div className="rounded-xl p-4 bg-[color:var(--fc-glass-highlight)] border-2 border-[color:var(--fc-accent)]">
                             <div className="flex items-start gap-3 mb-3">
-                              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-400 to-cyan-500">
+                              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-400 to-[color:var(--fc-group-c)]">
                                 <Dumbbell className="w-4 h-4 text-white" />
                               </div>
                               <div className="flex-1">
@@ -5120,7 +5328,7 @@ export default function LiveWorkout() {
 
                       {/* Exercise Info */}
                       <div className="flex items-start gap-3 mb-4">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-teal-400 to-cyan-500">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-teal-400 to-[color:var(--fc-group-c)]">
                           <Dumbbell className="w-4 h-4 text-white" />
                         </div>
                         <div className="flex-1">
@@ -5191,7 +5399,7 @@ export default function LiveWorkout() {
                         >
                           Main Set
                         </div>
-                        <div className="rounded-xl p-4 bg-[color:var(--fc-glass-highlight)] border-2 border-[color:var(--fc-accent-cyan)]">
+                        <div className="rounded-xl p-4 bg-[color:var(--fc-glass-highlight)] border-2 border-[color:var(--fc-accent)]">
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <label
@@ -6066,8 +6274,8 @@ export default function LiveWorkout() {
                               style={{ gap: "8px" }}
                             >
                               {targetReps && (
-                                <div className="inline-block rounded-xl px-3 py-1.5 bg-[color:var(--fc-accent-cyan)]/20">
-                                  <span className="text-sm font-semibold text-[color:var(--fc-accent-cyan)]">
+                                <div className="inline-block rounded-xl px-3 py-1.5 bg-[color:var(--fc-accent)]/20">
+                                  <span className="text-sm font-semibold text-[color:var(--fc-accent)]">
                                     {targetReps} reps
                                   </span>
                                 </div>
@@ -6099,8 +6307,8 @@ export default function LiveWorkout() {
                                 })()}
                               {currentExercise?.tempo != null &&
                                 currentExercise.tempo !== "" && (
-                                  <div className="inline-block rounded-xl px-3 py-1.5 bg-[color:var(--fc-accent-cyan)]/20">
-                                    <span className="text-sm font-semibold text-[color:var(--fc-accent-cyan)]">
+                                  <div className="inline-block rounded-xl px-3 py-1.5 bg-[color:var(--fc-accent)]/20">
+                                    <span className="text-sm font-semibold text-[color:var(--fc-accent)]">
                                       Tempo: {String(currentExercise.tempo)}
                                     </span>
                                   </div>
@@ -6144,7 +6352,7 @@ export default function LiveWorkout() {
                                   weight: parseFloat(e.target.value) || 0,
                                 }))
                               }
-                              className="w-full h-14 text-center text-lg font-bold rounded-2xl border-2 border-[color:var(--fc-accent-cyan)] fc-surface fc-text-primary focus:outline-none"
+                              className="w-full h-14 text-center text-lg font-bold rounded-2xl border-2 border-[color:var(--fc-accent)] fc-surface fc-text-primary focus:outline-none"
                               style={{
                                 width: "100%",
                                 height: "56px",
@@ -6171,7 +6379,7 @@ export default function LiveWorkout() {
                                   reps: parseInt(e.target.value) || 0,
                                 }))
                               }
-                              className="w-full h-14 text-center text-lg font-bold rounded-2xl border-2 border-[color:var(--fc-accent-cyan)] fc-surface fc-text-primary focus:outline-none"
+                              className="w-full h-14 text-center text-lg font-bold rounded-2xl border-2 border-[color:var(--fc-accent)] fc-surface fc-text-primary focus:outline-none"
                               style={{
                                 width: "100%",
                                 height: "56px",
@@ -6859,8 +7067,10 @@ export default function LiveWorkout() {
               </div>
             )}
 
-            {/* Workout Completion Modal */}
-            {showWorkoutCompletion && (
+            {/* Workout Completion Modal — traditional branch only.
+                Block path completes via completeWorkout() → /complete (no in-page modal). */}
+            {showWorkoutCompletion &&
+              !(useBlockSystem && workoutSetEntries.length > 0) && (
               <div
                 style={{
                   position: "fixed",
@@ -7185,8 +7395,19 @@ export default function LiveWorkout() {
               </div>
             )}
           </ClientPageShell>
-        </div>
-      </AnimatedBackground>
+
+        <ConfirmActionDialog
+          open={pendingExitConfirm}
+          onOpenChange={setPendingExitConfirm}
+          title="Exit workout?"
+          description="Progress is saved. You’ll return to Train."
+          confirmLabel="Exit"
+          onConfirm={() => {
+            setPendingExitConfirm(false);
+            window.location.href = "/client/train";
+          }}
+        />
+      </div>
     </ProtectedRoute>
   );
 }

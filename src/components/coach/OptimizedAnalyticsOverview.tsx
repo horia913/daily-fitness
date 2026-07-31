@@ -123,10 +123,10 @@ function tierBarColor(pct: number, tracked: boolean, fallback: string): string {
 
 function programAccent(t: string): { bg: string; fg: string } {
   const x = t.toLowerCase()
-  if (x.includes('hypertrophy')) return { bg: 'var(--lime-soft)', fg: 'var(--lime)' }
+  if (x.includes('hypertrophy')) return { bg: 'var(--fc-accent-dim)', fg: 'var(--fc-accent)' }
   if (x.includes('strength')) return { bg: 'var(--purple-soft)', fg: 'var(--purple)' }
   if (x.includes('complete')) return { bg: 'var(--good-soft)', fg: 'var(--good)' }
-  return { bg: 'var(--cyan-soft)', fg: 'var(--cyan)' }
+  return { bg: 'var(--fc-accent-dim)', fg: 'var(--fc-accent)' }
 }
 
 export default function OptimizedAnalyticsOverview({ coachId }: { coachId?: string }) {
@@ -300,7 +300,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: { coachId?: stri
         }
         stats={[
           { num: data.totalClients, label: 'Total clients', color: 'var(--t1)' },
-          { num: data.activeClients, label: 'Active', color: 'var(--cyan)' },
+          { num: data.activeClients, label: 'Active', color: 'var(--fc-accent)' },
           {
             num: `${data.clientRetentionRate}%`,
             label: 'Retention',
@@ -308,7 +308,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: { coachId?: stri
           },
           {
             num: `${data.overallComplianceRate}%`,
-            label: 'Avg compliance',
+            label: 'Avg adherence',
             color:
               data.overallComplianceRate <= 0
                 ? 'var(--critical)'
@@ -343,7 +343,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: { coachId?: stri
           variant="crit"
           value={`${data.overallComplianceRate}`}
           unitSuffix="%"
-          label="Compliance"
+          label="Adherence"
           valueColor={complianceValueColor}
           delta={complianceDeltaStr}
           deltaTone={complianceDeltaTone}
@@ -358,7 +358,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: { coachId?: stri
         />
         <StatTile
           icon={Apple}
-          variant="lime"
+          variant="action"
           value={data.totalMeals}
           label="Meals logged"
           delta={`${data.mealsPerWeek}/wk`}
@@ -385,7 +385,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: { coachId?: stri
           <div className={hub.sectionHead}>
             <div className={hub.sectionHeadLeft}>
               <PieChart className="size-3 shrink-0" style={{ color: 'var(--purple)' }} aria-hidden />
-              <span className={hub.sectionTitle}>Compliance breakdown</span>
+              <span className={hub.sectionTitle}>Adherence breakdown</span>
             </div>
             <span className={hub.sectionMeta}>4 domains</span>
           </div>
@@ -395,7 +395,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: { coachId?: stri
               const tracked = item.tracked !== false
               const display = !tracked ? 'Not tracked' : `${Math.round(item.percentage)}%`
               const pct = tracked ? item.percentage : 0
-              const domainColors = ['var(--cyan)', 'var(--good)', 'var(--warning)', 'var(--purple)']
+              const domainColors = ['var(--fc-accent)', 'var(--good)', 'var(--warning)', 'var(--purple)']
               const fill = domainColors[index % domainColors.length]
               return (
                 <BreakdownRow
@@ -429,7 +429,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: { coachId?: stri
             style={{ background: 'var(--card-2)', borderColor: 'var(--line-2)', color: 'var(--t3)' }}
           >
             No programs yet · Create your first program in{' '}
-            <Link href="/coach/programs" className="text-[var(--cyan)] underline-offset-2 hover:underline">
+            <Link href="/coach/programs" className="text-[var(--fc-accent)] underline-offset-2 hover:underline">
               /coach/programs
             </Link>
           </div>
@@ -446,8 +446,8 @@ export default function OptimizedAnalyticsOverview({ coachId }: { coachId?: stri
                   iconFg={acc.fg}
                   name={p.programName}
                   valueDisplay={`${Math.round(p.avgProgress)}%`}
-                  valueColor="var(--cyan)"
-                  barColor="var(--cyan)"
+                  valueColor="var(--fc-accent)"
+                  barColor="var(--fc-accent)"
                   fillPercent={p.avgProgress}
                   subMeta={sub}
                 />
@@ -539,7 +539,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: { coachId?: stri
             <Link
               href="/coach/compliance"
               className="mt-2 inline-block text-[11px]"
-              style={{ color: 'var(--cyan)' }}
+              style={{ color: 'var(--fc-accent)' }}
             >
               View all →
             </Link>
@@ -570,7 +570,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: { coachId?: stri
             <Link
               href="/coach/compliance"
               className="mt-2 inline-block text-[11px]"
-              style={{ color: 'var(--cyan)' }}
+              style={{ color: 'var(--fc-accent)' }}
             >
               View all →
             </Link>

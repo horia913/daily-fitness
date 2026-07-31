@@ -9,7 +9,7 @@ const toneStripeColor: Record<Exclude<AppCardShellTone, "neutral">, string> = {
   success: "var(--fc-status-success)",
   error: "var(--fc-status-error)",
   warning: "var(--fc-status-warning)",
-  info: "var(--fc-accent-cyan)",
+  info: "var(--fc-accent)",
 };
 
 export interface AppCardProps {

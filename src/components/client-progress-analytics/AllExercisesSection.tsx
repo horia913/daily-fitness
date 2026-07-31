@@ -53,7 +53,7 @@ export function AllExercisesSection({
     <SectionCard id="strength-exercises">
       <SectionHead
         icon={List}
-        iconClassName="bg-[rgba(79,227,232,0.12)] text-[var(--cyan)]"
+        iconClassName="bg-[color:var(--fc-group-c-soft)] text-[var(--fc-accent)]"
         title="All exercises"
         meta={<span>{trainedExercises.length} tracked</span>}
       />

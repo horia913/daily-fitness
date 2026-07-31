@@ -13,7 +13,7 @@ export interface LogSetButtonProps {
 }
 
 /**
- * Primary log CTA — mock log-btn: lime gradient, uppercase 14px tracking 0.06em.
+ * Primary log CTA — mock log-btn: action gradient, uppercase 14px tracking 0.06em.
  * Never uses `disabled` — parent should no-op in onClick when not ready.
  */
 export function LogSetButton({

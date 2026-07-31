@@ -1,0 +1,112 @@
+.wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--fc-hairline, var(--fc-glass-border));
+  min-width: 0;
+}
+
+.noteText {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--fc-text-dim);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.emptyText {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--fc-text-subtle);
+  font-style: italic;
+}
+
+.editLink {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--fc-set-type-straight, var(--fc-accent));
+  font-family: var(--f-headline);
+}
+
+.editLink:hover {
+  text-decoration: underline;
+}
+
+.textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 64px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--fc-glass-border);
+  background: var(--fc-collection-card, #0b0c0f);
+  color: var(--fc-text-primary);
+  font-size: 12px;
+  line-height: 1.4;
+  font-family: inherit;
+}
+
+.textarea:focus {
+  outline: 1px solid color-mix(in srgb, var(--fc-accent) 50%, transparent);
+}
+
+.editActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.cancelBtn,
+.saveBtn {
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-family: var(--f-headline);
+}
+
+.cancelBtn {
+  border: 1px solid var(--fc-glass-border);
+  background: transparent;
+  color: var(--fc-text-dim);
+}
+
+.saveBtn {
+  border: none;
+  background: var(--fc-accent);
+  color: var(--fc-ink);
+}
+
+.saveBtn:disabled,
+.cancelBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.wrap[data-standing-note="edit"] {
+  flex-direction: column;
+  align-items: stretch;
+}

@@ -1,0 +1,20 @@
+FIX — letter badges regain coloured square
+Date: 2026-07-19
+
+1. Files modified
+- src/components/client/workout-execution/ExecGroupList.tsx
+- src/components/client/workout-execution/execGroupList.module.css
+
+2. Header badge = live-card badge
+- Headers now use `liveCard.module.css` `.badge` (filled ~22px square,
+  dark mono letter, `background: var(--live-hue)`).
+- Group hue classes also set `--live-hue` (same mapping as the live card)
+  so the fill matches that group’s card / progress colour.
+
+3. Done-group treatment
+- Still a filled hue badge with the letter inside.
+- Receded via `opacity: 0.55` + reduced saturation (not bare text, not a
+  greyed-out empty square).
+
+4. tsc
+- `node node_modules/typescript/bin/tsc --noEmit` → exit 0.

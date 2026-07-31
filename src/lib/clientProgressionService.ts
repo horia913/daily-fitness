@@ -6,6 +6,7 @@
 
 import { supabase } from './supabase';
 import { calculateE1RM } from '@/lib/e1rmUtils';
+import type { WorkoutSetEntry } from '@/types/workoutSetEntries';
 
 // ============================================================================
 // INTERFACES
@@ -77,39 +78,115 @@ export interface PreviousWeekData {
   }>;
 }
 
-/** Row shape from `client_program_progression_rules` (snake_case from PostgREST). */
-type ProgressionRulesRow = {
-  reps: string | null;
-  sets: number | null;
-  weight_kg: number | string | null;
-  load_percentage: number | string | null;
-  rir: number | null;
-  tempo: string | null;
-  rest_seconds: number | null;
-  notes: string | null;
-  block_type: string | null;
-  reps_per_cluster: number | null;
-  clusters_per_set: number | null;
-  intra_cluster_rest: number | null;
-  drop_set_reps: string | null;
-  weight_reduction_percentage: number | null;
-  rest_pause_duration: number | null;
-  max_rest_pauses: number | null;
-  compound_reps: string | null;
-  isolation_reps: string | null;
-  first_exercise_reps: string | null;
-  second_exercise_reps: string | null;
-  rest_between_pairs: number | null;
-  rounds: number | null;
-  work_seconds: number | null;
-  duration_minutes: number | null;
-  time_cap_minutes: number | null;
-  target_reps: number | null;
-  emom_mode: string | null;
-  exercise_reps: string | null;
-  rest_after_set: number | null;
-  exercise_letter: string | null;
+/** Instance / pickup block exercise fields used for prescribed-target resolution. */
+export type BlockExercisePrescriptionSource = {
+  exercise_id?: string | null;
+  sets?: number | null;
+  reps?: string | number | null;
+  weight_kg?: number | null;
+  load_percentage?: number | null;
+  rir?: number | null;
+  tempo?: string | null;
+  rest_seconds?: number | null;
 };
+
+export type PrescriptionBlockSource = {
+  set_type?: string | null;
+  block_type?: string | null;
+  set_order?: number | null;
+  block_order?: number | null;
+  total_sets?: number | null;
+  rest_seconds?: number | null;
+  exercises?: BlockExercisePrescriptionSource[] | null;
+};
+
+/** Map instance prescription fields → CurrentWeekRules (same shape nudges / gym console use). */
+export function currentRulesFromBlockExercise(
+  ex: BlockExercisePrescriptionSource,
+  blockType?: string | null,
+  blockRestSeconds?: number | null,
+): CurrentWeekRules {
+  const repsRaw = ex.reps != null ? String(ex.reps) : null;
+  const repsRange = parseRepsRange(repsRaw);
+  const repsTrim = strOrNull(repsRaw);
+  return {
+    targetSets: numOrNull(ex.sets),
+    targetRepsMin: repsRange?.min ?? null,
+    targetRepsMax: repsRange?.max ?? null,
+    targetWeightKg: numOrNull(ex.weight_kg),
+    targetLoadPercentage: numOrNull(ex.load_percentage),
+    repsVarchar: repsTrim,
+    targetRir: numOrNull(ex.rir),
+    tempo: strOrNull(ex.tempo),
+    restSeconds: numOrNull(ex.rest_seconds ?? blockRestSeconds),
+    notes: null,
+    blockType: strOrNull(blockType),
+    repsPerCluster: null,
+    clustersPerSet: null,
+    intraClusterRest: null,
+    dropSetReps: null,
+    weightReductionPercentage: null,
+    restPauseDuration: null,
+    maxRestPauses: null,
+    compoundReps: null,
+    isolationReps: null,
+    firstExerciseReps: null,
+    secondExerciseReps: null,
+    restBetweenPairs: null,
+    rounds: null,
+    workSeconds: null,
+    durationMinutes: null,
+    timeCapMinutes: null,
+    targetReps: null,
+    emomMode: null,
+    exerciseReps: null,
+    restAfterSet: null,
+    exerciseLetter: null,
+  };
+}
+
+/** First matching exercise in set-order (current workout's instance prescriptions). */
+export function currentRulesForExerciseFromBlocks(
+  blocks: PrescriptionBlockSource[],
+  exerciseId: string,
+): CurrentWeekRules | null {
+  const ordered = [...blocks].sort(
+    (a, b) =>
+      (a.set_order ?? a.block_order ?? 0) - (b.set_order ?? b.block_order ?? 0),
+  );
+  for (const block of ordered) {
+    for (const ex of block.exercises ?? []) {
+      if (ex.exercise_id === exerciseId) {
+        const blockType = block.set_type ?? block.block_type ?? null;
+        return currentRulesFromBlockExercise(ex, blockType, block.rest_seconds ?? null);
+      }
+    }
+  }
+  return null;
+}
+
+/** All exercises in a workout → prescribed rules (first slot per exercise_id). */
+export function buildCurrentWeekRulesByExerciseId(
+  blocks: PrescriptionBlockSource[],
+): Map<string, CurrentWeekRules> {
+  const out = new Map<string, CurrentWeekRules>();
+  const ordered = [...blocks].sort(
+    (a, b) =>
+      (a.set_order ?? a.block_order ?? 0) - (b.set_order ?? b.block_order ?? 0),
+  );
+  for (const block of ordered) {
+    const blockType = block.set_type ?? block.block_type ?? null;
+    for (const ex of block.exercises ?? []) {
+      const eid = ex.exercise_id;
+      if (!eid || out.has(eid)) continue;
+      out.set(
+        eid,
+        currentRulesFromBlockExercise(ex, blockType, block.rest_seconds ?? null),
+      );
+    }
+  }
+  return out;
+}
 
 export interface CurrentWeekRules {
   // Tier 1
@@ -167,45 +244,6 @@ function strOrNull(v: unknown): string | null {
   if (v == null) return null;
   const t = String(v).trim();
   return t === "" ? null : t;
-}
-
-function mapProgressionRulesRow(rules: ProgressionRulesRow): CurrentWeekRules {
-  const repsRange = parseRepsRange(rules.reps);
-  const repsTrim = strOrNull(rules.reps);
-  return {
-    targetSets: numOrNull(rules.sets),
-    targetRepsMin: repsRange?.min ?? null,
-    targetRepsMax: repsRange?.max ?? null,
-    targetWeightKg: numOrNull(rules.weight_kg),
-    targetLoadPercentage: numOrNull(rules.load_percentage),
-    repsVarchar: repsTrim,
-    targetRir: numOrNull(rules.rir),
-    tempo: strOrNull(rules.tempo),
-    restSeconds: numOrNull(rules.rest_seconds),
-    notes: strOrNull(rules.notes),
-    blockType: strOrNull(rules.block_type),
-    repsPerCluster: numOrNull(rules.reps_per_cluster),
-    clustersPerSet: numOrNull(rules.clusters_per_set),
-    intraClusterRest: numOrNull(rules.intra_cluster_rest),
-    dropSetReps: strOrNull(rules.drop_set_reps),
-    weightReductionPercentage: numOrNull(rules.weight_reduction_percentage),
-    restPauseDuration: numOrNull(rules.rest_pause_duration),
-    maxRestPauses: numOrNull(rules.max_rest_pauses),
-    compoundReps: strOrNull(rules.compound_reps),
-    isolationReps: strOrNull(rules.isolation_reps),
-    firstExerciseReps: strOrNull(rules.first_exercise_reps),
-    secondExerciseReps: strOrNull(rules.second_exercise_reps),
-    restBetweenPairs: numOrNull(rules.rest_between_pairs),
-    rounds: numOrNull(rules.rounds),
-    workSeconds: numOrNull(rules.work_seconds),
-    durationMinutes: numOrNull(rules.duration_minutes),
-    timeCapMinutes: numOrNull(rules.time_cap_minutes),
-    targetReps: numOrNull(rules.target_reps),
-    emomMode: strOrNull(rules.emom_mode),
-    exerciseReps: strOrNull(rules.exercise_reps),
-    restAfterSet: numOrNull(rules.rest_after_set),
-    exerciseLetter: strOrNull(rules.exercise_letter),
-  };
 }
 
 export function isRuleEffectivelyEmpty(rule: CurrentWeekRules | null): boolean {
@@ -453,7 +491,7 @@ async function lastSessionForExerciseOnSameAssignment(
 
 // ============================================================================
 // NEW: Get previous performance for a single exercise (for PreviousPerformanceCard)
-// Primary: workout_set_logs. Legacy: workout_exercise_logs → workout_set_details
+// Primary: workout_logs → workout_set_logs
 // ============================================================================
 
 export async function getExercisePreviousPerformance(
@@ -504,74 +542,6 @@ export async function getExercisePreviousPerformance(
             date: '',
           }
         : null;
-
-    // Step 3: Legacy workout_exercise_logs + workout_set_details
-    if (!lastWorkout) {
-      const { data: exerciseLogs } = await supabase
-        .from('workout_exercise_logs')
-        .select('id, workout_log_id')
-        .eq('exercise_id', exerciseId)
-        .in('workout_log_id', logIds);
-
-      if (exerciseLogs && exerciseLogs.length > 0) {
-        const logIdsWithExercise = [
-          ...new Set(exerciseLogs.map((el) => el.workout_log_id as string)),
-        ];
-        logIdsWithExercise.sort((a, b) => {
-          const dateA = new Date(logDateMap.get(a) || '').getTime();
-          const dateB = new Date(logDateMap.get(b) || '').getTime();
-          return dateB - dateA;
-        });
-
-        const lastWorkoutLogId = logIdsWithExercise[0];
-        const allExerciseLogIds = exerciseLogs.map((el) => el.id as string);
-        const lastExerciseLogIds = exerciseLogs
-          .filter((el) => el.workout_log_id === lastWorkoutLogId)
-          .map((el) => el.id as string);
-
-        const { data: allSetDetails } = await supabase
-          .from('workout_set_details')
-          .select(
-            'workout_exercise_log_id, weight_kg, reps_completed, rpe, set_number'
-          )
-          .in('workout_exercise_log_id', allExerciseLogIds);
-
-        if (allSetDetails && allSetDetails.length > 0) {
-          const lastSets = allSetDetails.filter((s) =>
-            lastExerciseLogIds.includes(s.workout_exercise_log_id as string)
-          );
-
-          const normalized = lastSets.map((s) => ({
-            set_number: s.set_number as number,
-            weight_kg: s.weight_kg as number | null,
-            reps_completed: s.reps_completed as number | null,
-            rpe: s.rpe as number | null,
-          }));
-
-          lastWorkout = buildLastWorkoutFromSetRows(
-            normalized,
-            lastWorkoutLogId,
-            logDateMap.get(lastWorkoutLogId) || ''
-          );
-
-          const allWeights = allSetDetails
-            .filter((s) => s.weight_kg !== null)
-            .map((s) => s.weight_kg as number);
-          const allReps = allSetDetails
-            .filter((s) => s.reps_completed !== null)
-            .map((s) => s.reps_completed as number);
-
-          const maxWeight =
-            allWeights.length > 0 ? Math.max(...allWeights) : null;
-          const maxReps = allReps.length > 0 ? Math.max(...allReps) : null;
-
-          personalBest =
-            maxWeight !== null || maxReps !== null
-              ? { maxWeight, maxReps, date: '' }
-              : personalBest;
-        }
-      }
-    }
 
     if (
       !lastWorkout &&
@@ -636,9 +606,7 @@ export async function getPrDateKeysByExercise(
 /**
  * Get previous week's workout data for an exercise.
  * Fetches per-set golden `workout_set_logs` (weight, reps, rpe) for the previous
- * calendar week; RPE average prefers those rows, with legacy
- * `workout_exercise_logs` → `workout_set_details` only when no golden RPE exists.
- * Also computes weeksAtSameWeight via a 4-week lookback window.
+ * calendar week. Also computes weeksAtSameWeight via a 4-week lookback window.
  */
 export async function getPreviousWeekWorkoutData(
   assignmentId: string,
@@ -830,31 +798,6 @@ export async function getPreviousWeekWorkoutData(
       rpeCount = goldenRpeVals.length;
       averageRpe =
         goldenRpeVals.reduce((sum, r) => sum + r, 0) / goldenRpeVals.length;
-    } else if (previousWeekLogIds.length > 0) {
-      // Legacy: workout_exercise_logs → workout_set_details (only when no golden RPE)
-      const { data: exerciseLogData } = await supabase
-        .from('workout_exercise_logs')
-        .select('id')
-        .eq('exercise_id', exerciseId)
-        .in('workout_log_id', previousWeekLogIds);
-
-      if (exerciseLogData && exerciseLogData.length > 0) {
-        const exerciseLogIds = exerciseLogData.map((el) => el.id as string);
-        const { data: setDetails } = await supabase
-          .from('workout_set_details')
-          .select('rpe')
-          .in('workout_exercise_log_id', exerciseLogIds)
-          .not('rpe', 'is', null);
-
-        if (setDetails && setDetails.length > 0) {
-          rpeCount = setDetails.length;
-          const rpeSum = setDetails.reduce(
-            (sum, s) => sum + (s.rpe as number),
-            0
-          );
-          averageRpe = rpeSum / rpeCount;
-        }
-      }
     }
 
     return {
@@ -875,71 +818,49 @@ export async function getPreviousWeekWorkoutData(
 }
 
 /**
- * Get current week's progression rules for an exercise
+ * Get progression suggestions for all exercises in a workout.
+ * Prescribed targets come from in-memory instance blocks (current workout), not cppr.
  */
-export async function getCurrentWeekProgressionRules(
+export async function getProgressionSuggestionsForWorkout(
   assignmentId: string,
   currentWeek: number,
-  exerciseId: string
-): Promise<CurrentWeekRules | null> {
-  try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return null;
+  exerciseIds: string[],
+  exerciseNames: Map<string, string>,
+  blocks: WorkoutSetEntry[] = [],
+): Promise<Map<string, ProgressionSuggestion>> {
+  const suggestions = new Map<string, ProgressionSuggestion>();
 
-    const { data: rules, error } = await supabase
-      .from('client_program_progression_rules')
-      .select(
-        [
-          'reps',
-          'sets',
-          'weight_kg',
-          'load_percentage',
-          'rir',
-          'tempo',
-          'rest_seconds',
-          'notes',
-          'block_type',
-          'reps_per_cluster',
-          'clusters_per_set',
-          'intra_cluster_rest',
-          'drop_set_reps',
-          'weight_reduction_percentage',
-          'rest_pause_duration',
-          'max_rest_pauses',
-          'compound_reps',
-          'isolation_reps',
-          'first_exercise_reps',
-          'second_exercise_reps',
-          'rest_between_pairs',
-          'rounds',
-          'work_seconds',
-          'duration_minutes',
-          'time_cap_minutes',
-          'target_reps',
-          'emom_mode',
-          'exercise_reps',
-          'rest_after_set',
-          'exercise_letter',
-        ].join(', ')
-      )
-      .eq('program_assignment_id', assignmentId)
-      .eq('week_number', currentWeek)
-      .or(
-        `exercise_id.eq.${exerciseId},override_exercise_id.eq.${exerciseId}`
-      )
-      .order('updated_at', { ascending: false, nullsFirst: false })
-      .limit(1)
-      .maybeSingle();
+  const promises = exerciseIds.map(async (exerciseId) => {
+    const exerciseName = exerciseNames.get(exerciseId) || 'Exercise';
 
-    if (error || !rules) return null;
+    const previousData = await getPreviousWeekWorkoutData(
+      assignmentId,
+      currentWeek,
+      exerciseId,
+    );
 
-    return mapProgressionRulesRow(rules as unknown as ProgressionRulesRow);
-  } catch (error) {
-    console.error('Error fetching current week rules:', error);
-    return null;
-  }
+    const currentRules = currentRulesForExerciseFromBlocks(blocks, exerciseId);
+
+    const suggestion = calculateProgressionSuggestion(
+      previousData,
+      currentRules,
+      null,
+      exerciseId,
+      exerciseName,
+    );
+
+    return { exerciseId, suggestion };
+  });
+
+  const results = await Promise.all(promises);
+
+  results.forEach((result) => {
+    if (result && result.suggestion) {
+      suggestions.set(result.exerciseId, result.suggestion);
+    }
+  });
+
+  return suggestions;
 }
 
 /**
@@ -1139,61 +1060,4 @@ export function calculateProgressionSuggestion(
     type,
     confidence: 'medium',
   };
-}
-
-/**
- * Get progression suggestions for all exercises in a workout.
- * This is the main function called from the workout executor.
- *
- * The returned Map only contains entries for exercises that produced a
- * suggestion. Exercises with no previous performance data (first-time) are
- * intentionally absent — consumers must look up via `.get()` and handle
- * `undefined` gracefully (no nudge is rendered for missing entries).
- */
-export async function getProgressionSuggestionsForWorkout(
-  assignmentId: string,
-  currentWeek: number,
-  exerciseIds: string[],
-  exerciseNames: Map<string, string>
-): Promise<Map<string, ProgressionSuggestion>> {
-  const suggestions = new Map<string, ProgressionSuggestion>();
-
-  const promises = exerciseIds.map(async (exerciseId) => {
-    const exerciseName = exerciseNames.get(exerciseId) || 'Exercise';
-
-    // Fetch previous week data (now includes RPE and weeksAtSameWeight)
-    const previousData = await getPreviousWeekWorkoutData(
-      assignmentId,
-      currentWeek,
-      exerciseId
-    );
-
-    // Fetch current week targets
-    const currentRules = await getCurrentWeekProgressionRules(
-      assignmentId,
-      currentWeek,
-      exerciseId
-    );
-
-    // calculateProgressionSuggestion may return null (no actionable nudge).
-    const suggestion = calculateProgressionSuggestion(
-      previousData,
-      currentRules,
-      null,
-      exerciseId,
-      exerciseName
-    );
-
-    return { exerciseId, suggestion };
-  });
-
-  const results = await Promise.all(promises);
-
-  results.forEach((result) => {
-    if (result && result.suggestion) {
-      suggestions.set(result.exerciseId, result.suggestion);
-    }
-  });
-
-  return suggestions;
 }

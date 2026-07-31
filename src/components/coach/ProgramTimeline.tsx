@@ -122,7 +122,7 @@ export default function ProgramTimeline({
             Program timeline
           </span>
           <h3 className="text-xl font-semibold fc-text-primary mt-2">
-            Training blocks overview
+            Training phases overview
           </h3>
           <p className="text-sm fc-text-dim">
             {weeks.length} weeks • {weeks.reduce((sum, week) => sum + getTotalWorkoutsForWeek(week), 0)} total workouts

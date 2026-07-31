@@ -1,0 +1,538 @@
+# AUDIT — INLINE MEAL AUTHORING
+## Current modal flow vs program builder inline pattern
+**Date:** 2026-07-04  
+**Scope:** Read-only investigation. No code changes.
+
+---
+
+# PART 1 — Current meal authoring
+
+## 1a. Builder page
+
+**Route:** `src/app/coach/nutrition/meal-plans/[id]/page.tsx`  
+(`/coach/nutrition/meal-plans/[id]` — P3 create-modal `router.push` target; `/[id]/edit` redirects here.)
+
+**Top-level render tree (authoring-relevant):**
+- `ProtectedRoute` → `AnimatedBackground` → `CoachPageShell` → **`CoachPlanBuilderView`** (`src/components/meal-display/CoachPlanBuilderView.tsx`)
+- Sibling overlays (not in shell):
+  - **`MealCreator`** — conditional on `showMealCreator`
+  - **`Dialog` + `MealOptionEditor`** — when `editingMealOptions` is set
+  - `MealPlanMetadataModal` — plan metadata (out of inline-meal scope)
+  - `MealPlanAssignmentModal` — assign (out of scope)
+
+**How modals are invoked:**
+
+| Control | State / handler | Component | Props | On save / close |
+|--------|------------------|-----------|-------|-----------------|
+| ＋ Add meal | `setShowMealCreator(true)` | `MealCreator` | `mealPlanId`, `onClose={() => setShowMealCreator(false)}`, `onSave={handleMealSaved}` | `handleMealSaved` → `loadMealsTree()`, closes creator |
+| Meal ✎ / EDIT OPTION → | `setEditingMealOptions({ id, name })` | `MealOptionEditor` inside `Dialog` | `mealId`, `mealPlanId`, `onOptionsChange={() => {}}` (no-op) | Dialog `onOpenChange(false)` → `loadMealsTree()` |
+| ＋ ADD OPTION (canvas) | `handleAddOption` | *(no modal)* | Calls `MealPlanService.createMealOption(mealId, optionName)` directly | `loadMealsTree()` |
+
+**Data load:** `loadPlanBuilderMeals(mealPlanId)` (`src/components/meal-display/loadPlanBuilderMeals.ts`) — modern tree only maps rows with `meal_option_id` set; legacy `meal_food_items` without options are excluded from display (see 1e).
+
+---
+
+## 1b. `MealCreator`
+
+**File:** `src/components/coach/MealCreator.tsx`
+
+**UI shape:** Single full-screen modal (`fixed inset-0`, `z-[9999]`) — **not** a multi-step wizard. One scrollable form with footer Cancel/Save.
+
+**Fields the coach fills:**
+1. **Meal name** — optional text (`mealName`); auto-generated if empty
+2. **Meal type** — `Select`: breakfast | lunch | dinner | snack
+3. **Food search** — text input; debounced via `onChange` → `MealPlanService.searchFoods(query)` (server `ilike` on name, limit 20)
+4. **Search results** — click row to add (shown only when `searchQuery` non-empty)
+5. **Selected foods** — per-food quantity `Input` (number), remove (X)
+6. **Meal totals** — read-only summary (client-computed)
+
+**Save behavior (`saveMeal`):**
+1. **Insert `meals`** via direct `supabase.from('meals').insert({ meal_plan_id, name, meal_type })` — **does not** use `MealPlanService`; **does not** set `order_index` explicitly (DB default 0).
+2. **Insert `meal_food_items`** batch via `supabase.insert` with `{ meal_id, food_id, quantity, unit }` — **`meal_option_id` is NULL** (legacy path).
+3. **Does not create `meal_options`** in the same transaction.
+
+**Creation model:** Meal + all selected foods in **one shot** on Save. Save disabled until `selectedFoods.length > 0`. Not “empty meal then populate.”
+
+**Macro computation on save:** None stored on rows — totals are UI-only; persistence is `food_id` + `quantity` + `unit`; macros derived at render from joined `foods` table.
+
+---
+
+## 1c. `MealOptionEditor`
+
+**File:** `src/components/coach/MealOptionEditor.tsx`
+
+**UI shape:** Panel (mounted inside page `Dialog`, max-w-3xl). Accordion per option (max **5** options). Not a wizard.
+
+**Load:** `MealPlanService.getMealWithOptions(mealId)` on mount; `MealPlanService.getFoods()` loads **entire** food table into memory for client-side filter.
+
+**Option management:**
+- **Add option** — `MealPlanService.createMealOption(mealId, name)` (immediate API); auto-expands new option
+- **Delete option** — `confirm()` → `MealPlanService.deleteMealOption` (blocked if only option)
+- **Rename option** — inline `Input` + check → `MealPlanService.updateMealOption(optionId, { name })`
+
+**Food management (inside expanded option):**
+- **Search:** single `searchTerm` filters local `foods` array by name/category (not `searchFoods` API)
+- **Add food:** click result → `MealPlanService.addFoodToOption(mealId, optionId, food.id, food.serving_size, food.serving_unit)` — **immediate insert**, default qty = one serving
+- **Quantity:** `Input` `onChange` → `MealPlanService.updateFoodInOption(foodItemId, { quantity })` on **every change** (no debounce)
+- **Remove:** `MealPlanService.removeFoodFromOption(foodItemId)`
+
+**Macro model:** **No snapshot columns** on `meal_food_items`. Stored: `food_id`, `quantity`, `unit`. Display/sums via `MealPlanService.calculateFoodItemTotals` / `computeItemMacros` using live `foods` row (`calories_per_serving` × qty/serving_size, or per-100g fields when present).
+
+**Custom food path:** **Not present** in `MealOptionEditor`. Custom foods only via P2 `CoachFoodDatabasePanel` → `MealPlanService.createFood`.
+
+**Legacy bridge:** If meal has `legacy_food_items` (option_id NULL) and zero options, UI shows synthetic “Default” option with `isNew: true` — data already in DB; first real `createMealOption` triggers `migrateLegacyFoodsToDefaultOption`.
+
+---
+
+## 1d. Full click-path friction baseline
+
+**Scenario:** 4 meals; meals 1–3 have 1 option × 4 foods; meal 4 has 2 options × 3 foods each (~16 food lines total).
+
+### Path as implemented today (P4 builder + modals)
+
+**Meals 1–3 (via `MealCreator` only):**
+Per meal ≈  
+- 1 click Add meal  
+- 1 modal open (context switch)  
+- 1 meal type select (if changed)  
+- 4 foods: ~2 interactions each (type search fragment + click result) = 8  
+- 1 Save  
+- 0–4 optional quantity edits  
+≈ **11–15 clicks, 1 modal, 1 full refetch** per meal  
+
+×3 meals → **~33–45 clicks, 3 modals**
+
+**Critical gap:** Foods land in **legacy** `meal_food_items` (no `meal_option_id`). **`loadPlanBuilderMeals` ignores those rows** when building `displayOptions`, so P4 canvas shows **0 options, 0 kcal** until coach opens `MealOptionEditor` and adds an option (triggering migration) or otherwise creates `meal_options`. *(Confirmed in code — not inferred.)*
+
+**Meal 4 (two options):**
+- Same `MealCreator` for first 3 foods → **~11 clicks, 1 modal**
+- Expand meal on canvas: **1 click**
+- Open editor (✎ or EDIT OPTION): **1 click + modal**
+- Add Option: **1 click** (+ migration of legacy foods to “Default”)
+- Expand Option 2: **1 click**
+- 3 foods in Option 2: **~6 clicks** (search + pick ×3), each pick = **immediate API**
+- Close dialog (implicit or click away): refetch  
+
+**Meal 4 subtotal:** ~21 clicks, **2 modal sessions** (creator + editor)
+
+**Plan totals (approximate):**
+| Metric | Count |
+|--------|-------|
+| Modal opens | **5** (4× MealCreator + 1× MealOptionEditor) |
+| Major context switches | **5** |
+| Clicks (conservative) | **~55–65** |
+| Clicks (with qty tuning) | **~70–90** |
+| Network writes (MealOptionEditor foods only) | **3** for option 2 foods + option create + migrations; MealCreator batches **4×4=16** food inserts in 4 saves |
+| `loadMealsTree` refetches | **≥9** (after each creator save + dialog close + add option) |
+
+**Interaction tax drivers:**
+- Every meal requires leaving canvas for `MealCreator`
+- Multi-option meal requires **second** modal (`MealOptionEditor`)
+- `MealCreator` vs options model **mismatch** forces migration step
+- Food add in editor = **per-click API** + full tree refetch on dialog close (not per food, but coarse refresh)
+
+---
+
+## 1e. Data model — meals tree
+
+**Chain:** `meal_plans` → **`meals`** → **`meal_options`** → **`meal_food_items`** → **`foods`**
+
+### `meals` (from `docs/schema-snapshot-2026-04-27.md` + app usage)
+| Column | Notes |
+|--------|--------|
+| `id` | uuid PK |
+| `meal_plan_id` | NOT NULL → `meal_plans.id` |
+| `name` | NOT NULL |
+| `meal_type` | NOT NULL (app: breakfast/lunch/dinner/snack) |
+| `order_index` | nullable, default 0 |
+| `notes` | nullable |
+| `created_at`, `updated_at` | timestamptz |
+
+*App code sometimes references `description` on insert (`MealForm.tsx`) — not in schema snapshot; may be dead field or schema drift.*
+
+### `meal_options` (`migrations/20260129_meal_options.sql`)
+| Column | Constraints |
+|--------|-------------|
+| `id` | uuid PK |
+| `meal_id` | NOT NULL → `meals.id` **ON DELETE CASCADE** |
+| `name` | NOT NULL |
+| `order_index` | integer, default 0 |
+| `created_at` | timestamptz |
+
+App enforces **max 5 options** in UI only (`MealOptionEditor` MAX_OPTIONS).
+
+### `meal_food_items` (snapshot + migration)
+| Column | Constraints |
+|--------|-------------|
+| `id` | uuid PK |
+| `meal_id` | NOT NULL → `meals.id` |
+| `food_id` | NOT NULL → `foods.id` |
+| `quantity` | NOT NULL numeric |
+| `unit` | NOT NULL text |
+| `meal_option_id` | **nullable** → `meal_options.id` **ON DELETE CASCADE** |
+| `created_at` | timestamptz |
+
+**Semantics:** `meal_option_id IS NULL` = legacy meal-level items. Modern option-based items require NOT NULL `meal_option_id`.
+
+### `foods` (authoring-relevant)
+| Column | Notes |
+|--------|--------|
+| `name`, `serving_size`, `serving_unit` | NOT NULL |
+| `calories_per_serving`, `protein`, `carbs`, `fat`, `fiber` | macros source |
+| `is_active` | P2 Food DB filters `true` |
+| No `coach_id` / ownership column | global DB |
+
+**Macro storage:** Computed at read time from `foods`; optional `*_per_100g` columns used by `computeItemMacros` when present.
+
+### Inline autosave constraints
+- **Meal row:** needs `meal_plan_id`, `name`, `meal_type` before meaningful child rows
+- **Option row:** needs `meal_id`, `name` (NOT NULL)
+- **Food row:** needs `meal_id`, `food_id`, `quantity`, `unit`; for modern display path, `meal_option_id` should be set
+- **Cannot delete last option** (service guard in `deleteMealOption`)
+- **No DB unique** on (option, food) — duplicate same food allowed
+
+**Legacy parallel tables (out of modern tree):** `meal_plan_items` (plan-level legacy, P4 read-only branch), `meal_items` (alternate schema in snapshot — not used by current builder modals).
+
+---
+
+## 1f. Write functions inventory (`MealPlanService` + page direct calls)
+
+**File:** `src/lib/mealPlanService.ts` — static methods unless noted.
+
+### Foods
+```ts
+static getFoods(): Promise<Food[]>
+static searchFoods(query: string): Promise<Food[]>  // ilike name, limit 20
+static createFood(foodData: Omit<Food, 'id' | 'created_at' | 'updated_at'>): Promise<Food>
+```
+
+### Meal plans (metadata — not meal tree)
+```ts
+static createMealPlan(mealPlanData: ...): Promise<MealPlan>
+static updateMealPlan(id: string, updates: Partial<MealPlan>): Promise<MealPlan>
+static deleteMealPlan(id: string): Promise<void>
+```
+
+### Legacy plan items (`meal_plan_items` — old flat model)
+```ts
+static getMealItems(mealPlanId: string): Promise<MealItem[]>
+static addMealItem(mealPlanId, mealItemData): Promise<MealItem | null>
+static updateMealItem(mealItemId, updates): Promise<MealItem | null>
+static deleteMealItem(mealItemId): Promise<boolean>
+```
+
+### Meals (read only in service)
+```ts
+static getMeals(mealPlanId: string): Promise<Meal[]>  // aggregated view, not CRUD
+static getMealWithOptions(mealId: string): Promise<MealWithOptions | null>
+```
+**No `createMeal` / `updateMeal` / `deleteMeal` in service.**  
+Builder page deletes meal via **direct** `supabase.from('meals').delete().eq('id', mealId)` (`page.tsx`).
+
+### Options
+```ts
+static getMealOptions(mealId: string): Promise<MealOption[]>
+static createMealOption(mealId: string, name: string): Promise<MealOption>
+static updateMealOption(optionId: string, updates: Partial<Pick<MealOption, 'name' | 'order_index'>>): Promise<MealOption>
+static deleteMealOption(optionId: string): Promise<boolean>
+static reorderMealOptions(mealId: string, optionIds: string[]): Promise<boolean>
+static migrateLegacyFoodsToDefaultOption(mealId: string): Promise<MealOption | null>  // internal/side-effect
+static mealHasOptions(mealId: string): Promise<boolean>
+static getMealOptionCount(mealId: string): Promise<number>
+```
+
+### Foods on options
+```ts
+static addFoodToOption(mealId: string, optionId: string, foodId: string, quantity: number, unit: string): Promise<MealFoodItem | null>
+static removeFoodFromOption(foodItemId: string): Promise<boolean>
+static updateFoodInOption(foodItemId: string, updates: { quantity?: number; unit?: string }): Promise<MealFoodItem | null>
+```
+
+### Pure helpers
+```ts
+static calculateFoodItemTotals(items: MealFoodItem[]): MacroTotals
+export async function calculateMealPlanMacros(mealPlanId: string): Promise<{ daily: PlanMacros; perMeal: MealMacros[] }>
+```
+
+### Outside service (still in authoring path)
+- `MealCreator.saveMeal` — direct `supabase` insert `meals` + `meal_food_items`
+- `MealForm.handleSave` — same pattern (`src/components/MealForm.tsx`, used by legacy `MealPlanBuilder`)
+- Page `handleAddOption` — `createMealOption` only
+
+**Gaps for inline UI:** no service methods for update meal name/type/order, reorder meals, or create empty meal shell.
+
+---
+
+# PART 2 — Program/workout builder inline pattern
+
+## 2a. Location
+
+**Primary reference — Program Station (inline day editing):**
+- **Route:** `/coach/programs/[id]/edit` → `src/app/coach/programs/[id]/edit/page.tsx`
+- **Shell:** `ProgramStationShell` (`src/components/coach/programs/station/ProgramStationShell.tsx`)
+- **Day editor:** `ProgramDayEditor` (`src/components/coach/programs/station/ProgramDayEditor.tsx`)
+- **Canvas:** `WorkoutCanvasCore` → `WorkoutCanvas` (`src/components/workout-canvas/`)
+
+**Secondary reference — Library workout template editor:**
+- `WorkoutTemplateEditor` (`src/components/workout-canvas/WorkoutTemplateEditor.tsx`) — same canvas, explicit save via `useLibraryWorkoutDraft`
+
+**State:** `ProgramDraftProvider` / `useProgramDraft` (`src/contexts/ProgramDraftContext.tsx`) — whole program + embedded workouts in **`workingCopy`** memory.
+
+---
+
+## 2b. Inline-add mechanism (exercises)
+
+**No modal for adding exercises** in `WorkoutCanvas`.
+
+1. Footer link **"+ Add exercise"** (`WorkoutCanvas.tsx` ~685) or **N** hotkey
+2. Toggles **`addExerciseOpen`** → inline **`renderExerciseSearch`** block (autofocus input, dropdown of up to 12 matches)
+3. Click exercise → `dispatch({ type: 'ADD_EXERCISE', exerciseId, exercise })` via `applyCanvasAction`
+4. New group/slot appears **in place** on canvas; search closes
+
+**Within group:** "+ Add exercise to group" uses same search UI scoped to `groupId`.
+
+**Exercise library:** Preloaded `availableExercises` from `useExerciseLibrary` — **session-cached** full list, **client-side filter** (same pattern as `MealOptionEditor` foods, but no modal).
+
+**Contrast:** `LibraryWorkoutPicker` is a **modal**, but only for inserting a **whole workout day** from library — not per-exercise add.
+
+---
+
+## 2c. Nested structure inline
+
+**Model:** `CanvasWorkout` → `groups[]` → `slots[]` (exercises) → `prescriptions[]` (sets)
+
+| Level | Inline affordance | Component |
+|-------|-------------------|-----------|
+| Group/block | Drag handle reorder; checkbox multi-select + **G** merge; group meta label edit | `WorkoutCanvas` + `@hello-pangea/dnd` |
+| Exercise slot | Expand/collapse; floating menus (duplicate, delete, move) | `WorkoutCanvas` |
+| Sets / prescription | **`PrescriptionTable`** — inline `<input>` per set for reps/time/distance, load %, kg, RIR, tempo, etc. | `PrescriptionTable.tsx` |
+| Add set | "+ Add set" button in table | `PrescriptionTable` |
+
+**Analogue to meal → option → food:**
+- Group ≈ meal (container)
+- Slot ≈ option variant (exercise instance)
+- Prescription rows ≈ food lines (quantified lines)
+- Property columns ≈ macro columns (derived, not free-typed)
+
+---
+
+## 2d. Save model
+
+**Program station (draft flush):**
+- Edits call `draft.updateWorkout(templateId, next)` → mutates **`workingCopy` in memory**
+- `setWorkingCopy` debounces **500ms** write to **localStorage** (`STORAGE_DEBOUNCE_MS` in `ProgramDraftContext`) — crash recovery only
+- **No autosave to database per edit**
+- **`ProgramSaveButton`** → `draft.commit()` → `commitProgramDraft` / `commitInstanceProgramDraft` — **explicit bulk persist**
+- UI states: `idle | dirty | saving | saved | error`
+- Toast on edit: *"Save to commit."*
+
+**Library workout template:**
+- `useLibraryWorkoutDraft` — same **dirty working copy**, **explicit `commit()`** → `saveWorkoutFromCanvas`
+- **No per-field DB autosave**
+
+**WorkoutCanvasCore draft mode comment:** *"Draft mode: workout supplied by parent working copy — no load, no autosave."*
+
+**Summary:** Program builder feel = **optimistic in-memory canvas + explicit Save**. Not debounced autosave to Postgres.
+
+---
+
+## 2e. Add / reorder / delete affordances
+
+| Level | Add | Reorder | Delete / duplicate |
+|-------|-----|---------|-------------------|
+| Groups | Add exercise creates new group or adds to group | Drag handle (`REORDER_GROUPS`) | Group menu; merge selected |
+| Slots in group | Inline search in group | `REORDER_SLOTS` drag | Slot floating menu |
+| Sets | "+ Add set" | Implicit set_number | Remove set row |
+| Program day | "Add workout" / library insert (modal for library) | Move/copy day dialogs | Clear day (confirm) |
+
+**Meal builder mirror targets:** inline add meal row, inline add option chrome, inline food search row, drag reorder meals/options/foods, icon delete with confirm.
+
+---
+
+## 2f. What makes program builder feel fast
+
+1. **Zero modal** for core exercise add — search expands **in canvas footer**
+2. **Single working copy** — edits are instant in UI; no wait for network
+3. **Keyboard** — **N** add exercise, **G** group, inputs stay in tab flow
+4. **Preloaded library** — filter local, no round-trip per keystroke (after initial cache)
+5. **Inline prescription inputs** — borderless table cells, no nested dialogs
+6. **Expand/collapse** on canvas — edit details without route change
+7. **Explicit save** — coach controls when DB work happens; batch commit
+8. **Drag-and-drop reorder** — direct manipulation
+
+---
+
+# PART 3 — Food picker (meals vs programs)
+
+## Today in `MealOptionEditor`
+
+| Aspect | Implementation |
+|--------|----------------|
+| Search | Client filter on full `getFoods()` list; **not** `searchFoods` API |
+| Results | Up to 10 shown; name + cal + serving |
+| Select | Click row → `addFoodToOption` with default `serving_size` / `serving_unit` |
+| Quantity | Inline number input; updates on every change |
+| Macros | Joined `food` on returned row; `calculateFoodItemTotals` |
+
+## Today in `MealCreator`
+
+| Aspect | Implementation |
+|--------|----------------|
+| Search | `MealPlanService.searchFoods(query)` — server-side |
+| Initial load | First 20 foods via `getFoods()` |
+| Select | Click result; dedupe by food id (increment qty) |
+| Save | Batch insert legacy `meal_food_items` |
+
+## Program exercise-add pattern (reusable?)
+
+**Yes — partially.** `WorkoutCanvas.renderExerciseSearch` is the closest analogue:
+- Autofocus inline input
+- Filtered dropdown
+- Click inserts row via action dispatcher
+- Cancel link closes search
+
+**Reusable pieces:**
+- UX pattern from `renderExerciseSearch`
+- `SearchableSelect` (`src/components/ui/SearchableSelect.tsx`) — used in older `ExerciseDetailForm`, not in station canvas
+- **Not reusable:** `applyCanvasAction` / `CanvasWorkout` types (workout-specific)
+
+**Exercise selection is not modal** in the station canvas; library **day** picker is modal (different granularity).
+
+## Inline "add food" — what exists to build from
+
+| Building block | Location |
+|----------------|----------|
+| Food search API | `MealPlanService.searchFoods(query)` |
+| Full food list | `MealPlanService.getFoods()`, `fetchCoachFoods()` |
+| Insert row | `MealPlanService.addFoodToOption(...)` |
+| Update qty | `MealPlanService.updateFoodInOption(...)` |
+| Remove row | `MealPlanService.removeFoodFromOption(...)` |
+| Create custom food | `MealPlanService.createFood(...)` — form fields in `CoachFoodDatabasePanel` |
+| Macro display | `computeItemMacros`, `calculateFoodItemTotals`, `formatFoodMacros` |
+| Canvas UI pattern | `WorkoutCanvas.renderExerciseSearch` |
+| Presentation shell | P4 `MealListDisplay` accordion + option chrome (`src/components/meal-display/`) |
+
+**Recommended inline food row flow (conceptual):**
+1. `＋ Add food` under option expands inline search (clone canvas pattern)
+2. Pick food → optimistic row + `addFoodToOption` (or hold in draft until save — see Part 4)
+3. Qty `input` inline with debounced `updateFoodInOption`
+4. Macros column read-only from `foods` join
+5. Optional `＋ Create custom food` slim inline form or slide-over → `createFood` then auto-select
+
+**Make-or-break:** Search must stay **in the expanded meal/option** on the builder canvas — not a modal. Preload or debounce-search like `searchFoods` to avoid loading entire `foods` table on every editor open.
+
+---
+
+# PART 4 — Synthesis
+
+## 1. The delta
+
+| Area | Change needed | Reusable from program builder |
+|------|---------------|-------------------------------|
+| Presentation | Replace modal hosts with inline editors inside `MealListDisplay` / new `MealCanvasEditor` | Accordion + open-row pattern from P4; not WorkoutCanvas directly |
+| State | Introduce **plan-level working copy** OR per-meal inline state with coordinated refresh | `ProgramDraftContext` pattern (baseline + workingCopy + dirty + commit) |
+| Add meal | Inline row or inline form; create `meals` + default `meal_options` row in one logical step | `buildDayFromScratch` toast + in-place empty structure |
+| Add option | Already on canvas (`handleAddOption`); keep inline | `ADD_EXERCISE_TO_GROUP` instant insert |
+| Add food | Inline search per option | **`renderExerciseSearch`** UX |
+| Prescription/qty | Debounced inline inputs | `PrescriptionTable` input styling |
+| Reorder | Not in meal UI today; service has `reorderMealOptions` only | `@hello-pangea/dnd` from `WorkoutCanvas` |
+| Save | Move from per-action API scatter to coherent model | Explicit **Save** OR structured optimistic draft |
+
+**Not reusable as-is:** `applyCanvasAction`, `CanvasWorkout`, `commitProgramDraft`, `WorkoutCanvas` components — domain mismatch.
+
+## 2. Save-model recommendation
+
+**For meals tree, recommend: hybrid — optimistic working copy + explicit Save (match program station), with optional debounced persist for low-risk fields.**
+
+**Why not raw autosave-per-keystroke (current `MealOptionEditor` qty)?**
+- Quantity `onChange` already causes **write amplification** and race risk
+- Creating meal + option + foods has **ordering dependencies** (FK NOT NULLs)
+- Partial failure mid-plan leaves inconsistent tree without transaction boundary
+- Program builder already trained coaches on **dirty → Save**
+
+**Why not pure in-memory draft forever?**
+- Meal plan is single entity (unlike program's multi-day graph) — explicit save scope is smaller; could commit whole plan tree in one orchestrated write (would need **new** orchestration function — not in service today)
+
+**Pragmatic phased approach:**
+1. **Phase A:** Inline UI still calls existing granular APIs but **debounce** qty updates (300–500ms) and **optimistic local state** with `loadMealsTree` on structural changes only
+2. **Phase B:** Introduce `MealPlanDraftContext` mirroring `ProgramDraftContext` — flush on Save via new `commitMealPlanTree` (service addition)
+
+**Fit with constraints:** FK chain allows row-by-row persist **if** creation order is: meal → option → food. Inline "add meal" must create at least meal shell + Option 1 before foods display on P4 path.
+
+## 3. Modals' fate
+
+| Component | Can absorb inline? | Load-bearing notes |
+|-----------|-------------------|-------------------|
+| `MealCreator` | **Yes** — logic is ~150 lines of form + batch insert | Must be refactored to create **`meal_options`** row (not legacy NULL items) for P4 display compatibility |
+| `MealOptionEditor` | **Yes** — handlers map 1:1 to inline rows | Drop card UI; keep `handleAddFood`, rename, delete; fix qty debounce |
+| `MealPlanMetadataModal` | **Keep modal** — metadata is not canvas authoring | P3 wiring stays |
+| `MealPlanAssignmentModal` | **Keep modal** | Assign is not inline |
+
+**Cannot drop without replacement:**
+- Food search + pick interaction (move inline)
+- `createMealOption` migration side-effect when upgrading legacy meals
+
+**Orphan risk:** `MealForm`, `MealPlanBuilder` still use legacy insert path — separate from P4 but same data bug.
+
+## 4. Food-picker plan
+
+1. **Inline search row** at bottom of each option's food list (port `renderExerciseSearch` markup + tokens from `mealDisplay.module.css`)
+2. **Data:** Debounced `searchFoods(query)` when query length ≥ 2; else show recent/favorites from cached subset (not full table load)
+3. **On select:** `addFoodToOption` → append to local tree → update macro strip via existing `computePlanTotalsFromMeals`
+4. **Qty:** Inline input, debounced `updateFoodInOption`
+5. **Create custom:** Link opens compact panel (fields from `CoachFoodDatabasePanel` `EMPTY_ADD_FORM`) → `createFood` → auto-add to current option
+6. **Keyboard:** Optional `/` or `F` to focus food search when option expanded (mirror `N` for exercises)
+
+## 5. Risk & effort
+
+| Assessment | Detail |
+|------------|--------|
+| **Nature** | Primarily **presentation + state orchestration** over existing write APIs — **no schema change required** for MVP inline |
+| **Service gap** | Medium: need `createMeal` wrapper (meal + default option), possibly `updateMeal`, `reorderMeals`, batched commit for Save model Phase B |
+| **Traps** | (1) **Legacy vs options path** — MealCreator breaks P4 display; must fix in inline flow (2) **Qty autosave races** (3) **Migration on first option** side effects (4) **Macro strip drift** if local state not synced (5) **No meal reorder** API usage (6) **Food DB global** — search noise at scale (7) `meal_option_id` NULL items invisible to `loadPlanBuilderMeals` |
+
+**Effort (honest):**
+- **Contained MVP** (inline food search + inline option editor, keep granular APIs, drop modals): **medium** — 1 primary surface refactor in `meal-display/`
+- **Parity with program station** (draft context + explicit Save + localStorage recovery): **medium–large**
+- **Not** a tiny CSS swap — interaction model change
+
+## 6. Flags before design
+
+1. **MealCreator / legacy insert vs P4 display** — confirmed bug/tech debt; inline project must pick **options-first** creation only.
+2. **No `createMeal` service** — inline add-meal needs agreed insert contract (meal + option 1?).
+3. **Delete meal** is raw supabase on page — should move into service for consistency.
+4. **Metadata modal** stays modal — scope boundary OK.
+5. **Client `ClientMealEditor`** — separate surface; don't conflate with coach inline builder.
+6. **Generator (P5)** — out of scope but shares `meal-display` components.
+7. **Schema snapshot stale** on `meal_option_id` — trust migration `20260129_meal_options.sql` over snapshot export.
+
+---
+
+# Appendix — Key file paths
+
+```
+src/app/coach/nutrition/meal-plans/[id]/page.tsx
+src/components/meal-display/CoachPlanBuilderView.tsx
+src/components/meal-display/MealListDisplay.tsx
+src/components/meal-display/loadPlanBuilderMeals.ts
+src/components/coach/MealCreator.tsx
+src/components/coach/MealOptionEditor.tsx
+src/lib/mealPlanService.ts
+src/app/coach/programs/[id]/edit/page.tsx
+src/components/coach/programs/station/ProgramStationShell.tsx
+src/components/coach/programs/station/ProgramDayEditor.tsx
+src/contexts/ProgramDraftContext.tsx
+src/components/workout-canvas/WorkoutCanvas.tsx
+src/components/workout-canvas/WorkoutCanvasCore.tsx
+src/components/workout-canvas/PrescriptionTable.tsx
+src/components/workout-canvas/WorkoutTemplateEditor.tsx
+src/hooks/useLibraryWorkoutDraft.ts
+src/hooks/useExerciseLibrary.ts
+src/components/coach/nutrition/CoachFoodDatabasePanel.tsx
+migrations/20260129_meal_options.sql
+docs/schema-snapshot-2026-04-27.md
+```
+
+---
+
+*End of audit.*

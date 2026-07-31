@@ -1,0 +1,268 @@
+# AUDIT (READ-ONLY) — Coach nutrition lists → collection card
+**Date:** 2026-07-06  
+**Ground truth:** current `src/` + `design/mockups/element-16-collection-card.html` + `CollectionCard.tsx`
+
+---
+
+## PART 1 — Map the three panels
+
+### Workspace mount & shell
+
+| Item | Value |
+|------|-------|
+| **Route** | `/coach/nutrition` (default tab = plans); `?tab=assignments` \| `?tab=foods` |
+| **Page** | `src/app/coach/nutrition/page.tsx` |
+| **Shell** | `CoachPageShell widthVariant="data-7xl"` + `className="!p-0"` |
+| **Workspace** | `src/components/coach/nutrition/CoachNutritionWorkspace.tsx` |
+| **Styles** | `src/components/coach/nutrition/coachNutritionWorkspace.module.css` |
+| **Gutters** | `.page` padding: 26px 20px → 28px @640 → 32px @1024 (same rhythm as Programs workspace module) |
+
+Tabs render one panel at a time via `activeTab` (`plans` \| `assignments` \| `foods`). Header (title, Generator link, Create meal plan) and tab nav live in the workspace; create uses `MealPlanMetadataModal` at workspace level.
+
+**Note:** Programs list is `canvas-full`; nutrition workspace remains **`data-7xl`** (~1280px cap). A future full-width pass is separate from this card decision.
+
+---
+
+### A. `CoachMealPlansPanel`
+
+**Path:** `src/components/coach/nutrition/CoachMealPlansPanel.tsx`
+
+| Aspect | Detail |
+|--------|--------|
+| **Presentation** | **Open table** — `.tableHead` + `.tableRow` / `.tableRowDesktop` @≥1024px; stacked `.tableRowMobile` &lt;1024px |
+| **Columns (desktop)** | Plan · Status · Targets · Meals · Clients · Actions |
+| **Per-row content** | Name; Active/Draft pill (`is_active`); macro line (computed_* or target_* kcal/P/C/F); `{meal_count}/day`; `usage_count` (accent when &gt;0); View + Assign + Edit + Delete |
+| **Filters** | Search (name/notes/description); chips All / Active |
+| **Header actions** | None in panel (Create is workspace header) |
+| **Per-row actions** | View → `/coach/nutrition/meal-plans/[id]`; Assign → `handleAssignMealPlan`; Edit → `MealPlanMetadataModal`; Delete → `MealPlanService.deleteMealPlan` |
+| **Modals** | `MealPlanAssignmentModal`; `MealPlanMetadataModal` (edit) |
+
+**Data source:** `fetchCoachMealPlansWithStats(coachId)` in `src/components/coach/nutrition/fetchNutritionWorkspaceData.ts`
+
+1. `MealPlanService.getMealPlans(coachId)` — base plan rows
+2. Batch `meals` → `meal_count` per plan
+3. Batch `meal_plan_assignments` → `usage_count` per plan
+
+**Fields per plan returned (confirmed):**
+
+| Field | Source |
+|-------|--------|
+| All `MealPlan` columns from service | `id`, `name`, `description`, `notes`, `target_*`, `coach_id`, `difficulty_level`, `is_active`, `created_at`, `updated_at`, `category`, `generated_config`, `computed_*`, legacy `actual_*` |
+| **`meal_count`** | Aggregated from `meals` |
+| **`usage_count`** | Count of `meal_plan_assignments` rows (all assignments, not only active — **confirmed** in fetch; not filtered by `is_active`) |
+
+---
+
+### B. `CoachAssignmentsPanel`
+
+**Path:** `src/components/coach/nutrition/CoachAssignmentsPanel.tsx`
+
+| Aspect | Detail |
+|--------|--------|
+| **Presentation** | **Open table** — `.assignTableHead` / `.assignTableRowDesktop` (7 columns) |
+| **Columns** | Client · Plan · Started · Label · Compliance 30d · Status · Actions |
+| **Per-row content** | Client avatar + name (link to client); plan name (link to plan); `start_date` formatted; `label` or `—`; compliance % (color-coded) or `—`; Active/Inactive pill; View client + Unassign (if active) |
+| **Filters** | Search (client or plan name); Active / All chips; summary line `{activeCount} active · {totalCount} total` |
+| **Header action** | **＋ Assign plan** → plan picker `ResponsiveModal` → `MealPlanAssignmentModal` |
+| **Modals** | Plan picker; `MealPlanAssignmentModal` |
+
+**Data source:** `fetchCoachAssignments(coachId)` in `src/components/coach/nutrition/fetchCoachAssignments.ts`
+
+**Queries:**
+1. `meal_plan_assignments` `select('*')` where `coach_id`, order `created_at desc`
+2. `profiles` (first_name, last_name) for client ids
+3. `meal_plans` (id, name) for plan ids
+4. `meal_completions` last 30 days → `completedDays30d`, `compliancePct30d` per client
+
+**Fields per row (`CoachAssignmentRow` — confirmed):**
+
+| Field | Type / notes |
+|-------|----------------|
+| `id` | assignment uuid |
+| `client_id`, `meal_plan_id` | FKs |
+| `start_date` | ISO date |
+| `is_active` | boolean |
+| `label` | string \| null |
+| `client` | `{ id, first_name, last_name }` \| null |
+| `meal_plan` | `{ id, name }` \| null |
+| `completedDays30d` | number |
+| `compliancePct30d` | number \| null (rounded % of 30 days) |
+
+**Identity data:** Client full name derivable; **initials** via existing `clientInitials(name)` in panel (not stored in fetch).
+
+**Not in panel:** `updateAssignmentLabel` — label is **display-only** here; editing happens in `ClientMealsView` (`MealPlanService.updateAssignmentLabel`). **Confirmed** — assignments panel does not call update.
+
+---
+
+### C. `CoachFoodDatabasePanel`
+
+**Path:** `src/components/coach/nutrition/CoachFoodDatabasePanel.tsx`
+
+| Aspect | Detail |
+|--------|--------|
+| **Presentation** | **Open table** — `.foodTableHead` / `.foodTableRowDesktop` (5 columns) |
+| **Columns** | Food · Brand · Category · Macros · Actions |
+| **Per-row content** | Name; brand or `—`; category chip; kcal · P/C/F · serving; View (detail modal) + Delete |
+| **Filters** | Search (name/brand); All + per-category chips; summary `{totalCount} foods` |
+| **Header action** | **＋ Add food** → `ResponsiveModal` form |
+| **Modals** | Add food (`createFoodFromCatalogForm`); detail view (`detailFood`) |
+
+**Data source:** `fetchCoachFoods()` in `src/components/coach/nutrition/fetchCoachFoods.ts`
+
+**Query:** `foods` `select('*')` where `is_active = true`, order `name`
+
+**Fields per row (`CoachFoodRow` — confirmed):**
+
+`id`, `name`, `brand`, `serving_size`, `serving_unit`, `calories_per_serving`, `protein`, `carbs`, `fat`, `fiber`, `category`, `created_at`, `updated_at`
+
+**Create path:** `createFoodFromCatalogForm` → `src/lib/mealPlans/foodCatalogForm.ts` (not raw supabase in panel except delete).
+
+---
+
+## PART 2 — Fit assessment (the decision)
+
+### Meal plans — **CONVERT to collection card**
+
+**What a plan carries (real data):**
+- **Name** — yes
+- **Status** — `is_active` → Active / Draft (not “inactive archive”; draft = not active)
+- **Macro targets** — `computed_*` or `target_*` kcal + P/C/F (rich meta line; may show `—` if unset)
+- **Meal count** — `meal_count` (meals per day slot count, displayed as `N/day`)
+- **Assigned clients** — `usage_count` (assignment row count)
+- **No** periodization, weeks, training blocks, or segmented structure
+
+**Verdict:** Strong parallel to **Programs list** (Phase B). Enough for name + status pill + meta line + right-stat (client count) + four actions. **No structure strip** — meal plans have no block/phase analog; omit `structure` entirely.
+
+**Caveat:** `usage_count` counts all assignment rows, not distinct active clients; card should match current semantics unless product wants active-only (would be a logic change — fence).
+
+**Optional gap:** No **avatar initials** for assigned clients in fetch (Programs API added `assignedPreview`). Card can show count-only at zero extra data, or add a small batch preview later (presentation+API additive).
+
+---
+
+### Assignments — **CONVERT to client-forward collection card** (recommended) OR stay table
+
+**What a row is:** Relationship record (client ↔ plan) + operational fields (start, label, compliance, active).
+
+**Client-forward card case (recommended):**
+- Element 16’s **Clients roster example** is the pattern: name = client, meta = plan + dates + label, right-stat = compliance %.
+- Identity is strong (name + initials already rendered).
+- Each row is a **top-level coaching object** (a client’s live nutrition assignment), not a flat join table cell.
+
+**Tabular case:**
+- Seven comparable columns (plan, date, label, compliance) favor **scan across many assignments** in one glance.
+- Coach with 30+ assignments may prefer dense columns over 30 tall cards.
+
+**Verdict:** **Convert to client-forward collection card** for **coherence with Programs/Plans roster grammar**, if assignment volume stays moderate (typical coach roster). If lists routinely exceed ~15–20 rows, **hybrid**: card default with optional compact table toggle — but that’s product scope; **audit recommendation: convert**, same as plans.
+
+**No structure strip** — no segmented analog.
+
+**Label editing:** Not in this panel today; card build must not imply inline label edit unless added (fence).
+
+---
+
+### Food database — **STAY TABULAR** (explicit UX call)
+
+**What a food is:** Uniform catalog entry — name, brand, category, serving, macros. High count, **comparison-heavy** (scan kcal/P/C/F across rows, filter by category).
+
+**Card per food would be:**
+- Sparse (one macro line + category chip — little more than a table row)
+- Slower to scan (one card height >> one 58px hairline row)
+- Regresses the deliberate open-table Phase B nutrition workspace design
+
+**Verdict:** **Keep open table.** Restyle only if needed (already system-styled hairlines). **Do not force CollectionCard** on foods. This is intentional inconsistency: **roster entities = card; reference catalog = table** — matches Element 16 law (“roster pages” vs in-item sub-lists).
+
+---
+
+## PART 3 — Card mapping (panels that convert)
+
+### Meal plans → `CollectionCard`
+
+| Slot | Mapping | Real? |
+|------|---------|-------|
+| `hue` | `programCollectionHue`-style hash or `COLLECTION_HUES` cycle by index/id | ✓ |
+| `name` | `plan.name` | ✓ |
+| `status` | `is_active` → `active` \| `inactive` (label pill: **Active** / **Draft**) | ✓ |
+| `meta` | Macro chip line: `{kcal} kcal · P {p}g · C {c}g · F {f}g` · `{meal_count}/day` | ✓ (omit macros segment if all empty — show `—` as today) |
+| `structure` | **Omit** | — |
+| `rightStat` | `CollectionCardAssignedStat` with `count={usage_count}`; avatars **optional** (needs API extension for initials) | count ✓; avatars would-need-data |
+| `actions` | View → plan builder; Assign → existing modal; Edit → metadata modal; Delete → existing handler | ✓ |
+
+**Would-need-data (optional polish):** `assignedPreview.initials[]` like Programs API (not required for v1).
+
+---
+
+### Assignments → `CollectionCard` (client-forward)
+
+| Slot | Mapping | Real? |
+|------|---------|-------|
+| `hue` | Cycle `COLLECTION_HUES` or map compliance tier to hue (e.g. good=group-c, bad=group-d) — **presentation choice** | ✓ |
+| `name` | `clientDisplayName(row.client)` | ✓ |
+| `status` | `is_active` → Active / Inactive | ✓ |
+| `meta` | `{meal_plan.name}` · Started `{formatted start_date}` · Label `{label}` (omit label segment if null/—) | ✓ |
+| `structure` | **Omit** | — |
+| `rightStat` | **Compliance %** as headline number (mono, color from existing `complianceGood/Warn/Bad` tokens) — reads better than a ring here because value is already computed; or simple `{pct}%` + `30d` sublabel | ✓ |
+| `actions` | View → `/coach/clients/[id]`; Unassign → `handleUnassign` (only if active) | ✓ |
+
+**Avatar in card body:** Could reuse initials in meta area or skip (name is title). No `CollectionCardAssignedStat` needed unless showing plan name as stat — meta line is enough.
+
+---
+
+### Food database — N/A (stay table)
+
+No card mapping. Preserve `.foodTableHead` grid; optional future: macro column alignment tokens only.
+
+---
+
+## PART 4 — Fences (logic to preserve)
+
+| Fence | Location | Notes |
+|-------|----------|-------|
+| **Plan list fetch** | `fetchCoachMealPlansWithStats` | Aggregation of meal_count / usage_count unchanged |
+| **Assign flow** | `MealPlanAssignmentModal` → `MealPlanService.assignMealPlanToClients` | Client select, optional label, coach id |
+| **Unassign** | `MealPlanService.deactivateAssignment` | Assignments panel only |
+| **Plan CRUD** | `MealPlanService.deleteMealPlan`; `MealPlanMetadataModal` + service update/create | Edit/delete/create paths |
+| **Assignments fetch** | `fetchCoachAssignments` | Compliance calculation, joins |
+| **`updateAssignmentLabel`** | `MealPlanService.updateAssignmentLabel` | **Not used in assignments panel** — do not wire accidentally; client detail owns edit |
+| **Food fetch** | `fetchCoachFoods` | Active foods query |
+| **Food create** | `createFoodFromCatalogForm` / `validateFoodCatalogForm` | Add modal |
+| **Food delete** | `supabase.from('foods').delete()` | Panel handler |
+| **Workspace meta** | `fetchNutritionWorkspaceMeta`, `onMetaChange` counts | Tab badges |
+| **Tab routing** | `CoachNutritionWorkspace` `?tab=` | Unchanged |
+
+Build = **swap row renderer** (`tableRow` → `CollectionCardStack`) + restyle modals if desired; **no** changes to fetch signatures unless additive preview fields are explicitly approved.
+
+---
+
+## PART 5 — Recommendation
+
+| Panel | Decision | Why |
+|-------|----------|-----|
+| **Meal plans** | **→ Collection card** | Top-level roster entity; same richness as Programs (name, status, meta, assigned count, actions). Direct reuse of Phase B patterns. |
+| **Assignments** | **→ Collection card (client-forward)** | Each row is a coached relationship with identity + compliance stat; matches Element 16 Clients example. Table was built for scan density but roster grammar favors cards at coach scale. |
+| **Food database** | **→ Stay open table** | Reference/catalog data; uniform rows; macro comparison; high volume. Cards would be sparse and harm scan — **not** a “plain list regression” but the correct control for catalog search. |
+
+**Coherence statement:** Plans + Assignments as **collection cards** + Foods as **dense open table** is consistent with the design system law: Element 16 for **top-level roster entities**; Element 06-style open rows for **uniform searchable catalogs**. Nutrition workspace tabs then mirror Training: Programs (cards) vs Exercises (likely table elsewhere).
+
+**Decide before build (not mid-build):**
+1. Meal plan `usage_count` — keep all assignments vs active-only for right-stat?
+2. Assignment card — compliance as right-stat number vs mini ring?
+3. Whether to add `assignedPreview` initials for meal plans (optional; count-only is fine v1).
+4. Shell width — nutrition still `data-7xl`; align to `canvas-full` separately if desired.
+
+**Awkward-risk flag:** Assignments **only** if a coach has very large assignment lists (50+), a card stack may feel long; table excelled at 7-column scan. Monitor with real data; table fallback is a product escape hatch, not required for v1.
+
+---
+
+## Inferring vs confirming
+
+| Claim | Status |
+|-------|--------|
+| Panel paths, table columns, fetch fns | **Confirmed** — source read |
+| `usage_count` includes inactive assignments | **Confirmed** — fetch has no `is_active` filter on assignments aggregate |
+| `updateAssignmentLabel` in assignments panel | **Confirmed absent** |
+| Food count / compliance math | **Confirmed** — fetch files |
+| Typical assignment volume | **Inferring** — recommend card; flag volume edge case |
+
+---
+
+**No code, git, or migrations changed.**

@@ -5,7 +5,7 @@
 }
 
 .tile {
-  background: var(--fc-glass-soft);
+  background: transparent;
   border: 1px solid var(--fc-divider);
   border-radius: 12px;
   padding: 10px;
@@ -18,7 +18,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-family: var(--f-mono);
   font-size: 10px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -47,7 +47,8 @@
 }
 
 .value {
-  font-family: var(--f-display, var(--font-geist-sans));
+  font-family: var(--f-display);
+  font-stretch: 125%;
   font-weight: 800;
   font-size: 24px;
   line-height: 1;
@@ -71,13 +72,13 @@
   color: var(--fc-effort-easy);
 }
 
-.valLime {
-  color: var(--fc-accent-lime-2);
+.valAction {
+  color: var(--fc-accent);
 }
 
 .barTrack {
   height: 4px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--fc-track);
   border-radius: 999px;
   overflow: hidden;
 }
@@ -90,7 +91,7 @@
 }
 
 .barMuted {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--fc-glass-border);
 }
 
 .barCrit {
@@ -105,6 +106,6 @@
   background: var(--fc-effort-easy);
 }
 
-.barLime {
-  background: var(--fc-accent-lime-2);
+.barAction {
+  background: var(--fc-accent);
 }

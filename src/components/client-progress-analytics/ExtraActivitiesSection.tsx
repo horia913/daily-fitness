@@ -57,7 +57,7 @@ export function ExtraActivitiesSection({
     <SectionCard>
       <SectionHead
         icon={Activity}
-        iconClassName="bg-[rgba(197,255,74,0.12)] text-[var(--lime)]"
+        iconClassName="bg-[rgba(197,255,74,0.12)] text-[var(--fc-accent)]"
         title="Extra activities"
         description="Outside programmed workouts"
         meta={meta}
@@ -82,7 +82,7 @@ export function ExtraActivitiesSection({
                 className="mt-1 text-[22px] font-bold leading-none text-[var(--t1)]"
                 style={{
                   fontFamily:
-                    '"Big Shoulders Display", var(--font-geist-sans, Geist), sans-serif',
+                    'var(--f-display), var(--font-geist-sans, Geist), sans-serif',
                 }}
               >
                 {count}
@@ -102,10 +102,10 @@ export function ExtraActivitiesSection({
                 Minutes
               </div>
               <div
-                className="mt-1 text-[22px] font-bold leading-none text-[var(--lime)]"
+                className="mt-1 text-[22px] font-bold leading-none text-[var(--fc-accent)]"
                 style={{
                   fontFamily:
-                    '"Big Shoulders Display", var(--font-geist-sans, Geist), sans-serif',
+                    'var(--f-display), var(--font-geist-sans, Geist), sans-serif',
                 }}
               >
                 {totalMinutes}
