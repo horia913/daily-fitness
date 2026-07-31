@@ -31,6 +31,7 @@ function mapSlotToExerciseDisplay(
     size: options?.size,
     compact: options?.compact,
     segments: buildPrescriptionSegments(slot, group, { compact: options?.compact }),
+    exerciseId: slot.exercise_id?.trim() || null,
   }
 }
 

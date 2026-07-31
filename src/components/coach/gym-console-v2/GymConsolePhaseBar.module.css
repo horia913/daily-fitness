@@ -1,0 +1,9 @@
+.wrap {
+  width: 100%;
+  margin-bottom: 14px;
+}
+
+/* Segment buttons: ribbon CSS pads for a menu button we omit — tighten right pad. */
+.wrap :global(button[role='tab']) {
+  padding-right: 16px;
+}

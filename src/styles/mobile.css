@@ -2,9 +2,9 @@
 
 /* Base mobile styles - only essential, non-conflicting styles */
 @media (max-width: 768px) {
-  /* Ensure proper touch targets (exclude dense workout log +/- — see LargeInput fc-logset-step-btn) */
-  button:not(.fc-logset-step-btn),
-  [role="button"],
+  /* Ensure proper touch targets (exclude dense workout log +/- and gym-console mark toggle) */
+  button:not(.fc-logset-step-btn):not(.fc-gym-mark-toggle),
+  [role="button"]:not(.fc-gym-mark-toggle),
   input[type="button"],
   input[type="submit"] {
     min-height: 44px;

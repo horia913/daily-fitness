@@ -69,6 +69,100 @@ const PHASE_CLASS: Record<CollectionPhaseLevel, string> = {
   deload: styles.segDeload,
 };
 
+export type CollectionStructureStripProps = {
+  structure: CollectionCardStructureSegment[];
+  className?: string;
+  /** Optional selected segment index (gym console / interactive consumers). */
+  activeIndex?: number | null;
+  /** When set, segments become tappable; omit for presentational dashboard use. */
+  onSegmentClick?: (index: number) => void;
+};
+
+/**
+ * Continuous color-coded phase bar from Element 16 / CollectionCard.
+ * Dashboard uses it presentationally; gym console can pass activeIndex + onSegmentClick.
+ */
+export function CollectionStructureStrip({
+  structure,
+  className,
+  activeIndex = null,
+  onSegmentClick,
+}: CollectionStructureStripProps) {
+  if (structure.length === 0) return null;
+
+  const interactive = typeof onSegmentClick === "function";
+
+  return (
+    <div className={cn(styles.struct, className)}>
+      <div className={styles.segs} role={interactive ? "tablist" : undefined} aria-label={interactive ? "Training blocks" : undefined}>
+        {structure.map((seg, i) => {
+          const active = activeIndex === i;
+          const segClass = cn(
+            styles.seg,
+            PHASE_CLASS[seg.phase],
+            active && styles.segActive,
+            interactive && styles.segInteractive,
+          );
+          if (interactive) {
+            return (
+              <button
+                key={`${seg.label}-${i}`}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                aria-label={`${seg.label}, ${seg.duration}`}
+                className={segClass}
+                style={{ flex: seg.flex }}
+                onClick={() => onSegmentClick(i)}
+              />
+            );
+          }
+          return (
+            <div
+              key={`${seg.label}-${i}`}
+              className={segClass}
+              style={{ flex: seg.flex }}
+            />
+          );
+        })}
+      </div>
+      <div className={styles.seglabels}>
+        {structure.map((seg, i) => {
+          const active = activeIndex === i;
+          const slabInner = (
+            <>
+              <div className={styles.slabName}>{seg.label}</div>
+              <div className={styles.slabDuration}>{seg.duration}</div>
+            </>
+          );
+          if (interactive) {
+            return (
+              <button
+                key={`${seg.label}-lbl-${i}`}
+                type="button"
+                className={cn(styles.slab, styles.slabButton, active && styles.slabActive)}
+                style={{ flex: seg.flex }}
+                onClick={() => onSegmentClick(i)}
+              >
+                {slabInner}
+              </button>
+            );
+          }
+          return (
+            <div
+              key={`${seg.label}-lbl-${i}`}
+              className={cn(styles.slab, active && styles.slabActive)}
+              style={{ flex: seg.flex }}
+            >
+              {slabInner}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 const STATUS_TONE_CLASS: Record<CollectionCardStatusTone, string> = {
   good: styles.statusToneGood,
   warn: styles.statusToneWarn,
@@ -136,29 +230,7 @@ export function CollectionCard({
         </div>
         <div className={cn(styles.meta, avatar && styles.metaIndented)}>{meta}</div>
         {structure && structure.length > 0 ? (
-          <div className={styles.struct}>
-            <div className={styles.segs}>
-              {structure.map((seg, i) => (
-                <div
-                  key={`${seg.label}-${i}`}
-                  className={cn(styles.seg, PHASE_CLASS[seg.phase])}
-                  style={{ flex: seg.flex }}
-                />
-              ))}
-            </div>
-            <div className={styles.seglabels}>
-              {structure.map((seg, i) => (
-                <div
-                  key={`${seg.label}-lbl-${i}`}
-                  className={styles.slab}
-                  style={{ flex: seg.flex }}
-                >
-                  <div className={styles.slabName}>{seg.label}</div>
-                  <div className={styles.slabDuration}>{seg.duration}</div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <CollectionStructureStrip structure={structure} />
         ) : null}
       </div>
       {(rightStat || actions) && (

@@ -24,6 +24,22 @@ export interface ExerciseDisplayProps {
   /** Drops "N ×" prefix (round-based group contexts). */
   compact?: boolean
   segments: ExerciseDisplaySegments
+  /** Canvas exercise id — used by gym console prev-perf lookup. */
+  exerciseId?: string | null
+  /**
+   * Optional muted reference under the prescription (e.g. last performed).
+   * Absent on template / Train paths — no extra UI.
+   */
+  secondaryLine?: string | null
+  /**
+   * Gym console opened-workout scratchpad only.
+   * When set, a small toggle is absolutely positioned on the right of the row
+   * without changing badge / name / prescription layout.
+   */
+  markToggle?: {
+    done: boolean
+    onToggle: () => void
+  } | null
 }
 
 export interface ExerciseGroupDisplayProps {

@@ -21,9 +21,13 @@ import {
   Trophy,
   type LucideIcon,
 } from "lucide-react";
+import {
+  GYM_CONSOLE_BOARD_MAX,
+  GYM_CONSOLE_BOARD_STORAGE_KEY,
+} from "@/components/coach/gym-console-v2/boardStorage";
 import styles from "@/components/coach/coachTrainingHub.module.css";
 
-const GYM_STORAGE_KEY = "gym-console-clients";
+const GYM_STORAGE_KEY = GYM_CONSOLE_BOARD_STORAGE_KEY;
 
 /** Shipped destination hues — keep exactly as today. */
 const HUE = {
@@ -149,7 +153,7 @@ function readGymBoardCount(): number {
     const raw = localStorage.getItem(GYM_STORAGE_KEY);
     if (!raw) return 0;
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? Math.min(parsed.length, 6) : 0;
+    return Array.isArray(parsed) ? Math.min(parsed.length, GYM_CONSOLE_BOARD_MAX) : 0;
   } catch {
     return 0;
   }

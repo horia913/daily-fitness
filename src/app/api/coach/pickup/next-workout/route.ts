@@ -31,7 +31,20 @@ type PickupBlock = {
     sets?: number
     reps?: string
     weight_kg?: number
+    rest_seconds?: number
+    load_percentage?: number
+    rir?: number
+    tempo?: string
+    notes?: string
   }>
+}
+
+function numOrUndef(v: unknown): number | undefined {
+  return typeof v === 'number' && Number.isFinite(v) ? v : undefined
+}
+
+function strOrUndef(v: unknown): string | undefined {
+  return typeof v === 'string' && v.length > 0 ? v : undefined
 }
 
 async function buildPickupFallbackFromProgramState(clientId: string) {
@@ -109,9 +122,14 @@ async function buildPickupFallbackFromProgramState(clientId: string) {
         id: typeof ex.id === 'string' ? ex.id : `${String(block.id ?? 'block')}-${exerciseId}`,
         exercise_id: exerciseId,
         exercise_name: exerciseName,
-        sets: typeof ex.sets === 'number' ? ex.sets : undefined,
-        reps: typeof ex.reps === 'string' ? ex.reps : undefined,
-        weight_kg: typeof ex.weight_kg === 'number' ? ex.weight_kg : undefined,
+        sets: numOrUndef(ex.sets),
+        reps: typeof ex.reps === 'string' ? ex.reps : ex.reps != null ? String(ex.reps) : undefined,
+        weight_kg: numOrUndef(ex.weight_kg),
+        rest_seconds: numOrUndef(ex.rest_seconds),
+        load_percentage: numOrUndef(ex.load_percentage),
+        rir: numOrUndef(ex.rir),
+        tempo: strOrUndef(ex.tempo),
+        notes: strOrUndef(ex.notes),
       })
     }
 

@@ -25,6 +25,9 @@ export function ExerciseGroupDisplay({
         size={size}
         compact={compact}
         segments={solo.segments}
+        exerciseId={solo.exerciseId}
+        secondaryLine={solo.secondaryLine}
+        markToggle={solo.markToggle}
       />
     )
   }
@@ -37,7 +40,7 @@ export function ExerciseGroupDisplay({
       </div>
       <div className={`${styles.groupBody} ${styles.groupMulti} ${hue.rule}`}>
         {exercises.map((ex) => (
-          <div key={`${ex.badge}-${ex.name}`} className={styles.groupExercise}>
+          <div key={`${ex.badge}-${ex.exerciseId ?? ex.name}`} className={styles.groupExercise}>
             <ExerciseDisplay
               badge={ex.badge}
               groupIndex={groupIndex}
@@ -45,6 +48,9 @@ export function ExerciseGroupDisplay({
               size={size}
               compact={compact}
               segments={ex.segments}
+              exerciseId={ex.exerciseId}
+              secondaryLine={ex.secondaryLine}
+              markToggle={ex.markToggle}
             />
           </div>
         ))}

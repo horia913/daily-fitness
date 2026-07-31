@@ -95,6 +95,65 @@
   color: var(--fc-accent);
 }
 
+/* Muted last-performed / reference hint — subordinate to prescription */
+.secondaryLine {
+  margin: 2px 0 0;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--fc-text-subtle, var(--fc-text-dim));
+  opacity: 0.85;
+  white-space: normal;
+}
+
+/* Gym console: 14×14 mark — absolute top-right in a reserved gutter; not in flex flow */
+.rowWithMark {
+  position: relative;
+  /* Gutter for the 14px toggle so text never sits under it */
+  padding-right: 18px;
+}
+
+.rowMarked {
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--fc-status-success, #22c55e) 10%, transparent);
+}
+
+.markToggle {
+  all: unset;
+  position: absolute;
+  top: 10px;
+  right: 0;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px !important;
+  height: 14px !important;
+  min-width: 14px !important;
+  min-height: 14px !important;
+  max-width: 14px !important;
+  max-height: 14px !important;
+  margin: 0;
+  padding: 0 !important;
+  border-radius: 50%;
+  border: 1px solid var(--fc-text-dim, #888);
+  background: transparent;
+  color: transparent;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.markToggleOn {
+  border-color: var(--fc-status-success, #22c55e);
+  background: var(--fc-status-success, #22c55e);
+  color: #0b0b0c;
+}
+
 /* —— Group —— */
 
 .groupWrap {

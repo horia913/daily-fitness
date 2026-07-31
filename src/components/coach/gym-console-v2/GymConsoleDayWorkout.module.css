@@ -1,0 +1,61 @@
+.root {
+  width: 100%;
+  max-width: 28rem;
+  margin: 0 auto;
+  padding: 12px 14px 20px;
+  min-width: 0;
+}
+
+.title {
+  margin: 0 0 12px;
+  font-family: var(--f-head, var(--font-body));
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fc-accent, var(--fc-text-primary));
+}
+
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skeleton,
+.skeletonShort {
+  height: 52px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--fc-surface-elevated, #1a1a1a) 80%, transparent);
+  border: 1px solid var(--fc-glass-border, transparent);
+  animation: gymConsolePulse 1.4s ease-in-out infinite;
+}
+
+.skeletonShort {
+  height: 36px;
+  width: 72%;
+}
+
+.statusText {
+  margin: 4px 0 0;
+  font-family: var(--f-mono, monospace);
+  font-size: 12px;
+  color: var(--fc-text-dim, #888);
+}
+
+@keyframes gymConsolePulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}

@@ -1,0 +1,366 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  color: var(--fc-text-primary);
+}
+
+.shell {
+  flex: 1;
+  width: 100%;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 12px 12px calc(24px + var(--fc-bottom-safe-area, 0px));
+  min-width: 0;
+}
+
+.pageHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-bottom: 16px;
+}
+
+.pageTitle {
+  margin: 0;
+  font-family: var(--f-head, var(--font-body));
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--fc-text-primary);
+}
+
+.pageSub {
+  margin: 4px 0 0;
+  font-family: var(--f-mono, monospace);
+  font-size: 11px;
+  color: var(--fc-text-dim);
+  letter-spacing: 0.04em;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.addBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--fc-accent, #2e7bff) 35%, transparent);
+  background: color-mix(in srgb, var(--fc-accent, #2e7bff) 14%, transparent);
+  color: var(--fc-text-primary);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.addBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.addBtnSecondary {
+  border-color: var(--fc-glass-border, transparent);
+  background: var(--fc-glass-highlight, transparent);
+}
+
+.clearBtn {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--fc-text-dim);
+  font-family: var(--f-mono, monospace);
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.clearBtn:hover {
+  color: var(--fc-text-primary);
+}
+
+.boardFull {
+  margin: 0 0 12px;
+  font-family: var(--f-mono, monospace);
+  font-size: 11px;
+  color: var(--fc-text-dim);
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 48px 16px 32px;
+  gap: 8px;
+}
+
+.emptyTitle {
+  margin: 8px 0 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+  color: var(--fc-text-primary);
+}
+
+.emptyHint {
+  margin: 0 0 16px;
+  max-width: 22rem;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--fc-text-dim);
+}
+
+.emptyActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  min-width: 0;
+}
+
+@media (min-width: 900px) {
+  .shell {
+    padding: 20px 20px calc(28px + var(--fc-bottom-safe-area, 0px));
+  }
+
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+}
+
+/* —— Card —— */
+
+.card {
+  min-width: 0;
+  border-radius: 14px;
+  border: 1px solid var(--fc-glass-border, color-mix(in srgb, #fff 8%, transparent));
+  background: color-mix(in srgb, var(--fc-surface-elevated, #141416) 92%, transparent);
+}
+
+.cardExpanded {
+  border-color: color-mix(in srgb, var(--fc-accent, #2e7bff) 28%, transparent);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  min-width: 0;
+}
+
+.cardToggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 10px 12px 12px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.cardKind {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fc-glass-highlight, #fff) 8%, transparent);
+  color: var(--fc-text-dim);
+  font-family: var(--f-mono, monospace);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cardKindText {
+  display: none;
+}
+
+@media (min-width: 480px) {
+  .cardKindText {
+    display: inline;
+  }
+}
+
+.cardTitle {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--fc-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardChevron {
+  flex-shrink: 0;
+  color: var(--fc-text-dim);
+  transition: transform 0.18s ease;
+}
+
+.cardChevronOpen {
+  transform: rotate(180deg);
+}
+
+.cardRemove {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  border: none;
+  border-left: 1px solid var(--fc-glass-border, transparent);
+  background: transparent;
+  color: var(--fc-text-dim);
+  cursor: pointer;
+}
+
+.cardRemove:hover {
+  color: var(--fc-text-primary);
+  background: color-mix(in srgb, #ef4444 12%, transparent);
+}
+
+.cardBody {
+  border-top: 1px solid var(--fc-glass-border, transparent);
+  padding: 0 0 8px;
+  /* Natural height — page scrolls; no nested overflow trap */
+}
+
+/* —— Modals —— */
+
+.modalContent {
+  max-width: 28rem !important;
+  max-height: min(80vh, 36rem);
+  gap: 0 !important;
+  padding: 1rem !important;
+  display: flex !important;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.modalTitle {
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 1.05rem !important;
+  font-weight: 650 !important;
+  color: var(--fc-text-primary) !important;
+  text-align: left !important;
+}
+
+.modalHint {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--fc-text-dim);
+  flex-shrink: 0;
+}
+
+.modalLoading {
+  display: flex;
+  flex: 1;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem 0;
+  color: var(--fc-accent-cyan, var(--fc-accent));
+}
+
+.modalList {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.modalRow {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px;
+  margin-bottom: 4px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--fc-text-primary);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.modalRow:hover:not(:disabled) {
+  background: var(--fc-glass-highlight, transparent);
+}
+
+.modalRowSelected {
+  border-color: color-mix(in srgb, var(--fc-accent-cyan, var(--fc-accent)) 40%, transparent);
+  background: color-mix(in srgb, var(--fc-accent-cyan, var(--fc-accent)) 16%, transparent);
+}
+
+.modalRowDisabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.modalRowIcon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--fc-text-dim);
+}
+
+.modalRowLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modalCheck {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--fc-accent-cyan, var(--fc-accent));
+}
+
+.modalActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  padding-top: 4px;
+}

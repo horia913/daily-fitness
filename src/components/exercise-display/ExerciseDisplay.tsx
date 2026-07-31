@@ -81,16 +81,40 @@ export function ExerciseDisplay({
   name,
   size = 'list',
   segments,
+  secondaryLine = null,
+  markToggle = null,
 }: ExerciseDisplayProps) {
   const hue = groupHueClass(groupIndex)
+  const secondary = secondaryLine?.trim() || null
+  const done = Boolean(markToggle?.done)
+
+  const rowClass = [
+    styles.row,
+    markToggle ? styles.rowWithMark : '',
+    done ? styles.rowMarked : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
-    <div className={styles.row}>
+    <div className={rowClass}>
       <span className={`${styles.badge} ${hue.badge}`}>{badge}</span>
       <div className={styles.body}>
         <div className={size === 'executor' ? styles.nameExecutor : styles.nameList}>{name}</div>
         <PrescriptionLine segments={segments} />
+        {secondary ? <p className={styles.secondaryLine}>{secondary}</p> : null}
       </div>
+      {markToggle ? (
+        <button
+          type="button"
+          className={`fc-gym-mark-toggle ${styles.markToggle}${done ? ` ${styles.markToggleOn}` : ''}`}
+          aria-pressed={done}
+          aria-label={done ? `Unmark ${name}` : `Mark ${name} done`}
+          onClick={markToggle.onToggle}
+        >
+          {done ? '✓' : ''}
+        </button>
+      ) : null}
     </div>
   )
 }
