@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useQuery } from '@tanstack/react-query'
 import {
   FileText,
   Download,
@@ -220,13 +221,27 @@ interface OptimizedDetailedReportsProps {
   coachId?: string
 }
 
+async function fetchCoachReportsClients(
+  signal?: AbortSignal | null,
+): Promise<ClientData[]> {
+  const res = await fetchApi('/api/coach/reports/clients', {
+    signal: signal ?? null,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(
+      (body as { error?: string })?.error ?? `HTTP ${res.status}`,
+    )
+  }
+  const data = (await res.json()) as { clients?: ClientData[] }
+  return Array.isArray(data.clients) ? data.clients : []
+}
+
 export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedReportsProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const urlHydrated = useRef(false)
 
-  const [loading, setLoading] = useState(true)
-  const loadingRef = useRef(false)
   const [selectedClient, setSelectedClient] = useState<string>('')
   const [selectedTemplate, setSelectedTemplate] = useState<string>('progress')
   const [selectedSections, setSelectedSections] = useState<string[]>(() =>
@@ -240,61 +255,19 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
   const [isGenerating, setIsGenerating] = useState(false)
   const [requiredTooltipFlash, setRequiredTooltipFlash] = useState(false)
 
-  const [clients, setClients] = useState<ClientData[]>([])
-  const didLoadRef = useRef(false)
+  const clientsQuery = useQuery({
+    queryKey: ['coach-reports-clients', coachId],
+    queryFn: ({ signal }) => fetchCoachReportsClients(signal),
+    enabled: !!coachId,
+  })
 
-  const loadData = useCallback(
-    async (signal?: AbortSignal) => {
-      if (!coachId) {
-        setClients([])
-        setLoading(false)
-        return
-      }
-      if (didLoadRef.current) return
-      if (loadingRef.current) return
-      didLoadRef.current = true
-      loadingRef.current = true
-      setLoading(true)
-      try {
-        const res = await fetchApi('/api/coach/reports/clients', {
-          signal: signal ?? null,
-        })
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}))
-          throw new Error(body?.error ?? `HTTP ${res.status}`)
-        }
-        const data = await res.json()
-        setClients(data.clients ?? [])
-      } catch (err: unknown) {
-        if (err instanceof Error && err.name === 'AbortError') {
-          didLoadRef.current = false
-          return
-        }
-        console.error('Error loading report clients:', err)
-        didLoadRef.current = false
-        setClients([])
-      } finally {
-        setLoading(false)
-        loadingRef.current = false
-      }
-    },
-    [coachId],
-  )
-
-  useEffect(() => {
-    if (!coachId) {
-      setClients([])
-      setLoading(false)
-      return
-    }
-    const ac = new AbortController()
-    loadData(ac.signal)
-    return () => {
-      didLoadRef.current = false
-      loadingRef.current = false
-      ac.abort()
-    }
-  }, [coachId, loadData])
+  const clients = clientsQuery.data ?? []
+  const loading = clientsQuery.isLoading
+  const loadError = clientsQuery.isError
+    ? clientsQuery.error instanceof Error
+      ? clientsQuery.error.message
+      : 'Failed to load report clients'
+    : null
 
   /** Hydrate form from URL once loading finishes */
   useEffect(() => {
@@ -569,12 +542,7 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
             </button>
             <button
               type="button"
-              onClick={() => {
-                if (coachId) {
-                  didLoadRef.current = false
-                  loadData()
-                }
-              }}
+              onClick={() => void clientsQuery.refetch()}
               className="inline-flex items-center gap-1.5 rounded-[9px] border px-[15px] py-[9px] text-[10.5px] font-bold uppercase tracking-[0.07em] transition-colors hover:bg-white/[0.04]"
               style={{
                 borderColor: 'var(--line-2)',
@@ -589,6 +557,22 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
           </div>
         }
       />
+
+      {loadError ? (
+        <div
+          className="rounded-[14px] border p-4 text-sm"
+          style={{ borderColor: 'var(--critical)', color: 'var(--critical)' }}
+        >
+          {loadError}
+          <button
+            type="button"
+            className="ml-3 underline"
+            onClick={() => void clientsQuery.refetch()}
+          >
+            Retry
+          </button>
+        </div>
+      ) : null}
 
       {requiredTooltipFlash ? (
         <p className="text-center text-[11px]" style={{ color: 'var(--warning)' }}>

@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   RefreshCw,
   Plus,
@@ -18,7 +19,11 @@ import { supabase } from "@/lib/supabase";
 import WorkoutTemplateService from "@/lib/workoutTemplateService";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { useToast } from "@/components/ui/toast-provider";
-import { fetchApi } from "@/lib/apiClient";
+import {
+  COACH_PROGRAMS_LIST_QUERY_KEY,
+  fetchCoachProgramsList,
+  type CoachProgramListRow,
+} from "@/lib/coachProgramsList";
 import {
   CollectionCard,
   CollectionCardAssignedStat,
@@ -30,7 +35,6 @@ import {
   CollectionCardStack,
 } from "@/components/ui/CollectionCard";
 import { mapProgramBlocksToStructureSegments } from "@/lib/programs/mapProgramBlockPhaseSegments";
-import type { MasterProgramBlockRow } from "@/lib/programs/masterProgramBlocksBatch";
 import {
   avatarHueByIndex,
   formatDifficultyLevel,
@@ -39,39 +43,36 @@ import {
 } from "@/lib/programs/programListDisplayUtils";
 import styles from "@/components/coach/programs/coachProgramsWorkspace.module.css";
 
-interface Program {
-  id: string;
-  name: string;
-  description?: string;
-  coach_id: string;
+type Program = CoachProgramListRow & {
   difficulty_level: "beginner" | "intermediate" | "advanced" | "athlete";
   totalWeeks: number;
-  target_audience: string;
-  periodization_style?: string | null;
-  is_public?: boolean;
   is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  blocks?: MasterProgramBlockRow[];
-  assignedPreview?: {
-    count: number;
-    initials: string[];
+};
+
+function asDashboardProgram(row: CoachProgramListRow): Program {
+  const level = row.difficulty_level;
+  const difficulty_level =
+    level === "beginner" ||
+    level === "intermediate" ||
+    level === "advanced" ||
+    level === "athlete"
+      ? level
+      : "intermediate";
+  return {
+    ...row,
+    difficulty_level,
+    totalWeeks: row.totalWeeks ?? 0,
+    is_active: row.is_active !== false,
   };
 }
 
 export default function ProgramsDashboardContent() {
   const router = useRouter();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { addToast } = useToast();
 
-  const [programs, setPrograms] = useState<Program[]>([]);
-  const [loading, setLoading] = useState(true);
-  const loadingRef = useRef(false);
-  const [error, setError] = useState<string | null>(null);
   const [programFilter, setProgramFilter] = useState<"active" | "all">("active");
-  const [assignmentCountByProgram, setAssignmentCountByProgram] = useState<
-    Record<string, number>
-  >({});
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [programToDelete, setProgramToDelete] = useState<Program | null>(null);
   const [confirmImpact, setConfirmImpact] = useState(false);
@@ -93,7 +94,35 @@ export default function ProgramsDashboardContent() {
   const [clientSearchQuery, setClientSearchQuery] = useState<string>("");
 
   const coachId = user?.id || "";
-  const didLoadRef = useRef(false);
+
+  const programsQuery = useQuery({
+    queryKey: COACH_PROGRAMS_LIST_QUERY_KEY,
+    queryFn: ({ signal }) => fetchCoachProgramsList(signal),
+    enabled: !!user,
+  });
+
+  const allPrograms = useMemo(
+    () => (programsQuery.data?.programs ?? []).map(asDashboardProgram),
+    [programsQuery.data?.programs],
+  );
+  const assignmentCountByProgram =
+    programsQuery.data?.assignmentCountByProgram ?? {};
+  const programs =
+    programFilter === "active"
+      ? allPrograms.filter((p) => p.is_active)
+      : allPrograms;
+  const loading = programsQuery.isLoading;
+  const error = programsQuery.isError
+    ? programsQuery.error instanceof Error
+      ? programsQuery.error.message
+      : "Unknown error loading programs"
+    : null;
+
+  const invalidateProgramsList = useCallback(async () => {
+    await queryClient.invalidateQueries({
+      queryKey: COACH_PROGRAMS_LIST_QUERY_KEY,
+    });
+  }, [queryClient]);
 
   const filteredClients = useMemo(() => {
     if (!clientSearchQuery.trim()) return clients;
@@ -109,52 +138,6 @@ export default function ProgramsDashboardContent() {
       );
     });
   }, [clients, clientSearchQuery]);
-
-  const loadPrograms = useCallback(async (signal?: AbortSignal) => {
-    if (!coachId) {
-      setError("loadPrograms called without coachId");
-      setLoading(false);
-      return;
-    }
-    if (signal) {
-      if (didLoadRef.current) return;
-      if (loadingRef.current) return;
-      didLoadRef.current = true;
-    }
-    loadingRef.current = true;
-    setLoading(true);
-    setError(null);
-
-    try {
-      const filter = programFilter === "all" ? "all" : "active";
-      const res = await fetchApi(`/api/coach/programs?filter=${filter}`, {
-        signal: signal ?? null,
-        cache: "no-store",
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body?.error ?? `HTTP ${res.status}`);
-      }
-      const { programs: list, assignmentCountByProgram: counts } = await res.json();
-      setPrograms(Array.isArray(list) ? list : []);
-      setAssignmentCountByProgram(
-        counts && typeof counts === "object" ? counts : {},
-      );
-      setError(null);
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name === "AbortError") {
-        if (signal) didLoadRef.current = false;
-        return;
-      }
-      const errorMessage =
-        err instanceof Error ? err.message : "Unknown error loading programs";
-      console.error("[ProgramsDashboard] Error loading programs:", errorMessage);
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-      loadingRef.current = false;
-    }
-  }, [coachId, programFilter]);
 
   const openAssignModal = useCallback(
     async (programId: string) => {
@@ -223,7 +206,25 @@ export default function ProgramsDashboardContent() {
           assignNotes,
           assignProgressionMode,
         );
-      await loadPrograms();
+
+      await invalidateProgramsList();
+      // Assign changes client training + briefing signals for those clients.
+      await Promise.all(
+        selectedClients.flatMap((clientId) => [
+          queryClient.invalidateQueries({
+            queryKey: ["coach-client", clientId, "training"],
+          }),
+          queryClient.invalidateQueries({
+            queryKey: ["coach-client", clientId, "summary"],
+          }),
+        ]),
+      );
+      await queryClient.invalidateQueries({
+        queryKey: ["coach-clients", user?.id],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["coach-home-triage", user?.id],
+      });
 
       if (failed.length > 0) {
         const failLines = failed.map(
@@ -280,7 +281,9 @@ export default function ProgramsDashboardContent() {
     assignStartDate,
     assignNotes,
     assignProgressionMode,
-    loadPrograms,
+    invalidateProgramsList,
+    queryClient,
+    user?.id,
     addToast,
     clientLabel,
   ]);
@@ -301,7 +304,14 @@ export default function ProgramsDashboardContent() {
     if (!programToDelete || !confirmImpact) return;
     try {
       await WorkoutTemplateService.deleteProgram(programToDelete.id);
-      await loadPrograms();
+      await invalidateProgramsList();
+      // Deleted program can drop assignment signals on the clients list + briefing.
+      await queryClient.invalidateQueries({
+        queryKey: ["coach-clients", user?.id],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["coach-home-triage", user?.id],
+      });
       setShowDeleteModal(false);
       setProgramToDelete(null);
       setConfirmImpact(false);
@@ -312,31 +322,23 @@ export default function ProgramsDashboardContent() {
         variant: "destructive",
       });
     }
-  }, [programToDelete, confirmImpact, loadPrograms, addToast]);
-
-  useEffect(() => {
-    if (!coachId) return;
-    const ac = new AbortController();
-    loadPrograms(ac.signal);
-    return () => {
-      didLoadRef.current = false;
-      loadingRef.current = false;
-      ac.abort();
-    };
-  }, [coachId, programFilter, loadPrograms]);
-
-  useEffect(() => {
-    if (!loading) return;
-    const t = setTimeout(() => setLoading(false), 15000);
-    return () => clearTimeout(t);
-  }, [loading]);
+  }, [
+    programToDelete,
+    confirmImpact,
+    invalidateProgramsList,
+    queryClient,
+    user?.id,
+    addToast,
+  ]);
 
   const totalPrograms = programs.length;
   const activePrograms = programs.filter((p) => p.is_active).length;
-  const totalAssignments = Object.values(assignmentCountByProgram).reduce(
-    (a, b) => a + b,
-    0,
-  );
+  const totalAssignments = programs.reduce((sum, p) => {
+    return (
+      sum +
+      (p.assignedPreview?.count ?? assignmentCountByProgram[p.id] ?? 0)
+    );
+  }, 0);
 
   if (!coachId) {
     return (
@@ -385,7 +387,7 @@ export default function ProgramsDashboardContent() {
             <button
               type="button"
               className={styles.ghostBtn}
-              onClick={() => loadPrograms()}
+              onClick={() => void programsQuery.refetch()}
             >
               <RefreshCw className="h-4 w-4" />
               Refresh
@@ -401,8 +403,7 @@ export default function ProgramsDashboardContent() {
           <ErrorBanner
             title="Couldn't load programs"
             message="Please check your connection and try again."
-            onRetry={() => loadPrograms()}
-            onDismiss={() => setError(null)}
+            onRetry={() => void programsQuery.refetch()}
           />
         ) : null}
 

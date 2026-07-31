@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { fetchApi } from "@/lib/apiClient";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import type {
@@ -146,52 +148,42 @@ function DeltaLine({ delta }: { delta?: StatDelta }) {
   );
 }
 
+async function fetchCoachInsightsBundle(
+  period: InsightsPeriod,
+  signal?: AbortSignal | null,
+): Promise<CoachInsightsBundle> {
+  const res = await fetchApi(`/api/coach/insights/roster?period=${period}`, {
+    signal: signal ?? null,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(
+      (body as { error?: string })?.error ?? `HTTP ${res.status}`,
+    );
+  }
+  return (await res.json()) as CoachInsightsBundle;
+}
+
 export default function CoachInsightsHub() {
   const router = useRouter();
+  const { user } = useAuth();
   const [period, setPeriod] = useState<InsightsPeriod>("12wk");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<CoachInsightsBundle | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("adherence");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const loadSeqRef = useRef(0);
 
-  const load = useCallback(
-    async (signal?: AbortSignal, nextPeriod?: InsightsPeriod) => {
-      const p = nextPeriod ?? period;
-      const seq = ++loadSeqRef.current;
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetchApi(`/api/coach/insights/roster?period=${p}`, {
-          signal: signal ?? null,
-        });
-        if (seq !== loadSeqRef.current) return;
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body?.error ?? `HTTP ${res.status}`);
-        }
-        setData((await res.json()) as CoachInsightsBundle);
-      } catch (e) {
-        if (e instanceof Error && e.name === "AbortError") return;
-        if (seq !== loadSeqRef.current) return;
-        setError(e instanceof Error ? e.message : "Failed to load insights");
-        setData(null);
-      } finally {
-        if (seq === loadSeqRef.current) setLoading(false);
-      }
-    },
-    [period],
-  );
+  const insightsQuery = useQuery({
+    queryKey: ["coach-insights", period],
+    queryFn: ({ signal }) => fetchCoachInsightsBundle(period, signal),
+    enabled: !!user,
+  });
 
-  useEffect(() => {
-    const ac = new AbortController();
-    void load(ac.signal);
-    return () => {
-      loadSeqRef.current += 1;
-      ac.abort();
-    };
-  }, [load]);
+  const data = insightsQuery.data ?? null;
+  const loading = insightsQuery.isLoading;
+  const error = insightsQuery.isError
+    ? insightsQuery.error instanceof Error
+      ? insightsQuery.error.message
+      : "Failed to load insights"
+    : null;
 
   const sortedRows = useMemo(
     () => (data ? sortRows(data.rows, sortKey, sortDir) : []),
@@ -210,11 +202,6 @@ export default function CoachInsightsHub() {
       setSortKey(key);
       setSortDir("desc");
     }
-  };
-
-  const onPeriod = (p: InsightsPeriod) => {
-    setPeriod(p);
-    void load(undefined, p);
   };
 
   if (loading && !data) {
@@ -250,7 +237,7 @@ export default function CoachInsightsHub() {
               key={p.id}
               type="button"
               className={cn(styles.rangeBtn, period === p.id && styles.rangeBtnOn)}
-              onClick={() => onPeriod(p.id)}
+              onClick={() => setPeriod(p.id)}
             >
               {p.label}
             </button>
@@ -264,7 +251,11 @@ export default function CoachInsightsHub() {
           style={{ borderColor: "var(--critical)", color: "var(--critical)" }}
         >
           {error}
-          <button type="button" className="ml-3 underline" onClick={() => void load()}>
+          <button
+            type="button"
+            className="ml-3 underline"
+            onClick={() => void insightsQuery.refetch()}
+          >
             Retry
           </button>
         </div>

@@ -1,9 +1,13 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { fetchApi } from '@/lib/apiClient'
+import {
+  COACH_PROGRAMS_LIST_QUERY_KEY,
+  fetchCoachProgramsList,
+} from '@/lib/coachProgramsList'
 import styles from './ProgramTemplatePicker.module.css'
 
+/** Slim view of a list row — picker only reads these fields. */
 export type CoachProgramListItem = {
   id: string
   name: string
@@ -16,25 +20,10 @@ export type CoachProgramListItem = {
   }
 }
 
-type ProgramsApiResponse = {
-  programs?: CoachProgramListItem[]
-  assignmentCountByProgram?: Record<string, number>
-  error?: string
-}
-
 export type ProgramTemplatePickerProps = {
   onSelect: (programId: string) => void
   selectedProgramId?: string | null
   className?: string
-}
-
-async function fetchCoachPrograms(): Promise<CoachProgramListItem[]> {
-  const res = await fetchApi('/api/coach/programs?filter=active')
-  const body = (await res.json()) as ProgramsApiResponse
-  if (!res.ok) {
-    throw new Error(body.error ?? 'Failed to load programs')
-  }
-  return Array.isArray(body.programs) ? body.programs : []
 }
 
 export function ProgramTemplatePicker({
@@ -43,11 +32,12 @@ export function ProgramTemplatePicker({
   className,
 }: ProgramTemplatePickerProps) {
   const query = useQuery({
-    queryKey: ['coach-programs-list'],
-    queryFn: fetchCoachPrograms,
+    queryKey: COACH_PROGRAMS_LIST_QUERY_KEY,
+    queryFn: ({ signal }) => fetchCoachProgramsList(signal),
   })
 
-  const programs = query.data ?? []
+  // Shared cache holds filter=all; picker only shows active programs.
+  const programs = (query.data?.programs ?? []).filter((p) => p.is_active !== false)
 
   return (
     <div className={`${styles.root}${className ? ` ${className}` : ''}`}>
