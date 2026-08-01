@@ -43,7 +43,7 @@ export async function notifyWorkoutAssigned(
     userIds: [clientId],
     title: 'New Workout Assigned! 💪',
     message: `${coachName} assigned "${workoutName}" to you`,
-    url: `${appUrl}/client/workouts`,
+    url: `${appUrl}/client/train`,
     emailSubject: 'New Workout Assigned',
     emailHtml: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -54,7 +54,7 @@ export async function notifyWorkoutAssigned(
           <h2 style="margin: 0; color: #1f2937;">${workoutName}</h2>
         </div>
         <p>Ready to crush your goals? Start your workout now!</p>
-        <a href="${appUrl}/client/workouts" style="display: inline-block; background: #8B5CF6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">View Workout</a>
+        <a href="${appUrl}/client/train" style="display: inline-block; background: #8B5CF6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">View Workout</a>
         <p style="margin-top: 30px; color: #6b7280; font-size: 14px;">Keep crushing it! 💪<br>- FitCoach Pro Team</p>
       </div>
     `,

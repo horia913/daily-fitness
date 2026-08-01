@@ -65,7 +65,7 @@ export function DashboardLayout({
 
           {/* Quick Actions */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Link href="/client/workouts">
+            <Link href="/client/train">
               <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-md transition-shadow cursor-pointer">
                 <CardContent className="p-4 text-center">
                   <Dumbbell className="w-8 h-8 text-blue-600 mx-auto mb-2" />

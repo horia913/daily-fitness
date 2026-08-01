@@ -12,8 +12,6 @@
 
 const QUERY_BUDGETS: Record<string, number> = {
   // Critical endpoints - must be minimal queries
-  '/api/client/workouts/summary': 2,      // Target: 1 RPC call
-  '/api/client/workouts/summary-v2': 2,   // Optimized version
   '/api/coach/pickup/next-workout': 2,    // Target: 1 RPC call
   '/api/coach/pickup/next-workout-v2': 2, // Optimized version
   
@@ -32,8 +30,6 @@ const QUERY_BUDGETS: Record<string, number> = {
 
 const TIME_BUDGETS: Record<string, number> = {
   // Critical endpoints - must be fast
-  '/api/client/workouts/summary': 800,
-  '/api/client/workouts/summary-v2': 500,
   '/api/coach/pickup/next-workout': 800,
   '/api/coach/pickup/next-workout-v2': 500,
   

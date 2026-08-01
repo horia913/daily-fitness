@@ -35,7 +35,7 @@ function LeaderboardPageContent() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("from") === "workouts") {
-      setBackHref("/client/workouts");
+      setBackHref("/client/train");
     }
   }, []);
 

@@ -19,10 +19,11 @@ import {
   clientPhaseChipLabel,
   resolvePhaseForAbsoluteWeek,
 } from "@/lib/clientInstancePhaseContext";
-import { instanceTotalWeeks, isCoachSkipNote } from "@/lib/programInstanceResolver";
-import { normalizeClientTimezone } from "@/lib/clientZonedCalendar";
-import { resolveNextDue } from "@/lib/progression/resolveNextDue";
-import type { PauseState, WorkoutRef } from "@/lib/progression/weekWindows";
+import { instanceTotalWeeks } from "@/lib/programInstanceResolver";
+import {
+  loadFoundationNextDueForAssignment,
+  mapFoundationNextDueToHomeTodaysWorkout,
+} from "@/lib/progression/foundationNextDueLoad";
 
 export type AthleteScoreChipState = "default" | "paused" | "no_program";
 
@@ -195,143 +196,8 @@ type ActiveAssignmentRow = {
 };
 
 /**
- * Foundation next-due → existing dashboard `todaysWorkout` shape (card + greeting).
- * Uses the same `resolveNextDue` helper as Train.
- */
-async function computeFoundationTodaysWorkout(
-  assignment: ActiveAssignmentRow,
-  totalWeeks: number,
-): Promise<DashboardData["todaysWorkout"]> {
-  const [pdaRes, completionsRes, profileRes] = await Promise.all([
-    supabase
-      .from("program_day_assignments")
-      .select(
-        "id, week_number, program_day, workout_template_id, program_instance_workout_id, name, day_type, is_optional",
-      )
-      .eq("program_assignment_id", assignment.id)
-      .order("week_number", { ascending: true })
-      .order("program_day", { ascending: true }),
-    supabase
-      .from("program_day_completions")
-      .select("program_day_assignment_id, notes")
-      .eq("program_assignment_id", assignment.id),
-    supabase
-      .from("profiles")
-      .select("timezone")
-      .eq("id", assignment.client_id)
-      .maybeSingle(),
-  ]);
-
-  if (pdaRes.error) {
-    console.error("[fetchDashboardPageData] PDA:", pdaRes.error.message);
-    return { hasWorkout: false };
-  }
-  if (completionsRes.error) {
-    console.error("[fetchDashboardPageData] completions:", completionsRes.error.message);
-    return { hasWorkout: false };
-  }
-
-  const completedIds = new Set<string>();
-  for (const row of completionsRes.data ?? []) {
-    if (isCoachSkipNote(row.notes)) continue;
-    if (row.program_day_assignment_id) completedIds.add(row.program_day_assignment_id);
-  }
-
-  const slots = (pdaRes.data ?? []).filter((row) => row.day_type !== "rest");
-
-  const snap = assignment.timezone_snapshot?.trim() || "";
-  const prof =
-    profileRes.data && typeof (profileRes.data as { timezone?: string }).timezone === "string"
-      ? (profileRes.data as { timezone: string }).timezone.trim()
-      : "";
-  const timeZone = normalizeClientTimezone(snap || prof || "UTC");
-
-  const pauses: PauseState = {
-    accumulatedDays: Math.max(0, Number(assignment.pause_accumulated_days) || 0),
-    pauseStatus: assignment.pause_status ?? "active",
-    pausedAt: assignment.paused_at ?? null,
-  };
-
-  const workouts: WorkoutRef[] = slots
-    .filter((s) => Boolean(s.workout_template_id || s.program_instance_workout_id))
-    .map((s) => ({
-      id: s.id,
-      weekNumber: Number(s.week_number) || 1,
-      programDay: Number(s.program_day) || 1,
-      isDone: completedIds.has(s.id),
-    }));
-
-  const { nextDue } = resolveNextDue({
-    startDate: assignment.start_date,
-    totalWeeks,
-    timeZone,
-    pauses,
-    workouts,
-  });
-
-  if (!nextDue?.id) {
-    return { hasWorkout: false };
-  }
-
-  const slot = slots.find((s) => s.id === nextDue.id);
-  if (!slot) {
-    return { hasWorkout: false };
-  }
-
-  const templateId =
-    (slot.workout_template_id && String(slot.workout_template_id)) ||
-    (slot.program_instance_workout_id && String(slot.program_instance_workout_id)) ||
-    undefined;
-
-  let name =
-    typeof slot.name === "string" && slot.name.trim() ? slot.name.trim() : "Workout";
-  let estimatedDuration: number | null = 45;
-  let totalSets: number | null = 0;
-
-  if (slot.program_instance_workout_id) {
-    const { data: iw } = await supabase
-      .from("program_instance_workouts")
-      .select("name, estimated_duration")
-      .eq("id", slot.program_instance_workout_id)
-      .maybeSingle();
-    if (iw?.name) name = iw.name;
-    if (iw?.estimated_duration != null) estimatedDuration = Number(iw.estimated_duration) || 45;
-    const { count } = await supabase
-      .from("program_instance_set_entries")
-      .select("id", { count: "exact", head: true })
-      .eq("program_instance_workout_id", slot.program_instance_workout_id);
-    totalSets = count ?? 0;
-  } else if (slot.workout_template_id) {
-    const { data: wt } = await supabase
-      .from("workout_templates")
-      .select("name, estimated_duration")
-      .eq("id", slot.workout_template_id)
-      .maybeSingle();
-    if (wt?.name) name = wt.name;
-    if (wt?.estimated_duration != null) estimatedDuration = Number(wt.estimated_duration) || 45;
-    const { count } = await supabase
-      .from("workout_set_entries")
-      .select("id", { count: "exact", head: true })
-      .eq("template_id", slot.workout_template_id);
-    totalSets = count ?? 0;
-  }
-
-  return {
-    hasWorkout: true,
-    type: "program",
-    templateId,
-    scheduleId: slot.id,
-    name,
-    weekNumber: nextDue.weekNumber,
-    dayNumber: nextDue.programDay,
-    totalSets,
-    estimatedDuration,
-  };
-}
-
-/**
  * Single source: `get_client_dashboard` returns streak / weekly / score / etc.
- * `todaysWorkout` is then overwritten with foundation next-due (shared with Train).
+ * `todaysWorkout` is then overwritten with foundation next-due (shared with Train + summary).
  */
 export async function fetchDashboardPageData(userId: string): Promise<DashboardPageData> {
   const [{ data, error }, latestMeasurement, checkInConfig, activePaRes] = await Promise.all([
@@ -387,11 +253,13 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
         phases.map((p) => ({ duration_weeks: p.duration_weeks })),
       );
 
-      // Overwrite RPC fill-gap todaysWorkout with foundation next-due (same as Train).
-      pageData.dashboard.todaysWorkout = await computeFoundationTodaysWorkout(
+      const foundationNext = await loadFoundationNextDueForAssignment(
+        supabase,
         assignment,
-        totalWeeks,
+        { totalWeeks },
       );
+      pageData.dashboard.todaysWorkout =
+        mapFoundationNextDueToHomeTodaysWorkout(foundationNext);
 
       if (pp && pp.currentWeek >= 1) {
         const pos = resolvePhaseForAbsoluteWeek(

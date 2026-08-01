@@ -1,5 +1,5 @@
-import ClientWorkoutsClient from "./page.client";
+import { redirect } from 'next/navigation'
 
 export default function ClientWorkoutsPage() {
-  return <ClientWorkoutsClient />;
+  redirect('/client/train')
 }

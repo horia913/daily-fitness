@@ -1830,7 +1830,7 @@ export default function LiveWorkout() {
               "The requested workout could not be found. Please try again.",
             variant: "destructive",
           });
-          window.location.href = "/client/workouts";
+          window.location.href = "/client/train";
           return;
         }
       }

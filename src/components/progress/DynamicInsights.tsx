@@ -101,7 +101,7 @@ export function DynamicInsights({
       priority: 'high',
       actionable: true,
       actionText: 'Keep the momentum',
-      actionUrl: '/client/workouts',
+      actionUrl: '/client/train',
       icon: '🔥',
       color: 'text-orange-600',
       gradient: 'from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20',

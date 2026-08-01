@@ -499,7 +499,7 @@ export default function PersonalRecordsPage() {
               </p>
               <button
                 type="button"
-                onClick={() => router.push("/client/workouts")}
+                onClick={() => router.push("/client/train")}
                 className="fc-btn fc-btn-primary inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm"
               >
                 <Dumbbell className="h-4 w-4" />

@@ -638,7 +638,7 @@ function AnalyticsPageContent() {
                     title="No workouts yet"
                     description="Log a training session to see rhythm and volume for this range."
                     actionLabel="Train"
-                    actionHref="/client/workouts"
+                    actionHref="/client/train"
                   />
                 </div>
               </>

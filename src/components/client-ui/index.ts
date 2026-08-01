@@ -4,7 +4,6 @@ export { AthleteScoreRing, type AthleteScoreRingSizePreset } from "./AthleteScor
 export { SectionHeader } from "./SectionHeader";
 export { PrimaryButton } from "./PrimaryButton";
 export { SecondaryButton } from "./SecondaryButton";
-export { AssignedWorkoutRow } from "./AssignedWorkoutRow";
 export { ConfirmActionDialog } from "./ConfirmActionDialog";
 export { Eyebrow } from "@/components/ui/Eyebrow";
 export { IconButton } from "@/components/ui/IconButton";

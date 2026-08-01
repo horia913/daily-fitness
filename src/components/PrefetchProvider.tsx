@@ -62,8 +62,8 @@ export function PrefetchProvider({ children }: PrefetchProviderProps) {
     // Always prefetch dashboard data
     prefetchPromises.push(PrefetchService.prefetchClientDashboard(userId))
 
-    // Route-specific prefetching
-    if (pathname.includes('/client/workouts')) {
+    // Route-specific prefetching — execution paths only (hub deleted)
+    if (/\/client\/workouts\/[^/]+\/(start|complete|details)/.test(pathname)) {
       prefetchPromises.push(PrefetchService.prefetchWorkoutAssignments(userId))
     }
 
@@ -125,7 +125,7 @@ export function usePrefetch() {
   const prefetchClientRoutes = async (userId: string, pathname: string) => {
     const prefetchPromises: Promise<void>[] = []
 
-    if (pathname.includes('/client/workouts')) {
+    if (/\/client\/workouts\/[^/]+\/(start|complete|details)/.test(pathname)) {
       prefetchPromises.push(PrefetchService.prefetchWorkoutAssignments(userId))
     }
 

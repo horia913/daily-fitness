@@ -113,7 +113,7 @@ export class OneSignalSender {
   static async sendWorkoutReminder(userId: string, workoutName: string, scheduledTime: string): Promise<boolean> {
     return this.sendToUser(userId, '🏋️ Workout Reminder', `Time for your ${workoutName} workout! Scheduled for ${scheduledTime}`, {
       action: 'open_workouts',
-      url: '/client/workouts',
+      url: '/client/train',
       type: 'workout_reminder'
     })
   }

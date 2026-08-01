@@ -19,7 +19,6 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 // ============================================================================
 
 export const CACHE_TAGS = {
-  CLIENT_SUMMARY: 'client-summary',
   COACH_PICKUP: 'coach-pickup',
   TEMPLATES: 'templates',
   EXERCISES: 'exercises',
@@ -27,9 +26,6 @@ export const CACHE_TAGS = {
 } as const
 
 export const CACHE_TTL = {
-  /** Client summary - short TTL since it changes with workouts */
-  CLIENT_SUMMARY: 60, // 60 seconds
-  
   /** Coach pickup - changes when client completes workouts */
   COACH_PICKUP: 30, // 30 seconds
   
@@ -46,33 +42,6 @@ export const CACHE_TTL = {
 // ============================================================================
 // Cached Server Functions
 // ============================================================================
-
-/**
- * Get client workout summary with caching
- * Uses the optimized RPC function
- * 
- * @param userId - Client's user ID (used as cache key)
- * @returns Summary data from get_client_workout_summary RPC
- */
-export const getCachedClientSummary = (userId: string) => 
-  unstable_cache(
-    async () => {
-      const supabase = await createSupabaseServerClient()
-      const { data, error } = await supabase.rpc('get_client_workout_summary')
-      
-      if (error) {
-        console.error('[getCachedClientSummary] RPC error:', error)
-        throw error
-      }
-      
-      return data
-    },
-    [`client-summary-${userId}`], // Cache key includes userId
-    { 
-      revalidate: CACHE_TTL.CLIENT_SUMMARY,
-      tags: [CACHE_TAGS.CLIENT_SUMMARY, `user-${userId}`]
-    }
-  )()
 
 /**
  * Get coach pickup workout with caching
@@ -191,16 +160,6 @@ export { revalidateTag, revalidatePath } from 'next/cache'
  */
 export async function invalidateUserCache(userId: string) {
   const { revalidateTag } = await import('next/cache')
-  revalidateTag(`user-${userId}`)
-}
-
-/**
- * Invalidate client summary cache
- * Call this after completing a workout, changing assignments, etc.
- */
-export async function invalidateClientSummary(userId: string) {
-  const { revalidateTag } = await import('next/cache')
-  revalidateTag(CACHE_TAGS.CLIENT_SUMMARY)
   revalidateTag(`user-${userId}`)
 }
 
