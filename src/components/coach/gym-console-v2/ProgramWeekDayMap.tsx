@@ -17,6 +17,7 @@ import {
   type AssignmentDayStatus,
   type AssignmentMapSlot,
 } from './assignmentMapLoad'
+import type { ProgramWeekWindow } from '@/lib/progression/weekWindows'
 import { GymConsoleDayWorkout } from './GymConsoleDayWorkout'
 import { GymConsolePhaseBar } from './GymConsolePhaseBar'
 import {
@@ -129,8 +130,9 @@ function buildAssignmentWeekDays(
   weekNumber: number,
   completedPdaIds: Set<string>,
   nextDuePdaId: string | null,
-  nextDueWeek: number | null,
-  nextDueProgramDay: number | null,
+  windows: ProgramWeekWindow[],
+  startDate: string | null,
+  effectiveToday: string,
 ): ScheduleDay[] {
   const byDay = new Map<number, AssignmentMapSlot>()
   for (const slot of slots) {
@@ -155,8 +157,9 @@ function buildAssignmentWeekDays(
       weekNumber,
       programDay,
       nextDuePdaId,
-      nextDueWeek,
-      nextDueProgramDay,
+      windows,
+      startDate,
+      effectiveToday,
     })
     return {
       programDay,
@@ -564,8 +567,10 @@ export function ProgramWeekDayMap({
         activeWeek,
         assignmentData?.completedPdaIds ?? new Set(),
         assignmentData?.nextDuePdaId ?? null,
-        assignmentData?.nextDueWeek ?? null,
-        assignmentData?.nextDueProgramDay ?? null,
+        assignmentData?.windows ?? [],
+        assignmentData?.startDate ?? null,
+        assignmentData?.effectiveToday ??
+          new Date().toISOString().slice(0, 10),
       )
     }
     return buildTemplateWeekDays(schedule, activeWeek)

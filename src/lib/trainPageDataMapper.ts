@@ -20,16 +20,10 @@ import {
   addCalendarDaysYmd,
   mondayYmdOfZonedWeekContaining,
   weekdayMon0Sun6InTimezone,
-  zonedCalendarDateString,
   zonedDayInclusiveUtcBounds,
 } from '@/lib/clientZonedCalendar'
-import {
-  getEffectiveToday,
-  getNextDue,
-  getProgramWeekWindows,
-  type PauseState,
-  type WorkoutRef,
-} from '@/lib/progression/weekWindows'
+import { resolveNextDue } from '@/lib/progression/resolveNextDue'
+import type { PauseState, WorkoutRef } from '@/lib/progression/weekWindows'
 
 export interface TrainPageRpcScheduleRow {
   id: string
@@ -447,18 +441,21 @@ export async function rpcResponseToProgramWeekState(
       pauseStatus,
       pausedAt,
     }
-    const windows = getProgramWeekWindows(assignmentStartDate, totalWeeks, tz, pauses)
-    const todayYmd = zonedCalendarDateString(new Date(), tz)
-    const effectiveToday = getEffectiveToday(todayYmd, tz, pauses)
     const workoutRefs: WorkoutRef[] = slots
-      .filter((s) => Boolean(s.template_id))
+      .filter((s) => Boolean(s.template_id || s.program_instance_workout_id))
       .map((s) => ({
         id: s.id ?? undefined,
         weekNumber: s.week_number,
         programDay: s.day_number,
         isDone: slotKey(s) != null && completedKeysAllTime.has(slotKey(s)!),
       }))
-    const due = getNextDue(workoutRefs, windows, assignmentStartDate, effectiveToday)
+    const { nextDue: due } = resolveNextDue({
+      startDate: assignmentStartDate,
+      totalWeeks,
+      timeZone: tz,
+      pauses,
+      workouts: workoutRefs,
+    })
     if (due?.id) {
       const slot = slots.find((s) => s.id === due.id)
       if (slot) nextDue = toDayCardAllTimeDone(slot)

@@ -3,14 +3,28 @@
 /**
  * Load assignment map data for gym-console-v2 (Piece 3A).
  * Full PDA schedule + completions + next-due + instance phases — not the current-week-only RPC.
+ * Next-due + day status: weekWindows foundation (same as Train). Does not call SQL
+ * get_next_incomplete_program_slot / getNextSlot.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import {
-  getActiveProgramAssignment,
-  getNextSlot,
-} from '@/lib/programStateService'
+import { getActiveProgramAssignment } from '@/lib/programStateService'
 import { loadInstancePhases } from '@/lib/programInstance/instanceCanvasLoad'
+import { instanceTotalWeeks } from '@/lib/programInstanceResolver'
+import {
+  normalizeClientTimezone,
+  zonedCalendarDateString,
+} from '@/lib/clientZonedCalendar'
+import {
+  getEffectiveToday,
+  getNextDue,
+  getProgramWeekWindows,
+  getWorkoutStatus,
+  type PauseState,
+  type ProgramWeekWindow,
+  type WorkoutRef,
+  type WorkoutStatus,
+} from '@/lib/progression/weekWindows'
 import type { TrainingBlock } from '@/types/trainingBlock'
 
 export type AssignmentMapSlot = {
@@ -32,6 +46,13 @@ export type AssignmentMapData = {
   nextDueWeek: number | null
   nextDueProgramDay: number | null
   blocks: TrainingBlock[]
+  /** Foundation inputs (calendar week status / next-due). */
+  startDate: string | null
+  totalWeeks: number
+  timeZone: string
+  pauses: PauseState
+  windows: ProgramWeekWindow[]
+  effectiveToday: string
 }
 
 function mapPhaseToBlock(
@@ -77,6 +98,28 @@ export async function resolveAssignmentId(
   return null
 }
 
+async function resolveClientTimezone(
+  supabase: SupabaseClient,
+  timezoneSnapshot: string | null | undefined,
+  clientId: string | null | undefined,
+): Promise<string> {
+  const snap = typeof timezoneSnapshot === 'string' ? timezoneSnapshot.trim() : ''
+  if (snap) return normalizeClientTimezone(snap)
+  if (clientId) {
+    const { data } = await supabase
+      .from('profiles')
+      .select('timezone')
+      .eq('id', clientId)
+      .maybeSingle()
+    const prof =
+      data && typeof (data as { timezone?: string | null }).timezone === 'string'
+        ? (data as { timezone: string }).timezone.trim()
+        : ''
+    if (prof) return normalizeClientTimezone(prof)
+  }
+  return 'UTC'
+}
+
 export async function loadAssignmentMapData(
   supabase: SupabaseClient,
   opts: { clientId?: string | null; assignmentId?: string | null },
@@ -86,7 +129,14 @@ export async function loadAssignmentMapData(
 
   const { assignmentId, programId } = resolved
 
-  const [pdaRes, completionsRes, nextSlot, phases] = await Promise.all([
+  const [assignmentRes, pdaRes, completionsRes, phases] = await Promise.all([
+    supabase
+      .from('program_assignments')
+      .select(
+        'id, program_id, client_id, start_date, pause_accumulated_days, pause_status, paused_at, timezone_snapshot',
+      )
+      .eq('id', assignmentId)
+      .maybeSingle(),
     supabase
       .from('program_day_assignments')
       .select(
@@ -99,10 +149,13 @@ export async function loadAssignmentMapData(
       .from('program_day_completions')
       .select('program_day_assignment_id, notes')
       .eq('program_assignment_id', assignmentId),
-    getNextSlot(supabase, assignmentId, programId),
     loadInstancePhases(supabase, assignmentId),
   ])
 
+  if (assignmentRes.error) {
+    console.error('[loadAssignmentMapData] assignment:', assignmentRes.error.message)
+    throw assignmentRes.error
+  }
   if (pdaRes.error) {
     console.error('[loadAssignmentMapData] PDA:', pdaRes.error.message)
     throw pdaRes.error
@@ -111,6 +164,9 @@ export async function loadAssignmentMapData(
     console.error('[loadAssignmentMapData] completions:', completionsRes.error.message)
     throw completionsRes.error
   }
+
+  const assignment = assignmentRes.data
+  if (!assignment) return null
 
   const completedPdaIds = new Set<string>()
   for (const row of completionsRes.data ?? []) {
@@ -156,22 +212,94 @@ export async function loadAssignmentMapData(
     })
 
   const blocks = phases.map((p) => mapPhaseToBlock(p, programId))
+  const totalWeeks = instanceTotalWeeks(
+    phases.map((p) => ({ duration_weeks: p.duration_weeks })),
+  )
+
+  const startRaw =
+    typeof assignment.start_date === 'string' ? assignment.start_date.trim() : ''
+  const startDate = startRaw.length >= 10 ? startRaw.slice(0, 10) : startRaw || null
+
+  const pauses: PauseState = {
+    accumulatedDays: Math.max(0, Number(assignment.pause_accumulated_days) || 0),
+    pauseStatus: assignment.pause_status ?? 'active',
+    pausedAt: assignment.paused_at ?? null,
+  }
+
+  const timeZone = await resolveClientTimezone(
+    supabase,
+    assignment.timezone_snapshot,
+    assignment.client_id,
+  )
+
+  const todayYmd = zonedCalendarDateString(new Date(), timeZone)
+  const effectiveToday = getEffectiveToday(todayYmd, timeZone, pauses)
+  const windows =
+    startDate && totalWeeks > 0
+      ? getProgramWeekWindows(startDate, totalWeeks, timeZone, pauses)
+      : []
+
+  let nextDuePdaId: string | null = null
+  let nextDueWeek: number | null = null
+  let nextDueProgramDay: number | null = null
+
+  if (startDate && windows.length > 0) {
+    const workoutRefs: WorkoutRef[] = slots
+      .filter((s) => Boolean(s.template_id || s.program_instance_workout_id))
+      .map((s) => ({
+        id: s.id,
+        weekNumber: s.week_number,
+        programDay: s.program_day,
+        isDone: completedPdaIds.has(s.id),
+      }))
+    const due = getNextDue(workoutRefs, windows, startDate, effectiveToday)
+    if (due?.id) {
+      nextDuePdaId = due.id
+      nextDueWeek = due.weekNumber
+      nextDueProgramDay = due.programDay
+    }
+  }
 
   return {
     assignmentId,
     programId,
     slots,
     completedPdaIds,
-    nextDuePdaId: nextSlot?.program_day_assignment_id ?? nextSlot?.id ?? null,
-    nextDueWeek: nextSlot?.week_number ?? null,
-    nextDueProgramDay: nextSlot?.day_number ?? null,
+    nextDuePdaId,
+    nextDueWeek,
+    nextDueProgramDay,
     blocks,
+    startDate,
+    totalWeeks,
+    timeZone,
+    pauses,
+    windows,
+    effectiveToday,
   }
 }
 
 export type AssignmentDayStatus = 'rest' | 'done' | 'missed' | 'upcoming' | 'nextDue'
 
-/** Sequence-relative status: past vs next-due in program order (multi-week safe). */
+function mapFoundationToAssignmentStatus(status: WorkoutStatus): AssignmentDayStatus {
+  switch (status) {
+    case 'completed':
+      return 'done'
+    case 'missed':
+      return 'missed'
+    case 'due-today':
+    case 'upcoming':
+    case 'out-of-scope':
+      // Pre-start: neutral (no Missed). Matches Train — no new gym UI state.
+      return 'upcoming'
+    default:
+      return 'upcoming'
+  }
+}
+
+/**
+ * Day status from weekWindows foundation + next-due highlight.
+ * `nextDue` wins over due-today/upcoming for the highlighted "Next" card.
+ */
 export function getAssignmentDayStatus(opts: {
   hasWorkout: boolean
   isCompleted: boolean
@@ -179,19 +307,27 @@ export function getAssignmentDayStatus(opts: {
   weekNumber: number
   programDay: number
   nextDuePdaId: string | null
-  nextDueWeek: number | null
-  nextDueProgramDay: number | null
+  windows: ProgramWeekWindow[]
+  startDate: string | null
+  effectiveToday: string
 }): AssignmentDayStatus {
   if (!opts.hasWorkout) return 'rest'
   if (opts.isCompleted) return 'done'
   if (opts.scheduleId && opts.nextDuePdaId && opts.scheduleId === opts.nextDuePdaId) {
     return 'nextDue'
   }
-  if (opts.nextDueWeek != null && opts.nextDueProgramDay != null) {
-    const beforeNext =
-      opts.weekNumber < opts.nextDueWeek ||
-      (opts.weekNumber === opts.nextDueWeek && opts.programDay < opts.nextDueProgramDay)
-    if (beforeNext) return 'missed'
+  if (opts.startDate && opts.windows.length > 0) {
+    const foundation = getWorkoutStatus(
+      {
+        weekNumber: opts.weekNumber,
+        programDay: opts.programDay,
+        isDone: opts.isCompleted,
+      },
+      opts.windows,
+      opts.startDate,
+      opts.effectiveToday,
+    )
+    return mapFoundationToAssignmentStatus(foundation)
   }
   return 'upcoming'
 }
