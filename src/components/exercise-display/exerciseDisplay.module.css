@@ -116,7 +116,7 @@
 
 .rowMarked {
   border-radius: 8px;
-  background: color-mix(in srgb, var(--fc-status-success, #22c55e) 10%, transparent);
+  background: color-mix(in srgb, var(--fc-status-success) 10%, transparent);
 }
 
 .markToggle {
@@ -137,7 +137,7 @@
   margin: 0;
   padding: 0 !important;
   border-radius: 50%;
-  border: 1px solid var(--fc-text-dim, #888);
+  border: 1px solid var(--fc-text-dim);
   background: transparent;
   color: transparent;
   font-size: 10px;
@@ -149,9 +149,9 @@
 }
 
 .markToggleOn {
-  border-color: var(--fc-status-success, #22c55e);
-  background: var(--fc-status-success, #22c55e);
-  color: #0b0b0c;
+  border-color: var(--fc-status-success);
+  background: var(--fc-status-success);
+  color: var(--fc-bg-deep);
 }
 
 /* —— Group —— */

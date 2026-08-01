@@ -20,8 +20,16 @@ import {
   addCalendarDaysYmd,
   mondayYmdOfZonedWeekContaining,
   weekdayMon0Sun6InTimezone,
+  zonedCalendarDateString,
   zonedDayInclusiveUtcBounds,
 } from '@/lib/clientZonedCalendar'
+import {
+  getEffectiveToday,
+  getNextDue,
+  getProgramWeekWindows,
+  type PauseState,
+  type WorkoutRef,
+} from '@/lib/progression/weekWindows'
 
 export interface TrainPageRpcScheduleRow {
   id: string
@@ -99,6 +107,11 @@ const emptyState: ProgramWeekState = {
   coachFeedback: null,
   pauseStatus: 'active',
   pauseReason: null,
+  assignmentStartDate: null,
+  pauseAccumulatedDays: 0,
+  pausedAt: null,
+  clientTimezone: null,
+  nextDue: null,
 }
 
 /** Priority: RPC timezone_snapshot → profile timezone → UTC + warn (calendar boundaries). */
@@ -337,11 +350,30 @@ export async function rpcResponseToProgramWeekState(
       dayNumber: slot.day_number,
       dayLabel: `Day ${slot.day_number}`,
       dayOfWeek: slot.day_of_week,
+      weekNumber: slot.week_number,
       templateId: slot.template_id,
       instanceWorkoutId: slot.program_instance_workout_id ?? null,
       workoutName: meta.name,
       estimatedDuration: meta.estimated_duration,
       isCompleted: slotKey(slot) != null && completedKeys.has(slotKey(slot)!),
+      isOptional: slot.is_optional ?? false,
+    }
+  }
+
+  /** All-time done flag for next-due (not current-week completion window). */
+  const toDayCardAllTimeDone = (slot: ProgramScheduleSlot): ProgramWeekDayCard => {
+    const meta = resolveSlotMeta(slot)
+    return {
+      scheduleId: slot.id ?? null,
+      dayNumber: slot.day_number,
+      dayLabel: `Day ${slot.day_number}`,
+      dayOfWeek: slot.day_of_week,
+      weekNumber: slot.week_number,
+      templateId: slot.template_id,
+      instanceWorkoutId: slot.program_instance_workout_id ?? null,
+      workoutName: meta.name,
+      estimatedDuration: meta.estimated_duration,
+      isCompleted: slotKey(slot) != null && completedKeysAllTime.has(slotKey(slot)!),
       isOptional: slot.is_optional ?? false,
     }
   }
@@ -401,6 +433,38 @@ export async function rpcResponseToProgramWeekState(
   const pauseReason =
     data.pauseReason ?? data.pause_reason ?? null
 
+  const assignmentStartDate =
+    typeof data.assignmentStartDate === 'string' && data.assignmentStartDate.trim()
+      ? data.assignmentStartDate.trim().slice(0, 10)
+      : null
+  const pauseAccumulatedDays = Math.max(0, Number(data.pauseAccumulatedDays) || 0)
+  const pausedAt = data.pausedAt ?? null
+
+  let nextDue: ProgramWeekDayCard | null = null
+  if (assignmentStartDate && totalWeeks > 0) {
+    const pauses: PauseState = {
+      accumulatedDays: pauseAccumulatedDays,
+      pauseStatus,
+      pausedAt,
+    }
+    const windows = getProgramWeekWindows(assignmentStartDate, totalWeeks, tz, pauses)
+    const todayYmd = zonedCalendarDateString(new Date(), tz)
+    const effectiveToday = getEffectiveToday(todayYmd, tz, pauses)
+    const workoutRefs: WorkoutRef[] = slots
+      .filter((s) => Boolean(s.template_id))
+      .map((s) => ({
+        id: s.id ?? undefined,
+        weekNumber: s.week_number,
+        programDay: s.day_number,
+        isDone: slotKey(s) != null && completedKeysAllTime.has(slotKey(s)!),
+      }))
+    const due = getNextDue(workoutRefs, windows, assignmentStartDate, effectiveToday)
+    if (due?.id) {
+      const slot = slots.find((s) => s.id === due.id)
+      if (slot) nextDue = toDayCardAllTimeDone(slot)
+    }
+  }
+
   return {
     programWeek: {
       hasProgram: true,
@@ -427,6 +491,11 @@ export async function rpcResponseToProgramWeekState(
       coachFeedback,
       pauseStatus,
       pauseReason,
+      assignmentStartDate,
+      pauseAccumulatedDays,
+      pausedAt,
+      clientTimezone: tz,
+      nextDue,
     },
     todayWeekday,
   }

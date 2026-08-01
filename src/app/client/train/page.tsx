@@ -394,6 +394,26 @@ export default function TrainPage() {
                     todayWeekday={todayWeekday}
                     todayScheduleId={programWeek.todaySlot?.scheduleId ?? null}
                     exerciseCounts={exerciseCounts}
+                    progression={
+                      programWeek.assignmentStartDate &&
+                      programWeek.clientTimezone &&
+                      programWeek.totalWeeks > 0
+                        ? {
+                            startDate: programWeek.assignmentStartDate,
+                            totalWeeks: programWeek.totalWeeks,
+                            timeZone: programWeek.clientTimezone,
+                            pauses: {
+                              accumulatedDays: programWeek.pauseAccumulatedDays,
+                              pauseStatus: programWeek.pauseStatus,
+                              pausedAt: programWeek.pausedAt,
+                            },
+                            weekNumber:
+                              programWeek.displayWeekNumber > 0
+                                ? programWeek.displayWeekNumber
+                                : programWeek.currentWeekNumber,
+                          }
+                        : null
+                    }
                     onStartWorkout={(scheduleId) => {
                       void handleStartWorkout(scheduleId);
                     }}

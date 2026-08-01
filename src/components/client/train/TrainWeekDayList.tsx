@@ -1,17 +1,61 @@
 "use client";
 
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { ChevronRight, Loader2 } from "lucide-react";
 import type { ProgramWeekDayCard } from "@/lib/programWeekStateBuilder";
 import { ExerciseGroupDisplay } from "@/components/exercise-display";
 import type { ExerciseGroupDisplayProps } from "@/components/exercise-display";
 import { supabase } from "@/lib/supabase";
 import { loadDayExerciseGroups } from "@/components/client/train/loadDayCanvas";
+import { zonedCalendarDateString } from "@/lib/clientZonedCalendar";
+import {
+  getEffectiveToday,
+  getProgramWeekWindows,
+  getWorkoutStatus,
+  type PauseState,
+  type ProgramWeekWindow,
+  type WorkoutStatus,
+} from "@/lib/progression/weekWindows";
 import styles from "./trainPage.module.css";
 
 export type TrainDayRowStatus = "done" | "today" | "missed" | "rest" | "upcoming";
 
-export function getTrainDayRowStatus(
+/** Inputs needed to drive weekWindows status for the displayed week. */
+export type TrainDayStatusContext = {
+  startDate: string;
+  totalWeeks: number;
+  timeZone: string;
+  pauses: PauseState;
+  /** Fallback week when a day card omits weekNumber (current Train week). */
+  weekNumber: number;
+  /** Optional override for tests; defaults to zoned calendar today. */
+  actualTodayYmd?: string;
+};
+
+function mapFoundationStatusToTrain(status: WorkoutStatus): TrainDayRowStatus {
+  switch (status) {
+    case "completed":
+      return "done";
+    case "missed":
+      return "missed";
+    case "due-today":
+      return "today";
+    case "upcoming":
+      return "upcoming";
+    case "out-of-scope":
+      // Pre-start: still completable; no Missed pill. Match "upcoming" (no pill).
+      // Do not use "rest" — that disables the row.
+      return "upcoming";
+    default:
+      return "upcoming";
+  }
+}
+
+/**
+ * Legacy weekday-relative status (pre-weekWindows). Kept as fallback only when
+ * assignment start/tz context is missing.
+ */
+export function getTrainDayRowStatusLegacy(
   day: ProgramWeekDayCard,
   todayWeekday: number,
   todayScheduleId: string | null,
@@ -22,6 +66,51 @@ export function getTrainDayRowStatus(
   if (day.dayOfWeek < todayWeekday) return "missed";
   if (day.dayOfWeek === todayWeekday) return "today";
   return "upcoming";
+}
+
+/**
+ * Day-row status from weekWindows foundation when context is present;
+ * otherwise legacy weekday comparison.
+ */
+export function getTrainDayRowStatus(
+  day: ProgramWeekDayCard,
+  todayWeekday: number,
+  todayScheduleId: string | null,
+  progression?: TrainDayStatusContext | null,
+  windows?: ProgramWeekWindow[] | null,
+  effectiveTodayYmd?: string | null,
+): TrainDayRowStatus {
+  if (!day.templateId) return "rest";
+
+  if (progression?.startDate && progression.totalWeeks > 0 && progression.timeZone) {
+    const weekNumber = day.weekNumber ?? progression.weekNumber;
+    const programDay = day.dayNumber;
+    const win =
+      windows ??
+      getProgramWeekWindows(
+        progression.startDate,
+        progression.totalWeeks,
+        progression.timeZone,
+        progression.pauses,
+      );
+    const todayYmd =
+      effectiveTodayYmd ??
+      getEffectiveToday(
+        progression.actualTodayYmd ??
+          zonedCalendarDateString(new Date(), progression.timeZone),
+        progression.timeZone,
+        progression.pauses,
+      );
+    const foundation = getWorkoutStatus(
+      { weekNumber, programDay, isDone: day.isCompleted },
+      win,
+      progression.startDate,
+      todayYmd,
+    );
+    return mapFoundationStatusToTrain(foundation);
+  }
+
+  return getTrainDayRowStatusLegacy(day, todayWeekday, todayScheduleId);
 }
 
 const DAY_NUM_CLASS: Record<TrainDayRowStatus, string> = {
@@ -51,6 +140,8 @@ export interface TrainWeekDayListProps {
   todayWeekday: number;
   todayScheduleId: string | null;
   exerciseCounts: Map<string, number>;
+  /** When set, row status uses weekWindows; otherwise legacy weekday logic. */
+  progression?: TrainDayStatusContext | null;
   onStartWorkout?: (scheduleId: string) => void;
   isStarting?: boolean;
   startingScheduleId?: string | null;
@@ -78,6 +169,7 @@ export function TrainWeekDayList({
   todayWeekday,
   todayScheduleId,
   exerciseCounts,
+  progression = null,
   onStartWorkout,
   isStarting = false,
   startingScheduleId = null,
@@ -86,6 +178,25 @@ export function TrainWeekDayList({
   const [canvasCache, setCanvasCache] = useState<Map<string, CanvasCacheEntry>>(
     () => new Map(),
   );
+
+  const { windows, effectiveTodayYmd } = useMemo(() => {
+    if (!progression?.startDate || progression.totalWeeks <= 0 || !progression.timeZone) {
+      return { windows: null as ProgramWeekWindow[] | null, effectiveTodayYmd: null as string | null };
+    }
+    const win = getProgramWeekWindows(
+      progression.startDate,
+      progression.totalWeeks,
+      progression.timeZone,
+      progression.pauses,
+    );
+    const todayYmd =
+      progression.actualTodayYmd ??
+      zonedCalendarDateString(new Date(), progression.timeZone);
+    return {
+      windows: win,
+      effectiveTodayYmd: getEffectiveToday(todayYmd, progression.timeZone, progression.pauses),
+    };
+  }, [progression]);
 
   const loadCanvas = useCallback(async (day: ProgramWeekDayCard) => {
     const key = day.scheduleId ?? day.templateId;
@@ -136,7 +247,14 @@ export function TrainWeekDayList({
   return (
     <div className={styles.dayList} role="list" aria-label="This week workouts">
       {sortedDays.map((day) => {
-        const status = getTrainDayRowStatus(day, todayWeekday, todayScheduleId);
+        const status = getTrainDayRowStatus(
+          day,
+          todayWeekday,
+          todayScheduleId,
+          progression,
+          windows,
+          effectiveTodayYmd,
+        );
         const isRest = status === "rest";
         const isOpen = !isRest && openScheduleId === day.scheduleId;
         const cacheKey = day.scheduleId ?? day.templateId;

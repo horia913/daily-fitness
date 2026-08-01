@@ -20,12 +20,14 @@ export function TrainHeroCard({
   phaseChipLabel,
   exerciseCounts,
 }: TrainHeroCardProps) {
-  const { days, todaySlot, isRestDay } = programWeek;
+  const { days, todaySlot, isRestDay, nextDue } = programWeek;
 
   const nextWorkout = useMemo(() => {
+    // Foundation next-due (today-or-future in-scope incomplete).
+    if (nextDue && nextDue.templateId && !nextDue.isCompleted) return nextDue;
     if (todaySlot && !todaySlot.isCompleted && todaySlot.templateId) return todaySlot;
     return days.find((d) => !d.isCompleted && d.templateId) ?? null;
-  }, [days, todaySlot]);
+  }, [days, todaySlot, nextDue]);
 
   const heroWorkout = isRestDay ? nextWorkout : (todaySlot?.templateId ? todaySlot : nextWorkout);
 
@@ -90,8 +92,9 @@ export function TrainHeroCard({
 export function resolveTrainPrimaryWorkout(
   programWeek: ProgramWeekState,
 ): ProgramWeekDayCard | null {
-  const { days, todaySlot, isRestDay } = programWeek;
+  const { days, todaySlot, isRestDay, nextDue } = programWeek;
   if (isRestDay) return null;
   if (todaySlot && !todaySlot.isCompleted && todaySlot.templateId) return todaySlot;
+  if (nextDue && !nextDue.isCompleted && nextDue.templateId) return nextDue;
   return days.find((d) => !d.isCompleted && d.templateId) ?? null;
 }

@@ -24,6 +24,8 @@ export interface ProgramWeekDayCard {
   dayNumber: number
   dayLabel: string
   dayOfWeek: number // 0=Monday, 6=Sunday
+  /** Program week (1-based); required for weekWindows status / next-due. */
+  weekNumber?: number
   templateId: string
   /** program_instance_workouts.id — preferred for lazy canvas load on Train. */
   instanceWorkoutId?: string | null
@@ -70,6 +72,17 @@ export interface ProgramWeekState {
   /** B.1 coach pause — mirrors program_assignments.pause_status */
   pauseStatus: 'active' | 'paused'
   pauseReason: string | null
+  /** Assignment start_date (YYYY-MM-DD) for weekWindows foundation. */
+  assignmentStartDate: string | null
+  pauseAccumulatedDays: number
+  pausedAt: string | null
+  /** Client IANA timezone used for Mon–Sun / effective-today. */
+  clientTimezone: string | null
+  /**
+   * Earliest in-scope incomplete with date >= effective-today (weekWindows getNextDue).
+   * Null when none remain today-or-future.
+   */
+  nextDue: ProgramWeekDayCard | null
 }
 
 /**
@@ -103,6 +116,11 @@ export async function buildProgramWeekState(
     coachFeedback: null,
     pauseStatus: 'active',
     pauseReason: null,
+    assignmentStartDate: null,
+    pauseAccumulatedDays: 0,
+    pausedAt: null,
+    clientTimezone: null,
+    nextDue: null,
   }
 
   const state = await getProgramState(supabase, clientId)
@@ -143,6 +161,11 @@ export async function buildProgramWeekState(
         coachFeedback: null,
         pauseStatus: 'active',
         pauseReason: null,
+        assignmentStartDate: completedAssignment.start_date ?? null,
+        pauseAccumulatedDays: completedAssignment.pause_accumulated_days ?? 0,
+        pausedAt: completedAssignment.paused_at ?? null,
+        clientTimezone: completedAssignment.timezone_snapshot ?? null,
+        nextDue: null,
       }
     }
     return empty
@@ -199,6 +222,7 @@ export async function buildProgramWeekState(
       dayNumber: slot.day_number,
       dayLabel: `Day ${slot.day_number}`,
       dayOfWeek: slot.day_of_week,
+      weekNumber: slot.week_number,
       templateId: slot.template_id,
       instanceWorkoutId: slot.program_instance_workout_id ?? null,
       workoutName: template?.name || 'Workout',
@@ -293,5 +317,10 @@ export async function buildProgramWeekState(
     coachFeedback,
     pauseStatus,
     pauseReason: state.assignment.pause_reason ?? null,
+    assignmentStartDate: state.assignment.start_date ?? null,
+    pauseAccumulatedDays: state.assignment.pause_accumulated_days ?? 0,
+    pausedAt: state.assignment.paused_at ?? null,
+    clientTimezone: state.assignment.timezone_snapshot ?? null,
+    nextDue: null,
   }
 }

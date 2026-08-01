@@ -25,26 +25,27 @@
   height: 2rem;
   padding: 0 10px;
   border-radius: 999px;
-  border: 1px solid var(--fc-glass-border, transparent);
-  background: var(--fc-surface-card, #141416);
-  color: var(--fc-text-dim, #888);
-  font-family: var(--f-mono, monospace);
+  border: 1px solid var(--fc-hairline);
+  background: var(--fc-surface-inset);
+  color: var(--fc-text-dim);
+  font-family: var(--f-mono);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   cursor: pointer;
 }
 
 .weekTabActive {
-  color: var(--fc-text-primary, #f2f2f2);
+  color: var(--fc-text-primary);
   border-color: color-mix(
     in srgb,
-    var(--map-phase, var(--fc-accent, #2e7bff)) 55%,
+    var(--map-phase, var(--fc-accent)) 55%,
     transparent
   );
   background: color-mix(
     in srgb,
-    var(--map-phase, var(--fc-accent, #2e7bff)) 16%,
+    var(--map-phase, var(--fc-accent)) 16%,
     transparent
   );
 }
@@ -59,16 +60,16 @@
 }
 
 .dayCard {
-  border-radius: 12px;
-  border: 1px solid var(--fc-glass-border, transparent);
-  background: var(--fc-surface-card, #141416);
+  border-radius: var(--fc-radius-sm);
+  border: 1px solid var(--fc-hairline);
+  background: var(--fc-surface-inset);
   overflow: hidden;
 }
 
 .dayCardOpen {
   border-color: color-mix(
     in srgb,
-    var(--map-phase, var(--fc-accent, #2e7bff)) 35%,
+    var(--map-phase, var(--fc-accent)) 35%,
     transparent
   );
 }
@@ -78,13 +79,13 @@
 }
 
 .dayCardDone {
-  border-color: color-mix(in srgb, var(--fc-status-success, #22e56a) 40%, transparent);
-  background: color-mix(in srgb, var(--fc-status-success, #22e56a) 6%, var(--fc-surface-card, #141416));
+  border-color: color-mix(in srgb, var(--fc-status-success) 40%, transparent);
+  background: color-mix(in srgb, var(--fc-status-success) 6%, transparent);
 }
 
 .dayCardMissed {
-  border-color: color-mix(in srgb, var(--fc-status-error, #ff5a4d) 40%, transparent);
-  background: color-mix(in srgb, var(--fc-status-error, #ff5a4d) 6%, var(--fc-surface-card, #141416));
+  border-color: color-mix(in srgb, var(--fc-status-error) 40%, transparent);
+  background: color-mix(in srgb, var(--fc-status-error) 6%, transparent);
 }
 
 .dayCardUpcoming {
@@ -92,11 +93,11 @@
 }
 
 .dayCardNextDue {
-  border-color: color-mix(in srgb, var(--fc-accent, #2e7bff) 65%, transparent);
+  border-color: color-mix(in srgb, var(--fc-accent) 65%, transparent);
   box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--fc-accent, #2e7bff) 35%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--fc-accent, #2e7bff) 25%, transparent);
-  background: color-mix(in srgb, var(--fc-accent, #2e7bff) 8%, var(--fc-surface-card, #141416));
+    inset 0 0 0 1px color-mix(in srgb, var(--fc-accent) 35%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--fc-accent) 25%, transparent);
+  background: color-mix(in srgb, var(--fc-accent) 8%, transparent);
 }
 
 .dayHeader {
@@ -118,21 +119,21 @@
 }
 
 .dayLabel {
-  font-family: var(--f-mono, monospace);
+  font-family: var(--f-mono);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--fc-text-dim, #888);
+  color: var(--fc-text-dim);
 }
 
 .dayLabelInline {
-  font-family: var(--f-mono, monospace);
+  font-family: var(--f-mono);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--fc-text-dim, #888);
+  color: var(--fc-text-dim);
 }
 
 .dayMeta {
@@ -144,10 +145,10 @@
 }
 
 .dayName {
-  font-family: var(--f-head, var(--font-body));
+  font-family: var(--f-display);
   font-size: 14px;
-  font-weight: 600;
-  color: var(--fc-text-primary, #f2f2f2);
+  font-weight: 800;
+  color: var(--fc-text-primary);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -156,8 +157,8 @@
 }
 
 .dayCardRest .dayName {
-  color: var(--fc-text-dim, #888);
-  font-weight: 500;
+  color: var(--fc-text-dim);
+  font-weight: 700;
 }
 
 .statusDot {
@@ -165,47 +166,47 @@
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: var(--fc-text-dim, #888);
+  background: var(--fc-text-dim);
 }
 
 .statusDotDone {
-  background: var(--fc-status-success, #22e56a);
+  background: var(--fc-status-success);
 }
 
 .statusDotMissed {
-  background: var(--fc-status-error, #ff5a4d);
+  background: var(--fc-status-error);
 }
 
 .statusDotUpcoming {
-  background: var(--fc-text-dim, #666);
+  background: var(--fc-text-dim);
 }
 
 .statusDotNextDue {
-  background: var(--fc-accent, #2e7bff);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--fc-accent, #2e7bff) 28%, transparent);
+  background: var(--fc-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--fc-accent) 28%, transparent);
 }
 
 .statusPill {
-  font-family: var(--f-mono, monospace);
+  font-family: var(--f-mono);
   font-size: 9px;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--fc-text-dim, #888);
+  color: var(--fc-text-dim);
 }
 
 .chevron {
-  color: var(--fc-text-dim, #888);
+  color: var(--fc-text-dim);
   transition: transform 0.15s ease;
 }
 
 .chevronOpen {
   transform: rotate(180deg);
-  color: var(--map-phase, var(--fc-accent, #2e7bff));
+  color: var(--map-phase, var(--fc-accent));
 }
 
 .dayBody {
-  border-top: 1px solid var(--fc-glass-border, transparent);
+  border-top: 1px solid var(--fc-hairline);
   /* GymConsoleDayWorkout already pads; tighten nested title spacing */
   padding: 0 0 8px;
 }
@@ -224,19 +225,23 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 7px 12px;
-  border-radius: 9px;
-  border: 1px solid color-mix(in srgb, var(--map-phase, var(--fc-accent, #2e7bff)) 40%, transparent);
-  background: color-mix(in srgb, var(--map-phase, var(--fc-accent, #2e7bff)) 14%, transparent);
-  color: var(--fc-text-primary);
-  font-family: var(--font-body);
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 15px;
+  border: none;
+  background: var(--fc-accent);
+  color: #ffffff;
+  font-family: var(--f-display);
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   cursor: pointer;
+  box-shadow: 0 4px 24px var(--fc-accent-glow);
 }
 
 .openWorkoutBtn:hover {
-  background: color-mix(in srgb, var(--map-phase, var(--fc-accent, #2e7bff)) 22%, transparent);
+  box-shadow: 0 4px 24px var(--fc-accent-glow);
 }
 
 .openedView {
@@ -254,17 +259,19 @@
   margin: 4px 8px 0;
   padding: 6px 8px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--fc-radius-sm);
   background: transparent;
-  color: var(--fc-accent, #2e7bff);
-  font-family: var(--f-mono, monospace);
+  color: var(--fc-accent);
+  font-family: var(--f-mono);
   font-size: 12px;
   font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   cursor: pointer;
 }
 
 .backBtn:hover {
-  background: color-mix(in srgb, var(--fc-accent, #2e7bff) 12%, transparent);
+  background: var(--fc-accent-dim);
 }
 
 .loading {
@@ -275,17 +282,19 @@
 
 .skeleton {
   height: 48px;
-  border-radius: 12px;
-  border: 1px solid var(--fc-glass-border, transparent);
-  background: color-mix(in srgb, var(--fc-surface-elevated, #1a1a1a) 80%, transparent);
+  border-radius: var(--fc-radius-sm);
+  border: 1px solid var(--fc-hairline);
+  background: var(--fc-surface-tint);
   animation: pulse 1.4s ease-in-out infinite;
 }
 
 .statusText {
   margin: 4px 0 0;
-  font-family: var(--f-mono, monospace);
+  font-family: var(--f-mono);
   font-size: 12px;
-  color: var(--fc-text-dim, #888);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fc-text-dim);
 }
 
 @keyframes pulse {

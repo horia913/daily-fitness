@@ -128,12 +128,12 @@ export function AddClientToBoardModal({
           </ul>
         )}
         <div className={styles.modalActions}>
-          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
+          <Button type="button" variant="outline" className={styles.modalCancelBtn} onClick={onClose}>
             Cancel
           </Button>
           <Button
             type="button"
-            className="flex-1"
+            className={styles.modalPrimaryBtn}
             onClick={handleSave}
             disabled={selected.size === 0 || maxPick <= 0}
           >
