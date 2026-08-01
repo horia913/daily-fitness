@@ -396,6 +396,7 @@ export async function GET(
     // Canonical Week X of N (N = sum of instance phases, X in client tz). Loaded
     // once and reused for the weekly-review planned counts below.
     let instanceWeekInputs: Awaited<ReturnType<typeof loadInstanceWeekInputs>> = null;
+    let programTotalWeeks: number | null = null;
     if (pa) {
       const [{ data: wp }] = await Promise.all([
         supabaseAdmin.from('workout_programs').select('name').eq('id', pa.program_id).maybeSingle(),
@@ -411,6 +412,7 @@ export async function GET(
         : null;
       const cw = cwRes?.currentWeek ?? 1;
       const dw = cwRes?.totalWeeks ?? null;
+      programTotalWeeks = dw;
       let programProgressPercent: number | null = null;
       if (
         cw != null &&
@@ -450,7 +452,19 @@ export async function GET(
         ? buildTodayWorkoutSummary(supabaseAdmin, clientId, todayStart, todayEnd)
         : Promise.resolve(null),
       !trainedTodayZoned && pa
-        ? buildNextScheduledWorkout(supabaseAdmin, clientId, pa.id, pa.program_id)
+        ? buildNextScheduledWorkout(
+            supabaseAdmin,
+            {
+              id: pa.id,
+              client_id: clientId,
+              start_date: pa.start_date ?? null,
+              pause_accumulated_days: pa.pause_accumulated_days,
+              pause_status: pa.pause_status,
+              paused_at: pa.paused_at,
+              timezone_snapshot: pa.timezone_snapshot,
+            },
+            programTotalWeeks,
+          )
         : Promise.resolve(null),
       buildLatestCheckIn(supabaseAdmin, clientId),
       buildWeekWorkoutDots(supabaseAdmin, clientId, clientTz),

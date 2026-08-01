@@ -2,20 +2,23 @@
  * Batch calendar adherence for a coach roster — same math as
  * getWorkoutAdherenceHistory / program_day_completions calendars.
  * Fixed query count (not N×W per-client loops).
+ * Day placement: foundation via buildFoundationAdherenceDays.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { toLocalDateString } from "@/lib/clientActivityService";
-import { isCoachSkipNote } from "@/lib/programInstanceResolver";
-import {
-  computeCurrentProgramWeek,
-  normalizeClientTimezone,
-} from "@/lib/programWeekCalendar";
+import { instanceTotalWeeks } from "@/lib/programInstanceResolver";
+import { normalizeClientTimezone } from "@/lib/programWeekCalendar";
 import {
   isCountableCompletedWorkoutLog,
   type WorkoutAdherenceDay,
 } from "@/lib/workoutAdherenceHistoryService";
 import { addCalendarDaysYmd } from "@/lib/clientZonedCalendar";
+import {
+  buildFoundationAdherenceDays,
+  resolveAdherenceTotalWeeks,
+  type FoundationAdherenceDay,
+} from "@/lib/progression/foundationAdherenceDays";
 
 type AssignmentRow = {
   id: string;
@@ -60,12 +63,6 @@ function eachYmd(start: string, end: string): string[] {
   return out;
 }
 
-function programDayFromLocalYmd(ymd: string): number {
-  const d = new Date(ymd + "T12:00:00");
-  const js = d.getDay();
-  return js === 0 ? 7 : js;
-}
-
 function pickAssignmentForDay(
   assignments: AssignmentRow[],
   dayYmd: string,
@@ -96,6 +93,7 @@ function buildDaysForClient(input: {
   assignments: AssignmentRow[];
   slotsByAssignment: Map<string, SlotRow[]>;
   compsByAssignment: Map<string, CompletionRow[]>;
+  totalWeeksByAssignment: Map<string, number>;
   logs: LogRow[];
   sessionStatusById: Map<string, string>;
 }): WorkoutAdherenceDay[] {
@@ -106,6 +104,7 @@ function buildDaysForClient(input: {
     assignments,
     slotsByAssignment,
     compsByAssignment,
+    totalWeeksByAssignment,
     logs,
     sessionStatusById,
   } = input;
@@ -118,6 +117,31 @@ function buildDaysForClient(input: {
     extrasByDate.set(ymd, (extrasByDate.get(ymd) ?? 0) + 1);
   }
 
+  const emptyExtras = new Map<string, number>();
+  const seriesByAssignment = new Map<string, Map<string, FoundationAdherenceDay>>();
+  for (const a of assignments) {
+    const tz =
+      normalizeClientTimezone(a.timezone_snapshot) || profileTz || "UTC";
+    const series = buildFoundationAdherenceDays({
+      range: { startYmd: startDate, endYmd: endDate },
+      assignment: {
+        start_date: a.start_date,
+        pause_accumulated_days: a.pause_accumulated_days,
+        pause_status: a.pause_status,
+        paused_at: a.paused_at,
+        totalWeeks: totalWeeksByAssignment.get(a.id) ?? 0,
+      },
+      slots: slotsByAssignment.get(a.id) ?? [],
+      completions: compsByAssignment.get(a.id) ?? [],
+      extrasByDate: emptyExtras,
+      tz,
+    });
+    seriesByAssignment.set(
+      a.id,
+      new Map(series.map((d) => [d.date, d])),
+    );
+  }
+
   const days: WorkoutAdherenceDay[] = [];
   for (const ymd of eachYmd(startDate, endDate)) {
     const assignment = pickAssignmentForDay(assignments, ymd);
@@ -125,48 +149,9 @@ function buildDaysForClient(input: {
     let completed = 0;
 
     if (assignment) {
-      const tz =
-        normalizeClientTimezone(assignment.timezone_snapshot) ||
-        profileTz ||
-        "UTC";
-      const week = computeCurrentProgramWeek({
-        assignmentStartDate: assignment.start_date,
-        pauseAccumulatedDays: assignment.pause_accumulated_days,
-        pauseStatus: assignment.pause_status,
-        pausedAt: assignment.paused_at,
-        targetYmd: ymd,
-        clientTimezone: tz,
-      });
-      const programDay = programDayFromLocalYmd(ymd);
-      const assignmentSlots = slotsByAssignment.get(assignment.id) ?? [];
-      const assignmentComps = compsByAssignment.get(assignment.id) ?? [];
-      const skippedIds = new Set(
-        assignmentComps
-          .filter((c) => isCoachSkipNote(c.notes) && c.program_day_assignment_id)
-          .map((c) => c.program_day_assignment_id as string),
-      );
-      const daySlots = assignmentSlots.filter(
-        (s) =>
-          s.week_number === week &&
-          s.program_day === programDay &&
-          !s.is_optional &&
-          !skippedIds.has(s.id),
-      );
-      scheduled = daySlots.length;
-      if (scheduled > 0) {
-        const requiredIds = new Set(daySlots.map((s) => s.id));
-        const doneIds = new Set(
-          assignmentComps
-            .filter(
-              (c) =>
-                !isCoachSkipNote(c.notes) &&
-                c.program_day_assignment_id &&
-                requiredIds.has(c.program_day_assignment_id),
-            )
-            .map((c) => c.program_day_assignment_id as string),
-        );
-        completed = doneIds.size;
-      }
+      const row = seriesByAssignment.get(assignment.id)?.get(ymd);
+      scheduled = row?.scheduled ?? 0;
+      completed = row?.completed ?? 0;
     }
 
     const extras = extrasByDate.get(ymd) ?? 0;
@@ -247,6 +232,38 @@ export async function batchRosterAdherenceHistory(
     compsByAssignment.set(c.program_assignment_id, list);
   }
 
+  const totalWeeksByAssignment = new Map<string, number>();
+  if (assignmentIds.length > 0) {
+    const { data: phaseRows } = await db
+      .from("program_instance_phases")
+      .select("program_assignment_id, duration_weeks")
+      .in("program_assignment_id", assignmentIds);
+
+    const phasesByAssignment = new Map<
+      string,
+      Array<{ duration_weeks: number }>
+    >();
+    for (const row of phaseRows ?? []) {
+      const aid = (row as { program_assignment_id: string })
+        .program_assignment_id;
+      if (!aid) continue;
+      const list = phasesByAssignment.get(aid) ?? [];
+      list.push({
+        duration_weeks: Number(
+          (row as { duration_weeks: number }).duration_weeks,
+        ),
+      });
+      phasesByAssignment.set(aid, list);
+    }
+    for (const id of assignmentIds) {
+      const fromPhases = instanceTotalWeeks(phasesByAssignment.get(id) ?? []);
+      totalWeeksByAssignment.set(
+        id,
+        resolveAdherenceTotalWeeks(fromPhases, slotsByAssignment.get(id) ?? []),
+      );
+    }
+  }
+
   const sessionIds = [
     ...new Set(
       logs
@@ -292,6 +309,7 @@ export async function batchRosterAdherenceHistory(
       assignments: assignmentsByClient.get(clientId) ?? [],
       slotsByAssignment,
       compsByAssignment,
+      totalWeeksByAssignment,
       logs: logsByClient.get(clientId) ?? [],
       sessionStatusById,
     });

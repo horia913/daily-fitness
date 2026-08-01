@@ -19,7 +19,10 @@ import {
   weekdayMon0Sun6InTimezone,
   zonedDayInclusiveUtcBounds,
 } from "@/lib/clientZonedCalendar";
-import { getNextSlot } from "@/lib/programStateService";
+import {
+  loadFoundationNextDueForAssignment,
+  type FoundationNextDueAssignment,
+} from "@/lib/progression/foundationNextDueLoad";
 import { dbToUiScale } from "@/lib/wellnessService";
 import {
   durationMinutesFromSetCompletedAts,
@@ -753,30 +756,26 @@ export async function buildTodayWorkoutSummary(
 
 export type NextScheduledWorkout = { dayName: string; workoutName: string };
 
+/**
+ * Coach summary "next scheduled" — same foundation next-due as Home/Train.
+ * Display shape stays { dayName, workoutName }.
+ */
 export async function buildNextScheduledWorkout(
   sb: SupabaseClient,
-  clientId: string,
-  programAssignmentId: string,
-  programId: string
+  assignment: FoundationNextDueAssignment,
+  totalWeeks?: number | null,
 ): Promise<NextScheduledWorkout | null> {
-  const next = await getNextSlot(sb, programAssignmentId, programId);
-  if (!next) return null;
+  const next = await loadFoundationNextDueForAssignment(
+    sb,
+    assignment,
+    totalWeeks != null && totalWeeks > 0 ? { totalWeeks } : undefined,
+  );
+  if (!next.hasWorkout) return null;
 
-  const { data: tpl } = await sb
-    .from("workout_templates")
-    .select("name")
-    .eq("id", next.template_id)
-    .maybeSingle();
-
-  const dow =
-    typeof next.day_of_week === "number" && next.day_of_week >= 0 && next.day_of_week <= 6
-      ? next.day_of_week
-      : 0;
-  const dayName = DOW_SHORT[dow] ?? "—";
-
+  const dayIdx = Math.max(0, Math.min(6, next.programDay - 1));
   return {
-    dayName,
-    workoutName: tpl?.name?.trim() || "Workout",
+    dayName: DOW_SHORT[dayIdx] ?? "—",
+    workoutName: next.name?.trim() || "Workout",
   };
 }
 

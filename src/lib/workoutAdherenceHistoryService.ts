@@ -3,16 +3,20 @@
  * Days with nothing scheduled are neutral (`value: null`), not misses.
  * Unscheduled-but-completed workouts are credited as `value: 1`.
  * Abandoned sessions are never counted as completed.
+ *
+ * Day placement: foundation weekWindows (via buildFoundationAdherenceDays).
  */
 
 import { supabase } from "./supabase";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { toLocalDateString } from "./clientActivityService";
-import { isCoachSkipNote } from "./programInstanceResolver";
+import { instanceTotalWeeks } from "./programInstanceResolver";
+import { normalizeClientTimezone } from "./programWeekCalendar";
 import {
-  computeCurrentProgramWeek,
-  normalizeClientTimezone,
-} from "./programWeekCalendar";
+  buildFoundationAdherenceDays,
+  resolveAdherenceTotalWeeks,
+  type FoundationAdherenceDay,
+} from "@/lib/progression/foundationAdherenceDays";
 
 export type WorkoutAdherenceDay = {
   date: string;
@@ -74,13 +78,6 @@ function eachYmd(start: string, end: string): string[] {
   return out;
 }
 
-/** Local Mon=1…Sun=7 for a YYYY-MM-DD (noon local, mirrors nutrition date keys). */
-function programDayFromLocalYmd(ymd: string): number {
-  const d = new Date(ymd + "T12:00:00");
-  const js = d.getDay(); // 0=Sun
-  return js === 0 ? 7 : js;
-}
-
 /**
  * Abandoned ≠ completed:
  * - workout_sessions.status === 'abandoned', or
@@ -125,6 +122,45 @@ function pickAssignmentForDay(
     return b.created_at.localeCompare(a.created_at);
   });
   return matches[0] ?? null;
+}
+
+async function loadTotalWeeksByAssignment(
+  db: SupabaseClient,
+  assignmentIds: string[],
+  slotsByAssignment: Map<string, SlotRow[]>,
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (assignmentIds.length === 0) return out;
+
+  const { data: phaseRows } = await db
+    .from("program_instance_phases")
+    .select("program_assignment_id, duration_weeks")
+    .in("program_assignment_id", assignmentIds);
+
+  const phasesByAssignment = new Map<
+    string,
+    Array<{ duration_weeks: number }>
+  >();
+  for (const row of phaseRows ?? []) {
+    const aid = (row as { program_assignment_id: string }).program_assignment_id;
+    if (!aid) continue;
+    const list = phasesByAssignment.get(aid) ?? [];
+    list.push({
+      duration_weeks: Number(
+        (row as { duration_weeks: number }).duration_weeks,
+      ),
+    });
+    phasesByAssignment.set(aid, list);
+  }
+
+  for (const id of assignmentIds) {
+    const fromPhases = instanceTotalWeeks(phasesByAssignment.get(id) ?? []);
+    out.set(
+      id,
+      resolveAdherenceTotalWeeks(fromPhases, slotsByAssignment.get(id) ?? []),
+    );
+  }
+  return out;
 }
 
 /**
@@ -261,6 +297,38 @@ export async function getWorkoutAdherenceHistory(
     compsByAssignment.get(c.program_assignment_id)!.push(c);
   }
 
+  const totalWeeksByAssignment = await loadTotalWeeksByAssignment(
+    db,
+    assignmentIds,
+    slotsByAssignment,
+  );
+
+  // Per-assignment foundation series without extras (extras applied after pick).
+  const emptyExtras = new Map<string, number>();
+  const seriesByAssignment = new Map<string, Map<string, FoundationAdherenceDay>>();
+  for (const a of assignments) {
+    const tz =
+      normalizeClientTimezone(a.timezone_snapshot) || profileTz || "UTC";
+    const series = buildFoundationAdherenceDays({
+      range: { startYmd: startDate, endYmd: endDate },
+      assignment: {
+        start_date: a.start_date,
+        pause_accumulated_days: a.pause_accumulated_days,
+        pause_status: a.pause_status,
+        paused_at: a.paused_at,
+        totalWeeks: totalWeeksByAssignment.get(a.id) ?? 0,
+      },
+      slots: slotsByAssignment.get(a.id) ?? [],
+      completions: compsByAssignment.get(a.id) ?? [],
+      extrasByDate: emptyExtras,
+      tz,
+    });
+    seriesByAssignment.set(
+      a.id,
+      new Map(series.map((d) => [d.date, d])),
+    );
+  }
+
   const days: WorkoutAdherenceDay[] = [];
   for (const ymd of eachYmd(startDate, endDate)) {
     const assignment = pickAssignmentForDay(assignments, ymd);
@@ -268,50 +336,9 @@ export async function getWorkoutAdherenceHistory(
     let completed = 0;
 
     if (assignment) {
-      const tz =
-        normalizeClientTimezone(assignment.timezone_snapshot) ||
-        profileTz ||
-        "UTC";
-      const week = computeCurrentProgramWeek({
-        assignmentStartDate: assignment.start_date,
-        pauseAccumulatedDays: assignment.pause_accumulated_days,
-        pauseStatus: assignment.pause_status,
-        pausedAt: assignment.paused_at,
-        targetYmd: ymd,
-        clientTimezone: tz,
-      });
-      // Local calendar weekday for the same YMD keys as toLocalDateString (not UTC).
-      const programDay = programDayFromLocalYmd(ymd);
-
-      const assignmentSlots = slotsByAssignment.get(assignment.id) ?? [];
-      const assignmentComps = compsByAssignment.get(assignment.id) ?? [];
-      const skippedIds = new Set(
-        assignmentComps
-          .filter((c) => isCoachSkipNote(c.notes) && c.program_day_assignment_id)
-          .map((c) => c.program_day_assignment_id as string)
-      );
-      const daySlots = assignmentSlots.filter(
-        (s) =>
-          s.week_number === week &&
-          s.program_day === programDay &&
-          !s.is_optional &&
-          !skippedIds.has(s.id)
-      );
-      scheduled = daySlots.length;
-      if (scheduled > 0) {
-        const requiredIds = new Set(daySlots.map((s) => s.id));
-        const doneIds = new Set(
-          assignmentComps
-            .filter(
-              (c) =>
-                !isCoachSkipNote(c.notes) &&
-                c.program_day_assignment_id &&
-                requiredIds.has(c.program_day_assignment_id)
-            )
-            .map((c) => c.program_day_assignment_id as string)
-        );
-        completed = doneIds.size;
-      }
+      const row = seriesByAssignment.get(assignment.id)?.get(ymd);
+      scheduled = row?.scheduled ?? 0;
+      completed = row?.completed ?? 0;
     }
 
     const extras = extrasByDate.get(ymd) ?? 0;
@@ -319,7 +346,6 @@ export async function getWorkoutAdherenceHistory(
     if (scheduled > 0) {
       value = Math.min(1, completed / scheduled);
     } else if (extras > 0) {
-      // Unscheduled-but-completed: credit the day (client trained).
       completed = extras;
       value = 1;
     }
