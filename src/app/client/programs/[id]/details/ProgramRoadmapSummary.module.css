@@ -1,0 +1,117 @@
+/*
+ * Program roadmap summary card — v6 tokens.
+ */
+
+.card {
+  border: 1px solid var(--fc-hairline);
+  border-radius: 16px;
+  background: var(--fc-surface-float, var(--fc-bg-deep));
+  padding: 18px 16px 16px;
+}
+
+.title {
+  font-family: var(--f-display, var(--font-display, ui-sans-serif));
+  font-stretch: 125%;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  color: var(--fc-text-primary);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  font-family: var(--f-mono, ui-monospace, monospace);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--fc-text-dim);
+  margin: 8px 0 0;
+}
+
+.pctRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.pctNum {
+  font-family: var(--f-display, var(--font-display, ui-sans-serif));
+  font-stretch: 125%;
+  font-size: 40px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--fc-text-primary);
+}
+
+.pctLbl {
+  font-family: var(--f-mono, ui-monospace, monospace);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fc-text-subtle);
+}
+
+.barTrack {
+  display: flex;
+  height: 8px;
+  margin-top: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--fc-text-subtle) 18%, transparent);
+}
+
+.barDone {
+  height: 100%;
+  background: var(--fc-status-success);
+  min-width: 0;
+}
+
+.barMissed {
+  height: 100%;
+  background: var(--fc-status-error);
+  min-width: 0;
+}
+
+.barLabels {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  font-family: var(--f-mono, ui-monospace, monospace);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fc-text-subtle);
+}
+
+.divider {
+  height: 1px;
+  background: var(--fc-hairline);
+  margin: 18px 0 14px;
+}
+
+.eyebrow {
+  font-family: var(--f-mono, ui-monospace, monospace);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fc-text-subtle);
+  margin: 0 0 8px;
+}
+
+.hereLine {
+  font-family: var(--f-mono, ui-monospace, monospace);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--fc-accent);
+  margin: 0 0 10px;
+}
+
+.ribbon {
+  margin-bottom: 0 !important;
+}
