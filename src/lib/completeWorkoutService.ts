@@ -1,21 +1,23 @@
 /**
  * Complete Workout Service (Unified Pipeline)
- * 
+ *
  * SINGLE entry point for completing a workout — used by BOTH:
  *   - Client flow: POST /api/complete-workout
  *   - Coach flow:  POST /api/coach/pickup/mark-complete
- * 
+ *
  * Steps:
  * 1. Fetch workout_log, verify ownership
- * 2. Idempotency guard (already completed → no-op 200)
+ * 2. Idempotency guard (already completed → heal missing PDC if needed, then no-op)
  * 3. Compute totals from workout_set_logs
- * 4. Update workout_logs (completed_at, totals)
- * 5. Update workout_sessions status if session_id provided
- * 6. Program completion (if program_assignment_id + program_day_assignment_id on log):
- *    a. INSERT INTO program_day_completions (ON CONFLICT DO NOTHING — idempotent)
- *    b. Find next uncompleted slot via programStateService
- * 7. Sync goals/achievements (non-blocking, unchanged)
- * 
+ * 4. Resolve program_assignment_id + program_day_assignment_id
+ * 5. If program context: week-lock check, then REQUIRED program_day_completions insert
+ * 6. ONLY THEN update workout_logs (completed_at, totals) — and session if provided
+ * 7. Program progression (next slot / mark assignment completed)
+ * 8. Sync goals/achievements (non-blocking, unchanged)
+ *
+ * Crash-safety: PDC is written before the log is marked completed. Worst case =
+ * PDC exists with an incomplete log (retryable, foundation-correct).
+ *
  * Does NOT:
  *   - Call advance_program_progress RPC (replaced)
  *   - Write to program_day_assignments
@@ -72,6 +74,44 @@ export interface CompleteWorkoutResult {
   leaderboardRankChanges: import('@/lib/leaderboardPopulationService').LeaderboardRankChange[]
 }
 
+const isValidUuid = (value: string | null | undefined): boolean => {
+  if (!value) return false
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+}
+
+/**
+ * Idempotent PDC insert. 23505 (unique) = already recorded (ok).
+ * Any other error throws so callers do not mark the log completed.
+ */
+async function insertProgramDayCompletion(args: {
+  supabaseAdmin: SupabaseClient
+  programAssignmentId: string
+  programDayAssignmentId: string
+  completedAtIso: string
+  completedBy: string
+  notes?: string | null
+}): Promise<'inserted' | 'already_recorded'> {
+  const { error: ledgerError } = await args.supabaseAdmin
+    .from('program_day_completions')
+    .insert({
+      program_assignment_id: args.programAssignmentId,
+      program_day_assignment_id: args.programDayAssignmentId,
+      completed_at: args.completedAtIso,
+      completed_by: args.completedBy,
+      notes: args.notes || null,
+    })
+    .select('id')
+    .maybeSingle()
+
+  if (!ledgerError) return 'inserted'
+  if (ledgerError.code === '23505') {
+    console.log('[completeWorkoutService] Day already recorded in ledger (idempotent)')
+    return 'already_recorded'
+  }
+  console.error('[completeWorkoutService] Error writing to ledger:', ledgerError)
+  throw new Error(`Failed to write program_day_completions: ${ledgerError.message}`)
+}
+
 // ============================================================================
 // MAIN FUNCTION
 // ============================================================================
@@ -79,7 +119,6 @@ export interface CompleteWorkoutResult {
 export async function completeWorkout(params: CompleteWorkoutParams): Promise<CompleteWorkoutResult> {
   const {
     supabaseAdmin,
-    supabaseAuth,
     workoutLogId,
     clientId,
     completedBy,
@@ -105,10 +144,47 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
   }
 
   // ========================================================================
-  // STEP 2: Idempotency guard — if already completed, return no-op
+  // STEP 2: Idempotency guard — heal missing PDC if needed, then no-op
   // ========================================================================
   if (workoutLog.completed_at) {
-    console.log('[completeWorkoutService] Already completed, returning no-op:', workoutLogId)
+    console.log('[completeWorkoutService] Already completed, checking PDC heal:', workoutLogId)
+    const healPa = workoutLog.program_assignment_id as string | null
+    const healPda = (workoutLog.program_day_assignment_id as string | null) ?? null
+    if (healPa && healPda) {
+      const { data: existingPdc, error: pdcLookupError } = await supabaseAdmin
+        .from('program_day_completions')
+        .select('id')
+        .eq('program_assignment_id', healPa)
+        .eq('program_day_assignment_id', healPda)
+        .maybeSingle()
+
+      if (pdcLookupError) {
+        console.error('[completeWorkoutService] PDC heal lookup failed (non-blocking):', pdcLookupError)
+      } else if (!existingPdc) {
+        try {
+          await insertProgramDayCompletion({
+            supabaseAdmin,
+            programAssignmentId: healPa,
+            programDayAssignmentId: healPda,
+            completedAtIso:
+              typeof workoutLog.completed_at === 'string'
+                ? workoutLog.completed_at
+                : new Date(workoutLog.completed_at).toISOString(),
+            completedBy,
+            notes: notes || null,
+          })
+          console.log('[completeWorkoutService] Healed missing PDC for already-completed log:', {
+            workoutLogId,
+            programAssignmentId: healPa,
+            programDayAssignmentId: healPda,
+          })
+        } catch (healErr) {
+          // Already completed — do not fail the no-op; log and return as today.
+          console.error('[completeWorkoutService] PDC heal insert failed (non-blocking):', healErr)
+        }
+      }
+    }
+
     return {
       success: true,
       alreadyCompleted: true,
@@ -146,9 +222,6 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
     totalWeightLifted += (set.weight || 0) * (set.reps || 0)
   }
 
-  // ========================================================================
-  // STEP 4: Calculate duration and update workout_logs
-  // ========================================================================
   const completedAt = new Date()
   const { resolveWorkoutPersistDurationMinutes } = await import(
     '@/lib/workoutLogDuration'
@@ -162,50 +235,10 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
     completedAt,
     setCompletedAts: (setLogs ?? []).map((s) => s.completed_at),
   })
-
-  const { data: updatedLog, error: updateError } = await supabaseAdmin
-    .from('workout_logs')
-    .update({
-      completed_at: completedAt.toISOString(),
-      total_duration_minutes: totalDurationMinutes,
-      total_sets_completed: totalSetsCompleted,
-      total_reps_completed: totalRepsCompleted,
-      total_weight_lifted: totalWeightLifted,
-    })
-    .eq('id', workoutLogId)
-    .select()
-    .single()
-
-  if (updateError) {
-    console.error('[completeWorkoutService] Error updating workout_log:', updateError)
-    throw new Error(`Failed to update workout log: ${updateError.message}`)
-  }
+  const completedAtIso = completedAt.toISOString()
 
   // ========================================================================
-  // STEP 5: Update workout_sessions status if session_id provided
-  // ========================================================================
-  const isValidUuid = (value: string | null | undefined): boolean => {
-    if (!value) return false
-    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
-  }
-
-  if (isValidUuid(sessionId)) {
-    const { error: sessionUpdateError } = await supabaseAdmin
-      .from('workout_sessions')
-      .update({
-        status: 'completed',
-        completed_at: completedAt.toISOString(),
-      })
-      .eq('id', sessionId!)
-      .eq('client_id', clientId)
-
-    if (sessionUpdateError) {
-      console.warn('[completeWorkoutService] Failed to update session (non-blocking):', sessionUpdateError)
-    }
-  }
-
-  // ========================================================================
-  // STEP 6: Program completion (if workout is part of a program)
+  // STEP 4: Resolve program context (before marking the log completed)
   // ========================================================================
   let programProgression: CompleteWorkoutResult['programProgression'] = null
 
@@ -243,9 +276,27 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
     }
   }
 
-  if (programAssignmentId && programDayAssignmentId) {
+  // ========================================================================
+  // STEP 5: Week-lock + REQUIRED PDC insert (before log completed_at)
+  // ========================================================================
+  type AssignmentRow = {
+    id: string
+    client_id: string
+    program_id: string
+    start_date: string | null
+    status: string | null
+    progression_mode: string | null
+    pause_status: string | null
+    paused_at: string | null
+    pause_accumulated_days: number | null
+    timezone_snapshot: string | null
+  }
 
-    // 6-pre. Get program_id, slots, and completions for week lock check + progression
+  let assignmentForProgression: AssignmentRow | null = null
+  let allSlotsForProgression: Awaited<ReturnType<typeof getProgramScheduleSlotsForAssignment>> | null = null
+  let isAlreadyRecorded = false
+
+  if (programAssignmentId && programDayAssignmentId) {
     const { data: assignment } = await supabaseAdmin
       .from('program_assignments')
       .select(
@@ -258,6 +309,7 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
       console.error('[completeWorkoutService] Program assignment not found:', programAssignmentId)
       programProgression = { status: 'no_program' }
     } else {
+      assignmentForProgression = assignment as AssignmentRow
       const [allSlots, completedSlots, weekRes] = await Promise.all([
         getProgramScheduleSlotsForAssignment(
           supabaseAdmin,
@@ -267,9 +319,10 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
         getCompletedSlots(supabaseAdmin, programAssignmentId),
         resolveInstanceWeekForAssignment(supabaseAdmin, programAssignmentId),
       ])
+      allSlotsForProgression = allSlots
       const totalWeeksCap = weekRes?.totalWeeks ?? null
 
-      // 6-lock. WEEK LOCK: find the target slot's week and enforce sequential week order
+      // WEEK LOCK — reject BEFORE marking the log completed
       const targetSlot = allSlots.find(s => s.id === programDayAssignmentId)
       if (targetSlot) {
         try {
@@ -316,72 +369,110 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
         completedBy,
       })
 
-      // 6a. INSERT into ledger (idempotent via ON CONFLICT DO NOTHING)
-      const { error: ledgerError } = await supabaseAdmin
-        .from('program_day_completions')
-        .insert({
-          program_assignment_id: programAssignmentId,
-          program_day_assignment_id: programDayAssignmentId,
-          completed_at: completedAt.toISOString(),
-          completed_by: completedBy,
-          notes: notes || null,
-        })
-        .select('id')
-        .maybeSingle()
-
-      const isAlreadyRecorded = ledgerError?.code === '23505'
-      if (ledgerError && !isAlreadyRecorded) {
-        console.error('[completeWorkoutService] Error writing to ledger:', ledgerError)
-      }
-      if (isAlreadyRecorded) {
-        console.log('[completeWorkoutService] Day already recorded in ledger (idempotent)')
-      }
-
-      // 6b. ALWAYS run completion check — even on already_recorded (Fix A)
-      // Refetch so we have current ledger state (getNextSlot does this internally)
-      const nextSlotResult = await getNextSlot(supabaseAdmin, programAssignmentId, assignment.program_id)
-      const lastSlot = allSlots[allSlots.length - 1]
-
-      const isComplete = nextSlotResult === null && allSlots.length > 0
-      const referenceSlot = nextSlotResult ?? lastSlot
-
-      // 6d. If program fully completed, update assignment status (Fix B: non-blocking + 1 retry)
-      if (isComplete) {
-        const doStatusUpdate = async () => {
-          const { error } = await supabaseAdmin
-            .from('program_assignments')
-            .update({ status: 'completed' })
-            .eq('id', programAssignmentId)
-          return error
-        }
-        let assignmentUpdateError = await doStatusUpdate()
-        if (assignmentUpdateError) {
-          assignmentUpdateError = await doStatusUpdate()
-          if (assignmentUpdateError) {
-            console.error(
-              '[completeWorkoutService] Failed to mark assignment completed after retry. program_assignment_id=',
-              programAssignmentId,
-              assignmentUpdateError
-            )
-          }
-        }
-      }
-
-      programProgression = {
-        status: isAlreadyRecorded ? 'already_recorded' : (isComplete ? 'program_completed' : 'advanced'),
-        currentWeekNumber: referenceSlot?.week_number,
-        currentDayNumber: referenceSlot?.day_number,
-        isCompleted: isComplete,
+      // REQUIRED ledger write — failure must not leave a completed log without PDC
+      const ledgerResult = await insertProgramDayCompletion({
+        supabaseAdmin,
         programAssignmentId,
         programDayAssignmentId,
-      }
+        completedAtIso,
+        completedBy,
+        notes: notes || null,
+      })
+      isAlreadyRecorded = ledgerResult === 'already_recorded'
     }
   } else {
     programProgression = { status: 'no_program' }
   }
 
   // ========================================================================
-  // STEP 7: Sync goals and achievements (non-blocking)
+  // STEP 6: Mark workout_logs completed (only after PDC is guaranteed, or standalone)
+  // ========================================================================
+  const { data: updatedLog, error: updateError } = await supabaseAdmin
+    .from('workout_logs')
+    .update({
+      completed_at: completedAtIso,
+      total_duration_minutes: totalDurationMinutes,
+      total_sets_completed: totalSetsCompleted,
+      total_reps_completed: totalRepsCompleted,
+      total_weight_lifted: totalWeightLifted,
+    })
+    .eq('id', workoutLogId)
+    .select()
+    .single()
+
+  if (updateError) {
+    console.error('[completeWorkoutService] Error updating workout_log:', updateError)
+    throw new Error(`Failed to update workout log: ${updateError.message}`)
+  }
+
+  if (isValidUuid(sessionId)) {
+    const { error: sessionUpdateError } = await supabaseAdmin
+      .from('workout_sessions')
+      .update({
+        status: 'completed',
+        completed_at: completedAtIso,
+      })
+      .eq('id', sessionId!)
+      .eq('client_id', clientId)
+
+    if (sessionUpdateError) {
+      console.warn('[completeWorkoutService] Failed to update session (non-blocking):', sessionUpdateError)
+    }
+  }
+
+  // ========================================================================
+  // STEP 7: Program progression (next slot / mark assignment completed)
+  // ========================================================================
+  if (
+    programAssignmentId &&
+    programDayAssignmentId &&
+    assignmentForProgression &&
+    allSlotsForProgression
+  ) {
+    const allSlots = allSlotsForProgression
+    const nextSlotResult = await getNextSlot(
+      supabaseAdmin,
+      programAssignmentId,
+      assignmentForProgression.program_id,
+    )
+    const lastSlot = allSlots[allSlots.length - 1]
+
+    const isComplete = nextSlotResult === null && allSlots.length > 0
+    const referenceSlot = nextSlotResult ?? lastSlot
+
+    if (isComplete) {
+      const doStatusUpdate = async () => {
+        const { error } = await supabaseAdmin
+          .from('program_assignments')
+          .update({ status: 'completed' })
+          .eq('id', programAssignmentId)
+        return error
+      }
+      let assignmentUpdateError = await doStatusUpdate()
+      if (assignmentUpdateError) {
+        assignmentUpdateError = await doStatusUpdate()
+        if (assignmentUpdateError) {
+          console.error(
+            '[completeWorkoutService] Failed to mark assignment completed after retry. program_assignment_id=',
+            programAssignmentId,
+            assignmentUpdateError
+          )
+        }
+      }
+    }
+
+    programProgression = {
+      status: isAlreadyRecorded ? 'already_recorded' : (isComplete ? 'program_completed' : 'advanced'),
+      currentWeekNumber: referenceSlot?.week_number,
+      currentDayNumber: referenceSlot?.day_number,
+      isCompleted: isComplete,
+      programAssignmentId,
+      programDayAssignmentId,
+    }
+  }
+
+  // ========================================================================
+  // STEP 8: Sync goals and achievements (non-blocking)
   // ========================================================================
   try {
     const { syncGoalsForClient } = await import('@/lib/goalSyncService')
