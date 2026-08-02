@@ -28,11 +28,13 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import {
   getProgramScheduleSlotsForAssignment,
+  getAssignmentSchedule,
   getCompletedSlots,
   getNextSlot,
   assertWeekUnlocked,
 } from './programStateService'
 import { resolveInstanceWeekForAssignment } from './programInstanceResolver'
+import { resolveFoundationCompletion } from './progression/foundationCompletion'
 
 // ============================================================================
 // INTERFACES
@@ -294,6 +296,7 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
 
   let assignmentForProgression: AssignmentRow | null = null
   let allSlotsForProgression: Awaited<ReturnType<typeof getProgramScheduleSlotsForAssignment>> | null = null
+  let totalWeeksForProgression: number | null = null
   let isAlreadyRecorded = false
 
   if (programAssignmentId && programDayAssignmentId) {
@@ -320,7 +323,8 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
         resolveInstanceWeekForAssignment(supabaseAdmin, programAssignmentId),
       ])
       allSlotsForProgression = allSlots
-      const totalWeeksCap = weekRes?.totalWeeks ?? null
+      totalWeeksForProgression = weekRes?.totalWeeks ?? null
+      const totalWeeksCap = totalWeeksForProgression
 
       // WEEK LOCK — reject BEFORE marking the log completed
       const targetSlot = allSlots.find(s => s.id === programDayAssignmentId)
@@ -430,15 +434,76 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
     allSlotsForProgression
   ) {
     const allSlots = allSlotsForProgression
-    const nextSlotResult = await getNextSlot(
-      supabaseAdmin,
-      programAssignmentId,
-      assignmentForProgression.program_id,
-    )
+    // Post-PDC ledger + schedule for position + foundation complete-check
+    const [nextSlotResult, completedSlotsPost, assignmentSchedule] = await Promise.all([
+      getNextSlot(
+        supabaseAdmin,
+        programAssignmentId,
+        assignmentForProgression.program_id,
+      ),
+      getCompletedSlots(supabaseAdmin, programAssignmentId),
+      getAssignmentSchedule(supabaseAdmin, programAssignmentId),
+    ])
     const lastSlot = allSlots[allSlots.length - 1]
-
-    const isComplete = nextSlotResult === null && allSlots.length > 0
     const referenceSlot = nextSlotResult ?? lastSlot
+
+    // Comparison only — fill-gap no longer controls the write
+    const fillGapComplete = nextSlotResult === null && allSlots.length > 0
+
+    // WRITE CONTROL: foundation in-scope completion → status='completed'
+    // Fail-safe: if foundation throws, leave assignment active (do not mark complete).
+    let isComplete = false
+    let inScopeDone = 0
+    let inScopeTotal = 0
+    try {
+      const foundationMath = resolveFoundationCompletion({
+        assignment: {
+          start_date: assignmentForProgression.start_date,
+          pause_accumulated_days: assignmentForProgression.pause_accumulated_days,
+          pause_status: assignmentForProgression.pause_status,
+          paused_at: assignmentForProgression.paused_at,
+          totalWeeks: totalWeeksForProgression ?? 0,
+        },
+        slots: assignmentSchedule.map((s) => ({
+          id: s.id,
+          week_number: s.week_number,
+          program_day: s.program_day,
+          is_optional: s.is_optional ?? false,
+          day_type: s.day_type ?? null,
+        })),
+        completions: completedSlotsPost.map((c) => ({
+          program_day_assignment_id: c.program_day_assignment_id,
+          notes: c.notes,
+        })),
+        tz: assignmentForProgression.timezone_snapshot ?? 'UTC',
+      })
+      inScopeDone = foundationMath.inScopeDone
+      inScopeTotal = foundationMath.inScopeTotal
+      isComplete =
+        foundationMath.inScopeTotal > 0 &&
+        foundationMath.inScopeDone === foundationMath.inScopeTotal
+      console.log(
+        '[WRITEPATH complete-check]',
+        'assignmentId:',
+        programAssignmentId,
+        'foundationComplete(WRITES):',
+        isComplete,
+        'fillGapWouldHave:',
+        fillGapComplete,
+        'inScopeDone:',
+        inScopeDone,
+        'inScopeTotal:',
+        inScopeTotal,
+      )
+    } catch (foundationErr) {
+      isComplete = false
+      console.error(
+        '[WRITEPATH complete-check] foundation failed — leaving assignment active (fail-safe):',
+        'assignmentId:',
+        programAssignmentId,
+        foundationErr,
+      )
+    }
 
     if (isComplete) {
       const doStatusUpdate = async () => {
