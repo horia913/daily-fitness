@@ -18,6 +18,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import WorkoutTemplateService from "@/lib/workoutTemplateService";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   COACH_PROGRAMS_LIST_QUERY_KEY,
@@ -549,7 +550,7 @@ export default function ProgramsDashboardContent() {
         ) : null}
       </div>
 
-      {showAssignModal ? (
+      <ModalPortal isOpen={showAssignModal}>
         <div className={styles.modalScrim}>
           <div className={`${styles.modalPanel} ${styles.modalPanelWide}`}>
             <div className={styles.modalHead}>
@@ -717,9 +718,11 @@ export default function ProgramsDashboardContent() {
             </div>
           </div>
         </div>
-      ) : null}
+      </ModalPortal>
 
-      {showReplaceConfirm && replaceConfirmList.length > 0 ? (
+      <ModalPortal
+        isOpen={showReplaceConfirm && replaceConfirmList.length > 0}
+      >
         <div className={`${styles.modalScrim} ${styles.modalScrimTop}`}>
           <div className={styles.modalPanel}>
             <div className={styles.modalHead}>
@@ -753,9 +756,9 @@ export default function ProgramsDashboardContent() {
             </div>
           </div>
         </div>
-      ) : null}
+      </ModalPortal>
 
-      {showDeleteModal && programToDelete ? (
+      <ModalPortal isOpen={Boolean(showDeleteModal && programToDelete)}>
         <div className={styles.modalScrim}>
           <div className={styles.modalPanel}>
             <div className={styles.modalHead}>
@@ -763,8 +766,8 @@ export default function ProgramsDashboardContent() {
             </div>
             <div className={styles.modalBody}>
               <p className={styles.modalCopy}>
-                Are you sure you want to delete &quot;{programToDelete.name}
-                &quot;? This action cannot be undone.
+                Are you sure you want to delete &quot;
+                {programToDelete?.name}&quot;? This action cannot be undone.
               </p>
               <label className={styles.confirmCheck}>
                 <input
@@ -798,7 +801,7 @@ export default function ProgramsDashboardContent() {
             </div>
           </div>
         </div>
-      ) : null}
+      </ModalPortal>
     </>
   );
 }

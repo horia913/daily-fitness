@@ -188,7 +188,7 @@
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: color-mix(in srgb, var(--fc-bg-deep) 72%, transparent);
+  background: color-mix(in srgb, var(--fc-bg-deep) 85%, transparent);
 }
 
 .modalScrimTop {
@@ -201,7 +201,8 @@
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  background: var(--fc-surface-card);
+  /* v5 float surface — solid page-black; --fc-surface-card is transparent under flat scope */
+  background: var(--fc-surface-float);
   border: 1px solid var(--fc-hairline);
   border-radius: 14px;
   overflow: hidden;
