@@ -339,14 +339,11 @@ export default function CoachClientDailyReview({
       })()
     : "";
 
+  // Lifetime in-scope completion % from summary (foundation); no week-ratio fallback.
   const programProgressDisplay =
     program?.programProgressPercent != null
       ? program.programProgressPercent
-      : program?.currentWeek != null &&
-          program?.durationWeeks != null &&
-          program.durationWeeks > 0
-        ? Math.min(100, Math.round((program.currentWeek / program.durationWeeks) * 100))
-        : null;
+      : null;
 
   const programStatusLabel = program
     ? program.behindOnWeeklyWorkouts

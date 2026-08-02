@@ -231,7 +231,11 @@ export default function ClientAnalyticsView({
             {overview.programProgress ? (
               <>
                 <p className="text-sm font-semibold fc-text-primary leading-tight">
-                  Week {overview.programProgress.weekNum} of {overview.programProgress.totalWeeks} ({overview.programProgress.pct}%)
+                  Week {overview.programProgress.weekNum} of{" "}
+                  {overview.programProgress.totalWeeks}
+                </p>
+                <p className="mt-1 text-xs fc-text-dim tabular-nums">
+                  {overview.programProgress.pct}% complete
                 </p>
                 <div className="mt-2 h-1.5 w-full rounded-full bg-transparent overflow-hidden">
                   <div

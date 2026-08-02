@@ -435,12 +435,8 @@ export async function fetchCoachAttentionSignalsBatch(
             nutritionAdherencePct: nutritionPct.get(clientId) ?? null,
             daysSinceLastCheckIn,
             prsLast7Days: prCount.get(clientId) ?? 0,
-            priorWeekMissedEntirely:
-              t.priorWeekScheduledCount > 0 &&
-              t.priorWeekCompletedCount === 0 &&
-              t.currentWeekCompletedCount === 0,
-            currentWeekBehindSchedule:
-              t.currentWeekCompletedCount < t.currentWeekScheduledPastCount,
+            priorWeekMissedEntirely: t.hasFullyMissedPastWeek === true,
+            currentWeekBehindSchedule: t.hasMissed === true,
           });
         } catch (e) {
           console.error(

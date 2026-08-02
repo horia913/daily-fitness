@@ -170,10 +170,8 @@ export function CoachClientProgramPauseMenu({
       trainingStatus: computeClientTrainingStatus({
         pauseStatus: "active",
         hasActiveProgram: client.hasActiveProgram,
-        priorWeekScheduledCount: client.priorWeekScheduledCount,
-        priorWeekCompletedCount: client.priorWeekCompletedCount,
-        currentWeekCompletedCount: client.currentWeekCompletedCount,
-        currentWeekScheduledPastCount: client.currentWeekScheduledPastCount,
+        hasMissed: client.hasMissed === true,
+        hasFullyMissedPastWeek: client.hasFullyMissedPastWeek === true,
       }),
       athleteScore: client.athleteScore
         ? { ...client.athleteScore, paused: false }

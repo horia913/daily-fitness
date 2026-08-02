@@ -290,6 +290,8 @@ export async function GET() {
         hasActiveProgram: training?.hasActiveProgram ?? false,
         activeProgramAssignmentId: training?.activeProgramAssignmentId ?? null,
         trainingStatus: training?.trainingStatus ?? 'no_program',
+        hasMissed: training?.hasMissed ?? false,
+        hasFullyMissedPastWeek: training?.hasFullyMissedPastWeek ?? false,
         priorWeekScheduledCount: training?.priorWeekScheduledCount ?? 0,
         priorWeekCompletedCount: training?.priorWeekCompletedCount ?? 0,
         currentWeekCompletedCount: training?.currentWeekCompletedCount ?? 0,

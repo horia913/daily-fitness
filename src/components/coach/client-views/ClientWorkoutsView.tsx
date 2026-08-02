@@ -33,6 +33,8 @@ import {
   resolveInstanceWeekForAssignment,
   isCoachSkipNote,
 } from '@/lib/programInstanceResolver'
+import { resolveFoundationCompletion } from '@/lib/progression/foundationCompletion'
+import { normalizeClientTimezone } from '@/lib/clientZonedCalendar'
 
 // Data mapping: workout_assignments -> workout_templates -> workout_set_entries ->
 // workout_set_entry_exercises -> protocol tables (workout_time_protocols,
@@ -99,6 +101,8 @@ type ActiveProgramSummary = {
   requiredCount: number
   completedCount: number
   durationWeeks: number | null
+  /** Lifetime in-scope completion % (foundation); not week-elapsed ratio */
+  programCompletionPct: number
   weekDays: WeekDayCell[]
   weekScheduleSlots: WeekScheduleSlot[]
 }
@@ -403,6 +407,7 @@ async function fetchCoachClientTrainingPage(
             completedCount: ap.completedRequiredThisWeek ?? 0,
             durationWeeks:
               ap.durationWeeks ?? null,
+            programCompletionPct: 0,
             weekDays: normalizeWeekDays(ap.weekDays),
             weekScheduleSlots: slots,
           }
@@ -491,8 +496,60 @@ async function fetchCoachClientTrainingPage(
             requiredCount: weekSlots.length,
             completedCount,
             durationWeeks: weekRes?.totalWeeks ?? null,
+            programCompletionPct: 0,
             weekDays,
             weekScheduleSlots,
+          }
+        }
+
+        // Lifetime foundation completion % (all PDAs + completions).
+        if (activeProgramSummary) {
+          const totalWeeks = activeProgramSummary.durationWeeks ?? 0
+          const [allPdasRes, allCompsRes, profileRes] = await Promise.all([
+            supabase
+              .from('program_day_assignments')
+              .select('id, week_number, program_day, is_optional, day_type')
+              .eq('program_assignment_id', active.id),
+            supabase
+              .from('program_day_completions')
+              .select('program_day_assignment_id, notes')
+              .eq('program_assignment_id', active.id),
+            supabase
+              .from('profiles')
+              .select('timezone')
+              .eq('id', clientId)
+              .maybeSingle(),
+          ])
+          const profileTz = (
+            profileRes.data as { timezone?: string | null } | null
+          )?.timezone
+          const tz = normalizeClientTimezone(
+            active.timezone_snapshot || profileTz,
+          )
+          const math = resolveFoundationCompletion({
+            assignment: {
+              start_date: active.start_date ?? null,
+              pause_accumulated_days: active.pause_accumulated_days,
+              pause_status: active.pause_status,
+              paused_at: active.paused_at,
+              totalWeeks,
+            },
+            slots: (allPdasRes.data ?? []) as Array<{
+              id: string
+              week_number: number
+              program_day: number | null
+              is_optional: boolean | null
+              day_type: string | null
+            }>,
+            completions: (allCompsRes.data ?? []) as Array<{
+              program_day_assignment_id: string | null
+              notes: string | null
+            }>,
+            tz,
+          })
+          activeProgramSummary = {
+            ...activeProgramSummary,
+            programCompletionPct: math.completionPct,
           }
         }
       }
@@ -941,18 +998,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
     return `${Math.round(n)} kg`
   }
 
-  const overallProgramPct =
-    activeProgramSummary &&
-    activeProgramSummary.durationWeeks != null &&
-    activeProgramSummary.durationWeeks > 0
-      ? Math.min(
-          100,
-          Math.round(
-            (activeProgramSummary.displayWeek / activeProgramSummary.durationWeeks) *
-              100
-          )
-        )
-      : 0
+  const overallProgramPct = activeProgramSummary?.programCompletionPct ?? 0
 
   const reviewWeekNumber =
     activeProgramSummary != null

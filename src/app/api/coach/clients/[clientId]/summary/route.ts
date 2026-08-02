@@ -34,6 +34,7 @@ import {
   loadInstanceWeekInputs,
   resolveInstanceProgramWeek,
 } from '@/lib/programInstanceResolver';
+import { resolveFoundationCompletion } from '@/lib/progression/foundationCompletion';
 
 async function assertCoachHasClient(
   coachId: string,
@@ -413,13 +414,44 @@ export async function GET(
       const cw = cwRes?.currentWeek ?? 1;
       const dw = cwRes?.totalWeeks ?? null;
       programTotalWeeks = dw;
+      // Lifetime in-scope completion % (not elapsed weeks / total weeks).
       let programProgressPercent: number | null = null;
-      if (
-        cw != null &&
-        dw != null &&
-        dw > 0
-      ) {
-        programProgressPercent = Math.min(100, Math.round((cw / dw) * 100));
+      if (dw != null && dw > 0) {
+        const [allPdasRes, allCompsRes] = await Promise.all([
+          supabaseAdmin
+            .from('program_day_assignments')
+            .select('id, week_number, program_day, is_optional, day_type')
+            .eq('program_assignment_id', pa.id),
+          supabaseAdmin
+            .from('program_day_completions')
+            .select('program_day_assignment_id, notes')
+            .eq('program_assignment_id', pa.id),
+        ]);
+        const completionTz = normalizeClientTimezone(
+          pa.timezone_snapshot || clientTz,
+        );
+        const math = resolveFoundationCompletion({
+          assignment: {
+            start_date: pa.start_date ?? null,
+            pause_accumulated_days: pa.pause_accumulated_days,
+            pause_status: pa.pause_status,
+            paused_at: pa.paused_at,
+            totalWeeks: dw,
+          },
+          slots: (allPdasRes.data ?? []) as Array<{
+            id: string;
+            week_number: number;
+            program_day: number | null;
+            is_optional: boolean | null;
+            day_type: string | null;
+          }>,
+          completions: (allCompsRes.data ?? []) as Array<{
+            program_day_assignment_id: string | null;
+            notes: string | null;
+          }>,
+          tz: completionTz,
+        });
+        programProgressPercent = math.completionPct;
       }
       const goal = weeklyProgress.goal;
       const cur = weeklyProgress.current;

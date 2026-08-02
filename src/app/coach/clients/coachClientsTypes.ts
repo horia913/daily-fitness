@@ -19,6 +19,9 @@ export interface Client {
   hasActiveProgram: boolean;
   activeProgramAssignmentId: string | null;
   trainingStatus: ClientTrainingStatusKind;
+  /** Foundation: any in-scope missed (list API). */
+  hasMissed?: boolean;
+  hasFullyMissedPastWeek?: boolean;
   priorWeekScheduledCount: number;
   priorWeekCompletedCount: number;
   currentWeekCompletedCount: number;

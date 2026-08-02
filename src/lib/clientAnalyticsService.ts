@@ -23,6 +23,7 @@ import {
 } from "./programInstanceResolver";
 import { fetchClientHabits } from "./habitTemplateService";
 import { normalizeClientTimezone } from "@/lib/clientZonedCalendar";
+import { resolveFoundationCompletion } from "@/lib/progression/foundationCompletion";
 
 const TODAY = new Date().toISOString().split("T")[0];
 const THIRTY_DAYS_AGO = new Date();
@@ -230,12 +231,12 @@ export async function getClientAnalytics(
 
   if (assignment?.id) {
     // Instance-keyed: schedule from program_day_assignments, completions by
-    // program_day_assignment_id; Week X of N + adherence from the canonical
-    // resolver (N = instance phases, coach-skip excluded from the denominator).
+    // program_day_assignment_id; Week X of N from resolver; % = foundation
+    // lifetime in-scope completion (not week-elapsed ratio).
     const [{ data: schedule }, { data: completions }, weekRes] = await Promise.all([
       supabase
         .from("program_day_assignments")
-        .select("id, week_number, is_optional")
+        .select("id, week_number, program_day, is_optional, day_type")
         .eq("program_assignment_id", assignment.id),
       supabase
         .from("program_day_completions")
@@ -247,14 +248,46 @@ export async function getClientAnalytics(
     const weekNum = weekRes?.currentWeek ?? 1;
     const totalWeeks = weekRes?.totalWeeks ?? 0;
 
+    const profileTz = (profileRes.data as { timezone?: string | null } | null)
+      ?.timezone;
+    const completionTz = resolveStatsTabTimezone(
+      assignment.timezone_snapshot,
+      profileTz,
+    );
+    const math = resolveFoundationCompletion({
+      assignment: {
+        start_date: assignment.start_date ?? null,
+        pause_accumulated_days: assignment.pause_accumulated_days,
+        pause_status: assignment.pause_status,
+        paused_at: assignment.paused_at,
+        totalWeeks,
+      },
+      slots: (schedule ?? []) as Array<{
+        id: string;
+        week_number: number;
+        program_day: number | null;
+        is_optional: boolean | null;
+        day_type: string | null;
+      }>,
+      completions: (completions ?? []) as Array<{
+        program_day_assignment_id: string | null;
+        notes: string | null;
+      }>,
+      tz: completionTz,
+    });
+
     programProgress = {
       weekNum,
       totalWeeks,
-      pct: totalWeeks > 0 ? Math.min(100, Math.round((weekNum / totalWeeks) * 100)) : 0,
+      pct: math.completionPct,
     };
 
     const slots = (schedule ?? []).map(
-      (s: { id: string; week_number: number; is_optional?: boolean | null }) => ({
+      (s: {
+        id: string;
+        week_number: number;
+        is_optional?: boolean | null;
+      }) => ({
         id: s.id,
         week_number: s.week_number,
         is_optional: s.is_optional ?? null,
