@@ -7,6 +7,12 @@ import { getActiveProgramAssignment } from "@/lib/programStateService";
 import { computeProgramAthleteScore } from "@/lib/athleteScoreScoringPure";
 import { getWorkoutAdherenceHistory } from "@/lib/workoutAdherenceHistoryService";
 import { batchAdherenceForWorkoutLogs } from "@/lib/coachClientSummaryServer";
+import {
+  addCalendarDaysYmd,
+  normalizeClientTimezone,
+  zonedCalendarDateString,
+  zonedDayInclusiveUtcBounds,
+} from "@/lib/clientZonedCalendar";
 
 export function getTier(score: number): AthleteScoreTierKey {
   if (score >= 90) return "beast_mode";
@@ -36,10 +42,19 @@ export async function calculateAthleteScore(
     return { skipped: true, reason: "paused" };
   }
 
-  const endYmd = new Date().toISOString().slice(0, 10);
-  const startDate = new Date(`${endYmd}T12:00:00Z`);
-  startDate.setUTCDate(startDate.getUTCDate() - 13);
-  const startYmd = startDate.toISOString().slice(0, 10);
+  // Rolling 14 client-local days (inclusive): today … today−13 in assignment/profile TZ.
+  let tzRaw = (assignment.timezone_snapshot ?? "").trim();
+  if (!tzRaw) {
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("timezone")
+      .eq("id", clientId)
+      .maybeSingle();
+    tzRaw = ((profile as { timezone?: string | null } | null)?.timezone ?? "").trim();
+  }
+  const tz = normalizeClientTimezone(tzRaw);
+  const endYmd = zonedCalendarDateString(new Date(), tz);
+  const startYmd = addCalendarDaysYmd(endYmd, -13);
 
   const history = await getWorkoutAdherenceHistory(clientId, {
     db: supabaseAdmin,
@@ -60,14 +75,17 @@ export async function calculateAthleteScore(
 
   const completionPct = Math.round((completed / scheduled) * 100);
 
+  const { startIso: windowStartIso } = zonedDayInclusiveUtcBounds(startYmd, tz);
+  const { endIso: windowEndIso } = zonedDayInclusiveUtcBounds(endYmd, tz);
+
   const { data: logRows, error: logsErr } = await supabaseAdmin
     .from("workout_logs")
     .select("id")
     .eq("client_id", clientId)
     .eq("program_assignment_id", assignment.id)
     .not("completed_at", "is", null)
-    .gte("completed_at", `${startYmd}T00:00:00.000Z`)
-    .lte("completed_at", `${endYmd}T23:59:59.999Z`);
+    .gte("completed_at", windowStartIso)
+    .lte("completed_at", windowEndIso);
 
   if (logsErr) {
     throw new Error(`Failed to load workout logs for execution score: ${logsErr.message}`);
