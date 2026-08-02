@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Check, ChevronDown } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
@@ -24,11 +24,33 @@ import {
   clientPhaseSecondaryLabel,
   formatPhaseWeekSpanLabel,
 } from "@/lib/clientInstancePhaseContext";
-import { isCoachSkipNote } from "@/lib/programInstanceResolver";
+import { isCoachSkipNote, instanceTotalWeeks } from "@/lib/programInstanceResolver";
 import type { WorkoutSetEntry } from "@/types/workoutSetEntries";
 import { fetchApi } from "@/lib/apiClient";
-import { instanceTotalWeeks } from "@/lib/programInstanceResolver";
+import {
+  normalizeClientTimezone,
+  zonedCalendarDateString,
+} from "@/lib/clientZonedCalendar";
+import {
+  getEffectiveToday,
+  getProgramWeekWindows,
+  getWorkoutStatus,
+  type PauseState,
+  type ProgramWeekWindow,
+  type WorkoutStatus,
+} from "@/lib/progression/weekWindows";
+import { resolveAdherenceTotalWeeks } from "@/lib/progression/foundationAdherenceDays";
+import { startProgramWorkout } from "@/lib/startProgramWorkout";
+import { useToast } from "@/components/ui/toast-provider";
 import styles from "./programDetailsV6.module.css";
+
+/** Assignment calendar context for foundation getWorkoutStatus. */
+type FoundationProgression = {
+  startDate: string;
+  totalWeeks: number;
+  timeZone: string;
+  pauses: PauseState;
+};
 
 /** Group hue palette (matches design/mockups/program-details-v6.html: blue · cyan · amber · purple). */
 const GROUP_HUES = [
@@ -64,6 +86,35 @@ interface DaySlot {
   scheduleNotes?: string | null;
   template: TemplatePreview | null;
   isRest: boolean;
+}
+
+function resolveDayFoundationStatus(
+  day: DaySlot,
+  completedIds: Set<string>,
+  skippedIds: Set<string>,
+  windows: ProgramWeekWindow[] | null,
+  progression: FoundationProgression | null,
+  effectiveTodayYmd: string | null,
+): WorkoutStatus | null {
+  if (day.isRest || !day.scheduleId || !windows || !progression || !effectiveTodayYmd) {
+    return null;
+  }
+  const isDone =
+    completedIds.has(day.scheduleId) || skippedIds.has(day.scheduleId);
+  return getWorkoutStatus(
+    {
+      weekNumber: day.weekNumber,
+      programDay: day.dayNumber,
+      isDone,
+    },
+    windows,
+    progression.startDate,
+    effectiveTodayYmd,
+  );
+}
+
+function isFoundationStartable(status: WorkoutStatus | null): boolean {
+  return status === "missed" || status === "due-today";
 }
 
 interface WeekSection {
@@ -406,11 +457,16 @@ function buildPhaseSections(
 function ProgramDetailsContent() {
   const params = useParams();
   const router = useRouter();
+  const { addToast } = useToast();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const [program, setProgram] = useState<Program | null>(null);
   const [phaseSections, setPhaseSections] = useState<PhaseSection[]>([]);
   /** program_day_assignment ids completed by the client (excludes coach-skips). */
   const [completedDayIds, setCompletedDayIds] = useState<Set<string>>(new Set());
+  /** Coach-skipped PDA ids — treated as dealt-with for status (not startable). */
+  const [skippedDayIds, setSkippedDayIds] = useState<Set<string>>(new Set());
+  const [foundationProgression, setFoundationProgression] =
+    useState<FoundationProgression | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   /** Absolute program week to expand by default (from /api/client/program-week when program matches). */
@@ -426,6 +482,8 @@ function ProgramDetailsContent() {
   const [blocksCache, setBlocksCache] = useState<Map<string, WorkoutSetEntry[]>>(new Map());
   const blocksCacheRef = useRef(blocksCache);
   blocksCacheRef.current = blocksCache;
+  const [isStarting, setIsStarting] = useState(false);
+  const [startingScheduleId, setStartingScheduleId] = useState<string | null>(null);
 
   const isValidUuid = (val: string) =>
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
@@ -465,11 +523,17 @@ function ProgramDetailsContent() {
           const programData = assignmentData.program as { id: string; name: string; description?: string };
           const assignmentId = assignmentData.id as string;
 
-          const [assignmentSlots, phases, completedSlots] = await Promise.all([
-            getAssignmentSchedule(supabase, assignmentId),
-            loadInstancePhases(supabase, assignmentId),
-            getCompletedSlots(supabase, assignmentId),
-          ]);
+          const [assignmentSlots, phases, completedSlots, profileRes] =
+            await Promise.all([
+              getAssignmentSchedule(supabase, assignmentId),
+              loadInstancePhases(supabase, assignmentId),
+              getCompletedSlots(supabase, assignmentId),
+              supabase
+                .from("profiles")
+                .select("timezone")
+                .eq("id", user.id)
+                .maybeSingle(),
+            ]);
 
           setCompletedDayIds(
             new Set(
@@ -478,8 +542,46 @@ function ProgramDetailsContent() {
                 .map((c) => c.program_day_assignment_id),
             ),
           );
+          setSkippedDayIds(
+            new Set(
+              completedSlots
+                .filter((c) => isCoachSkipNote(c.notes))
+                .map((c) => c.program_day_assignment_id),
+            ),
+          );
 
-          const derivedTotalWeeks = instanceTotalWeeks(phases);
+          const derivedTotalWeeks = resolveAdherenceTotalWeeks(
+            instanceTotalWeeks(phases),
+            assignmentSlots,
+          );
+          const assignmentRow = assignmentData as {
+            start_date?: string | null;
+            pause_accumulated_days?: number | null;
+            pause_status?: string | null;
+            paused_at?: string | null;
+            timezone_snapshot?: string | null;
+          };
+          const profileTz = (
+            profileRes.data as { timezone?: string | null } | null
+          )?.timezone;
+          const tz = normalizeClientTimezone(
+            assignmentRow.timezone_snapshot || profileTz,
+          );
+          const startDate = (assignmentRow.start_date ?? "").slice(0, 10);
+          if (startDate && derivedTotalWeeks > 0) {
+            setFoundationProgression({
+              startDate,
+              totalWeeks: derivedTotalWeeks,
+              timeZone: tz,
+              pauses: {
+                accumulatedDays: assignmentRow.pause_accumulated_days,
+                pauseStatus: assignmentRow.pause_status,
+                pausedAt: assignmentRow.paused_at,
+              },
+            });
+          } else {
+            setFoundationProgression(null);
+          }
 
           setProgram({
             id: programData.id,
@@ -618,6 +720,92 @@ function ProgramDetailsContent() {
   const progressNavPhaseKey = useMemo(
     () => sectionNavKeyForWeek(phaseSections, clientOutlineWeek),
     [phaseSections, clientOutlineWeek],
+  );
+
+  const { foundationWindows, effectiveTodayYmd } = useMemo(() => {
+    if (
+      !foundationProgression?.startDate ||
+      foundationProgression.totalWeeks <= 0 ||
+      !foundationProgression.timeZone
+    ) {
+      return {
+        foundationWindows: null as ProgramWeekWindow[] | null,
+        effectiveTodayYmd: null as string | null,
+      };
+    }
+    const win = getProgramWeekWindows(
+      foundationProgression.startDate,
+      foundationProgression.totalWeeks,
+      foundationProgression.timeZone,
+      foundationProgression.pauses,
+    );
+    const wallToday = zonedCalendarDateString(
+      new Date(),
+      foundationProgression.timeZone,
+    );
+    return {
+      foundationWindows: win,
+      effectiveTodayYmd: getEffectiveToday(
+        wallToday,
+        foundationProgression.timeZone,
+        foundationProgression.pauses,
+      ),
+    };
+  }, [foundationProgression]);
+
+  const handleStartWorkout = useCallback(
+    async (scheduleId: string) => {
+      if (isStarting) return;
+      setIsStarting(true);
+      setStartingScheduleId(scheduleId);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15_000);
+      try {
+        const result = await startProgramWorkout({
+          programDayAssignmentId: scheduleId,
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        if (!result.ok) {
+          if (result.code === "WEEK_LOCKED") {
+            addToast({
+              title: result.message || "Complete the current week first.",
+              variant: "destructive",
+            });
+          } else if (result.code === "ALREADY_COMPLETED") {
+            addToast({
+              title:
+                result.message ||
+                result.error ||
+                "This workout is already completed.",
+              variant: "destructive",
+            });
+            void loadProgramDetails(id as string);
+          } else if (result.code === "TIMEOUT") {
+            addToast({
+              title: "Request timed out. Please try again.",
+              variant: "destructive",
+            });
+          } else {
+            addToast({
+              title: result.message || result.error || "Could not start workout.",
+              variant: "destructive",
+            });
+          }
+        }
+      } catch (err) {
+        clearTimeout(timeout);
+        console.error("Error starting workout from program details:", err);
+        addToast({
+          title: "Could not start workout. Check your connection.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsStarting(false);
+        setStartingScheduleId(null);
+      }
+    },
+    [addToast, id, isStarting, loadProgramDetails],
   );
 
   const highlightedNavPhaseKey =
@@ -960,14 +1148,28 @@ function ProgramDetailsContent() {
                                   !!day.templateId &&
                                   loadingTemplates.has(dayLoadKey);
                                 const cachedBlocks = blocksCache.get(dayLoadKey);
+                                const foundationStatus = resolveDayFoundationStatus(
+                                  day,
+                                  completedDayIds,
+                                  skippedDayIds,
+                                  foundationWindows,
+                                  foundationProgression,
+                                  effectiveTodayYmd,
+                                );
                                 const isDone =
-                                  !!day.scheduleId &&
-                                  completedDayIds.has(day.scheduleId);
-                                /* Missed = not done, non-optional, and its week is behind the current week. */
-                                const isMissed =
-                                  !isDone &&
-                                  !day.isOptional &&
-                                  weekNumber < clientOutlineWeek;
+                                  foundationStatus === "completed" ||
+                                  (!!day.scheduleId &&
+                                    completedDayIds.has(day.scheduleId));
+                                const isMissed = foundationStatus === "missed";
+                                const isDueToday =
+                                  foundationStatus === "due-today";
+                                const canStart =
+                                  isFoundationStartable(foundationStatus) &&
+                                  Boolean(day.scheduleId) &&
+                                  Boolean(day.templateId);
+                                const isStartingThis =
+                                  isStarting &&
+                                  startingScheduleId === day.scheduleId;
 
                                 const workoutName =
                                   day.template?.name ?? "Workout";
@@ -1012,6 +1214,36 @@ function ProgramDetailsContent() {
                                           <DayRowSubtitle day={day} />
                                         </div>
                                       </div>
+                                      {canStart ? (
+                                        <button
+                                          type="button"
+                                          className={styles.dayStart}
+                                          disabled={isStartingThis}
+                                          aria-busy={isStartingThis}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (day.scheduleId) {
+                                              void handleStartWorkout(
+                                                day.scheduleId,
+                                              );
+                                            }
+                                          }}
+                                        >
+                                          {isStartingThis ? (
+                                            <>
+                                              <Loader2
+                                                className="h-3.5 w-3.5 animate-spin"
+                                                aria-hidden
+                                              />
+                                              Starting…
+                                            </>
+                                          ) : isMissed ? (
+                                            "Start missed"
+                                          ) : (
+                                            "Start"
+                                          )}
+                                        </button>
+                                      ) : null}
                                       <Check
                                         className={cn(
                                           styles.dayCheck,
@@ -1019,7 +1251,9 @@ function ProgramDetailsContent() {
                                             ? styles.checkDone
                                             : isMissed
                                               ? styles.checkMissed
-                                              : styles.checkUpcoming,
+                                              : isDueToday
+                                                ? styles.checkDueToday
+                                                : styles.checkUpcoming,
                                         )}
                                         strokeWidth={isDone || isMissed ? 2.5 : 2}
                                         aria-label={
@@ -1027,7 +1261,9 @@ function ProgramDetailsContent() {
                                             ? "Completed"
                                             : isMissed
                                               ? "Missed"
-                                              : "Not done yet"
+                                              : isDueToday
+                                                ? "Due today"
+                                                : "Not done yet"
                                         }
                                       />
                                       <ChevronDown
