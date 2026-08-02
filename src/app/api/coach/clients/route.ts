@@ -201,36 +201,6 @@ export async function GET() {
       profilesById,
     )
 
-    const todayYmd = new Date().toISOString().slice(0, 10)
-    const activeAssignmentIds = [...new Set(
-      [...trainingMap.values()]
-        .map((t) => t.activeProgramAssignmentId)
-        .filter((id): id is string => typeof id === 'string' && id.length > 0),
-    )]
-
-    const nextSessionByClient = new Map<string, string>()
-    if (activeAssignmentIds.length > 0) {
-      const { data: nextRows, error: nextErr } = await scoreSupabase
-        .from('workout_assignments')
-        .select('client_id, scheduled_date, assigned_date')
-        .in('program_assignment_id', activeAssignmentIds)
-        .is('completed_at', null)
-        .or(`scheduled_date.gte.${todayYmd},and(scheduled_date.is.null,assigned_date.gte.${todayYmd})`)
-        .order('scheduled_date', { ascending: true, nullsFirst: false })
-        .order('assigned_date', { ascending: true, nullsFirst: false })
-
-      if (nextErr) {
-        console.error('[coach/clients] next workout_assignments:', nextErr.message)
-      } else {
-        for (const row of nextRows ?? []) {
-          const clientId = row.client_id as string
-          if (nextSessionByClient.has(clientId)) continue
-          const nextDate = (row.scheduled_date as string | null) ?? (row.assigned_date as string | null)
-          if (nextDate) nextSessionByClient.set(clientId, nextDate.slice(0, 10))
-        }
-      }
-    }
-
     const [mealPlanNameByClient, attentionSignals, notesRes] = await Promise.all([
       fetchActiveMealPlanNamesByClient(scoreSupabase, clientIds),
       fetchCoachAttentionSignalsBatch(scoreSupabase, clientIds, profilesById),
@@ -285,7 +255,7 @@ export async function GET() {
         athleteScore,
         mealPlanName: mealPlanNameByClient.get(row.client_id) ?? null,
         scoreIsStale,
-        nextSessionDate: nextSessionByClient.get(row.client_id) ?? null,
+        nextSessionDate: training?.nextSessionDate ?? null,
         pauseStatus: training?.pauseStatus ?? 'active',
         hasActiveProgram: training?.hasActiveProgram ?? false,
         activeProgramAssignmentId: training?.activeProgramAssignmentId ?? null,

@@ -8,9 +8,12 @@ import {
   normalizeClientTimezone,
   zonedCalendarDateString,
 } from "@/lib/clientZonedCalendar";
-import { instanceTotalWeeks } from "@/lib/programInstanceResolver";
+import { instanceTotalWeeks, isCoachSkipNote } from "@/lib/programInstanceResolver";
 import { resolveAdherenceTotalWeeks } from "@/lib/progression/foundationAdherenceDays";
 import { countFoundationMissed } from "@/lib/progression/countFoundationMissed";
+import { resolveNextDue } from "@/lib/progression/resolveNextDue";
+import { getWorkoutDate } from "@/lib/progression/weekWindows";
+import type { WorkoutRef } from "@/lib/progression/weekWindows";
 
 export type ClientTrainingStatusKind =
   | "on_track"
@@ -35,6 +38,10 @@ export type CoachClientTrainingListPayload = {
   currentWeekCompletedCount: number;
   currentWeekScheduledPastCount: number;
   trainingStatus: ClientTrainingStatusKind;
+  /** Foundation next-due calendar YMD (null if none today-or-future) */
+  nextSessionDate: string | null;
+  /** Foundation next-due week number (for debug / callers); null if none */
+  nextDueWeekNumber: number | null;
 };
 
 export function computeClientTrainingStatus(fields: {
@@ -71,6 +78,8 @@ export async function fetchCoachClientListTrainingPayload(
     currentWeekCompletedCount: 0,
     currentWeekScheduledPastCount: 0,
     trainingStatus: "no_program",
+    nextSessionDate: null,
+    nextDueWeekNumber: null,
   });
 
   for (const id of clientIds) {
@@ -125,7 +134,7 @@ export async function fetchCoachClientListTrainingPayload(
     db
       .from("program_day_assignments")
       .select(
-        "id, program_assignment_id, week_number, program_day, is_optional, day_type",
+        "id, program_assignment_id, week_number, program_day, is_optional, day_type, workout_template_id, program_instance_workout_id",
       )
       .in("program_assignment_id", assignmentIds),
     db
@@ -155,6 +164,8 @@ export async function fetchCoachClientListTrainingPayload(
     program_day: number | null;
     is_optional: boolean | null;
     day_type: string | null;
+    workout_template_id: string | null;
+    program_instance_workout_id: string | null;
   };
   type CompRow = {
     program_assignment_id: string;
@@ -239,6 +250,45 @@ export async function fetchCoachClientListTrainingPayload(
     payload.currentWeekScheduledPastCount = missed.currentWeekScheduledPastCount;
     payload.currentWeekCompletedCount = missed.currentWeekCompletedCount;
     payload.trainingStatus = computeClientTrainingStatus(payload);
+
+    // Foundation next-due date (same resolveNextDue as loadFoundationNextDueForAssignment).
+    const allSlots = slotsByAssignment.get(assignment.id) ?? [];
+    const comps = compsByAssignment.get(assignment.id) ?? [];
+    const doneIds = new Set(
+      comps
+        .filter(
+          (c) =>
+            !isCoachSkipNote(c.notes) && Boolean(c.program_day_assignment_id),
+        )
+        .map((c) => c.program_day_assignment_id as string),
+    );
+    const workouts: WorkoutRef[] = allSlots
+      .filter((s) => (s.day_type ?? "").toLowerCase() !== "rest")
+      .filter((s) => Boolean(s.workout_template_id || s.program_instance_workout_id))
+      .map((s) => ({
+        id: s.id,
+        weekNumber: Number(s.week_number) || 1,
+        programDay: Number(s.program_day) || 1,
+        isDone: doneIds.has(s.id),
+      }));
+    const totalWeeks = totalWeeksByAssignment.get(assignment.id) ?? 0;
+    const { nextDue, windows } = resolveNextDue({
+      startDate: assignment.start_date,
+      totalWeeks,
+      timeZone: tz,
+      pauses: {
+        accumulatedDays: assignment.pause_accumulated_days,
+        pauseStatus: assignment.pause_status,
+        pausedAt: assignment.paused_at,
+      },
+      workouts,
+      actualTodayYmd: wallTodayYmd,
+    });
+    if (nextDue) {
+      const date = getWorkoutDate(nextDue.weekNumber, nextDue.programDay, windows);
+      payload.nextSessionDate = date;
+      payload.nextDueWeekNumber = nextDue.weekNumber;
+    }
   }
 
   return out;
