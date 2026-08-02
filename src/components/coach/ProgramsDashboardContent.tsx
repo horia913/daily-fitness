@@ -41,7 +41,16 @@ import {
   formatPeriodizationListLabel,
   programCollectionHue,
 } from "@/lib/programs/programListDisplayUtils";
+import {
+  normalizeClientTimezone,
+  zonedCalendarDateString,
+} from "@/lib/clientZonedCalendar";
 import styles from "@/components/coach/programs/coachProgramsWorkspace.module.css";
+
+/** YYYY-MM-DD "today" in an IANA zone (falls back to UTC). */
+function todayYmdForTimezone(tz: string | null | undefined): string {
+  return zonedCalendarDateString(new Date(), normalizeClientTimezone(tz));
+}
 
 type Program = CoachProgramListRow & {
   difficulty_level: "beginner" | "intermediate" | "advanced" | "athlete";
@@ -68,7 +77,7 @@ function asDashboardProgram(row: CoachProgramListRow): Program {
 
 export default function ProgramsDashboardContent() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const queryClient = useQueryClient();
   const { addToast } = useToast();
 
@@ -84,8 +93,8 @@ export default function ProgramsDashboardContent() {
   const [replaceConfirmList, setReplaceConfirmList] = useState<
     { client_id: string; program_name: string }[]
   >([]);
-  const [assignStartDate, setAssignStartDate] = useState<string>(
-    new Date().toISOString().split("T")[0],
+  const [assignStartDate, setAssignStartDate] = useState<string>(() =>
+    todayYmdForTimezone(profile?.timezone),
   );
   const [assignNotes, setAssignNotes] = useState<string>("");
   const [assignProgressionMode, setAssignProgressionMode] = useState<
@@ -144,7 +153,7 @@ export default function ProgramsDashboardContent() {
       setAssignProgramId(programId);
       setSelectedClients([]);
       setAssignNotes("");
-      setAssignStartDate(new Date().toISOString().split("T")[0]);
+      setAssignStartDate(todayYmdForTimezone(profile?.timezone));
       setClientSearchQuery("");
       setShowAssignModal(true);
       try {
@@ -162,7 +171,7 @@ export default function ProgramsDashboardContent() {
             .filter(Boolean);
           const { data: profilesData } = await supabase
             .from("profiles")
-            .select("id, first_name, last_name, email")
+            .select("id, first_name, last_name, email, timezone")
             .in("id", profileIds);
 
           const merged = clientsData.map((client) => ({
@@ -179,7 +188,7 @@ export default function ProgramsDashboardContent() {
         setClients([]);
       }
     },
-    [coachId],
+    [coachId, profile?.timezone],
   );
 
   const clientLabel = useCallback(
@@ -579,16 +588,28 @@ export default function ProgramsDashboardContent() {
                       type="checkbox"
                       checked={selectedClients.includes(client.client_id)}
                       onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedClients([
-                            ...selectedClients,
-                            client.client_id,
-                          ]);
-                        } else {
-                          setSelectedClients(
-                            selectedClients.filter(
+                        const next = e.target.checked
+                          ? [...selectedClients, client.client_id]
+                          : selectedClients.filter(
                               (id) => id !== client.client_id,
+                            );
+                        setSelectedClients(next);
+                        // Default start date: single client → their TZ today; else coach TZ.
+                        if (next.length === 1) {
+                          const row = clients.find(
+                            (c) => c.client_id === next[0],
+                          );
+                          const clientTz = (
+                            row?.profiles as { timezone?: string | null } | null
+                          )?.timezone;
+                          setAssignStartDate(
+                            todayYmdForTimezone(
+                              clientTz || profile?.timezone,
                             ),
+                          );
+                        } else {
+                          setAssignStartDate(
+                            todayYmdForTimezone(profile?.timezone),
                           );
                         }
                       }}
