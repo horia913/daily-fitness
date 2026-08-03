@@ -34,6 +34,7 @@ import {
   isCoachSkipNote,
 } from '@/lib/programInstanceResolver'
 import { resolveFoundationCompletion } from '@/lib/progression/foundationCompletion'
+import { loadFoundationWeekForAssignment } from '@/lib/progression/resolveFoundationWeek'
 import { normalizeClientTimezone } from '@/lib/clientZonedCalendar'
 
 // Data mapping: workout_assignments -> workout_templates -> workout_set_entries ->
@@ -150,6 +151,15 @@ function normalizeWeekDays(raw: unknown): WeekDayCell[] {
     }
   }
   return base
+}
+
+function weekDaysFromScheduleSlots(slots: WeekScheduleSlot[]): WeekDayCell[] {
+  return Array.from({ length: 7 }, (_, dow) => {
+    const daySlots = slots.filter((s) => s.dayOfWeek === dow && !s.isOptional)
+    const hasSlot = daySlots.length > 0
+    const done = hasSlot && daySlots.every((s) => s.isCompleted)
+    return { dow, hasSlot, done }
+  })
 }
 
 const SCHEDULE_DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
@@ -385,12 +395,53 @@ async function fetchCoachClientTrainingPage(
           ap.assignmentId === active.id &&
           ap.programId === active.program_id
 
+        const durationHint =
+          (typeof ap?.durationWeeks === 'number' && ap.durationWeeks > 0
+            ? ap.durationWeeks
+            : null) ??
+          (typeof active.workout_programs?.duration_weeks === 'number'
+            ? active.workout_programs.duration_weeks
+            : undefined)
+
+        const foundation = await loadFoundationWeekForAssignment(
+          supabase,
+          {
+            id: active.id,
+            client_id: clientId,
+            start_date: active.start_date ?? null,
+            pause_accumulated_days: active.pause_accumulated_days,
+            pause_status: active.pause_status,
+            paused_at: active.paused_at,
+            timezone_snapshot: active.timezone_snapshot,
+          },
+          {
+            totalWeeks:
+              durationHint != null && durationHint > 0
+                ? durationHint
+                : undefined,
+          },
+        )
+
         if (rpcMatch) {
-          const dw = ap.displayWeek ?? 1
-          let slots = parseWeekSchedule(ap.weekSchedule)
+          const elapsedDw = ap.displayWeek ?? 1
+          const dw = foundation?.foundationWeek ?? elapsedDw
+          const weekChanged =
+            foundation?.foundationWeek != null &&
+            foundation.foundationWeek !== elapsedDw
+          let slots = weekChanged
+            ? []
+            : parseWeekSchedule(ap.weekSchedule)
           if (slots.length === 0) {
             slots = await fetchWeekScheduleSlotsClient(active.id, dw)
           }
+          const requiredCount =
+            foundation?.weeklyProgress?.goal ??
+            (weekChanged ? slots.filter((s) => !s.isOptional).length : ap.requiredSlotsThisWeek ?? 0)
+          const completedCount =
+            foundation?.weeklyProgress?.current ??
+            (weekChanged
+              ? slots.filter((s) => !s.isOptional && s.isCompleted).length
+              : ap.completedRequiredThisWeek ?? 0)
           activeProgramSummary = {
             assignmentId: active.id,
             programId: active.program_id,
@@ -403,17 +454,19 @@ async function fetchCoachClientTrainingPage(
             coachUnlockedWeek:
               ap.coachUnlockedWeek ?? null,
             displayWeek: dw,
-            requiredCount: ap.requiredSlotsThisWeek ?? 0,
-            completedCount: ap.completedRequiredThisWeek ?? 0,
+            requiredCount,
+            completedCount,
             durationWeeks:
-              ap.durationWeeks ?? null,
+              foundation?.totalWeeks ?? ap.durationWeeks ?? null,
             programCompletionPct: 0,
-            weekDays: normalizeWeekDays(ap.weekDays),
+            weekDays: weekChanged
+              ? weekDaysFromScheduleSlots(slots)
+              : normalizeWeekDays(ap.weekDays),
             weekScheduleSlots: slots,
           }
         } else {
           // Instance-keyed: schedule from program_day_assignments, completions by
-          // program_day_assignment_id; Week X of N from the canonical resolver.
+          // program_day_assignment_id; Week X of N from foundation Mon–Sun.
           const [schedRes, compRes, weekRes] = await Promise.all([
             supabase
               .from('program_day_assignments')
@@ -427,7 +480,8 @@ async function fetchCoachClientTrainingPage(
           ])
 
           const mode = active.progression_mode ?? 'auto'
-          const displayWeek = weekRes?.currentWeek ?? 1
+          const displayWeek =
+            foundation?.foundationWeek ?? weekRes?.currentWeek ?? 1
 
           const schedule = (schedRes.data || []) as {
             id: string
@@ -462,9 +516,11 @@ async function fetchCoachClientTrainingPage(
               )
               .map((c) => c.program_day_assignment_id as string)
           )
-          const completedCount = weekSlots.filter((s) =>
-            completedIds.has(s.id)
-          ).length
+          const completedCount =
+            foundation?.weeklyProgress?.current ??
+            weekSlots.filter((s) => completedIds.has(s.id)).length
+          const requiredCount =
+            foundation?.weeklyProgress?.goal ?? weekSlots.length
 
           const requiredByDay: Record<number, string[]> = {}
           for (const s of weekSlots) {
@@ -493,9 +549,10 @@ async function fetchCoachClientTrainingPage(
             progressionMode: mode,
             coachUnlockedWeek: null,
             displayWeek,
-            requiredCount: weekSlots.length,
+            requiredCount,
             completedCount,
-            durationWeeks: weekRes?.totalWeeks ?? null,
+            durationWeeks:
+              foundation?.totalWeeks ?? weekRes?.totalWeeks ?? null,
             programCompletionPct: 0,
             weekDays,
             weekScheduleSlots,

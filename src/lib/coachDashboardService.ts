@@ -10,6 +10,8 @@ import {
   resolveInstanceWeeksForAssignments,
   isCoachSkipNote,
 } from '@/lib/programInstanceResolver';
+import { normalizeClientTimezone } from '@/lib/clientZonedCalendar';
+import { resolveFoundationCurrentWeek } from '@/lib/progression/resolveFoundationWeek';
 
 /** Compute program end date from start_date + duration_weeks (program_assignments has no end_date column). */
 function computeProgramEndDate(start_date: string | null, duration_weeks: number | null): string | null {
@@ -267,13 +269,35 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
     ]);
 
     const programNameById = new Map((programNameRows || []).map((p: { id: string; name: string }) => [p.id, p.name]));
-    // Canonical Week X of N per assignment (client tz, N = instance phases).
+    // Week X of N: totalWeeks from instance resolver; current week from foundation
+    // Mon–Sun (fallback: elapsed÷7 from the same resolver).
     const instanceWeekByAssignment = await resolveInstanceWeeksForAssignments(
       db,
       programRows.map((r) => r.id),
     );
     const currentWeekByAssignment = new Map<string, number>();
-    for (const [aid, wk] of instanceWeekByAssignment) currentWeekByAssignment.set(aid, wk.currentWeek);
+    for (const [aid, wk] of instanceWeekByAssignment) {
+      currentWeekByAssignment.set(aid, wk.currentWeek);
+    }
+    for (const row of firstProgramByClient.values()) {
+      const totalWeeks = instanceWeekByAssignment.get(row.id)?.totalWeeks ?? 0;
+      const foundationWeek =
+        totalWeeks > 0
+          ? resolveFoundationCurrentWeek({
+              startDate: row.start_date ?? null,
+              totalWeeks,
+              timeZone: normalizeClientTimezone(row.timezone_snapshot) || 'UTC',
+              pauses: {
+                accumulatedDays: row.pause_accumulated_days,
+                pauseStatus: row.pause_status,
+                pausedAt: row.paused_at,
+              },
+            })
+          : null;
+      if (foundationWeek != null) {
+        currentWeekByAssignment.set(row.id, foundationWeek);
+      }
+    }
 
     const mealDaysByClient = new Map<string, Set<string>>();
     for (const row of mealCompletionRows || []) {

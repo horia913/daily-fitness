@@ -24,6 +24,11 @@ import {
 import { fetchClientHabits } from "./habitTemplateService";
 import { normalizeClientTimezone } from "@/lib/clientZonedCalendar";
 import { resolveFoundationCompletion } from "@/lib/progression/foundationCompletion";
+import {
+  loadFoundationWeekForAssignment,
+  resolveFoundationCurrentWeek,
+} from "@/lib/progression/resolveFoundationWeek";
+import type { PauseState } from "@/lib/progression/weekWindows";
 
 const TODAY = new Date().toISOString().split("T")[0];
 const THIRTY_DAYS_AGO = new Date();
@@ -120,7 +125,9 @@ export async function fetchClientProgramAdherenceSnapshot(
 ): Promise<ClientProgramAdherenceSnapshot> {
   const { data: assignment } = await supabase
     .from("program_assignments")
-    .select("id")
+    .select(
+      "id, client_id, start_date, pause_accumulated_days, pause_status, paused_at, timezone_snapshot",
+    )
     .eq("client_id", clientId)
     .eq("status", "active")
     .maybeSingle();
@@ -129,6 +136,26 @@ export async function fetchClientProgramAdherenceSnapshot(
     return { adherencePct: null, completedThisWeek: 0, scheduledThisWeek: 0 };
   }
 
+  const foundation = await loadFoundationWeekForAssignment(supabase, {
+    id: assignment.id,
+    client_id: assignment.client_id,
+    start_date: assignment.start_date ?? null,
+    pause_accumulated_days: assignment.pause_accumulated_days ?? 0,
+    pause_status: assignment.pause_status ?? null,
+    paused_at: assignment.paused_at ?? null,
+    timezone_snapshot: assignment.timezone_snapshot ?? null,
+  });
+
+  if (foundation?.weeklyProgress) {
+    const { current, goal } = foundation.weeklyProgress;
+    return {
+      scheduledThisWeek: goal,
+      completedThisWeek: current,
+      adherencePct: goal > 0 ? Math.round((current / goal) * 100) : null,
+    };
+  }
+
+  // Fallback: elapsed÷7 if foundation cannot compute
   const [{ data: schedule }, { data: completions }, weekRes] = await Promise.all([
     supabase
       .from("program_day_assignments")
@@ -231,7 +258,7 @@ export async function getClientAnalytics(
 
   if (assignment?.id) {
     // Instance-keyed: schedule from program_day_assignments, completions by
-    // program_day_assignment_id; Week X of N from resolver; % = foundation
+    // program_day_assignment_id; Week X of N from foundation Mon–Sun; % = foundation
     // lifetime in-scope completion (not week-elapsed ratio).
     const [{ data: schedule }, { data: completions }, weekRes] = await Promise.all([
       supabase
@@ -245,15 +272,29 @@ export async function getClientAnalytics(
       resolveInstanceWeekForAssignment(supabase, assignment.id),
     ]);
 
-    const weekNum = weekRes?.currentWeek ?? 1;
     const totalWeeks = weekRes?.totalWeeks ?? 0;
-
     const profileTz = (profileRes.data as { timezone?: string | null } | null)
       ?.timezone;
     const completionTz = resolveStatsTabTimezone(
       assignment.timezone_snapshot,
       profileTz,
     );
+    const pauses: PauseState = {
+      accumulatedDays: assignment.pause_accumulated_days,
+      pauseStatus: assignment.pause_status,
+      pausedAt: assignment.paused_at,
+    };
+    const foundationWeek =
+      totalWeeks > 0
+        ? resolveFoundationCurrentWeek({
+            startDate: assignment.start_date ?? null,
+            totalWeeks,
+            timeZone: completionTz,
+            pauses,
+          })
+        : null;
+    const weekNum = foundationWeek ?? weekRes?.currentWeek ?? 1;
+
     const math = resolveFoundationCompletion({
       assignment: {
         start_date: assignment.start_date ?? null,

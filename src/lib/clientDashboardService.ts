@@ -5,8 +5,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from './supabase';
-import { computeCurrentProgramWeekForAssignment } from '@/lib/programWeekCalendar';
-import { resolveInstanceWeekForAssignment } from '@/lib/programInstanceResolver';
+import { loadFoundationWeekForAssignment } from '@/lib/progression/resolveFoundationWeek';
 
 export interface DashboardStats {
   streak: number;
@@ -14,64 +13,6 @@ export interface DashboardStats {
     current: number;
     goal: number;
   };
-}
-
-/** Matches get_client_dashboard Option C: active program + program-linked sessions only. */
-interface ActiveProgramCtx {
-  paId: string;
-  programId: string;
-  ppWeek: number;
-}
-
-async function getActiveProgramCtx(
-  sb: SupabaseClient,
-  clientId: string
-): Promise<ActiveProgramCtx | null> {
-  const { data: pa, error: paErr } = await sb
-    .from('program_assignments')
-    .select('id, client_id, program_id, start_date, pause_accumulated_days, pause_status, paused_at, timezone_snapshot')
-    .eq('client_id', clientId)
-    .eq('status', 'active')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (paErr || !pa?.id || !pa.program_id) return null;
-
-  const { data: profile } = await sb
-    .from('profiles')
-    .select('timezone')
-    .eq('id', clientId)
-    .maybeSingle();
-  const weekRes = await resolveInstanceWeekForAssignment(sb, pa.id);
-  const totalWeeksCap = weekRes?.totalWeeks ?? null;
-  const { week: calendarWeek } = computeCurrentProgramWeekForAssignment(
-    {
-      start_date: pa.start_date ?? null,
-      pause_accumulated_days: pa.pause_accumulated_days ?? 0,
-      pause_status: pa.pause_status ?? null,
-      paused_at: pa.paused_at ?? null,
-      timezone_snapshot: pa.timezone_snapshot ?? null,
-    },
-    (profile as { timezone?: string | null } | null)?.timezone ?? 'UTC',
-    { totalWeeksCap },
-  );
-
-  return {
-    paId: pa.id,
-    programId: pa.program_id,
-    ppWeek: calendarWeek,
-  };
-}
-
-function resolveIndexedWeekNumber(
-  distinctWeekNumbers: number[],
-  currentWeekNumberFromProgress: number
-): number | null {
-  if (!distinctWeekNumbers.length) return null;
-  const idx = Math.max(0, currentWeekNumberFromProgress - 1);
-  if (idx >= distinctWeekNumbers.length) return null;
-  return distinctWeekNumbers[idx] ?? null;
 }
 
 function streakFromUtcDayStrings(datesDesc: string[]): number {
@@ -96,43 +37,59 @@ function streakFromUtcDayStrings(datesDesc: string[]): number {
 }
 
 /**
- * Single fetch: program schedule rows + completed program sessions (2 queries max).
- * Aligns with public.get_client_dashboard Option C.
+ * Streak from program-linked sessions; weeklyProgress from foundation Mon–Sun
+ * current week (not elapsed÷7).
  */
 export async function fetchProgramWorkoutCounters(
   sb: SupabaseClient,
   clientId: string
 ): Promise<DashboardStats> {
   try {
-    const ctx = await getActiveProgramCtx(sb, clientId);
-    if (!ctx) {
+    const { data: pa, error: paErr } = await sb
+      .from('program_assignments')
+      .select(
+        'id, client_id, program_id, start_date, pause_accumulated_days, pause_status, paused_at, timezone_snapshot',
+      )
+      .eq('client_id', clientId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (paErr || !pa?.id || !pa.program_id) {
       return { streak: 0, weeklyProgress: { current: 0, goal: 0 } };
     }
 
-    const { data: schedRows, error: schedErr } = await sb
-      .from('program_day_assignments')
-      .select('id, week_number')
-      .eq('program_assignment_id', ctx.paId);
+    const { data: profile } = await sb
+      .from('profiles')
+      .select('timezone')
+      .eq('id', clientId)
+      .maybeSingle();
 
-    if (schedErr) {
-      console.error('fetchProgramWorkoutCounters program_day_assignments:', schedErr);
-      return { streak: 0, weeklyProgress: { current: 0, goal: 0 } };
-    }
-
-    const distinctWeeks = [...new Set((schedRows ?? []).map((r) => r.week_number))].sort(
-      (a, b) => a - b
+    const foundation = await loadFoundationWeekForAssignment(
+      sb,
+      {
+        id: pa.id,
+        client_id: pa.client_id,
+        start_date: pa.start_date ?? null,
+        pause_accumulated_days: pa.pause_accumulated_days ?? 0,
+        pause_status: pa.pause_status ?? null,
+        paused_at: pa.paused_at ?? null,
+        timezone_snapshot: pa.timezone_snapshot ?? null,
+      },
+      {
+        includeWeeklyProgress: true,
+        profileTimezone:
+          (profile as { timezone?: string | null } | null)?.timezone ?? null,
+      },
     );
-    const resolvedWeek = resolveIndexedWeekNumber(distinctWeeks, ctx.ppWeek);
-    if (resolvedWeek == null) {
-      return { streak: 0, weeklyProgress: { current: 0, goal: 0 } };
-    }
 
-    const slotIds = (schedRows ?? [])
-      .filter((r) => r.week_number === resolvedWeek)
-      .map((r) => r.id)
-      .filter(Boolean);
-    const goal = slotIds.length;
-    const slotSet = new Set(slotIds);
+    const weeklyProgress = foundation?.weeklyProgress
+      ? {
+          current: foundation.weeklyProgress.current,
+          goal: foundation.weeklyProgress.goal,
+        }
+      : { current: 0, goal: 0 };
 
     const { data: sessions, error: sessErr } = await sb
       .from('workout_sessions')
@@ -140,28 +97,21 @@ export async function fetchProgramWorkoutCounters(
       .eq('client_id', clientId)
       .eq('status', 'completed')
       .not('completed_at', 'is', null)
-      .eq('program_assignment_id', ctx.paId)
+      .eq('program_assignment_id', pa.id)
       .not('program_day_assignment_id', 'is', null);
 
     if (sessErr) {
       console.error('fetchProgramWorkoutCounters workout_sessions:', sessErr);
-      return { streak: 0, weeklyProgress: { current: 0, goal: goal } };
+      return { streak: 0, weeklyProgress };
     }
 
     const sessionList = sessions ?? [];
-    const current = sessionList.filter(
-      (s) => s.program_day_assignment_id && slotSet.has(s.program_day_assignment_id)
-    ).length;
-
     const dayStrings = sessionList.map((s) =>
       new Date(s.completed_at!).toISOString().split('T')[0]
     );
     const streak = streakFromUtcDayStrings(dayStrings);
 
-    return {
-      streak,
-      weeklyProgress: { current, goal },
-    };
+    return { streak, weeklyProgress };
   } catch (e) {
     console.error('fetchProgramWorkoutCounters:', e);
     return { streak: 0, weeklyProgress: { current: 0, goal: 0 } };

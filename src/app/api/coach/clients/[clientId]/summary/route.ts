@@ -35,6 +35,7 @@ import {
   resolveInstanceProgramWeek,
 } from '@/lib/programInstanceResolver';
 import { resolveFoundationCompletion } from '@/lib/progression/foundationCompletion';
+import { resolveFoundationCurrentWeek } from '@/lib/progression/resolveFoundationWeek';
 
 async function assertCoachHasClient(
   coachId: string,
@@ -411,9 +412,24 @@ export async function GET(
             instanceWeekInputs.clientTz,
           )
         : null;
-      const cw = cwRes?.currentWeek ?? 1;
       const dw = cwRes?.totalWeeks ?? null;
       programTotalWeeks = dw;
+      // Foundation Mon–Sun current week (not elapsed÷7 resolver X).
+      const foundationWeek =
+        instanceWeekInputs && dw != null && dw > 0
+          ? resolveFoundationCurrentWeek({
+              startDate: instanceWeekInputs.assignment.start_date,
+              totalWeeks: dw,
+              timeZone: instanceWeekInputs.clientTz,
+              pauses: {
+                accumulatedDays:
+                  instanceWeekInputs.assignment.pause_accumulated_days,
+                pauseStatus: instanceWeekInputs.assignment.pause_status,
+                pausedAt: instanceWeekInputs.assignment.paused_at,
+              },
+            })
+          : null;
+      const cw = foundationWeek ?? cwRes?.currentWeek ?? 1;
       // Lifetime in-scope completion % (not elapsed weeks / total weeks).
       let programProgressPercent: number | null = null;
       if (dw != null && dw > 0) {

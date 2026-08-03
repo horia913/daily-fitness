@@ -2,9 +2,9 @@
  * Control Room Service (read-only)
  *
  * Computes coach-wide signals for the Control Room home.
- * Uses ONLY whitelisted tables: program_assignments, profiles, program_schedule,
- * program_day_completions. Current week is calendar-derived via
- * computeCurrentProgramWeekForAssignment; no program_progress week reads.
+ * Uses ONLY whitelisted tables: program_assignments, profiles, program_day_assignments,
+ * program_day_completions. This-week compliance uses foundation Mon–Sun
+ * (resolveFoundationCurrentWeek) per assignment; falls back to elapsed÷7 resolver.
  * No workout_assignments, no workout_logs.
  *
  * Active program selection invariant: per client, program_assignments where
@@ -19,6 +19,8 @@ import {
   resolveInstanceWeeksForAssignments,
   isCoachSkipNote,
 } from '@/lib/programInstanceResolver'
+import { resolveFoundationCurrentWeek } from '@/lib/progression/resolveFoundationWeek'
+import { normalizeClientTimezone } from '@/lib/clientZonedCalendar'
 
 export interface ControlRoomPeriod {
   startUtc: string
@@ -196,8 +198,8 @@ export async function getControlRoomResult(
   const assignmentIds = assignments.map((a) => a.assignmentId)
 
   // Instance-keyed: schedule from program_day_assignments, completions by
-  // program_day_assignment_id (with coach-skip notes). Week X of N from the
-  // canonical resolver (N = instance phases, X in client tz, clamped).
+  // program_day_assignment_id (with coach-skip notes). This-week window from
+  // foundation Mon–Sun per assignment (fallback: elapsed÷7 resolver).
   const [
     { data: scheduleRows },
     { data: completionRows },
@@ -239,10 +241,25 @@ export async function getControlRoomResult(
     const comp = completedByAssignment.get(a.assignmentId) ?? { done: new Set<string>(), skipped: new Set<string>() }
     const nextSlot = slots.find((s) => !comp.done.has(s.id) && !comp.skipped.has(s.id)) ?? null
     const referenceSlot = nextSlot ?? slots[slots.length - 1]
-    const currentWeek =
+    const elapsedWeek =
       progressMap.get(a.assignmentId)?.currentWeek ??
       referenceSlot?.week_number ??
       1
+    const totalWeeks = progressMap.get(a.assignmentId)?.totalWeeks ?? 0
+    const foundationWeek =
+      totalWeeks > 0
+        ? resolveFoundationCurrentWeek({
+            startDate: a.startDate,
+            totalWeeks,
+            timeZone: normalizeClientTimezone(a.timezoneSnapshot) || 'UTC',
+            pauses: {
+              accumulatedDays: Math.max(0, Number(a.pauseAccumulatedDays) || 0),
+              pauseStatus: a.pauseStatus ?? 'active',
+              pausedAt: a.pausedAt ?? null,
+            },
+          })
+        : null
+    const currentWeek = foundationWeek ?? elapsedWeek
 
     const requiredSlotsThisWeek = slots.filter((s) => s.week_number === currentWeek && !s.is_optional)
     const effectiveRequired = requiredSlotsThisWeek.filter((s) => !comp.skipped.has(s.id))
