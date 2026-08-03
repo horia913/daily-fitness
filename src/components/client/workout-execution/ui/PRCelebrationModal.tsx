@@ -106,17 +106,19 @@ function PRCelebrationContent({
 
   const ms = pr.max_strength;
   const se = pr.strength_endurance;
-  /** Dual PR on one set: celebrate max strength only. */
   const showMaxStrength = !!ms;
-  const showVolume = !!se && !ms;
+  const showVolume = !!se;
+  const isDual = showMaxStrength && showVolume;
 
-  const title = showMaxStrength
-    ? "New Max Strength PR"
-    : showVolume
-      ? "New Volume PR"
-      : "New PR";
+  const title = isDual
+    ? "New Max Strength & Volume PRs"
+    : showMaxStrength
+      ? "New Max Strength PR"
+      : showVolume
+        ? "New Volume PR"
+        : "New PR";
 
-  const headlineEmoji = showMaxStrength ? "🏆" : showVolume ? "🔥" : "🏆";
+  const headlineEmoji = isDual ? "🏆🔥" : showMaxStrength ? "🏆" : showVolume ? "🔥" : "🏆";
 
   return (
     <div
@@ -191,7 +193,7 @@ function PRCelebrationContent({
                   }}
                   aria-hidden
                 >
-                  {showVolume ? "🔥" : "🏆"}
+                  {isDual ? "🏆" : showVolume && !showMaxStrength ? "🔥" : "🏆"}
                 </div>
               </div>
 
@@ -200,7 +202,12 @@ function PRCelebrationContent({
               </h3>
 
               {showMaxStrength && ms && (
-                <div className="mb-3">
+                <div className={cn("mb-3", isDual && "rounded-xl border border-amber-500/20 bg-white/5 px-3 py-3")}>
+                  {isDual ? (
+                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-300/90 mb-1.5">
+                      Max strength
+                    </p>
+                  ) : null}
                   <p className="text-4xl font-bold text-white tabular-nums mb-2">
                     {ms.weight} kg
                   </p>
@@ -222,7 +229,12 @@ function PRCelebrationContent({
               )}
 
               {showVolume && se && (
-                <div className="mb-3">
+                <div className={cn("mb-3", isDual && "rounded-xl border border-amber-500/20 bg-white/5 px-3 py-3")}>
+                  {isDual ? (
+                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-300/90 mb-1.5">
+                      Volume
+                    </p>
+                  ) : null}
                   <p className="text-4xl font-bold text-white tabular-nums mb-2">
                     {se.weight} kg × {se.reps}
                   </p>

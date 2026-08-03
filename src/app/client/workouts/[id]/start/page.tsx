@@ -187,13 +187,18 @@ export default function LiveWorkout() {
   const [lastSessionWeightByExerciseId, setLastSessionWeightByExerciseId] =
     useState<Record<string, number>>({});
 
-  // Celebration queue: PR shows first, then achievements sequentially
+  // Celebration queue: PR shows first (FIFO), then achievements sequentially
   const [newAchievementsQueue, setNewAchievementsQueue] = useState<
     Achievement[]
   >([]);
   const [achievementModalIndex, setAchievementModalIndex] = useState(0);
-  const [prCelebrationData, setPrCelebrationData] =
-    useState<PrDetectedPayload | null>(null);
+  /** FIFO queue — rapid PRs enqueue; modal shows head until dismissed. */
+  const [prCelebrationQueue, setPrCelebrationQueue] = useState<
+    PrDetectedPayload[]
+  >([]);
+  const prCelebrationQueueRef = useRef<PrDetectedPayload[]>([]);
+  prCelebrationQueueRef.current = prCelebrationQueue;
+  const prCelebrationData = prCelebrationQueue[0] ?? null;
   /** Latest body weight (kg) for PR tier multiplier; one fetch per page load */
   const [clientBodyWeightKg, setClientBodyWeightKg] = useState<number | null>(
     null,
@@ -211,6 +216,35 @@ export default function LiveWorkout() {
       }, 300);
     }
   }, []);
+
+  /** Split dual pr_detected into one celebration per PR type (matches summary row count). */
+  const enqueuePrCelebrations = useCallback((pr: PrDetectedPayload) => {
+    const items: PrDetectedPayload[] = [];
+    if (pr.max_strength) {
+      items.push({
+        exercise_name: pr.exercise_name,
+        max_strength: pr.max_strength,
+      });
+    }
+    if (pr.strength_endurance) {
+      items.push({
+        exercise_name: pr.exercise_name,
+        strength_endurance: pr.strength_endurance,
+      });
+    }
+    if (items.length === 0) return;
+    setPrCelebrationQueue((prev) => [...prev, ...items]);
+  }, []);
+
+  const advancePrCelebration = useCallback(() => {
+    const prev = prCelebrationQueueRef.current;
+    if (prev.length === 0) return;
+    const next = prev.slice(1);
+    setPrCelebrationQueue(next);
+    if (next.length === 0) {
+      showAchievementsAfterPR();
+    }
+  }, [showAchievementsAfterPR]);
 
   // Progression suggestions state
   const [progressionSuggestions, setProgressionSuggestions] = useState<
@@ -4687,7 +4721,7 @@ export default function LiveWorkout() {
                               ),
                             )
                           }
-                          onPRDetected={(pr) => setPrCelebrationData(pr)}
+                          onPRDetected={enqueuePrCelebrations}
                           onAchievementsUnlocked={(achievements, context) => {
                             const mapped: Achievement[] = achievements.map((a) => ({
                               id: a.templateId,
@@ -4702,7 +4736,7 @@ export default function LiveWorkout() {
                               unlocked: true,
                             }));
                             const deferForPr =
-                              prCelebrationData != null ||
+                              prCelebrationQueue.length > 0 ||
                               context?.prDetectedThisSync === true;
                             if (deferForPr) {
                               pendingAchievementsRef.current = [
@@ -7002,10 +7036,7 @@ export default function LiveWorkout() {
             {prCelebrationData && (
               <PRCelebrationModal
                 visible={!!prCelebrationData}
-                onClose={() => {
-                  setPrCelebrationData(null);
-                  showAchievementsAfterPR();
-                }}
+                onClose={advancePrCelebration}
                 pr={prCelebrationData}
                 bodyWeightKg={clientBodyWeightKg}
               />

@@ -3,11 +3,21 @@
  *
  * Builds `ProgramWeekState` from programStateService (slots, assignment, completions).
  * Consumed by GET `/api/client/program-week` via `buildProgramWeekState`.
- * The client dashboard primary payload uses `get_client_dashboard` RPC; dashboard uses this builder
- * only where it explicitly delegates week UI state — do not assume every dashboard path imports here.
+ * Current week (display / unlock / this-week slots) uses foundation Mon–Sun
+ * getCurrentProgramWeek — not elapsed÷7 resolver — so roadmap row marker matches day cells.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import {
+  normalizeClientTimezone,
+  zonedCalendarDateString,
+} from '@/lib/clientZonedCalendar'
+import {
+  getCurrentProgramWeek,
+  getEffectiveToday,
+  getProgramWeekWindows,
+  type PauseState,
+} from '@/lib/progression/weekWindows'
 import {
   getProgramState,
   getRecentlyCompletedProgramAssignment,
@@ -64,7 +74,7 @@ export interface ProgramWeekState {
   completedCount: number
   totalSlots: number
   currentWeekNumber: number
-  /** Calendar week X from get_program_instance_week (display / phase context). */
+  /** Foundation Mon–Sun current week X (display / phase / roadmap row context). */
   displayWeekNumber: number
   progressionMode: 'auto' | 'coach_managed'
   isWeekCompleteAwaitingReview: boolean
@@ -171,25 +181,68 @@ export async function buildProgramWeekState(
     return empty
   }
 
-  // Canonical Week X of N from the resolver (X = calendar/pause clamped to N,
-  // N = SUM(instance phases)). Falls back to the calendar helper / distinct
-  // slot weeks only if the resolver has no row (e.g. missing phases).
+  // N from resolver (instance phases); X from foundation Mon–Sun windows.
   const weekNumbers = [...new Set(state.slots.map(s => s.week_number))].sort((a, b) => a - b)
   const resolved = await resolveInstanceWeekForAssignment(supabase, state.assignment.id)
-  const unlockedWeekMax =
-    resolved?.currentWeek ??
-    computeUnlockedWeekMax(state.slots, state.completedSlots, {
-      start_date: state.assignment?.start_date ?? null,
-      pause_accumulated_days: state.assignment?.pause_accumulated_days ?? 0,
-      pause_status: state.assignment?.pause_status ?? null,
-      paused_at: state.assignment?.paused_at ?? null,
-      timezone_snapshot: state.assignment?.timezone_snapshot ?? null,
-      progression_mode: state.assignment?.progression_mode,
-      coach_unlocked_week: state.assignment?.coach_unlocked_week ?? null,
-      totalWeeksCap: resolved?.totalWeeks ?? null,
-    })
   const totalWeeks =
     resolved?.totalWeeks && resolved.totalWeeks > 0 ? resolved.totalWeeks : weekNumbers.length
+
+  const assignmentStartDate =
+    typeof state.assignment.start_date === 'string' && state.assignment.start_date.trim()
+      ? state.assignment.start_date.trim().slice(0, 10)
+      : null
+  const pauseAccumulatedDays = Math.max(
+    0,
+    Number(state.assignment.pause_accumulated_days) || 0,
+  )
+  const pausedAt = state.assignment.paused_at ?? null
+  const pauseStatusRaw = state.assignment.pause_status ?? 'active'
+  const pauses: PauseState = {
+    accumulatedDays: pauseAccumulatedDays,
+    pauseStatus: pauseStatusRaw === 'paused' ? 'paused' : 'active',
+    pausedAt,
+  }
+  const tz =
+    normalizeClientTimezone(state.assignment.timezone_snapshot) || 'UTC'
+
+  let foundationCurrentWeek: number | null = null
+  if (assignmentStartDate && totalWeeks > 0) {
+    const windows = getProgramWeekWindows(
+      assignmentStartDate,
+      totalWeeks,
+      tz,
+      pauses,
+    )
+    const wallToday = zonedCalendarDateString(new Date(), tz)
+    const effectiveTodayYmd = getEffectiveToday(wallToday, tz, pauses)
+    const hit = getCurrentProgramWeek(windows, effectiveTodayYmd)
+    if (hit) {
+      foundationCurrentWeek = hit.weekNumber
+    } else if (windows.length > 0) {
+      if (effectiveTodayYmd < windows[0].mondayStart) {
+        foundationCurrentWeek = 1
+      } else {
+        foundationCurrentWeek = windows[windows.length - 1].weekNumber
+      }
+    }
+  }
+
+  const unlockedWeekMax =
+    foundationCurrentWeek != null && foundationCurrentWeek >= 1
+      ? foundationCurrentWeek
+      : resolved?.currentWeek ??
+        computeUnlockedWeekMax(state.slots, state.completedSlots, {
+          start_date: state.assignment?.start_date ?? null,
+          pause_accumulated_days: state.assignment?.pause_accumulated_days ?? 0,
+          pause_status: state.assignment?.pause_status ?? null,
+          paused_at: state.assignment?.paused_at ?? null,
+          timezone_snapshot: state.assignment?.timezone_snapshot ?? null,
+          progression_mode: state.assignment?.progression_mode,
+          coach_unlocked_week: state.assignment?.coach_unlocked_week ?? null,
+          totalWeeksCap: resolved?.totalWeeks ?? null,
+        })
+  const displayWeekNumber = unlockedWeekMax
+
   const todaySlotRaw = getTodaySlot(state.slots, unlockedWeekMax, todayWeekday)
   const isRestDay = todaySlotRaw === null
 
@@ -311,7 +364,7 @@ export async function buildProgramWeekState(
     completedCount: state.completedCount,
     totalSlots: state.totalSlots,
     currentWeekNumber: unlockedWeekMax,
-    displayWeekNumber: resolved?.currentWeek ?? unlockedWeekMax,
+    displayWeekNumber,
     progressionMode,
     isWeekCompleteAwaitingReview,
     coachFeedback,

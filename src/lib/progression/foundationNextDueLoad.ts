@@ -3,14 +3,27 @@
  * Home / Train share this so which-slot + core fields never diverge.
  *
  * Flow: PDAs + completions + phases → resolveNextDue → canonical slot → adapters.
+ * Also returns foundation this-week adherence (Mon–Sun current week) from the
+ * same loaded slots — used to overwrite RPC weeklyProgress (elapsed÷7).
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { normalizeClientTimezone } from '@/lib/clientZonedCalendar'
+import {
+  normalizeClientTimezone,
+  zonedCalendarDateString,
+} from '@/lib/clientZonedCalendar'
 import { loadInstancePhases } from '@/lib/programInstance/instanceCanvasLoad'
 import { instanceTotalWeeks, isCoachSkipNote } from '@/lib/programInstanceResolver'
 import { resolveNextDue } from '@/lib/progression/resolveNextDue'
-import type { PauseState, WorkoutRef } from '@/lib/progression/weekWindows'
+import {
+  getCurrentProgramWeek,
+  getEffectiveToday,
+  getProgramWeekWindows,
+  getWorkoutDate,
+  isInScope,
+  type PauseState,
+  type WorkoutRef,
+} from '@/lib/progression/weekWindows'
 
 export type FoundationNextDueAssignment = {
   id: string
@@ -44,20 +57,102 @@ export type FoundationNextDueResult =
   | { hasWorkout: false; message: string }
   | FoundationNextDueSlot
 
+/** Foundation Mon–Sun this-week adherence for dashboard weeklyProgress. */
+export type FoundationWeeklyProgress = {
+  current: number
+  goal: number
+  foundationWeek: number
+}
+
+export type FoundationNextDueLoadResult = {
+  nextDue: FoundationNextDueResult
+  weeklyProgress: FoundationWeeklyProgress | null
+}
+
 const NO_WORKOUT: FoundationNextDueResult = {
   hasWorkout: false,
   message: 'No active workout assigned. Contact your coach to get started!',
 }
 
+type PdaRow = {
+  id: string
+  week_number: number
+  program_day: number
+  workout_template_id: string | null
+  program_instance_workout_id: string | null
+  name: string | null
+  day_type: string | null
+  is_optional: boolean | null
+}
+
 /**
- * Load assignment schedule/completions and resolve foundation next-due.
- * Optional totalWeeks avoids a second phases fetch when the caller already has it.
+ * In-scope required slots for the foundation current week → { current, goal }.
+ * Matches adherence style: non-optional, non-rest, not coach-skipped; done = any
+ * non-skip completion on that PDA.
+ */
+export function computeFoundationWeeklyProgress(input: {
+  startDate: string | null
+  totalWeeks: number
+  timeZone: string
+  pauses: PauseState
+  slots: PdaRow[]
+  completedIds: Set<string>
+  skippedIds: Set<string>
+}): FoundationWeeklyProgress | null {
+  const startDate =
+    typeof input.startDate === 'string' && input.startDate.trim()
+      ? input.startDate.trim().slice(0, 10)
+      : ''
+  if (!startDate || input.totalWeeks <= 0) return null
+
+  const windows = getProgramWeekWindows(
+    startDate,
+    input.totalWeeks,
+    input.timeZone,
+    input.pauses,
+  )
+  if (windows.length === 0) return null
+
+  const wallToday = zonedCalendarDateString(new Date(), input.timeZone)
+  const effectiveTodayYmd = getEffectiveToday(
+    wallToday,
+    input.timeZone,
+    input.pauses,
+  )
+  const hit = getCurrentProgramWeek(windows, effectiveTodayYmd)
+  let foundationWeek = hit?.weekNumber ?? null
+  if (foundationWeek == null) {
+    if (effectiveTodayYmd < windows[0].mondayStart) foundationWeek = 1
+    else foundationWeek = windows[windows.length - 1].weekNumber
+  }
+
+  const weekSlots = input.slots.filter((s) => {
+    if (Number(s.week_number) !== foundationWeek) return false
+    if (s.is_optional) return false
+    if ((s.day_type ?? '').toLowerCase() === 'rest') return false
+    if (input.skippedIds.has(s.id)) return false
+    if (!s.workout_template_id && !s.program_instance_workout_id) return false
+    const programDay = Number(s.program_day) || 0
+    if (programDay < 1 || programDay > 7) return false
+    const date = getWorkoutDate(Number(s.week_number) || 1, programDay, windows)
+    if (!date || !isInScope(date, startDate)) return false
+    return true
+  })
+
+  const goal = weekSlots.length
+  const current = weekSlots.filter((s) => input.completedIds.has(s.id)).length
+  return { current, goal, foundationWeek }
+}
+
+/**
+ * Load assignment schedule/completions and resolve foundation next-due + this-week
+ * adherence. Optional totalWeeks avoids a second phases fetch when the caller already has it.
  */
 export async function loadFoundationNextDueForAssignment(
   supabase: SupabaseClient,
   assignment: FoundationNextDueAssignment,
   options?: { totalWeeks?: number },
-): Promise<FoundationNextDueResult> {
+): Promise<FoundationNextDueLoadResult> {
   const phasesPromise =
     options?.totalWeeks != null && options.totalWeeks > 0
       ? Promise.resolve(null)
@@ -86,11 +181,11 @@ export async function loadFoundationNextDueForAssignment(
 
   if (pdaRes.error) {
     console.error('[loadFoundationNextDue] PDA:', pdaRes.error.message)
-    return NO_WORKOUT
+    return { nextDue: NO_WORKOUT, weeklyProgress: null }
   }
   if (completionsRes.error) {
     console.error('[loadFoundationNextDue] completions:', completionsRes.error.message)
-    return NO_WORKOUT
+    return { nextDue: NO_WORKOUT, weeklyProgress: null }
   }
 
   const totalWeeks =
@@ -101,12 +196,18 @@ export async function loadFoundationNextDueForAssignment(
         )
 
   const completedIds = new Set<string>()
+  const skippedIds = new Set<string>()
   for (const row of completionsRes.data ?? []) {
-    if (isCoachSkipNote(row.notes)) continue
-    if (row.program_day_assignment_id) completedIds.add(row.program_day_assignment_id)
+    if (!row.program_day_assignment_id) continue
+    if (isCoachSkipNote(row.notes)) {
+      skippedIds.add(row.program_day_assignment_id)
+      continue
+    }
+    completedIds.add(row.program_day_assignment_id)
   }
 
-  const slots = (pdaRes.data ?? []).filter((row) => row.day_type !== 'rest')
+  const slots = (pdaRes.data ?? []) as PdaRow[]
+  const nonRestSlots = slots.filter((row) => row.day_type !== 'rest')
 
   const snap = assignment.timezone_snapshot?.trim() || ''
   const prof =
@@ -121,7 +222,17 @@ export async function loadFoundationNextDueForAssignment(
     pausedAt: assignment.paused_at ?? null,
   }
 
-  const workouts: WorkoutRef[] = slots
+  const weeklyProgress = computeFoundationWeeklyProgress({
+    startDate: assignment.start_date,
+    totalWeeks,
+    timeZone,
+    pauses,
+    slots,
+    completedIds,
+    skippedIds,
+  })
+
+  const workouts: WorkoutRef[] = nonRestSlots
     .filter((s) => Boolean(s.workout_template_id || s.program_instance_workout_id))
     .map((s) => ({
       id: s.id,
@@ -138,10 +249,14 @@ export async function loadFoundationNextDueForAssignment(
     workouts,
   })
 
-  if (!nextDue?.id) return NO_WORKOUT
+  if (!nextDue?.id) {
+    return { nextDue: NO_WORKOUT, weeklyProgress }
+  }
 
-  const slot = slots.find((s) => s.id === nextDue.id)
-  if (!slot) return NO_WORKOUT
+  const slot = nonRestSlots.find((s) => s.id === nextDue.id)
+  if (!slot) {
+    return { nextDue: NO_WORKOUT, weeklyProgress }
+  }
 
   const masterTemplateId = slot.workout_template_id
     ? String(slot.workout_template_id)
@@ -188,19 +303,22 @@ export async function loadFoundationNextDueForAssignment(
   const programDay = nextDue.programDay
 
   return {
-    hasWorkout: true,
-    scheduleId: slot.id,
-    templateId,
-    masterTemplateId,
-    instanceWorkoutId,
-    name,
-    weekNumber,
-    programDay,
-    estimatedDuration,
-    totalSets,
-    weekLabel: `Week ${weekNumber}`,
-    dayLabel: `Day ${programDay}`,
-    message: `Week ${weekNumber} • Day ${programDay} ready!`,
+    nextDue: {
+      hasWorkout: true,
+      scheduleId: slot.id,
+      templateId,
+      masterTemplateId,
+      instanceWorkoutId,
+      name,
+      weekNumber,
+      programDay,
+      estimatedDuration,
+      totalSets,
+      weekLabel: `Week ${weekNumber}`,
+      dayLabel: `Day ${programDay}`,
+      message: `Week ${weekNumber} • Day ${programDay} ready!`,
+    },
+    weeklyProgress,
   }
 }
 

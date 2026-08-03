@@ -765,7 +765,7 @@ export async function buildNextScheduledWorkout(
   assignment: FoundationNextDueAssignment,
   totalWeeks?: number | null,
 ): Promise<NextScheduledWorkout | null> {
-  const next = await loadFoundationNextDueForAssignment(
+  const { nextDue: next } = await loadFoundationNextDueForAssignment(
     sb,
     assignment,
     totalWeeks != null && totalWeeks > 0 ? { totalWeeks } : undefined,

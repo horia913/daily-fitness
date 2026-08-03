@@ -2,8 +2,10 @@
  * Shared dashboard page data: single RPC `get_client_dashboard` + mapping.
  * Used by `/client` and `/client/me` (score insights) so fetch logic stays one place.
  *
- * `todaysWorkout` is overwritten in TS with weekWindows foundation next-due
- * (same `resolveNextDue` as Train) — the RPC fill-gap field is not used for display.
+ * `todaysWorkout`, `weeklyProgress`, and `programProgress.currentWeek` are
+ * overwritten in TS with weekWindows foundation values (same Mon–Sun current
+ * week as Train) — RPC fill-gap / elapsed÷7 fields are not used for display
+ * when an active assignment exists.
  */
 
 import { supabase } from "@/lib/supabase";
@@ -42,13 +44,9 @@ export interface DashboardData {
   firstName: string | null;
   streak: number;
   /**
-   * Program-scoped “this week” workout counts from the active assignment only
-   * (see RPC `get_client_dashboard` / migration `20260407_get_client_dashboard_program_counters.sql`):
-   * - `goal` = number of `program_schedule` rows in the **current program week**
-   *   (week resolved from `program_progress.current_week_number`).
-   * - `current` = count of **completed** `workout_sessions` linked to that assignment
-   *   and a `program_schedule_id` in that same week’s slots.
-   * Not read from user_settings / arbitrary weekly goals when an active program exists.
+   * Program-scoped “this week” workout counts from the active assignment.
+   * Overwritten in `fetchDashboardPageData` with foundation Mon–Sun current-week
+   * adherence when an active assignment exists (RPC elapsed÷7 is fallback only).
    */
   weeklyProgress: {
     current: number;
@@ -197,7 +195,8 @@ type ActiveAssignmentRow = {
 
 /**
  * Single source: `get_client_dashboard` returns streak / weekly / score / etc.
- * `todaysWorkout` is then overwritten with foundation next-due (shared with Train + summary).
+ * `todaysWorkout` + `weeklyProgress` overwritten with foundation Mon–Sun values
+ * (shared with Train) when an active assignment exists.
  */
 export async function fetchDashboardPageData(userId: string): Promise<DashboardPageData> {
   const [{ data, error }, latestMeasurement, checkInConfig, activePaRes] = await Promise.all([
@@ -253,22 +252,36 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
         phases.map((p) => ({ duration_weeks: p.duration_weeks })),
       );
 
-      const foundationNext = await loadFoundationNextDueForAssignment(
+      const foundation = await loadFoundationNextDueForAssignment(
         supabase,
         assignment,
         { totalWeeks },
       );
       pageData.dashboard.todaysWorkout =
-        mapFoundationNextDueToHomeTodaysWorkout(foundationNext);
+        mapFoundationNextDueToHomeTodaysWorkout(foundation.nextDue);
 
-      if (pp && pp.currentWeek >= 1) {
-        const pos = resolvePhaseForAbsoluteWeek(
-          pp.currentWeek,
-          buildPhaseWeekRanges(phases),
-        );
-        if (pos) {
-          pp.currentPhaseLabel = clientPhaseChipLabel(pos.range.phase);
-          pp.weekWithinPhase = pos.weekWithinPhase;
+      if (foundation.weeklyProgress) {
+        pageData.dashboard.weeklyProgress = {
+          current: foundation.weeklyProgress.current,
+          goal: foundation.weeklyProgress.goal,
+        };
+      }
+
+      // Phase chip: use foundation week (same as weeklyProgress), not RPC elapsed÷7.
+      const foundationWeek = foundation.weeklyProgress?.foundationWeek ?? null;
+      if (pp) {
+        if (foundationWeek != null && foundationWeek >= 1) {
+          pp.currentWeek = foundationWeek;
+        }
+        if (pp.currentWeek >= 1) {
+          const pos = resolvePhaseForAbsoluteWeek(
+            pp.currentWeek,
+            buildPhaseWeekRanges(phases),
+          );
+          if (pos) {
+            pp.currentPhaseLabel = clientPhaseChipLabel(pos.range.phase);
+            pp.weekWithinPhase = pos.weekWithinPhase;
+          }
         }
       }
     } else {

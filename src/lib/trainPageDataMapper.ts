@@ -1,7 +1,8 @@
 /**
  * Maps get_train_page_data RPC response to ProgramWeekState.
- * Uses programStateService helpers for unlocked week, today slot, and overdue.
- * Schedule rows come from program_day_assignments (canonical), not RPC schedule.
+ * Current week (label / unlock / this-week slots) comes from foundation
+ * Mon–Sun getCurrentProgramWeek — same source as resolveNextDue — not RPC
+ * currentProgramWeek (elapsed÷7).
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -14,16 +15,22 @@ import {
   getCompletedSlots,
   type ProgramScheduleSlot,
 } from './programStateService'
-import { computeCurrentProgramWeekForAssignment } from '@/lib/programWeekCalendar'
 import { isCoachSkipNote } from '@/lib/programInstanceResolver'
 import {
   addCalendarDaysYmd,
   mondayYmdOfZonedWeekContaining,
   weekdayMon0Sun6InTimezone,
+  zonedCalendarDateString,
   zonedDayInclusiveUtcBounds,
 } from '@/lib/clientZonedCalendar'
 import { resolveNextDue } from '@/lib/progression/resolveNextDue'
-import type { PauseState, WorkoutRef } from '@/lib/progression/weekWindows'
+import {
+  getCurrentProgramWeek,
+  getEffectiveToday,
+  getProgramWeekWindows,
+  type PauseState,
+  type WorkoutRef,
+} from '@/lib/progression/weekWindows'
 
 export interface TrainPageRpcScheduleRow {
   id: string
@@ -264,27 +271,6 @@ export async function rpcResponseToProgramWeekState(
   const resolveSlotMeta = (slot: ProgramScheduleSlot) =>
     contentMetaMap.get(slot.template_id) ?? { name: 'Workout', estimated_duration: 0 }
 
-  const totalWeeksCap =
-    typeof data.durationWeeks === 'number' && data.durationWeeks > 0
-      ? data.durationWeeks
-      : null
-  const assignmentForUnlock = {
-    progression_mode: data.progressionMode ?? 'auto',
-    start_date: data.assignmentStartDate ?? null,
-    pause_accumulated_days:
-      data.pauseAccumulatedDays ?? 0,
-    pause_status: data.pauseStatus ?? data.pause_status ?? 'active',
-    paused_at: data.pausedAt ?? null,
-    timezone_snapshot: tz,
-    totalWeeksCap,
-  }
-  const unlockedWeekMax =
-    (typeof data.currentProgramWeek === 'number' && data.currentProgramWeek >= 1)
-      ? data.currentProgramWeek
-      : computeUnlockedWeekMax(slots, completedSlots, assignmentForUnlock, tz)
-  const todaySlotRaw = getTodaySlot(slots, unlockedWeekMax, todayWeekday)
-  const isRestDay = todaySlotRaw === null
-
   // N (total weeks) is canonical: SUM(instance phases) from the resolver,
   // surfaced via the RPC durationWeeks. Distinct slot weeks are only a fallback.
   const weekNumbers = [...new Set(slots.map((s) => s.week_number))].sort((a, b) => a - b)
@@ -292,6 +278,72 @@ export async function rpcResponseToProgramWeekState(
     typeof data.durationWeeks === 'number' && data.durationWeeks > 0
       ? data.durationWeeks
       : weekNumbers.length
+
+  const totalWeeksCap =
+    typeof data.durationWeeks === 'number' && data.durationWeeks > 0
+      ? data.durationWeeks
+      : null
+  const assignmentStartDate =
+    typeof data.assignmentStartDate === 'string' && data.assignmentStartDate.trim()
+      ? data.assignmentStartDate.trim().slice(0, 10)
+      : null
+  const pauseAccumulatedDays = Math.max(0, Number(data.pauseAccumulatedDays) || 0)
+  const pausedAt = data.pausedAt ?? null
+  const rawPauseEarly = data.pauseStatus ?? data.pause_status ?? 'active'
+  const pauseStatusEarly: 'active' | 'paused' =
+    rawPauseEarly === 'paused' ? 'paused' : 'active'
+  const pausesForFoundation: PauseState = {
+    accumulatedDays: pauseAccumulatedDays,
+    pauseStatus: pauseStatusEarly,
+    pausedAt,
+  }
+
+  // Foundation Mon–Sun current week (same source as resolveNextDue) — NOT RPC
+  // currentProgramWeek / elapsed÷7, which drifts for mid-week start dates.
+  let foundationCurrentWeek: number | null = null
+  if (assignmentStartDate && totalWeeks > 0) {
+    const windows = getProgramWeekWindows(
+      assignmentStartDate,
+      totalWeeks,
+      tz,
+      pausesForFoundation,
+    )
+    const wallToday = zonedCalendarDateString(new Date(), tz)
+    const effectiveTodayYmd = getEffectiveToday(
+      wallToday,
+      tz,
+      pausesForFoundation,
+    )
+    const hit = getCurrentProgramWeek(windows, effectiveTodayYmd)
+    if (hit) {
+      foundationCurrentWeek = hit.weekNumber
+    } else if (windows.length > 0) {
+      if (effectiveTodayYmd < windows[0].mondayStart) {
+        foundationCurrentWeek = 1
+      } else {
+        foundationCurrentWeek = windows[windows.length - 1].weekNumber
+      }
+    }
+  }
+
+  const assignmentForUnlock = {
+    progression_mode: data.progressionMode ?? 'auto',
+    start_date: assignmentStartDate,
+    pause_accumulated_days: pauseAccumulatedDays,
+    pause_status: pauseStatusEarly,
+    paused_at: pausedAt,
+    timezone_snapshot: tz,
+    totalWeeksCap,
+  }
+  // Prefer foundation; fall back to elapsed unlock helper only if windows unavailable.
+  const unlockedWeekMax =
+    foundationCurrentWeek != null && foundationCurrentWeek >= 1
+      ? foundationCurrentWeek
+      : computeUnlockedWeekMax(slots, completedSlots, assignmentForUnlock, tz)
+  const displayWeekNumber = unlockedWeekMax
+
+  const todaySlotRaw = getTodaySlot(slots, unlockedWeekMax, todayWeekday)
+  const isRestDay = todaySlotRaw === null
   const currentWeekSlots = slots.filter((s) => s.week_number === unlockedWeekMax)
 
   // All-time: for nextSlot, isCompleted, completedCount (week unlock uses all completions).
@@ -306,30 +358,19 @@ export async function rpcResponseToProgramWeekState(
   // Use all-time completions since each instance slot is unique per week.
   const progressionModeRaw = data.progressionMode ?? 'auto'
   let completedKeysCurrentWeek: Set<string>
-  const derivedWeek = computeCurrentProgramWeekForAssignment(
-    {
-      start_date: data.assignmentStartDate ?? null,
-      pause_accumulated_days: data.pauseAccumulatedDays ?? 0,
-      pause_status: data.pauseStatus ?? data.pause_status ?? null,
-      paused_at: data.pausedAt ?? null,
-      timezone_snapshot: tz,
-    },
-    tz,
-    { totalWeeksCap },
-  ).week
   if (progressionModeRaw === 'coach_managed') {
     completedKeysCurrentWeek = completedKeysAllTime
-  } else if (data.assignmentStartDate) {
+  } else if (assignmentStartDate) {
     const { startIso, endIso } = zonedUtcBoundsForProgramWeek(
-      data.assignmentStartDate,
-      derivedWeek,
-      tz
+      assignmentStartDate,
+      unlockedWeekMax,
+      tz,
     )
     completedKeysCurrentWeek = new Set(
       completedSlots
         .filter((c) => c.completed_at >= startIso && c.completed_at <= endIso)
         .map((c) => c.program_day_assignment_id)
-        .filter((id): id is string => !!id)
+        .filter((id): id is string => !!id),
     )
   } else {
     completedKeysCurrentWeek = completedKeysAllTime
@@ -420,27 +461,13 @@ export async function rpcResponseToProgramWeekState(
     ? { notes: data.coachReviewNotes, reviewedAt: data.coachReviewDate ?? '' }
     : null
 
-  const rawPause =
-    data.pauseStatus ?? data.pause_status ?? 'active'
-  const pauseStatus: 'active' | 'paused' =
-    rawPause === 'paused' ? 'paused' : 'active'
+  const pauseStatus = pauseStatusEarly
   const pauseReason =
     data.pauseReason ?? data.pause_reason ?? null
 
-  const assignmentStartDate =
-    typeof data.assignmentStartDate === 'string' && data.assignmentStartDate.trim()
-      ? data.assignmentStartDate.trim().slice(0, 10)
-      : null
-  const pauseAccumulatedDays = Math.max(0, Number(data.pauseAccumulatedDays) || 0)
-  const pausedAt = data.pausedAt ?? null
-
   let nextDue: ProgramWeekDayCard | null = null
   if (assignmentStartDate && totalWeeks > 0) {
-    const pauses: PauseState = {
-      accumulatedDays: pauseAccumulatedDays,
-      pauseStatus,
-      pausedAt,
-    }
+    const pauses: PauseState = pausesForFoundation
     const workoutRefs: WorkoutRef[] = slots
       .filter((s) => Boolean(s.template_id || s.program_instance_workout_id))
       .map((s) => ({
@@ -479,10 +506,7 @@ export async function rpcResponseToProgramWeekState(
       completedCount,
       totalSlots,
       currentWeekNumber: unlockedWeekMax,
-      displayWeekNumber:
-        typeof data.currentProgramWeek === 'number' && data.currentProgramWeek >= 1
-          ? data.currentProgramWeek
-          : unlockedWeekMax,
+      displayWeekNumber,
       progressionMode,
       isWeekCompleteAwaitingReview,
       coachFeedback,
