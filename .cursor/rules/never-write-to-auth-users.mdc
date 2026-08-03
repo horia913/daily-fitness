@@ -1,0 +1,5 @@
+---
+alwaysApply: true
+---
+
+NEVER write to auth.users. NEVER programmatically reset/change passwords to "verify." Verify auth flows ONLY with a throwaway account you create for the test, or stop and report. Cursor does not touch real user auth records — not the coach account, not Popescu, not anyone.

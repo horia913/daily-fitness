@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,8 +14,14 @@ import {
 } from "@/components/server/AuthLayout";
 import { AlertCircle, CheckCircle, Eye, EyeOff, KeyRound, Shield } from "lucide-react";
 
-export default function ResetPasswordPage() {
+/**
+ * Password reset landing page.
+ * Session is established by GET /auth/confirm (verifyOtp + cookies) before redirect here.
+ * This page only checks for a session and lets the user set a new password.
+ */
+function ResetPasswordContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [status, setStatus] = useState<
     "verifying" | "ready" | "invalid" | "submitting" | "success" | "error"
   >("verifying");
@@ -24,56 +31,68 @@ export default function ResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const recoveryEventSeenRef = useRef(false);
-  const invalidTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const startRecoveryVerification = useCallback(() => {
-    recoveryEventSeenRef.current = false;
+  const markReady = useCallback(() => {
     setErrorMessage("");
-    setStatus("verifying");
+    setStatus("ready");
+  }, []);
 
-    if (invalidTimeoutRef.current) {
-      clearTimeout(invalidTimeoutRef.current);
-    }
-
-    invalidTimeoutRef.current = setTimeout(() => {
-      if (!recoveryEventSeenRef.current) {
-        console.warn("[reset-password] Recovery event not received within timeout");
-        setStatus("invalid");
-        setErrorMessage("This reset link is invalid or expired. Request a new one.");
-      }
-    }, 5000);
+  const markInvalid = useCallback((message?: string) => {
+    setStatus("invalid");
+    setErrorMessage(
+      message ||
+        "This reset link is invalid or expired. Request a new one from the login page.",
+    );
   }, []);
 
   useEffect(() => {
-    // This page relies on detectSessionInUrl: true (default) in the supabase browser client.
-    // Supabase auto-detects the ?code=xxx query param and exchanges it for a recovery session,
-    // which triggers a PASSWORD_RECOVERY auth state event. Do NOT call exchangeCodeForSession
-    // manually here — that creates a duplicate-exchange race.
+    let cancelled = false;
+
+    const linkError = searchParams.get("error");
+    if (linkError === "invalid_link" || linkError === "reset_link_invalid") {
+      markInvalid(
+        "This reset link is invalid or expired. Request a new one from the login page.",
+      );
+      return;
+    }
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("[reset-password] auth state event", { event, hasSession: Boolean(session) });
-      if ((event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") && session) {
-        recoveryEventSeenRef.current = true;
-        if (invalidTimeoutRef.current) {
-          clearTimeout(invalidTimeoutRef.current);
-          invalidTimeoutRef.current = null;
-        }
-        setErrorMessage("");
-        setStatus("ready");
+      if (cancelled) return;
+      if (
+        session &&
+        (event === "PASSWORD_RECOVERY" ||
+          event === "SIGNED_IN" ||
+          event === "INITIAL_SESSION")
+      ) {
+        markReady();
       }
     });
 
-    startRecoveryVerification();
+    void (async () => {
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession();
+      if (cancelled) return;
+      if (error) {
+        console.warn("[reset-password] getSession failed", error.message);
+        markInvalid();
+        return;
+      }
+      if (session) {
+        markReady();
+      } else {
+        markInvalid();
+      }
+    })();
 
     return () => {
-      if (invalidTimeoutRef.current) {
-        clearTimeout(invalidTimeoutRef.current);
-      }
+      cancelled = true;
       subscription.unsubscribe();
     };
-  }, [startRecoveryVerification]);
+  }, [markInvalid, markReady, searchParams]);
 
   const handleUpdatePassword = async () => {
     if (status === "submitting") return;
@@ -82,7 +101,9 @@ export default function ResetPasswordPage() {
 
     if (status !== "ready" && status !== "error") {
       setStatus("invalid");
-      setErrorMessage("This reset link is invalid or expired. Request a new one.");
+      setErrorMessage(
+        "This reset link is invalid or expired. Request a new one.",
+      );
       return;
     }
 
@@ -100,10 +121,11 @@ export default function ResetPasswordPage() {
 
     setStatus("submitting");
     try {
-      console.log("[reset-password] Calling supabase.auth.updateUser()");
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
       if (error) {
-        console.error("[reset-password] supabase.auth.updateUser failed", error);
+        console.error("[reset-password] updateUser failed", error);
         const msg = String(error.message || "").toLowerCase();
         if (
           msg.includes("invalid") ||
@@ -116,20 +138,24 @@ export default function ResetPasswordPage() {
           return;
         }
         setStatus("error");
-        setErrorMessage(error.message || "Could not update password. Please try again.");
+        setErrorMessage(
+          error.message || "Could not update password. Please try again.",
+        );
         return;
       }
 
-      console.log("[reset-password] Password updated successfully");
       setStatus("success");
       setTimeout(() => router.push("/"), 1200);
-    } catch (updateError: any) {
+    } catch (updateError: unknown) {
       console.error("Password update failed:", updateError);
       setStatus("error");
-      if (updateError?.name === "AbortError") {
+      const err = updateError as { name?: string; message?: string };
+      if (err?.name === "AbortError") {
         setErrorMessage("Network error. Please try again.");
       } else {
-        setErrorMessage(updateError?.message || "Could not update password. Please try again.");
+        setErrorMessage(
+          err?.message || "Could not update password. Please try again.",
+        );
       }
     }
   };
@@ -150,7 +176,13 @@ export default function ResetPasswordPage() {
         ) : status === "invalid" ? (
           <div className="space-y-4">
             <div className="fc-glass-soft border border-[color:var(--fc-status-error)] fc-text-error px-4 py-3 rounded-2xl text-sm flex items-start gap-2">
-              <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "color-mix(in srgb, var(--fc-status-error) 25%, transparent)" }}>
+              <div
+                className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{
+                  background:
+                    "color-mix(in srgb, var(--fc-status-error) 25%, transparent)",
+                }}
+              >
                 <AlertCircle className="w-3 h-3" />
               </div>
               <div>
@@ -160,20 +192,13 @@ export default function ResetPasswordPage() {
             </div>
 
             <div className="flex flex-col gap-3">
-              <Button
-                type="button"
-                variant="fc-primary"
-                className="w-full h-12 rounded-xl font-semibold"
-                onClick={startRecoveryVerification}
-              >
-                Retry verification
+              <Button type="button" variant="fc-primary" className="w-full h-12 rounded-xl font-semibold" asChild>
+                <Link href="/">Back to login</Link>
               </Button>
-              <Link
-                href="/"
-                className="text-center fc-text-dim hover:fc-text-primary text-sm font-medium transition-colors"
-              >
-                Back to login
-              </Link>
+              <p className="text-center text-xs fc-text-dim">
+                Use &quot;Forgot your password?&quot; on the login page to
+                request a fresh link.
+              </p>
             </div>
           </div>
         ) : (
@@ -187,7 +212,13 @@ export default function ResetPasswordPage() {
           >
             {status === "error" && errorMessage && (
               <div className="fc-glass-soft border border-[color:var(--fc-status-error)] fc-text-error px-4 py-3 rounded-2xl text-sm flex items-center gap-2">
-                <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "color-mix(in srgb, var(--fc-status-error) 25%, transparent)" }}>
+                <div
+                  className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{
+                    background:
+                      "color-mix(in srgb, var(--fc-status-error) 25%, transparent)",
+                  }}
+                >
                   <AlertCircle className="w-3 h-3" />
                 </div>
                 {errorMessage}
@@ -196,7 +227,13 @@ export default function ResetPasswordPage() {
 
             {status === "success" && (
               <div className="fc-glass-soft border border-[color:var(--fc-status-success)] fc-text-success px-4 py-3 rounded-2xl text-sm flex items-center gap-2">
-                <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "color-mix(in srgb, var(--fc-status-success) 25%, transparent)" }}>
+                <div
+                  className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{
+                    background:
+                      "color-mix(in srgb, var(--fc-status-success) 25%, transparent)",
+                  }}
+                >
                   <CheckCircle className="w-3 h-3" />
                 </div>
                 Password updated successfully. Redirecting to sign in...
@@ -204,7 +241,10 @@ export default function ResetPasswordPage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="newPassword" className="text-sm font-medium fc-text-primary">
+              <Label
+                htmlFor="newPassword"
+                className="text-sm font-medium fc-text-primary"
+              >
                 New Password
               </Label>
               <div className="relative">
@@ -225,14 +265,21 @@ export default function ResetPasswordPage() {
                   disabled={status === "submitting" || status === "success"}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 fc-text-dim hover:fc-text-primary transition-colors"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
                 </button>
               </div>
               <p className="text-xs fc-text-dim">Use at least 8 characters.</p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="text-sm font-medium fc-text-primary">
+              <Label
+                htmlFor="confirmPassword"
+                className="text-sm font-medium fc-text-primary"
+              >
                 Confirm New Password
               </Label>
               <div className="relative">
@@ -253,7 +300,11 @@ export default function ResetPasswordPage() {
                   disabled={status === "submitting" || status === "success"}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 fc-text-dim hover:fc-text-primary transition-colors"
                 >
-                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showConfirmPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
                 </button>
               </div>
             </div>
@@ -264,7 +315,6 @@ export default function ResetPasswordPage() {
               className="w-full h-12 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
               disabled={status === "submitting" || status === "success"}
               onClick={() => {
-                console.log("[reset-password] Update button clicked", { status });
                 void handleUpdatePassword();
               }}
             >
@@ -286,8 +336,29 @@ export default function ResetPasswordPage() {
             <span>Your data is protected with enterprise-grade security</span>
           </div>
         </div>
-
       </AuthFormContainer>
     </AuthLayout>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <AuthLayout>
+          <AuthFormContainer
+            title="Set new password"
+            description="Choose a new secure password for your account"
+          >
+            <div className="fc-glass-soft border border-[color:var(--fc-glass-border)] px-4 py-4 rounded-2xl text-sm flex items-center gap-3">
+              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin opacity-70" />
+              Loading...
+            </div>
+          </AuthFormContainer>
+        </AuthLayout>
+      }
+    >
+      <ResetPasswordContent />
+    </Suspense>
   );
 }

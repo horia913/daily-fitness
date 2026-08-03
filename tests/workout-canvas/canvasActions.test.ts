@@ -139,6 +139,58 @@ describe('canvas actions', () => {
     expect(slot.rest_pause_seconds).toBeNull()
     expect(slot.max_rest_pauses).toBeNull()
   })
+  it('seeds rest when adding rest_after_exercise', () => {
+    const w = workoutWithTwoSoloGroups()
+    const groupId = w.groups[0].id
+    const slotId = w.groups[0].slots[0].id
+    const stripped = applyCanvasAction(w, {
+      type: 'UPDATE_SLOT',
+      groupId,
+      slotId,
+      patch: { enabledProperties: ['load'], rest_seconds: null },
+    })
+    expect(stripped.ok).toBe(true)
+    const result = applyCanvasAction(stripped.ok ? stripped.workout : w, {
+      type: 'ADD_PROPERTY',
+      groupId,
+      slotId,
+      property: 'rest_after_exercise',
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      const slot = result.workout.groups[0].slots[0]
+      expect(slot.enabledProperties).toContain('rest_after_exercise')
+      expect(slot.rest_seconds).toBe(90)
+    }
+  })
+
+  it('clears rest_seconds when removing rest_after_exercise', () => {
+    const w = workoutWithTwoSoloGroups()
+    const groupId = w.groups[0].id
+    const slotId = w.groups[0].slots[0].id
+    expect(w.groups[0].slots[0].enabledProperties).toContain('rest_after_exercise')
+    const removed = applyCanvasAction(w, {
+      type: 'REMOVE_PROPERTY',
+      groupId,
+      slotId,
+      property: 'rest_after_exercise',
+      confirmed: true,
+    })
+    expect(removed.ok).toBe(true)
+    if (!removed.ok) return
+    const slot = removed.workout.groups[0].slots[0]
+    expect(slot.enabledProperties).not.toContain('rest_after_exercise')
+    expect(slot.rest_seconds).toBeNull()
+  })
+
+  it('new exercises default to sets, reps, load, and rest', () => {
+    const slot = createDefaultExercise(EX_A, { id: EX_A, name: 'Squat' }, 1)
+    const group = createSoloGroup(slot, 1)
+    expect(group.total_sets).toBe(3)
+    expect(slot.measurement).toBe('reps')
+    expect(slot.enabledProperties).toEqual(['load', 'rest_after_exercise'])
+    expect(slot.rest_seconds).toBe(90)
+  })
 })
 
 describe('canvasGroupToWritePayload derived legacy', () => {

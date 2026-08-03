@@ -10,7 +10,12 @@ import {
   syncPrescriptionsForGroup,
 } from './prescriptions'
 import type { CanvasExercise, CanvasGroup, CanvasWorkout } from './canvasTypes'
-import { createDefaultExercise, createSoloGroup, defaultPropertiesForMeasurement } from './canvasTypes'
+import {
+  createDefaultExercise,
+  createSoloGroup,
+  DEFAULT_REST_SECONDS,
+  defaultPropertiesForMeasurement,
+} from './canvasTypes'
 import type { Measurement, Prescription, RoundsDriver, SlotProperty, Technique } from './types'
 
 export type CanvasAction =
@@ -392,7 +397,9 @@ export function applyCanvasAction(workout: CanvasWorkout, action: CanvasAction):
               : [...s.enabledProperties, prop]
             const configPatch = ['drop_set', 'cluster', 'rest_pause'].includes(prop)
               ? techniqueConfigPatch(technique)
-              : {}
+              : prop === 'rest_after_exercise' && s.rest_seconds == null
+                ? { rest_seconds: DEFAULT_REST_SECONDS }
+                : {}
             return { ...s, enabledProperties, technique, ...configPatch }
           }),
         })),
@@ -403,7 +410,7 @@ export function applyCanvasAction(workout: CanvasWorkout, action: CanvasAction):
       const group = findGroup(workout, action.groupId)
       const slot = group?.slots.find((s) => s.id === action.slotId)
       if (!group || !slot) return { ok: false, error: 'Exercise not found.' }
-      if (!action.confirmed && ['load', 'rir', 'tempo'].includes(action.property)) {
+      if (!action.confirmed && ['load', 'rir', 'tempo', 'rest_after_exercise'].includes(action.property)) {
         return { ok: false, error: 'Remove this property and clear its values?', needsConfirm: true }
       }
       return {
@@ -426,6 +433,9 @@ export function applyCanvasAction(workout: CanvasWorkout, action: CanvasAction):
             }
             if (action.property === 'tempo') {
               next.prescriptions = s.prescriptions.map((p) => ({ ...p, tempo: null }))
+            }
+            if (action.property === 'rest_after_exercise') {
+              next.rest_seconds = null
             }
             if (['drop_set', 'cluster', 'rest_pause'].includes(action.property)) {
               next = { ...next, technique: 'none', ...techniqueConfigPatch('none') }

@@ -73,9 +73,12 @@ export function groupColorIndex(groupIndex: number): number {
 }
 
 export function defaultPropertiesForMeasurement(measurement: Measurement): SlotProperty[] {
-  if (measurement === 'reps') return ['load']
-  return []
+  if (measurement === 'reps') return ['load', 'rest_after_exercise']
+  return ['rest_after_exercise']
 }
+
+/** Default rest between sets when Rest is enabled on a new exercise. */
+export const DEFAULT_REST_SECONDS = 90
 
 export function createDefaultExercise(
   exerciseId: string,
@@ -90,7 +93,8 @@ export function createDefaultExercise(
     measurement: 'reps',
     technique: 'none',
     prescriptions,
-    enabledProperties: ['load'],
+    enabledProperties: ['load', 'rest_after_exercise'],
+    rest_seconds: DEFAULT_REST_SECONDS,
     exercise: exercise ?? null,
   }
 }

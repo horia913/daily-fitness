@@ -101,6 +101,9 @@ function PrescriptionTable({
             {slot.enabledProperties.includes('tempo') && (
               <th className="text-left py-1 pr-3 font-normal w-[100px]">Tempo</th>
             )}
+            {slot.enabledProperties.includes('rest_after_exercise') && (
+              <th className="text-left py-1 pr-3 font-normal w-[80px]">Rest (s)</th>
+            )}
             {slot.technique === 'drop_set' && (
               <th className="text-left py-1 pr-3 font-normal w-[80px]">Drop %</th>
             )}
@@ -122,7 +125,7 @@ function PrescriptionTable({
         <tbody>
           {[...slot.prescriptions]
             .sort((a, b) => a.set_number - b.set_number)
-            .map((row) => (
+            .map((row, rowIndex) => (
               <tr key={row.id ?? row.set_number} style={{ borderTop: `1px solid ${CANVAS.hairline}` }}>
                 <td className="py-2 pr-2 font-mono w-[34px]">{row.set_number}</td>
                 <td className="py-2 pr-3 w-[120px]">
@@ -218,6 +221,22 @@ function PrescriptionTable({
                       value={row.tempo ?? ''}
                       onChange={(e) =>
                         onUpdatePrescription(row.set_number, { tempo: e.target.value || null })
+                      }
+                    />
+                  </td>
+                )}
+                {slot.enabledProperties.includes('rest_after_exercise') && rowIndex === 0 && (
+                  <td className="py-2 pr-3 align-top" rowSpan={slot.prescriptions.length}>
+                    <input
+                      type="number"
+                      min={0}
+                      className="w-14 bg-transparent border-b outline-none font-mono"
+                      style={{ borderColor: CANVAS.hairline }}
+                      value={slot.rest_seconds ?? ''}
+                      onChange={(e) =>
+                        onUpdateSlot({
+                          rest_seconds: e.target.value ? Number(e.target.value) : null,
+                        })
                       }
                     />
                   </td>
