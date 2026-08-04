@@ -291,21 +291,23 @@ export function ProgramDayEditor({
   if (embedded) {
     return (
       <>
-        <div className={columnCss.header}>
-          {headerPrefix ?? <span className="w-6" />}
-          <div className={columnCss.headerText}>
-            <p className={columnCss.dayLabel}>{programDayLabel(programDay)}</p>
-            <p className={columnCss.dayDate}>Day {timelineDay}</p>
-            {!isRest && summary.exerciseCount != null && summary.exerciseCount > 0 ? (
-              <p className={columnCss.sessionMeta}>
-                {summary.label}
-                {summary.isOptional ? ' · Optional' : ''}
-              </p>
-            ) : null}
+        <div className={columnCss.body}>
+          <div className={columnCss.header}>
+            {headerPrefix ?? <span className="w-6" />}
+            <div className={columnCss.headerText}>
+              <p className={columnCss.dayLabel}>{programDayLabel(programDay)}</p>
+              <p className={columnCss.dayDate}>Day {timelineDay}</p>
+              {!isRest && summary.exerciseCount != null && summary.exerciseCount > 0 ? (
+                <p className={columnCss.sessionMeta}>
+                  {summary.label}
+                  {summary.isOptional ? ' · Optional' : ''}
+                </p>
+              ) : null}
+            </div>
+            {sessionHeaderActions}
           </div>
-          {sessionHeaderActions}
+          <div className={columnCss.sessionBody}>{editorBody}</div>
         </div>
-        <div className={columnCss.sessionBody}>{editorBody}</div>
         <LibraryWorkoutPicker
           open={pickerOpen}
           coachId={coachId}
