@@ -14,7 +14,7 @@
 
  * 1. existing `ex.rir` on the block (from get_workout_blocks RPC)
 
- * 2. workout_set_entry_exercises.rir (template row on set_entry_id)
+ * 2. workout_set_entry_exercises.rpe (template row on set_entry_id; was rir)
 
  */
 
@@ -122,7 +122,7 @@ export async function enrichWorkoutBlocksPrescribedRir(
 
     .from("workout_set_entry_exercises")
 
-    .select("set_entry_id, exercise_id, exercise_order, rir")
+    .select("set_entry_id, exercise_id, exercise_order, rpe")
 
     .in("set_entry_id", blockIds);
 
@@ -150,7 +150,7 @@ export async function enrichWorkoutBlocksPrescribedRir(
 
       const ord = Number(row.exercise_order ?? 1);
 
-      const r = normalizeRir(row.rir);
+      const r = normalizeRir(row.rpe);
 
       if (r !== undefined) templateMap.set(rirKey(bid, ord, eid), r);
 

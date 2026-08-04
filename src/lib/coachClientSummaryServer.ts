@@ -47,7 +47,8 @@ function mapEntryExercise(
     reps: row.reps != null ? String(row.reps) : null,
     weight_kg: row.weight_kg as number | string | null | undefined,
     load_percentage: row.load_percentage as number | string | null | undefined,
-    rir: row.rir as number | string | null | undefined,
+    // DB column is `rpe`; PrescribedExerciseRow still uses legacy `rir` until Phase 2.
+    rir: row.rpe as number | string | null | undefined,
   };
 }
 
@@ -154,7 +155,7 @@ export async function loadPrescriptionProtocolBundle(
   ] = await Promise.all([
     sb
       .from("workout_set_entry_exercises")
-      .select("set_entry_id, exercise_id, reps, weight_kg, load_percentage, rir")
+      .select("set_entry_id, exercise_id, reps, weight_kg, load_percentage, rpe")
       .in("set_entry_id", entryIds),
     sb
       .from("workout_time_protocols")
@@ -250,7 +251,7 @@ export async function computeAdherenceForWorkoutLog(
   const { data: exRaw } = await sb
     .from("workout_set_entry_exercises")
     .select(
-      "set_entry_id, exercise_id, reps, weight_kg, load_percentage, rir"
+      "set_entry_id, exercise_id, reps, weight_kg, load_percentage, rpe"
     )
     .in("set_entry_id", entryIds);
 
@@ -420,7 +421,7 @@ export async function batchAdherenceForWorkoutLogs(
   const { data: exRaw } = await sb
     .from("workout_set_entry_exercises")
     .select(
-      "set_entry_id, exercise_id, reps, weight_kg, load_percentage, rir"
+      "set_entry_id, exercise_id, reps, weight_kg, load_percentage, rpe"
     )
     .in("set_entry_id", entryIds);
 

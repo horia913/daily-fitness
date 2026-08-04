@@ -31,7 +31,7 @@ describe('canvas session state', () => {
     expect(withRir.ok).toBe(true)
     if (withRir.ok) {
       expect(withRir.workout.groups[0].slots[0].enabledProperties).toContain('rir')
-      expect(withRir.workout.groups[0].slots[0].prescriptions[0].rir ?? null).toBeNull()
+      expect(withRir.workout.groups[0].slots[0].prescriptions[0].rpe ?? null).toBeNull()
     }
   })
 

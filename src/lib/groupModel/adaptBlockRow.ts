@@ -24,7 +24,7 @@ function rowToSlot(row: Record<string, unknown>): GroupModelSlot {
     reps: row.reps as string | null | undefined,
     weight_kg: row.weight_kg as number | null | undefined,
     load_percentage: row.load_percentage as number | null | undefined,
-    rir: row.rir as number | null | undefined,
+    rpe: row.rpe as number | null | undefined,
     tempo: row.tempo as string | null | undefined,
     rest_seconds: row.rest_seconds as number | null | undefined,
     notes: row.notes as string | null | undefined,

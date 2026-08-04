@@ -50,14 +50,14 @@ describe('prescriptions sync', () => {
 describe('derived legacy from prescriptions', () => {
   it('uses first row for slot scalars', () => {
     const rows: Prescription[] = [
-      { set_number: 1, reps: '5', weight_kg: 60, rir: 2, tempo: '3010' },
+      { set_number: 1, reps: '5', weight_kg: 60, rpe: 2, tempo: '3010' },
       { set_number: 2, reps: '5', weight_kg: 62 },
     ]
     expect(derivedLegacyFromPrescriptions(rows)).toEqual({
       reps: '5',
       weight_kg: 60,
       load_percentage: null,
-      rir: 2,
+      rpe: 2,
       tempo: '3010',
       work_seconds: null,
       distance_meters: null,

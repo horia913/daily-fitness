@@ -64,7 +64,8 @@ export interface WorkoutSetEntryExercise {
   reps?: string
   weight_kg?: number
   load_percentage?: number            // Percentage of 1RM for suggested weight
-  rir?: number                        // Prescribed RPE (1–10); DB column name is legacy
+  /** Prescribed RPE (legacy field name `rir` on older payloads; canvas path uses Prescription.rpe). */
+  rir?: number
   tempo?: string                      // Tempo notation
   rest_seconds?: number               // Exercise-specific rest
   notes?: string

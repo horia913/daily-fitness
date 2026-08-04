@@ -54,7 +54,7 @@ export function propertyExistsOnSlot(slot: CanvasExercise, property: FillPropert
     case 'rir':
       return (
         slot.enabledProperties.includes('rir') &&
-        sortedPrescriptions(slot).some((r) => r.rir != null)
+        sortedPrescriptions(slot).some((r) => r.rpe != null)
       )
     case 'work_seconds':
       return (
@@ -98,7 +98,7 @@ export function readBaselineValues(slot: CanvasExercise, property: FillPropertyK
       return parsed as number[]
     }
     case 'rir':
-      return rows.map((r) => r.rir).filter((v): v is number => v != null)
+      return rows.map((r) => r.rpe).filter((v): v is number => v != null)
     case 'work_seconds':
       return rows.map((r) => r.work_seconds).filter((v): v is number => v != null)
     case 'distance_meters':
@@ -208,7 +208,7 @@ export function applyValuesToSlot(
       case 'reps':
         return { ...row, reps: String(Math.round(value)) }
       case 'rir':
-        return { ...row, rir: Math.round(value) }
+        return { ...row, rpe: Math.round(value) }
       case 'work_seconds':
         return { ...row, work_seconds: Math.round(value) }
       case 'distance_meters':

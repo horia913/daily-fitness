@@ -26,7 +26,7 @@ function rowToPrescription(row: Record<string, unknown>): Prescription {
     reps: row.reps as string | null | undefined,
     weight_kg: row.weight_kg as number | null | undefined,
     load_percentage: row.load_percentage as number | null | undefined,
-    rir: row.rir as number | null | undefined,
+    rpe: row.rpe as number | null | undefined,
     tempo: row.tempo as string | null | undefined,
     work_seconds: row.work_seconds as number | null | undefined,
     distance_meters: row.distance_meters as number | null | undefined,

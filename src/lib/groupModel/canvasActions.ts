@@ -429,7 +429,7 @@ export function applyCanvasAction(workout: CanvasWorkout, action: CanvasAction):
               }))
             }
             if (action.property === 'rir') {
-              next.prescriptions = s.prescriptions.map((p) => ({ ...p, rir: null }))
+              next.prescriptions = s.prescriptions.map((p) => ({ ...p, rpe: null }))
             }
             if (action.property === 'tempo') {
               next.prescriptions = s.prescriptions.map((p) => ({ ...p, tempo: null }))
@@ -532,7 +532,7 @@ export function inferPropertiesFromSlot(row: Record<string, unknown>, technique:
   if (row.load_percentage != null || row.weight_kg != null) {
     if (!props.includes('load')) props.push('load')
   }
-  if (row.rir != null && !props.includes('rir')) props.push('rir')
+  if (row.rpe != null && !props.includes('rir')) props.push('rir')
   if (row.tempo && !props.includes('tempo')) props.push('tempo')
   if (row.rest_seconds != null && !props.includes('rest_after_exercise')) props.push('rest_after_exercise')
   if (technique === 'drop_set' && !props.includes('drop_set')) props.push('drop_set')

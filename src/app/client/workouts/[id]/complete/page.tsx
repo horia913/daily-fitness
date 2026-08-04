@@ -895,13 +895,13 @@ function WorkoutCompleteContent() {
           // Standalone template path: workout_set_entry_exercises → workout_set_prescriptions
           const { data: slots } = await supabase
             .from("workout_set_entry_exercises")
-            .select("id, set_entry_id, exercise_id, rir")
+            .select("id, set_entry_id, exercise_id, rpe")
             .in("set_entry_id", entryIds);
           const slotIds = (slots ?? []).map((s) => s.id);
           if (slotIds.length > 0) {
             const { data: rxRows } = await supabase
               .from("workout_set_prescriptions")
-              .select("slot_id, set_number, rir")
+              .select("slot_id, set_number, rpe")
               .in("slot_id", slotIds);
             const slotById = new Map(
               (slots ?? []).map((s) => [s.id, s] as const),
@@ -911,21 +911,22 @@ function WorkoutCompleteContent() {
               if (!slot?.set_entry_id || !slot.exercise_id) continue;
               const sn = Number(rx.set_number);
               if (!Number.isFinite(sn)) continue;
+              // DB columns are `rpe`; map local still named `rir` feeds Phase 2 display map.
               const rir =
-                rx.rir != null && Number(rx.rir) > 0
-                  ? Number(rx.rir)
-                  : slot.rir != null && Number(slot.rir) > 0
-                    ? Number(slot.rir)
+                rx.rpe != null && Number(rx.rpe) > 0
+                  ? Number(rx.rpe)
+                  : slot.rpe != null && Number(slot.rpe) > 0
+                    ? Number(slot.rpe)
                     : null;
               map.set(
                 prescribedKey(slot.set_entry_id, slot.exercise_id, sn),
                 rir,
               );
             }
-            // Slot-level rir fallback when no per-set prescriptions
+            // Slot-level prescribed-effort fallback when no per-set prescriptions
             for (const slot of slots ?? []) {
               if (!slot.set_entry_id || !slot.exercise_id) continue;
-              if (slot.rir == null || Number(slot.rir) <= 0) continue;
+              if (slot.rpe == null || Number(slot.rpe) <= 0) continue;
               // Only fill gaps — don't overwrite per-set values
               for (let sn = 1; sn <= 20; sn++) {
                 const k = prescribedKey(
@@ -933,7 +934,7 @@ function WorkoutCompleteContent() {
                   slot.exercise_id,
                   sn,
                 );
-                if (!map.has(k)) map.set(k, Number(slot.rir));
+                if (!map.has(k)) map.set(k, Number(slot.rpe));
               }
             }
           }
@@ -941,13 +942,13 @@ function WorkoutCompleteContent() {
           // Program instance path
           const { data: pSlots } = await supabase
             .from("program_instance_set_entry_exercises")
-            .select("id, program_instance_set_entry_id, exercise_id, rir")
+            .select("id, program_instance_set_entry_id, exercise_id, rpe")
             .in("program_instance_set_entry_id", entryIds);
           const pSlotIds = (pSlots ?? []).map((s) => s.id);
           if (pSlotIds.length > 0) {
             const { data: pRx } = await supabase
               .from("program_instance_set_prescriptions")
-              .select("slot_id, set_number, rir")
+              .select("slot_id, set_number, rpe")
               .in("slot_id", pSlotIds);
             const pById = new Map((pSlots ?? []).map((s) => [s.id, s] as const));
             for (const rx of pRx ?? []) {
@@ -957,10 +958,10 @@ function WorkoutCompleteContent() {
               const sn = Number(rx.set_number);
               if (!Number.isFinite(sn)) continue;
               const rir =
-                rx.rir != null && Number(rx.rir) > 0
-                  ? Number(rx.rir)
-                  : slot.rir != null && Number(slot.rir) > 0
-                    ? Number(slot.rir)
+                rx.rpe != null && Number(rx.rpe) > 0
+                  ? Number(rx.rpe)
+                  : slot.rpe != null && Number(slot.rpe) > 0
+                    ? Number(slot.rpe)
                     : null;
               map.set(
                 prescribedKey(
@@ -975,8 +976,8 @@ function WorkoutCompleteContent() {
               if (
                 !slot.program_instance_set_entry_id ||
                 !slot.exercise_id ||
-                slot.rir == null ||
-                Number(slot.rir) <= 0
+                slot.rpe == null ||
+                Number(slot.rpe) <= 0
               )
                 continue;
               for (let sn = 1; sn <= 20; sn++) {
@@ -985,7 +986,7 @@ function WorkoutCompleteContent() {
                   slot.exercise_id,
                   sn,
                 );
-                if (!map.has(k)) map.set(k, Number(slot.rir));
+                if (!map.has(k)) map.set(k, Number(slot.rpe));
               }
             }
           }

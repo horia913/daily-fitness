@@ -543,9 +543,9 @@ export class WorkoutSetEntryService {
       if (exerciseData.weight_kg !== undefined && exerciseData.weight_kg !== null) {
         insertData.weight_kg = exerciseData.weight_kg
       }
-      // Column `rir` stores prescribed RPE (1–10), not reps in reserve.
+      // Column `rpe` stores prescribed RPE (1–10). Legacy TS field on exerciseData is still `rir` until Phase 2.
       if (exerciseData.rir !== undefined && exerciseData.rir !== null) {
-        insertData.rir = exerciseData.rir
+        insertData.rpe = exerciseData.rir
       }
       if (exerciseData.tempo !== undefined && exerciseData.tempo !== null && exerciseData.tempo !== '') {
         insertData.tempo = exerciseData.tempo
@@ -586,7 +586,7 @@ export class WorkoutSetEntryService {
         if (error.code === 'PGRST204') {
           console.error('Column not found. Please check that the workout_set_entry_exercises table has all required columns.')
           console.error('Required columns: set_entry_id, exercise_id, exercise_order')
-          console.error('Optional columns: exercise_letter, sets, reps, weight_kg, rir, tempo, rest_seconds, notes')
+          console.error('Optional columns: exercise_letter, sets, reps, weight_kg, rpe, tempo, rest_seconds, notes')
         }
         if (error.code === '57014' || error.message?.includes('timeout')) {
           console.warn('Database timeout - the special set tables may need indexes.')
@@ -907,7 +907,7 @@ export class WorkoutSetEntryService {
         'reps',
         'weight_kg',
         'load_percentage',
-        'rir',
+        'rpe',
         'tempo',
         'rest_seconds',
         'notes',

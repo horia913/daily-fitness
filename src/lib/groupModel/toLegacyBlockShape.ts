@@ -36,7 +36,7 @@ function mapSlotToExercise(
     reps: slot.reps ?? group.reps_per_set ?? undefined,
     weight_kg: slot.weight_kg ?? undefined,
     load_percentage: slot.load_percentage ?? undefined,
-    rir: slot.rir ?? undefined,
+    rir: slot.rpe ?? undefined,
     tempo: slot.tempo ?? undefined,
     rest_seconds: slot.rest_seconds ?? undefined,
     notes: slot.notes ?? undefined,

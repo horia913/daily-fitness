@@ -27,7 +27,7 @@ function mapEntryExercise(
     reps: row.reps != null ? String(row.reps) : null,
     weight_kg: row.weight_kg as number | string | null | undefined,
     load_percentage: row.load_percentage as number | string | null | undefined,
-    rir: row.rir as number | string | null | undefined,
+    rir: row.rpe as number | string | null | undefined,
   };
 }
 
@@ -39,14 +39,14 @@ function pickPrescriptionFields(
     return {
       reps: rx.reps != null ? String(rx.reps) : slot.reps != null ? String(slot.reps) : null,
       weight_kg: rx.weight_kg ?? slot.weight_kg,
-      rir: rx.rir ?? slot.rir,
+      rir: rx.rpe ?? slot.rpe,
       load_percentage: rx.load_percentage ?? slot.load_percentage,
     };
   }
   return {
     reps: slot.reps != null ? String(slot.reps) : null,
     weight_kg: slot.weight_kg,
-    rir: slot.rir,
+    rir: slot.rpe,
     load_percentage: slot.load_percentage,
   };
 }
@@ -85,7 +85,7 @@ export async function loadInstancePrescriptionProtocolBundle(
     sb
       .from("program_instance_set_entry_exercises")
       .select(
-        "id, program_instance_set_entry_id, exercise_id, reps, weight_kg, load_percentage, rir"
+        "id, program_instance_set_entry_id, exercise_id, reps, weight_kg, load_percentage, rpe"
       )
       .in("program_instance_set_entry_id", instanceEntryIds),
     sb
@@ -99,7 +99,7 @@ export async function loadInstancePrescriptionProtocolBundle(
   if (slotIds.length > 0) {
     const { data: rxRows } = await sb
       .from("program_instance_set_prescriptions")
-      .select("slot_id, reps, weight_kg, load_percentage, rir, set_number")
+      .select("slot_id, reps, weight_kg, load_percentage, rpe, set_number")
       .in("slot_id", slotIds)
       .order("set_number", { ascending: true });
     for (const rx of rxRows ?? []) {

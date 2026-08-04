@@ -204,10 +204,10 @@ function PrescriptionTable({
                       max={10}
                       className="w-12 bg-transparent border-b outline-none font-mono"
                       style={{ borderColor: CANVAS.hairline }}
-                      value={row.rir ?? ''}
+                      value={row.rpe ?? ''}
                       onChange={(e) =>
                         onUpdatePrescription(row.set_number, {
-                          rir: e.target.value ? Number(e.target.value) : null,
+                          rpe: e.target.value ? Number(e.target.value) : null,
                         })
                       }
                     />

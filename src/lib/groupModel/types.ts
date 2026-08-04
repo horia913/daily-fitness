@@ -13,7 +13,8 @@ export interface Prescription {
   reps?: string | null
   weight_kg?: number | null
   load_percentage?: number | null
-  rir?: number | null
+  /** Prescribed effort (RPE). DB column renamed from legacy `rir`. */
+  rpe?: number | null
   tempo?: string | null
   work_seconds?: number | null
   distance_meters?: number | null
@@ -59,7 +60,8 @@ export interface GroupModelSlot {
   reps?: string | null
   weight_kg?: number | null
   load_percentage?: number | null
-  rir?: number | null
+  /** Prescribed effort (RPE). DB column renamed from legacy `rir`. */
+  rpe?: number | null
   tempo?: string | null
   rest_seconds?: number | null
   notes?: string | null
@@ -109,7 +111,8 @@ export interface GroupModelSlotWrite {
   reps?: string | null
   weight_kg?: number | null
   load_percentage?: number | null
-  rir?: number | null
+  /** Prescribed effort (RPE). DB column renamed from legacy `rir`. */
+  rpe?: number | null
   tempo?: string | null
   rest_seconds?: number | null
   notes?: string | null

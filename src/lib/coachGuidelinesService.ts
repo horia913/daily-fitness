@@ -49,7 +49,7 @@ export interface VolumeGuideline {
   setsPerMuscleWeekMax: number;
   repsPerSetMin: number;
   repsPerSetMax: number;
-  /** DB columns `rir_min` / `rir_max`: treat as prescribed RPE range (1–10) after data backfill. */
+  /** DB columns `rpe_min` / `rpe_max` (legacy TS names rirMin/rirMax until Phase 2). */
   rirMin: number;
   rirMax: number;
   loadPercentMin: number;
@@ -170,8 +170,8 @@ async function loadVolumeGuidelines(): Promise<Map<string, VolumeGuideline>> {
         setsPerMuscleWeekMax: row.sets_per_muscle_week_max,
         repsPerSetMin: row.reps_per_set_min,
         repsPerSetMax: row.reps_per_set_max,
-        rirMin: row.rir_min,
-        rirMax: row.rir_max,
+        rirMin: row.rpe_min,
+        rirMax: row.rpe_max,
         loadPercentMin: row.load_percent_min,
         loadPercentMax: row.load_percent_max,
         restPeriodSec: row.rest_period_sec,

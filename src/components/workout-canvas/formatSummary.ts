@@ -126,7 +126,7 @@ export function formatExerciseSummary(slot: CanvasExercise, group: CanvasGroup):
 
 
 
-  if (first?.rir != null) parts.push(`RIR ${first.rir}`)
+  if (first?.rpe != null) parts.push(`RIR ${first.rpe}`)
 
   if (first?.tempo) parts.push(first.tempo)
 

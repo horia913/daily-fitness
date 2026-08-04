@@ -1,7 +1,7 @@
 /**
  * Pure progression generation engine.
  *
- * IMPORTANT — `ProgramProgressionRule.rir` (DB column `rir`):
+ * IMPORTANT — `ProgramProgressionRule.rir` (TS until Phase 2; DB column `rpe`):
  * Stores **prescribed RPE** (1–10), not “reps in reserve”. No column rename; values are RPE.
  *
  * Prescribed RPE progression (non-deload profiles):
@@ -184,7 +184,7 @@ function addChange(
 
 const PRESCRIBED_RPE_CEILING = 10
 
-/** `b.rir` / `r.rir` = prescribed RPE in DB column `rir`. */
+/** `b.rir` / `r.rir` = prescribed RPE (TS field; DB column `rpe`). */
 function prescribedRpeForWeek(
   week1P: number,
   weekNumber: number,
@@ -615,7 +615,7 @@ function applyTaper(
     }
   }
 
-  // Prescribed RPE (column `rir`): hold Week 1 baseline for every taper week
+  // Prescribed RPE (TS `rir` / DB `rpe`): hold Week 1 baseline for every taper week
   const week1P = b.rir as number | null
   if (week1P != null) {
     const newP = week1P
@@ -801,7 +801,7 @@ function applyReduction(
     }
   }
 
-  // Prescribed RPE (column `rir`): deload = easier than Week 1 (−1 RPE, floor 1)
+  // Prescribed RPE (TS `rir` / DB `rpe`): deload = easier than Week 1 (−1 RPE, floor 1)
   const week1P = b.rir as number | null
   if (week1P != null) {
     const newP = Math.max(1, week1P - 1)

@@ -5,7 +5,7 @@ export const PRESCRIPTION_VALUE_FIELDS = [
   'reps',
   'weight_kg',
   'load_percentage',
-  'rir',
+  'rpe',
   'tempo',
   'work_seconds',
   'distance_meters',
@@ -15,7 +15,7 @@ export type PrescriptionValueField = (typeof PRESCRIPTION_VALUE_FIELDS)[number]
 
 /** Columns on workout_set_prescriptions (pace/time/speed/HR targets live on wsee slots). */
 export const PRESCRIPTION_SELECT_COLUMNS =
-  'id, slot_id, set_number, reps, weight_kg, load_percentage, rir, tempo, work_seconds, distance_meters'
+  'id, slot_id, set_number, reps, weight_kg, load_percentage, rpe, tempo, work_seconds, distance_meters'
 
 export function emptyPrescription(setNumber: number): Prescription {
   return { id: newId(), set_number: setNumber }
@@ -82,7 +82,7 @@ export function derivedLegacyFromPrescriptions(
   prescriptions: Prescription[],
 ): Pick<
   Prescription,
-  'reps' | 'weight_kg' | 'load_percentage' | 'rir' | 'tempo' | 'work_seconds' | 'distance_meters'
+  'reps' | 'weight_kg' | 'load_percentage' | 'rpe' | 'tempo' | 'work_seconds' | 'distance_meters'
 > {
   const first = prescriptions.slice().sort((a, b) => a.set_number - b.set_number)[0]
   if (!first) return {}
@@ -90,7 +90,7 @@ export function derivedLegacyFromPrescriptions(
     reps: first.reps ?? null,
     weight_kg: first.weight_kg ?? null,
     load_percentage: first.load_percentage ?? null,
-    rir: first.rir ?? null,
+    rpe: first.rpe ?? null,
     tempo: first.tempo ?? null,
     work_seconds: first.work_seconds ?? null,
     distance_meters: first.distance_meters ?? null,
@@ -119,7 +119,7 @@ export function prescriptionsFromSlotLegacy(
     reps: (slot.reps as string | null | undefined) ?? null,
     weight_kg: (slot.weight_kg as number | null | undefined) ?? null,
     load_percentage: (slot.load_percentage as number | null | undefined) ?? null,
-    rir: (slot.rir as number | null | undefined) ?? null,
+    rpe: (slot.rpe as number | null | undefined) ?? null,
     tempo: (slot.tempo as string | null | undefined) ?? null,
     work_seconds: (slot.work_seconds as number | null | undefined) ?? null,
     distance_meters: (slot.distance_meters as number | null | undefined) ?? null,
