@@ -728,6 +728,10 @@ export function SupersetExecutor({
         if (representative) updateSetRpe(representative, rpe);
       },
       disabled: !representative || representative.id.startsWith("temp-"),
+      onTitleClick:
+        allowSetEditDelete && forSet[0]
+          ? () => handleEditSet(forSet[0])
+          : undefined,
       menu: allowSetEditDelete && forSet[0] ? (
         <button
           type="button"

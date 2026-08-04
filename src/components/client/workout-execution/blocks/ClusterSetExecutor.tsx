@@ -494,6 +494,9 @@ export function ClusterSetExecutor({
     rpe: setEntry.rpe ?? null,
     onEffortChange: (rpe) => updateSetRpe(setEntry, rpe),
     disabled: setEntry.id.startsWith("temp-"),
+    onTitleClick: allowSetEditDelete
+      ? () => handleEditSet(setEntry)
+      : undefined,
     menu: allowSetEditDelete ? (
       <div className="relative flex items-center">
         <button

@@ -18,7 +18,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Check, ChevronDown, ChevronUp } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SetEffortPicker } from "./SetEffortPicker";
 import { LoggedEffortInline } from "./LoggedEffortInline";
@@ -33,6 +33,11 @@ export interface LoggedSetRow {
   rpe: number | null | undefined;
   /** Called when the user taps an effort button. */
   onEffortChange: (rpe: number) => void;
+  /**
+   * When set, the title/set-info area is tappable to enter edit mode.
+   * Does NOT wrap the effort picker — RPE taps stay independent.
+   */
+  onTitleClick?: () => void;
   /** Optional right-aligned slot (typically the 3-dot menu). */
   menu?: React.ReactNode;
   /** When true, picker is disabled (e.g. set still syncing). */
@@ -108,17 +113,41 @@ export function LoggedSetsList({
               className="flex flex-col gap-1.5 border-b border-white/[0.04] py-2.5 last:border-b-0"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="flex min-w-0 items-center gap-2 text-[13px] font-semibold text-white">
-                  <Check
-                    className="h-3.5 w-3.5 shrink-0 text-[color:var(--fc-accent)]"
-                    strokeWidth={3}
-                    aria-hidden
-                  />
-                  <span className="min-w-0 truncate font-medium text-[color:var(--fc-text-primary)]">
-                    {row.title}
-                    {hasRpe ? <LoggedEffortInline rpe={row.rpe} /> : null}
+                {row.onTitleClick ? (
+                  <button
+                    type="button"
+                    onClick={row.onTitleClick}
+                    disabled={row.disabled}
+                    className="flex min-w-0 flex-1 items-center gap-2 rounded-md text-left text-[13px] font-semibold text-white transition-colors hover:bg-white/[0.04] active:bg-white/[0.06] disabled:opacity-60"
+                    aria-label="Edit set"
+                  >
+                    <Check
+                      className="h-3.5 w-3.5 shrink-0 text-[color:var(--fc-accent)]"
+                      strokeWidth={3}
+                      aria-hidden
+                    />
+                    <span className="min-w-0 truncate font-medium text-[color:var(--fc-text-primary)] underline decoration-white/25 underline-offset-2">
+                      {row.title}
+                      {hasRpe ? <LoggedEffortInline rpe={row.rpe} /> : null}
+                    </span>
+                    <Pencil
+                      className="h-3 w-3 shrink-0 text-[color:var(--fc-text-dim)]"
+                      aria-hidden
+                    />
+                  </button>
+                ) : (
+                  <span className="flex min-w-0 items-center gap-2 text-[13px] font-semibold text-white">
+                    <Check
+                      className="h-3.5 w-3.5 shrink-0 text-[color:var(--fc-accent)]"
+                      strokeWidth={3}
+                      aria-hidden
+                    />
+                    <span className="min-w-0 truncate font-medium text-[color:var(--fc-text-primary)]">
+                      {row.title}
+                      {hasRpe ? <LoggedEffortInline rpe={row.rpe} /> : null}
+                    </span>
                   </span>
-                </span>
+                )}
                 {row.menu ? (
                   <div className="flex shrink-0 items-center">{row.menu}</div>
                 ) : null}

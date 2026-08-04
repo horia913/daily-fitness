@@ -241,7 +241,7 @@ export function DropSetExecutor({
             reps: repsPrefill,
           },
         ],
-        expanded: false,
+        expanded: true,
         done: false,
       };
     },
@@ -646,6 +646,9 @@ export function DropSetExecutor({
     rpe: setEntry.rpe ?? null,
     onEffortChange: (rpe) => updateSetRpe(setEntry, rpe),
     disabled: setEntry.id.startsWith("temp-"),
+    onTitleClick: allowSetEditDelete
+      ? () => handleEditSet(setEntry)
+      : undefined,
     menu: allowSetEditDelete ? (
       <div className="relative flex items-center">
         <button

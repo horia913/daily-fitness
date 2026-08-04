@@ -765,6 +765,10 @@ export function GiantSetExecutor({
         if (representative) updateSetRpe(representative, rpe);
       },
       disabled: !representative || representative.id.startsWith("temp-"),
+      onTitleClick:
+        allowSetEditDelete && forRound[0]
+          ? () => handleEditSet(forRound[0])
+          : undefined,
       menu: allowSetEditDelete && forRound[0] ? (
         <button
           type="button"
