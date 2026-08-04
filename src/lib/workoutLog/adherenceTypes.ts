@@ -20,7 +20,7 @@ export type SetOutcome = {
 export type PrescribedSetReferenceLite = {
   prescribedReps: number | null;
   prescribedWeightKg: number | null;
-  prescribedRir: number | null;
+  prescribedRpe: number | null;
 };
 
 export type ActualSetReferenceLite = {

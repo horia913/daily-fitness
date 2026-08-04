@@ -20,7 +20,7 @@ export type SetGroup = {
   containsPR: boolean;
   /** set_log ids in this collapsed group (for rating). */
   setLogIds: string[];
-  prescribedRir: number | null;
+  prescribedRpe: number | null;
   loggedRpe: number | null;
 };
 
@@ -39,5 +39,5 @@ export type ExerciseSummaryModel = {
   techniqueNote?: string | null;
 };
 
-/** Prescribed RIR keyed by `${set_entry_id}:${exercise_id}:${set_number}` */
-export type PrescribedRirMap = Map<string, number | null>;
+/** Prescribed RPE keyed by `${set_entry_id}:${exercise_id}:${set_number}` */
+export type PrescribedRpeMap = Map<string, number | null>;

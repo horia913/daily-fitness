@@ -2,7 +2,7 @@ import {
   consolidateRowOutcome,
   isSetOnTarget,
   repsOutcome,
-  rpeVsPrescribedRirOutcome,
+  rpeVsPrescribedRpeOutcome,
   weightOutcome,
 } from "@/lib/workoutLogSetOutcome";
 
@@ -23,10 +23,10 @@ describe("workoutLogSetOutcome", () => {
     expect(weightOutcome(110, 100)).toBe("over");
   });
 
-  it("rpeVsPrescribedRirOutcome: ±1 is hit", () => {
-    expect(rpeVsPrescribedRirOutcome(8, 8)).toBe("hit");
-    expect(rpeVsPrescribedRirOutcome(9, 8)).toBe("hit");
-    expect(rpeVsPrescribedRirOutcome(10, 8)).toBe("flag");
+  it("rpeVsPrescribedRpeOutcome: ±1 is hit", () => {
+    expect(rpeVsPrescribedRpeOutcome(8, 8)).toBe("hit");
+    expect(rpeVsPrescribedRpeOutcome(9, 8)).toBe("hit");
+    expect(rpeVsPrescribedRpeOutcome(10, 8)).toBe("flag");
   });
 
   it("consolidateRowOutcome picks worst signal", () => {
@@ -42,7 +42,7 @@ describe("workoutLogSetOutcome", () => {
         actualWeightKg: 100,
         prescribedWeightKg: 100,
         actualRpe: 8,
-        prescribedRir: 8,
+        prescribedRpe: 8,
       })
     ).toBe(true);
     expect(
@@ -52,7 +52,7 @@ describe("workoutLogSetOutcome", () => {
         actualWeightKg: 100,
         prescribedWeightKg: 100,
         actualRpe: 8,
-        prescribedRir: 8,
+        prescribedRpe: 8,
       })
     ).toBe(true);
     expect(
@@ -62,7 +62,7 @@ describe("workoutLogSetOutcome", () => {
         actualWeightKg: 100,
         prescribedWeightKg: 100,
         actualRpe: 8,
-        prescribedRir: 8,
+        prescribedRpe: 8,
       })
     ).toBe(false);
     expect(
@@ -72,7 +72,7 @@ describe("workoutLogSetOutcome", () => {
         actualWeightKg: 100,
         prescribedWeightKg: 100,
         actualRpe: 10,
-        prescribedRir: 8,
+        prescribedRpe: 8,
       })
     ).toBe(false);
   });

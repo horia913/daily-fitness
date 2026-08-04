@@ -60,7 +60,7 @@ function hasComparablePrescription(ref: PrescribedBlockReference): boolean {
       s.prescribedParts?.length ||
       s.prescribedReps != null ||
       s.prescribedWeightKg != null ||
-      s.prescribedRir != null ||
+      s.prescribedRpe != null ||
       (s.prescribedLine != null && String(s.prescribedLine).trim() !== "")
     ) {
       return true;

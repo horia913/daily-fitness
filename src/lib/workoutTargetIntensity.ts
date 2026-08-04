@@ -1,6 +1,6 @@
 /**
- * DB column `rir` stores **prescribed RPE** as the literal number to show (e.g. 8 → RPE 8).
- * Do not apply `10 - rir` or any RIR↔RPE conversion.
+ * DB column `rpe` stores **prescribed RPE** as the literal number to show (e.g. 8 → RPE 8).
+ * Do not apply any legacy effort-scale conversion.
  */
 
 /** UI label: show the stored value exactly (trimmed), prefixed with "RPE ". */

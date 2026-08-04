@@ -147,18 +147,16 @@ export type WorkoutLogFullPayload = {
 export type PrescribedSetReference = {
   prescribedReps?: number | null;
   prescribedWeightKg?: number | null;
-  /** Prescribed intensity from template `rir` column (shown as RIR in UI). */
-  prescribedRir?: number | null;
-  /** @deprecated use prescribedRir for display; kept for older payloads */
+  /** Prescribed intensity (RPE 6–10). */
   prescribedRpe?: number | null;
   outcome?: "hit" | "under" | "over" | "miss" | "flag" | "neutral";
   /** Rest-pause continuation etc.: show badge, do not treat as a graded set row. */
   informationalRowBadge?: string | null;
-  /** Superset / multi-segment prescribed cell (each segment: weight × reps @ RIR). */
+  /** Superset / multi-segment prescribed cell (each segment: weight × reps @ RPE). */
   prescribedParts?: Array<{
     weightKg: number | null;
     reps: number | null;
-    rir: number | null;
+    rpe: number | null;
   }>;
   /** Prescribed cell text for speed/endurance rows when not using weight×reps. */
   prescribedLine?: string | null;
@@ -173,7 +171,7 @@ export type PrescribedBlockReference = {
   prescribedReps?: number | null;
   prescribedWeightKg?: number | null;
   prescribedLoadPercent?: number | null;
-  prescribedRir?: number | null;
+  prescribedRpe?: number | null;
   sets?: PrescribedSetReference[];
   /** Speed / endurance header helpers */
   prescribedSpeedDurationSec?: number | null;

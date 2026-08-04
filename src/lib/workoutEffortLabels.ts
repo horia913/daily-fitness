@@ -1,15 +1,14 @@
 /**
- * Per-set effort tier — UI-1 / BE-1 (workout-exec-v6).
+ * Per-set effort tier — prescribed + logged RPE (6–10).
  *
- * Stored RPE (1-10) maps to one of four buttons (Easy / Medium / Hard / Max).
- * Bands use RPE upper bounds:
- *   - Easy   ≤ 4   (button writes RPE 4)
- *   - Medium ≤ 6   (button writes RPE 6)
- *   - Hard   ≤ 8   (button writes RPE 8)
- *   - Max    ≤ 10  (button writes RPE 10)
+ * Bands:
+ *   - Easy   = 6
+ *   - Medium = 7
+ *   - Hard   = 8–9
+ *   - Max    = 10
  *
- * Existing logged data (RPE values across full 1-10 from old UI) stays as-is.
- * The new band mapping just changes how stored values display.
+ * RPE < 6 or null → no tier (blank). Logged picker writes band representatives
+ * (easy:6, medium:7, hard:9, max:10) into workout_set_logs.rpe.
  */
 
 export type EffortTier = "easy" | "medium" | "hard" | "max";
@@ -21,16 +20,16 @@ const EFFORT_TIER_LABEL: Record<EffortTier, string> = {
   max: "Max",
 };
 
-/** Stored RPE → tier key. NULL / non-positive / NaN → null. */
+/** Stored RPE → tier key. NULL / < 6 / NaN → null. */
 export function rpeToEffortTier(
   rpe: number | null | undefined,
 ): EffortTier | null {
   if (rpe == null || Number.isNaN(Number(rpe))) return null;
   const n = Math.round(Number(rpe));
-  if (n <= 0) return null;
-  if (n <= 4) return "easy";
-  if (n <= 6) return "medium";
-  if (n <= 8) return "hard";
+  if (n < 6) return null;
+  if (n === 6) return "easy";
+  if (n === 7) return "medium";
+  if (n <= 9) return "hard";
   return "max";
 }
 
@@ -54,6 +53,8 @@ export function formatEffortSuffix(
 export function formatEffortSuffixFromAverage(
   avgRpe: number | null | undefined,
 ): string | null {
-  if (avgRpe == null || avgRpe <= 0) return null;
-  return formatEffortSuffix(Math.round(avgRpe));
+  if (avgRpe == null || Number.isNaN(Number(avgRpe))) return null;
+  const n = Math.round(Number(avgRpe));
+  if (n < 6) return null;
+  return formatEffortSuffix(n);
 }

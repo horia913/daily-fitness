@@ -131,14 +131,14 @@ function ex(
   exerciseId: string,
   reps: string,
   weightKg: number,
-  rir: number
+  rpe: number
 ): PrescribedExerciseRow & { set_entry_id: string } {
   return {
     set_entry_id: setEntryId,
     exercise_id: exerciseId,
     reps,
     weight_kg: weightKg,
-    rir,
+    rpe,
   };
 }
 
@@ -228,7 +228,7 @@ describe("buildAdherenceBlocks — superset", () => {
   const a = "ex-a";
   const b = "ex-b";
 
-  it("hit all targets — both sides + shared RPE vs RIR", () => {
+  it("hit all targets — both sides + shared RPE vs prescribed RPE", () => {
     const block = mkBlock(entry, "superset", [
       mkLog("1", entry, "superset", {
         superset_exercise_a_id: a,
@@ -266,7 +266,7 @@ describe("buildAdherenceBlocks — superset", () => {
     expect(out.setOutcomes[0]?.row).toBe("miss");
   });
 
-  it("regression — actual RPE is not ignored (shared RPE vs both RIR)", () => {
+  it("regression — actual RPE is not ignored (shared RPE vs both prescribed RPE)", () => {
     const block = mkBlock(entry, "superset", [
       mkLog("1", entry, "superset", {
         superset_exercise_a_id: a,

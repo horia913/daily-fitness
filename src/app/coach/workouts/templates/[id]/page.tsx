@@ -214,7 +214,7 @@ function blockPrimaryLine(block: WorkoutSetEntry): string {
       const exName = ex ? displayExerciseName(ex) : "Exercise";
       const sets = ex?.sets ?? block.total_sets ?? "—";
       const reps = displayReps(ex?.reps, block.reps_per_set);
-      const rpe = ex?.rir != null ? ` @ RPE ${ex.rir}` : "";
+      const rpe = ex?.rpe != null ? ` @ RPE ${ex.rpe}` : "";
       const tempo = ex?.tempo ? `, tempo ${ex.tempo}` : "";
       return `${exName} ${sets} × ${reps}${rpe}${tempo}`;
     }

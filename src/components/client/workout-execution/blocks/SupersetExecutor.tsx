@@ -37,7 +37,7 @@ import {
   LiveCardLog,
   LiveCardLogField,
   LiveCardLogButton,
-  effortFromPrescribedRir,
+  effortFromPrescribedRpe,
   formatLiveRest,
   resolveRestSeconds,
   formatLiveLast,
@@ -977,7 +977,7 @@ export function SupersetExecutor({
                   )}
                   name={exerciseA?.exercise?.name || "Exercise A"}
                   target={targetsToLiveCardTarget(targetsAActive)}
-                  effort={effortFromPrescribedRir(targetsAActive.rir)}
+                  effort={effortFromPrescribedRpe(targetsAActive.rpe)}
                   loadPct={exerciseA?.load_percentage}
                   note={exerciseA?.notes}
                   hint={hintA || null}
@@ -1035,7 +1035,7 @@ export function SupersetExecutor({
                   )}
                   name={exerciseB?.exercise?.name || "Exercise B"}
                   target={targetsToLiveCardTarget(targetsBActive)}
-                  effort={effortFromPrescribedRir(targetsBActive.rir)}
+                  effort={effortFromPrescribedRpe(targetsBActive.rpe)}
                   loadPct={exerciseB?.load_percentage}
                   note={exerciseB?.notes}
                   hint={hintB || null}

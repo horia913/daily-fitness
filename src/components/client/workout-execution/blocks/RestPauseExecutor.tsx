@@ -44,7 +44,7 @@ import {
   LiveCardLog,
   LiveCardLogField,
   formatRestPauseTechniqueBody,
-  effortFromPrescribedRir,
+  effortFromPrescribedRpe,
   formatLiveRest,
   resolveRestSeconds,
   formatLiveLast,
@@ -241,7 +241,7 @@ export function RestPauseExecutor({
     activeSetNumber,
     liveSetEntry.setEntry.reps_per_set,
   );
-  const activeEffort = effortFromPrescribedRir(activeTargets.rir);
+  const activeEffort = effortFromPrescribedRpe(activeTargets.rpe);
   const liveTarget: LiveCardTarget = {
     kind: "reps_only",
     reps: activeTargets.reps ?? prescribedTargetRepsRaw ?? "—",

@@ -48,9 +48,7 @@ function canvasGroupToSetEntry(group: CanvasGroup, templateId: string): WorkoutS
       reps: firstRx?.reps ?? undefined,
       weight_kg: firstRx?.weight_kg ?? undefined,
       load_percentage: firstRx?.load_percentage ?? undefined,
-      // Legacy WorkoutSetEntryExercise still exposes prescribed effort as `rir`
-      // until Phase 2 client rename; canvas Prescription field is `rpe`.
-      rir: firstRx?.rpe ?? undefined,
+            rpe: firstRx?.rpe ?? undefined,
       tempo: firstRx?.tempo ?? undefined,
       rest_seconds: slot.rest_seconds,
       notes: slot.notes,

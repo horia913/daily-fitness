@@ -367,9 +367,9 @@ export default function ExerciseBlockCard({
           details.push(`${exercise.load_percentage}% load`);
         if (exercise.rest_seconds)
           details.push(`${exercise.rest_seconds}s rest`);
-        if (exercise.rir != null && exercise.rir !== "") {
+        if (exercise.rpe != null && exercise.rpe !== "") {
           details.push(
-            formatPrescribedRpeLabel(exercise.rir) ?? `RPE ${String(exercise.rir).trim()}`,
+            formatPrescribedRpeLabel(exercise.rpe) ?? `RPE ${String(exercise.rpe).trim()}`,
           );
         }
         if (exercise.rpe) details.push(`RPE: ${exercise.rpe}`);
@@ -399,7 +399,6 @@ export default function ExerciseBlockCard({
         exercise_letter: ex.exercise_letter,
         weight_kg: ex.weight_kg,
         tempo: ex.tempo,
-        rir: ex.rir,
         rpe: ex.rpe,
         notes: ex.notes,
         load_percentage: ex.load_percentage?.toString() || "",
@@ -456,7 +455,6 @@ export default function ExerciseBlockCard({
             rest_seconds: exercise.rest_seconds,
             weight: exercise.weight,
             tempo: exercise.tempo,
-            rir: exercise.rir,
             rpe: exercise.rpe,
             load_percentage: exercise.load_percentage?.toString() || "",
           },
@@ -468,7 +466,6 @@ export default function ExerciseBlockCard({
             rest_seconds: exercise.rest_seconds,
             weight: exercise.superset_weight,
             tempo: exercise.superset_tempo,
-            rir: exercise.superset_rir,
             rpe: exercise.superset_rpe,
             load_percentage:
               (exercise as any).superset_load_percentage?.toString() || "",
@@ -485,7 +482,6 @@ export default function ExerciseBlockCard({
             rest_seconds: exercise.rest_seconds,
             weight: exercise.weight,
             tempo: exercise.tempo,
-            rir: exercise.rir,
             rpe: exercise.rpe,
             load_percentage: exercise.load_percentage?.toString() || "",
           },
@@ -498,7 +494,6 @@ export default function ExerciseBlockCard({
             rest_seconds: exercise.rest_seconds,
             weight: exercise.compound_weight,
             tempo: exercise.compound_tempo,
-            rir: exercise.compound_rir,
             rpe: exercise.compound_rpe,
             load_percentage:
               (exercise as any).compound_load_percentage?.toString() || "",
@@ -520,7 +515,6 @@ export default function ExerciseBlockCard({
               rest_seconds: exercise.rest_seconds,
               weight: exercise.weight,
               tempo: exercise.tempo,
-              rir: exercise.rir,
               rpe: exercise.rpe,
               duration_seconds: exercise.duration_seconds,
               work_seconds: exercise.work_seconds,

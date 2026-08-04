@@ -55,7 +55,7 @@ describe('Type definitions', () => {
       sets: 3,
       reps: '10',
       weight_kg: null,
-      rir: null,
+      rpe: null,
       tempo: null,
       rest_seconds: null,
       notes: null,

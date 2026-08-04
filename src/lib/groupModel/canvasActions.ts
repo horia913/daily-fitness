@@ -410,7 +410,7 @@ export function applyCanvasAction(workout: CanvasWorkout, action: CanvasAction):
       const group = findGroup(workout, action.groupId)
       const slot = group?.slots.find((s) => s.id === action.slotId)
       if (!group || !slot) return { ok: false, error: 'Exercise not found.' }
-      if (!action.confirmed && ['load', 'rir', 'tempo', 'rest_after_exercise'].includes(action.property)) {
+      if (!action.confirmed && ['load', 'rpe', 'tempo', 'rest_after_exercise'].includes(action.property)) {
         return { ok: false, error: 'Remove this property and clear its values?', needsConfirm: true }
       }
       return {
@@ -428,7 +428,7 @@ export function applyCanvasAction(workout: CanvasWorkout, action: CanvasAction):
                 load_percentage: null,
               }))
             }
-            if (action.property === 'rir') {
+            if (action.property === 'rpe') {
               next.prescriptions = s.prescriptions.map((p) => ({ ...p, rpe: null }))
             }
             if (action.property === 'tempo') {
@@ -532,7 +532,7 @@ export function inferPropertiesFromSlot(row: Record<string, unknown>, technique:
   if (row.load_percentage != null || row.weight_kg != null) {
     if (!props.includes('load')) props.push('load')
   }
-  if (row.rpe != null && !props.includes('rir')) props.push('rir')
+  if (row.rpe != null && !props.includes('rpe')) props.push('rpe')
   if (row.tempo && !props.includes('tempo')) props.push('tempo')
   if (row.rest_seconds != null && !props.includes('rest_after_exercise')) props.push('rest_after_exercise')
   if (technique === 'drop_set' && !props.includes('drop_set')) props.push('drop_set')

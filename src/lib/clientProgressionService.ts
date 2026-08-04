@@ -85,7 +85,7 @@ export type BlockExercisePrescriptionSource = {
   reps?: string | number | null;
   weight_kg?: number | null;
   load_percentage?: number | null;
-  rir?: number | null;
+  rpe?: number | null;
   tempo?: string | null;
   rest_seconds?: number | null;
 };
@@ -116,7 +116,7 @@ export function currentRulesFromBlockExercise(
     targetWeightKg: numOrNull(ex.weight_kg),
     targetLoadPercentage: numOrNull(ex.load_percentage),
     repsVarchar: repsTrim,
-    targetRir: numOrNull(ex.rir),
+    targetRpe: numOrNull(ex.rpe),
     tempo: strOrNull(ex.tempo),
     restSeconds: numOrNull(ex.rest_seconds ?? blockRestSeconds),
     notes: null,
@@ -199,7 +199,7 @@ export interface CurrentWeekRules {
   repsVarchar: string | null;
 
   // Tier 2
-  targetRir: number | null;
+  targetRpe: number | null;
   tempo: string | null;
   restSeconds: number | null;
 
@@ -257,7 +257,7 @@ export function isRuleEffectivelyEmpty(rule: CurrentWeekRules | null): boolean {
     rule.targetLoadPercentage != null ||
     nz(rule.repsVarchar) ||
     nz(rule.exerciseReps) ||
-    rule.targetRir != null ||
+    rule.targetRpe != null ||
     nz(rule.tempo) ||
     rule.restSeconds != null ||
     nz(rule.notes) ||
@@ -1017,7 +1017,7 @@ export function calculateProgressionSuggestion(
     completion = enoughSets && everySetMet;
   }
 
-  const prescribedRpe = currentRules.targetRir;
+  const prescribedRpe = currentRules.targetRpe;
   const targetReps = currentRules.targetRepsMin ?? 8;
 
   let suggestedWeight: number | null = null;

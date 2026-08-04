@@ -36,8 +36,8 @@ export interface NewExerciseInput {
   sets?: string | number;
   reps?: string | number;
   rest_seconds?: string | number;
-  /** Prescribed RPE (1–10); persisted in DB column `rir`. */
-  rir?: string | number;
+  /** Prescribed RPE (6–10). */
+  rpe?: string | number;
   tempo?: string;
   notes?: string;
   amrap_duration?: string | number;
@@ -97,8 +97,8 @@ export interface BuiltExercise {
   sets: string;
   reps: string;
   rest_seconds: string;
-  /** Prescribed RPE (1–10); DB column name is `rir`. */
-  rir: string;
+  /** Prescribed RPE (6–10). */
+  rpe: string;
   tempo: string;
   notes: string;
   amrap_duration: string;
@@ -292,7 +292,7 @@ export function buildExerciseFromNewExercise(
     sets: cleanNumericForForm(newExercise.sets),
     reps: cleanStringForForm(newExercise.reps),
     rest_seconds: cleanNumericForForm(newExercise.rest_seconds),
-    rir: cleanNumericForForm(newExercise.rir),
+    rpe: cleanNumericForForm(newExercise.rpe),
     tempo: cleanStringForForm(newExercise.tempo),
     notes: newExercise.notes ?? "",
     amrap_duration: cleanNumericForForm(newExercise.amrap_duration),

@@ -1,20 +1,20 @@
 /**
 
- * Resolves prescribed RIR (displayed as "Target effort" / RPE) for standalone workout blocks.
+ * Resolves prescribed RPE (displayed as "Target effort" / RPE) for standalone workout blocks.
 
  *
 
- * Program instance workouts load RIR from program_instance_set_prescriptions via
+ * Program instance workouts load RPE from program_instance_set_prescriptions via
 
  * get_instance_workout_canvas — callers should skip this helper on that path.
 
  *
 
- * Standalone priority (first non-null 1–10 wins):
+ * Standalone priority (first non-null 6–10 wins):
 
- * 1. existing `ex.rir` on the block (from get_workout_blocks RPC)
+ * 1. existing `ex.rpe` on the block (from get_workout_blocks RPC)
 
- * 2. workout_set_entry_exercises.rpe (template row on set_entry_id; was rir)
+ * 2. workout_set_entry_exercises.rpe (template row on set_entry_id)
 
  */
 
@@ -30,7 +30,7 @@ type ExerciseLike = {
 
   exercise_order?: number;
 
-  rir?: number | null;
+  rpe?: number | null;
 
 };
 
@@ -98,7 +98,7 @@ export type EnrichPrescribedRirContext = {
 
 
 
-export async function enrichWorkoutBlocksPrescribedRir(
+export async function enrichWorkoutBlocksPrescribedRpe(
 
   supabase: SupabaseClient,
 
@@ -184,11 +184,11 @@ export async function enrichWorkoutBlocksPrescribedRir(
 
       const key = rirKey(bid, ord, eid);
 
-      const merged = firstRir(ex.rir, templateMap.get(key));
+      const merged = firstRir(ex.rpe, templateMap.get(key));
 
       if (merged !== undefined) {
 
-        ex.rir = merged;
+        ex.rpe = merged;
 
       }
 

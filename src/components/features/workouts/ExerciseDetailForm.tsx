@@ -605,11 +605,11 @@ export default function ExerciseDetailForm({
                 <Input
                   type="number"
                   value={
-                    exercise.rir === "" ? "" : exercise.rir ?? ""
+                    exercise.rpe === "" ? "" : exercise.rpe ?? ""
                   }
                   onChange={(e) =>
                     updateExercise({
-                      rir: handleNumberChange(e.target.value, 0),
+                      rpe: handleNumberChange(e.target.value, 0),
                     })
                   }
                   min={1}

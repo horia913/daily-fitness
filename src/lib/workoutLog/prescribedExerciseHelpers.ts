@@ -8,8 +8,8 @@ export type PrescribedExerciseRow = {
   reps?: string | null;
   weight_kg?: number | string | null;
   load_percentage?: number | string | null;
-  /** Prescribed intensity — stored in `rir` column in DB. */
-  rir?: number | string | null;
+  /** Prescribed intensity — DB column `rpe`. */
+  rpe?: number | string | null;
 };
 
 function num(v: number | string | null | undefined): number | null {
@@ -49,7 +49,7 @@ export function parseRepsRange(repsString: string | null | undefined): {
 }
 
 export function prescribedRpe(pe: PrescribedExerciseRow): number | null {
-  return numInt(pe.rir);
+  return numInt(pe.rpe);
 }
 
 export function repsTargetMin(pe: PrescribedExerciseRow): number | null {

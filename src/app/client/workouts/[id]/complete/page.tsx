@@ -40,7 +40,7 @@ import {
   type TileStat,
 } from "@/components/client-workout-complete";
 import completeStyles from "@/components/client-workout-complete/clientWorkoutCompleteV6.module.css";
-import type { PrescribedRirMap } from "@/components/client-workout-complete/types";
+import type { PrescribedRpeMap } from "@/components/client-workout-complete/types";
 import { prescribedKey } from "@/components/client-workout-complete/setLinesFromLogs";
 
 const WORKOUT_LOG_COMPLETION_SELECT =
@@ -260,7 +260,7 @@ function WorkoutCompleteContent() {
     string | null
   >(null);
   const [personalRecords, setPersonalRecords] = useState<any[]>([]);
-  const [prescribedRirMap, setPrescribedRirMap] = useState<PrescribedRirMap>(
+  const [prescribedRpeMap, setPrescribedRpeMap] = useState<PrescribedRpeMap>(
     new Map(),
   );
   const [previousLogTotals, setPreviousLogTotals] = useState<{
@@ -881,7 +881,7 @@ function WorkoutCompleteContent() {
 
       setBlockGroups(blocksArray);
 
-      // Prescribed effort (RIR) for target / yours pairs
+      // Prescribed effort (RPE) for target / yours pairs
       try {
         const entryIds = [
           ...new Set(
@@ -890,7 +890,7 @@ function WorkoutCompleteContent() {
               .filter(Boolean) as string[],
           ),
         ];
-        const map: PrescribedRirMap = new Map();
+        const map: PrescribedRpeMap = new Map();
         if (entryIds.length > 0) {
           // Standalone template path: workout_set_entry_exercises → workout_set_prescriptions
           const { data: slots } = await supabase
@@ -911,8 +911,8 @@ function WorkoutCompleteContent() {
               if (!slot?.set_entry_id || !slot.exercise_id) continue;
               const sn = Number(rx.set_number);
               if (!Number.isFinite(sn)) continue;
-              // DB columns are `rpe`; map local still named `rir` feeds Phase 2 display map.
-              const rir =
+              // DB columns are `rpe`; local value feeds Phase 2 display map.
+              const prescribed =
                 rx.rpe != null && Number(rx.rpe) > 0
                   ? Number(rx.rpe)
                   : slot.rpe != null && Number(slot.rpe) > 0
@@ -920,7 +920,7 @@ function WorkoutCompleteContent() {
                     : null;
               map.set(
                 prescribedKey(slot.set_entry_id, slot.exercise_id, sn),
-                rir,
+                prescribed,
               );
             }
             // Slot-level prescribed-effort fallback when no per-set prescriptions
@@ -957,7 +957,7 @@ function WorkoutCompleteContent() {
                 continue;
               const sn = Number(rx.set_number);
               if (!Number.isFinite(sn)) continue;
-              const rir =
+              const prescribed =
                 rx.rpe != null && Number(rx.rpe) > 0
                   ? Number(rx.rpe)
                   : slot.rpe != null && Number(slot.rpe) > 0
@@ -969,7 +969,7 @@ function WorkoutCompleteContent() {
                   slot.exercise_id,
                   sn,
                 ),
-                rir,
+                prescribed,
               );
             }
             for (const slot of pSlots ?? []) {
@@ -991,9 +991,9 @@ function WorkoutCompleteContent() {
             }
           }
         }
-        setPrescribedRirMap(map);
+        setPrescribedRpeMap(map);
       } catch (e) {
-        console.warn("[complete] prescribed RIR load failed", e);
+        console.warn("[complete] prescribed RPE load failed", e);
       }
 
     } catch (error) {
@@ -2158,7 +2158,7 @@ function WorkoutCompleteContent() {
                 <WorkoutSummarySection
                   blockGroups={blockGroups}
                   prs={personalRecords}
-                  prescribed={prescribedRirMap}
+                  prescribed={prescribedRpeMap}
                   onSetRpeUpdated={handleSetRpeUpdated}
                 />
               ) : null}

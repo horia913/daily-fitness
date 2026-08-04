@@ -6,11 +6,11 @@ import {
   rpeToEffortTier,
   type EffortTier,
 } from "@/lib/workoutEffortLabels";
-import { effortFromPrescribedRir } from "@/components/client/workout-execution/live-card/effortFromPrescribedRir";
+import { effortFromPrescribedRpe } from "@/components/client/workout-execution/live-card/effortFromPrescribedRpe";
 import { SetEffortPicker } from "@/components/client/workout-execution/ui/SetEffortPicker";
 import { compressSets } from "./compressStrengthSets";
 import type { CompressLine } from "./compressStrengthSets";
-import type { PrescribedRirMap, SetGroup } from "./types";
+import type { PrescribedRpeMap, SetGroup } from "./types";
 import { buildCompressLinesForExercise } from "./setLinesFromLogs";
 import effortStyles from "@/components/client/workout-execution/ui/setEffortPicker.module.css";
 import styles from "./clientWorkoutCompleteV6.module.css";
@@ -57,14 +57,14 @@ function prLinePredicate(
 }
 
 function EffortCell(props: {
-  prescribedRir: number | null;
+  prescribedRpe: number | null;
   loggedRpe: number | null;
   setLogIds: string[];
   ratingTargetId: string | null;
   onTapNa: (setLogIds: string[]) => void;
   ratingBusy: boolean;
 }) {
-  const target = effortFromPrescribedRir(props.prescribedRir);
+  const target = effortFromPrescribedRpe(props.prescribedRpe);
   const loggedTier = rpeToEffortTier(props.loggedRpe);
   const loggedLabel = clientEffortLabelFromStoredRpe(props.loggedRpe);
   const hasLogged =
@@ -168,7 +168,7 @@ export function CompressedSetList(props: {
                   )
                 ) : (
                   <EffortCell
-                    prescribedRir={g.prescribedRir}
+                    prescribedRpe={g.prescribedRpe}
                     loggedRpe={g.loggedRpe}
                     setLogIds={g.setLogIds}
                     ratingTargetId={props.ratingTargetId}
@@ -211,7 +211,7 @@ export function buildLinesForRow(
     record_type?: string;
     record_value?: number | string;
   }>,
-  prescribed?: PrescribedRirMap,
+  prescribed?: PrescribedRpeMap,
 ): CompressLine[] {
   if (!row.exerciseId) return [];
   return buildCompressLinesForExercise(
@@ -227,7 +227,7 @@ export function collapseFootnote(lines: CompressLine[]): string | null {
   const groups = compressSets(lines);
   if (groups.length !== 1 || groups[0].count < 2) return null;
   const g = groups[0];
-  const noRx = g.prescribedRir == null;
+  const noRx = g.prescribedRpe == null;
   if (noRx) {
     return `same across all ${g.count} sets · no effort prescribed`;
   }

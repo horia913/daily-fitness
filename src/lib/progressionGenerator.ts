@@ -1,7 +1,7 @@
 /**
  * Pure progression generation engine.
  *
- * IMPORTANT — `ProgramProgressionRule.rir` (TS until Phase 2; DB column `rpe`):
+ * IMPORTANT — `ProgramProgressionRule.rpe` (TS until Phase 2; DB column `rpe`):
  * Stores **prescribed RPE** (1–10), not “reps in reserve”. No column rename; values are RPE.
  *
  * Prescribed RPE progression (non-deload profiles):
@@ -184,7 +184,7 @@ function addChange(
 
 const PRESCRIBED_RPE_CEILING = 10
 
-/** `b.rir` / `r.rir` = prescribed RPE (TS field; DB column `rpe`). */
+/** `b.rpe` / `r.rpe` = prescribed RPE (TS field; DB column `rpe`). */
 function prescribedRpeForWeek(
   week1P: number,
   weekNumber: number,
@@ -203,18 +203,18 @@ function applyPrescribedRpeProgression(
   setEntryId: string | undefined,
   name: string,
 ): void {
-  const week1P = b.rir as number | null
+  const week1P = b.rpe as number | null
   if (week1P == null) return
   const newP = prescribedRpeForWeek(week1P, weekNumber, increaseEveryNWeeks)
-  const prevP = (r.rir as number | null) ?? week1P
+  const prevP = (r.rpe as number | null) ?? week1P
   if (newP !== prevP) {
-    r.rir = newP
+    r.rpe = newP
     const d = newP - prevP
     addChange(
       changes,
       setEntryId,
       name,
-      'rir',
+      'rpe',
       prevP,
       newP,
       d > 0 ? `+${d} RPE` : `${d} RPE`,
@@ -615,19 +615,19 @@ function applyTaper(
     }
   }
 
-  // Prescribed RPE (TS `rir` / DB `rpe`): hold Week 1 baseline for every taper week
-  const week1P = b.rir as number | null
+  // Prescribed RPE (field/column `rpe`): hold Week 1 baseline for every taper week
+  const week1P = b.rpe as number | null
   if (week1P != null) {
     const newP = week1P
-    const prevP = (r.rir as number | null) ?? week1P
+    const prevP = (r.rpe as number | null) ?? week1P
     if (newP !== prevP) {
-      r.rir = newP
+      r.rpe = newP
       const d = newP - prevP
       addChange(
         changes,
         setEntryId,
         name,
-        'rir',
+        'rpe',
         prevP,
         newP,
         d > 0 ? `+${d} RPE` : `${d} RPE`,
@@ -801,13 +801,13 @@ function applyReduction(
     }
   }
 
-  // Prescribed RPE (TS `rir` / DB `rpe`): deload = easier than Week 1 (−1 RPE, floor 1)
-  const week1P = b.rir as number | null
+  // Prescribed RPE (field/column `rpe`): deload = easier than Week 1 (−1 RPE, floor 1)
+  const week1P = b.rpe as number | null
   if (week1P != null) {
     const newP = Math.max(1, week1P - 1)
     if (newP !== week1P) {
-      r.rir = newP
-      addChange(changes, setEntryId, name, 'rir', week1P, newP, `-1 RPE (deload)`)
+      r.rpe = newP
+      addChange(changes, setEntryId, name, 'rpe', week1P, newP, `-1 RPE (deload)`)
     }
   }
 
@@ -1287,25 +1287,25 @@ if (
 
   // Test 1: Volume Ramp, straight_set, 6 weeks
   const t1 = generateProgression({
-    week1Rules: [_makeTestRule('straight_set', { sets: 3, reps: '10', weight_kg: 60, rir: 3, rest_seconds: 90 })],
+    week1Rules: [_makeTestRule('straight_set', { sets: 3, reps: '10', weight_kg: 60, rpe: 3, rest_seconds: 90 })],
     profile: 'volume_ramp', durationWeeks: 6, goal: 'hypertrophy',
   })
   console.log('Test 1 — Volume Ramp, straight_set, 6w:')
   t1.weekRules.forEach(w => {
     const r = w.rules[0] as any
-    console.log(`  Week ${w.weekNumber}: sets:${r.sets}, reps:${r.reps}, weight:${r.weight_kg}, RPE:${r.rir}, rest:${r.rest_seconds}`)
+    console.log(`  Week ${w.weekNumber}: sets:${r.sets}, reps:${r.reps}, weight:${r.weight_kg}, RPE:${r.rpe}, rest:${r.rest_seconds}`)
   })
   console.log('  Expected: W2:3×11@60,RPE3 | W3:3×12@60,RPE4 | W4:4×8@61.5,RPE4 | W5:4×9@61.5,RPE5 | W6:4×10@61.5,RPE5')
 
   // Test 2: Intensity Ramp, straight_set, 4 weeks
   const t2 = generateProgression({
-    week1Rules: [_makeTestRule('straight_set', { sets: 4, reps: '5', weight_kg: 100, rir: 3, rest_seconds: 180 })],
+    week1Rules: [_makeTestRule('straight_set', { sets: 4, reps: '5', weight_kg: 100, rpe: 3, rest_seconds: 180 })],
     profile: 'intensity_ramp', durationWeeks: 4, goal: 'strength',
   })
   console.log('Test 2 — Intensity Ramp, straight_set, 4w:')
   t2.weekRules.forEach(w => {
     const r = w.rules[0] as any
-    console.log(`  Week ${w.weekNumber}: sets:${r.sets}, reps:${r.reps}, weight:${r.weight_kg}, RPE:${r.rir}, rest:${r.rest_seconds}`)
+    console.log(`  Week ${w.weekNumber}: sets:${r.sets}, reps:${r.reps}, weight:${r.weight_kg}, RPE:${r.rpe}, rest:${r.rest_seconds}`)
   })
   console.log('  Expected: W2:4×5@102.5,RPE4,rest195 | W3:4×4@105,RPE5,rest210 | W4:3×3@107.5,RPE6,rest225')
 
@@ -1324,37 +1324,37 @@ if (
 
   // Test 4: Reduction, straight_set, 2 weeks
   const t4 = generateProgression({
-    week1Rules: [_makeTestRule('straight_set', { sets: 4, reps: '10', weight_kg: 100, rir: 2, rest_seconds: 120 })],
+    week1Rules: [_makeTestRule('straight_set', { sets: 4, reps: '10', weight_kg: 100, rpe: 2, rest_seconds: 120 })],
     profile: 'reduction', durationWeeks: 2, goal: 'deload',
   })
   console.log('Test 4 — Reduction, straight_set, 2w:')
   t4.weekRules.forEach(w => {
     const r = w.rules[0] as any
-    console.log(`  Week ${w.weekNumber}: sets:${r.sets}, reps:${r.reps}, weight:${r.weight_kg}, RPE:${r.rir}, rest:${r.rest_seconds}`)
+    console.log(`  Week ${w.weekNumber}: sets:${r.sets}, reps:${r.reps}, weight:${r.weight_kg}, RPE:${r.rpe}, rest:${r.rest_seconds}`)
   })
   console.log('  Expected: W2: sets:2, reps:10, weight:60, RPE:1, rest:120')
 
   // Test 5: Density, straight_set, 4 weeks
   const t5 = generateProgression({
-    week1Rules: [_makeTestRule('straight_set', { sets: 4, reps: '10', weight_kg: 60, rir: 2, rest_seconds: 90 })],
+    week1Rules: [_makeTestRule('straight_set', { sets: 4, reps: '10', weight_kg: 60, rpe: 2, rest_seconds: 90 })],
     profile: 'density_increase', durationWeeks: 4, goal: 'conditioning',
   })
   console.log('Test 5 — Density, straight_set, 4w:')
   t5.weekRules.forEach(w => {
     const r = w.rules[0] as any
-    console.log(`  Week ${w.weekNumber}: sets:${r.sets}, reps:${r.reps}, weight:${r.weight_kg}, RPE:${r.rir}, rest:${r.rest_seconds}`)
+    console.log(`  Week ${w.weekNumber}: sets:${r.sets}, reps:${r.reps}, weight:${r.weight_kg}, RPE:${r.rpe}, rest:${r.rest_seconds}`)
   })
   console.log('  Expected: W2:4×10@60,RPE2,rest80 | W3:4×11@60,RPE2,rest70 | W4:4×11@60,RPE2,rest60')
 
   // Test 6: Linear, straight_set, 4 weeks
   const t6 = generateProgression({
-    week1Rules: [_makeTestRule('straight_set', { sets: 3, reps: '10', weight_kg: 40, rir: 3, rest_seconds: 90 })],
+    week1Rules: [_makeTestRule('straight_set', { sets: 3, reps: '10', weight_kg: 40, rpe: 3, rest_seconds: 90 })],
     profile: 'linear', durationWeeks: 4, goal: 'hypertrophy',
   })
   console.log('Test 6 — Linear, straight_set, 4w:')
   t6.weekRules.forEach(w => {
     const r = w.rules[0] as any
-    console.log(`  Week ${w.weekNumber}: sets:${r.sets}, reps:${r.reps}, weight:${r.weight_kg}, RPE:${r.rir}, rest:${r.rest_seconds}`)
+    console.log(`  Week ${w.weekNumber}: sets:${r.sets}, reps:${r.reps}, weight:${r.weight_kg}, RPE:${r.rpe}, rest:${r.rest_seconds}`)
   })
   console.log('  Expected: W2:3×10@41,RPE3 | W3:3×11@41,RPE4 | W4:3×11@42,RPE4')
 

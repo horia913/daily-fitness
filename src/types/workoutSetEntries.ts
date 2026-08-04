@@ -64,8 +64,8 @@ export interface WorkoutSetEntryExercise {
   reps?: string
   weight_kg?: number
   load_percentage?: number            // Percentage of 1RM for suggested weight
-  /** Prescribed RPE (legacy field name `rir` on older payloads; canvas path uses Prescription.rpe). */
-  rir?: number
+  /** Prescribed RPE (1–10; DB column `rpe`). */
+  rpe?: number
   tempo?: string                      // Tempo notation
   rest_seconds?: number               // Exercise-specific rest
   notes?: string
@@ -245,8 +245,7 @@ export interface LoggedSet {
   set_number: number
   weight_kg?: number
   reps_completed?: number
-  rir?: number
-  rpe?: number // Rate of Perceived Exertion (1-10)
+  rpe?: number // Rate of Perceived Exertion (logged effort, 1–10)
   tempo?: string
   rest_seconds?: number
   notes?: string

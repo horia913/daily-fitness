@@ -2,7 +2,7 @@
 
 import styles from "./progressSuiteV1.module.css";
 
-/** Display label is always RPE; value from stored RPE (rir column mapped to `rpe` in UI). */
+/** Display label is always RPE; value from stored logged RPE. */
 export function PsRpePill({ value }: { value: number | null | undefined }) {
   if (value == null || Number.isNaN(Number(value))) {
     return <span className={styles.psRpeEmpty}>—</span>;

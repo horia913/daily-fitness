@@ -34,7 +34,7 @@ import {
   LiveCardLog,
   LiveCardLogField,
   LiveCardLogButton,
-  effortFromPrescribedRir,
+  effortFromPrescribedRpe,
   formatLiveRest,
   resolveRestSeconds,
   formatLiveLast,
@@ -264,7 +264,7 @@ export function StraightSetExecutor({
       weight: String(setEntry.weight_kg ?? ""),
       reps: String(setEntry.reps_completed ?? ""),
       set_number: setEntry.set_number ?? 1,
-      rpe: setEntry.rir != null ? Number(setEntry.rir) : undefined,
+      rpe: setEntry.rpe != null ? Number(setEntry.rpe) : undefined,
     });
     setMenuOpenSetId(null);
   };
@@ -333,7 +333,7 @@ export function StraightSetExecutor({
           set_number: editDraft.set_number,
           weight_kg: w,
           reps_completed: r,
-          ...(editDraft.rpe != null && { rir: editDraft.rpe }),
+          ...(editDraft.rpe != null && { rpe: editDraft.rpe }),
           completed_at: current?.completed_at ?? new Date(),
         };
         onSetEditSaved?.(liveSetEntry.setEntry.id, updatedEntry);
@@ -456,7 +456,7 @@ export function StraightSetExecutor({
     activeSetNumber,
     liveSetEntry.setEntry.reps_per_set,
   );
-  const activeEffort = effortFromPrescribedRir(activeTargets.rir);
+  const activeEffort = effortFromPrescribedRpe(activeTargets.rpe);
   const liveTarget: LiveCardTarget =
     activeTargets.weight_kg != null
       ? {

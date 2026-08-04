@@ -520,7 +520,7 @@ export default function WorkoutDetailsPage() {
             reps: ex.reps ?? null,
             weight_kg: ex.weight_kg ?? null,
             load_percentage: ex.load_percentage ?? null,
-            rir: ex.rir ?? null,
+            rpe: ex.rpe ?? null,
             tempo: ex.tempo ?? null,
             rest_seconds: ex.rest_seconds ?? null,
             notes: ex.notes ?? null,
@@ -647,7 +647,7 @@ export default function WorkoutDetailsPage() {
                   exerciseLetter: exercise.exercise_letter,
                   notes: filterTestValue(exercise.notes), // Filter out "test"
                   tempo: exercise.tempo ?? null,
-                  rir: exercise.rir ?? null,
+                  rpe: exercise.rpe ?? null,
                   raw: exercise,
                   meta: parsedNotes,
                 };
@@ -956,13 +956,13 @@ export default function WorkoutDetailsPage() {
         }
       }
       
-      // OPTIONAL: prescribed RPE (`rir` column), tempo, notes (only if set)
+      // OPTIONAL: prescribed RPE, tempo, notes (only if set)
       // For SUPERSET: RPE, tempo, notes only for exercise 1 (first exercise, orderIndex === 0)
       if (blockType === "superset") {
         if (exercise.orderIndex === 0) {
           // Only show RPE/tempo/notes for first exercise in superset
-          if (exercise.rir !== null && exercise.rir !== undefined) {
-            result.push({ label: "RPE", value: `${exercise.rir}` });
+          if (exercise.rpe !== null && exercise.rpe !== undefined) {
+            result.push({ label: "RPE", value: `${exercise.rpe}` });
           }
           if (exercise.tempo) {
             result.push({ label: "Tempo", value: exercise.tempo });
@@ -973,8 +973,8 @@ export default function WorkoutDetailsPage() {
         }
       } else {
         // For all other block types, show RPE/tempo/notes for all exercises
-        if (exercise.rir !== null && exercise.rir !== undefined) {
-          result.push({ label: "RPE", value: `${exercise.rir}` });
+        if (exercise.rpe !== null && exercise.rpe !== undefined) {
+          result.push({ label: "RPE", value: `${exercise.rpe}` });
         }
         if (exercise.tempo) {
           result.push({ label: "Tempo", value: exercise.tempo });
@@ -1404,8 +1404,8 @@ export default function WorkoutDetailsPage() {
         ? {
             label: "Effort",
             value:
-              clientEffortLabelFromStoredRpe(exercise.rir) ??
-              String(exercise.rir ?? ""),
+              clientEffortLabelFromStoredRpe(exercise.rpe) ??
+              String(exercise.rpe ?? ""),
           }
         : r,
     );

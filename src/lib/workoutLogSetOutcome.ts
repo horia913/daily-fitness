@@ -26,13 +26,13 @@ export function weightOutcome(
   return "over";
 }
 
-/** RPE vs prescribed RIR: within ±1 → hit, else flag */
-export function rpeVsPrescribedRirOutcome(
+/** Logged RPE vs prescribed RPE: within ±1 → hit, else flag */
+export function rpeVsPrescribedRpeOutcome(
   actualRpe: number | null,
-  prescribedRir: number | null
+  prescribedRpe: number | null
 ): DimensionOutcome {
-  if (prescribedRir == null || actualRpe == null) return "neutral";
-  if (Math.abs(actualRpe - prescribedRir) <= 1) return "hit";
+  if (prescribedRpe == null || actualRpe == null) return "neutral";
+  if (Math.abs(actualRpe - prescribedRpe) <= 1) return "hit";
   return "flag";
 }
 
@@ -78,7 +78,7 @@ export type StrengthSetScalars = {
   actualWeightKg: number | null;
   prescribedWeightKg: number | null;
   actualRpe: number | null;
-  prescribedRir: number | null;
+  prescribedRpe: number | null;
 };
 
 /**
@@ -90,7 +90,7 @@ export function isSetOnTarget(s: StrengthSetScalars): boolean {
   const row = consolidateRowOutcome(
     repsOutcome(s.actualReps, s.prescribedReps),
     weightOutcome(s.actualWeightKg, s.prescribedWeightKg),
-    rpeVsPrescribedRirOutcome(s.actualRpe, s.prescribedRir)
+    rpeVsPrescribedRpeOutcome(s.actualRpe, s.prescribedRpe)
   );
   return row === "hit" || row === "under" || row === "over";
 }

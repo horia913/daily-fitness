@@ -41,8 +41,8 @@ function PrescriptionLine({ segments }: { segments: ExerciseDisplaySegments }) {
   if (segments.load) {
     parts.push({ key: 'load', node: segments.load })
   }
-  if (segments.rir) {
-    parts.push({ key: 'rir', node: segments.rir })
+  if (segments.rpe) {
+    parts.push({ key: 'rpe', node: segments.rpe })
   }
   if (segments.technique) {
     parts.push({ key: 'technique', node: segments.technique })

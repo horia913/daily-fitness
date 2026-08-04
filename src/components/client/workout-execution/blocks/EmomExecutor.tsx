@@ -36,7 +36,7 @@ import {
   LiveCardLogField,
   LiveCardLogButton,
   LiveCardGlue,
-  effortFromPrescribedRir,
+  effortFromPrescribedRpe,
   groupIndexToHue,
   type LiveCardTarget,
 } from "../live-card";
@@ -248,7 +248,7 @@ export function EmomExecutor({
     currentMinute,
     liveSetEntry.setEntry.reps_per_set,
   );
-  const activeEffort = effortFromPrescribedRir(activeTargets.rir);
+  const activeEffort = effortFromPrescribedRpe(activeTargets.rpe);
   const liveTarget: LiveCardTarget =
     activeTargets.weight_kg != null
       ? {

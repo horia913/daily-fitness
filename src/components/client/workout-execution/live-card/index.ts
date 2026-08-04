@@ -19,7 +19,7 @@ export {
   LiveCardGroupedExercise,
   LiveCardGlue,
 } from "./LiveCardGroupedExercise";
-export { effortFromPrescribedRir } from "./effortFromPrescribedRir";
+export { effortFromPrescribedRpe } from "./effortFromPrescribedRpe";
 export {
   formatLiveRest,
   resolveRestSeconds,

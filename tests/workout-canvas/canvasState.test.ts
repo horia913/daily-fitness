@@ -26,11 +26,11 @@ describe('canvas session state', () => {
       type: 'ADD_PROPERTY',
       groupId,
       slotId,
-      property: 'rir',
+      property: 'rpe',
     })
     expect(withRir.ok).toBe(true)
     if (withRir.ok) {
-      expect(withRir.workout.groups[0].slots[0].enabledProperties).toContain('rir')
+      expect(withRir.workout.groups[0].slots[0].enabledProperties).toContain('rpe')
       expect(withRir.workout.groups[0].slots[0].prescriptions[0].rpe ?? null).toBeNull()
     }
   })

@@ -76,14 +76,14 @@ const emptyBundleExtras: Pick<
 
 describe("formatPrescribedStrengthLine", () => {
   it("adds reps suffix for bare rep counts (no kg)", () => {
-    expect(formatPrescribedStrengthLine({ prescribedReps: 6, prescribedRir: 8 })).toBe("6 reps @ RIR 8");
+    expect(formatPrescribedStrengthLine({ prescribedReps: 6, prescribedRpe: 8 })).toBe("6 reps @ RPE 8");
     expect(formatPrescribedStrengthLine({ prescribedReps: 10 })).toBe("10 reps");
     expect(formatPrescribedStrengthLine({ prescribedReps: 15 })).toBe("15 reps");
   });
 
   it("keeps kg × reps shape without extra reps word after the number", () => {
-    expect(formatPrescribedStrengthLine({ prescribedWeightKg: 12, prescribedReps: 8, prescribedRir: 2 })).toBe(
-      "12 kg × 8 @ RIR 2"
+    expect(formatPrescribedStrengthLine({ prescribedWeightKg: 12, prescribedReps: 8, prescribedRpe: 2 })).toBe(
+      "12 kg × 8 @ RPE 2"
     );
   });
 });
@@ -107,7 +107,7 @@ describe("buildPrescribedWorkoutReference", () => {
           exercise_id: "ex1",
           reps: "8",
           weight_kg: 12,
-          rir: 7,
+          rpe: 7,
         },
       ],
       exerciseNames: new Map([["ex1", "Press"]]),
@@ -159,7 +159,7 @@ describe("buildPrescribedWorkoutReference", () => {
       ...emptyBundleExtras,
       setEntries: [{ id: "d1", set_type: "drop_set", total_sets: 1, reps_per_set: "10" }],
       entryExercises: [
-        { set_entry_id: "d1", exercise_id: "ex1", reps: "10", weight_kg: 20, rir: null },
+        { set_entry_id: "d1", exercise_id: "ex1", reps: "10", weight_kg: 20, rpe: null },
       ],
       exerciseNames: new Map([["ex1", "Curl"]]),
       dropSets: [

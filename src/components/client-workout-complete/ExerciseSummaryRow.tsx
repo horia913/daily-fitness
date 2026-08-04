@@ -5,7 +5,7 @@ import {
   formatSoloGroupBadge,
 } from "@/components/client/workout-execution/groupLetterBadges";
 import { groupIndexToHue } from "@/components/client/workout-execution/live-card";
-import type { ExerciseSummaryModel, PrescribedRirMap } from "./types";
+import type { ExerciseSummaryModel, PrescribedRpeMap } from "./types";
 import {
   CompressedSetList,
   buildLinesForRow,
@@ -30,7 +30,7 @@ export function ExerciseSummaryRow(props: {
     record_value?: number | string;
   }>;
   exerciseHasPr: boolean;
-  prescribed?: PrescribedRirMap;
+  prescribed?: PrescribedRpeMap;
   ratingTargetId: string | null;
   onTapNa: (setLogIds: string[]) => void;
   onRate: (setLogIds: string[], rpe: number) => void;

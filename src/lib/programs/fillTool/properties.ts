@@ -7,7 +7,7 @@ export const FILL_PROPERTY_LABELS: Record<FillPropertyKey, string> = {
   load_pct: 'Load (% 1RM)',
   load_kg: 'Load (kg)',
   reps: 'Reps',
-  rir: 'RIR',
+  rpe: 'RPE',
   work_seconds: 'Time (seconds)',
   distance_meters: 'Distance (meters)',
   rest_after_exercise: 'Rest after exercise (seconds)',
@@ -51,9 +51,9 @@ export function propertyExistsOnSlot(slot: CanvasExercise, property: FillPropert
         slot.measurement === 'reps' &&
         sortedPrescriptions(slot).some((r) => r.reps != null && String(r.reps).trim() !== '')
       )
-    case 'rir':
+    case 'rpe':
       return (
-        slot.enabledProperties.includes('rir') &&
+        slot.enabledProperties.includes('rpe') &&
         sortedPrescriptions(slot).some((r) => r.rpe != null)
       )
     case 'work_seconds':
@@ -97,7 +97,7 @@ export function readBaselineValues(slot: CanvasExercise, property: FillPropertyK
       if (parsed.some((v) => v == null)) return null
       return parsed as number[]
     }
-    case 'rir':
+    case 'rpe':
       return rows.map((r) => r.rpe).filter((v): v is number => v != null)
     case 'work_seconds':
       return rows.map((r) => r.work_seconds).filter((v): v is number => v != null)
@@ -121,7 +121,7 @@ export function roundForProperty(property: FillPropertyKey, value: number): numb
     case 'load_kg':
       return roundWeight(value)
     case 'reps':
-    case 'rir':
+    case 'rpe':
     case 'work_seconds':
     case 'distance_meters':
     case 'rest_after_exercise':
@@ -151,7 +151,7 @@ export function formatPropertyValues(
 export function representativeSetValue(property: FillPropertyKey, values: number[]): number {
   if (values.length === 0) return NaN
   if (property === 'load_pct' || property === 'load_kg') return Math.max(...values)
-  if (property === 'rir') return Math.min(...values)
+  if (property === 'rpe') return Math.min(...values)
   return values[values.length - 1]
 }
 
@@ -176,7 +176,7 @@ export function enumeratePropertiesForSlots(
     if (loadUnit === 'kg' && propertyExistsOnSlot(slot, 'load_kg')) keys.add('load_kg')
     for (const key of [
       'reps',
-      'rir',
+      'rpe',
       'work_seconds',
       'distance_meters',
       'rest_after_exercise',
@@ -207,7 +207,7 @@ export function applyValuesToSlot(
         return { ...row, weight_kg: value, load_percentage: null }
       case 'reps':
         return { ...row, reps: String(Math.round(value)) }
-      case 'rir':
+      case 'rpe':
         return { ...row, rpe: Math.round(value) }
       case 'work_seconds':
         return { ...row, work_seconds: Math.round(value) }

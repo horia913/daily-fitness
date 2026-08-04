@@ -391,7 +391,7 @@ describe('Program Creation - Progression Rules (CRITICAL)', () => {
 
   describe('All supported exercise types in Progression Rules', () => {
     const exerciseTypes = [
-      { type: 'straight_set', fields: ['sets', 'reps', 'rest_seconds', 'tempo', 'rir'] },
+      { type: 'straight_set', fields: ['sets', 'reps', 'rest_seconds', 'tempo', 'rpe'] },
       { type: 'superset', fields: ['first_exercise_reps', 'second_exercise_reps', 'rest_between_pairs'] },
       { type: 'giant_set', fields: ['rounds', 'rest_after_seconds'] },
       { type: 'drop_set', fields: ['exercise_reps', 'drop_set_reps', 'weight_reduction_percentage'] },
@@ -420,7 +420,7 @@ describe('Program Creation - Progression Rules (CRITICAL)', () => {
           else if (field === 'reps') updateData[field] = '10';
           else if (field === 'rest_seconds') updateData[field] = 60;
           else if (field === 'tempo') updateData[field] = '2-0-1-0';
-          else if (field === 'rir') updateData[field] = 2;
+          else if (field === 'rpe') updateData[field] = 2;
           else if (field === 'weight_kg') updateData[field] = 50;
           else if (field === 'duration_minutes') updateData[field] = 10;
           else if (field === 'target_reps') updateData[field] = 100;
@@ -462,7 +462,7 @@ describe('Program Creation - Progression Rules (CRITICAL)', () => {
         reps: '10',
         rest_seconds: 60,
         tempo: '2-0-1-0',
-        rir: 2,
+        rpe: 2,
       };
 
       // Replace exercise

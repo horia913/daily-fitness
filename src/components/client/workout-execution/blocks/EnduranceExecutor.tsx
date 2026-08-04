@@ -25,7 +25,7 @@ import {
   LiveCardLog,
   LiveCardLogDistanceTime,
   LiveCardLogButton,
-  effortFromPrescribedRir,
+  effortFromPrescribedRpe,
   formatLiveRest,
   resolveRestSeconds,
   formatLiveLastDistance,
@@ -268,7 +268,7 @@ export function EnduranceExecutor({
   const aboveStickyContent =
     loggedSetRows.length > 0 ? <LoggedSetsList rows={loggedSetRows} /> : null;
 
-  const activeEffort = effortFromPrescribedRir(targets.rir);
+  const activeEffort = effortFromPrescribedRpe(targets.rpe);
   const liveTarget: LiveCardTarget =
     targetDistM > 0
       ? {

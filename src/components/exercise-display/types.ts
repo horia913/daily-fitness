@@ -5,7 +5,7 @@ export interface ExerciseDisplaySegments {
   /** Bold primary segment, e.g. "3 × 12/6/6" or "15s/side" in compact mode. */
   setsReps?: string
   load?: string
-  rir?: string
+  rpe?: string
   technique?: string
   /** m:ss portion only — component prefixes "rest ". */
   rest?: string

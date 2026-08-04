@@ -95,8 +95,8 @@ function PrescriptionTable({
             {slot.enabledProperties.includes('load') && (
               <th className="text-left py-1 pr-3 font-normal w-[140px]">Load</th>
             )}
-            {slot.enabledProperties.includes('rir') && (
-              <th className="text-left py-1 pr-3 font-normal w-[80px]">RIR</th>
+            {slot.enabledProperties.includes('rpe') && (
+              <th className="text-left py-1 pr-3 font-normal w-[80px]">RPE</th>
             )}
             {slot.enabledProperties.includes('tempo') && (
               <th className="text-left py-1 pr-3 font-normal w-[100px]">Tempo</th>
@@ -196,11 +196,11 @@ function PrescriptionTable({
                     </div>
                   </td>
                 )}
-                {slot.enabledProperties.includes('rir') && (
+                {slot.enabledProperties.includes('rpe') && (
                   <td className="py-2 pr-3">
                     <input
                       type="number"
-                      min={0}
+                      min={6}
                       max={10}
                       className="w-12 bg-transparent border-b outline-none font-mono"
                       style={{ borderColor: CANVAS.hairline }}

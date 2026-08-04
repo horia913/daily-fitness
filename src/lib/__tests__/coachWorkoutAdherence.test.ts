@@ -28,8 +28,8 @@ describe("coachWorkoutAdherence", () => {
       ],
       [{ id: "entry-1", set_type: "superset" }],
       [
-        { set_entry_id: "entry-1", exercise_id: "a", reps: "10", weight_kg: 40, rir: 8 },
-        { set_entry_id: "entry-1", exercise_id: "b", reps: "12", weight_kg: 20, rir: 8 },
+        { set_entry_id: "entry-1", exercise_id: "a", reps: "10", weight_kg: 40, rpe: 8 },
+        { set_entry_id: "entry-1", exercise_id: "b", reps: "12", weight_kg: 20, rpe: 8 },
       ],
       new Map([
         ["a", "Exercise A"],

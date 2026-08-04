@@ -22,7 +22,7 @@ import {
   LiveCardLog,
   LiveCardLogTimeHeld,
   LiveCardLogButton,
-  effortFromPrescribedRir,
+  effortFromPrescribedRpe,
   formatLiveRest,
   resolveRestSeconds,
   formatLiveLastDuration,
@@ -247,7 +247,7 @@ export function TimedSetExecutor({
   const elapsedWorkSeconds = workSeconds - remainingSeconds;
   const fmt = formatTimeProp ?? formatTime;
 
-  const activeEffort = effortFromPrescribedRir(targets.rir);
+  const activeEffort = effortFromPrescribedRpe(targets.rpe);
   const liveTarget: LiveCardTarget = {
     kind: "time",
     seconds: workSeconds,

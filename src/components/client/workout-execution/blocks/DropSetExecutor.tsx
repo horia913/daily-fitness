@@ -42,7 +42,7 @@ import {
   LiveCardLogField,
   LiveCardLogButton,
   formatDropTechniqueBody,
-  effortFromPrescribedRir,
+  effortFromPrescribedRpe,
   formatLiveRest,
   resolveRestSeconds,
   formatLiveLast,
@@ -308,7 +308,7 @@ export function DropSetExecutor({
     activeSetNumber,
     liveSetEntry.setEntry.reps_per_set,
   );
-  const activeEffort = effortFromPrescribedRir(activeTargets.rir);
+  const activeEffort = effortFromPrescribedRpe(activeTargets.rpe);
   const liveTarget: LiveCardTarget =
     activeTargets.weight_kg != null
       ? {

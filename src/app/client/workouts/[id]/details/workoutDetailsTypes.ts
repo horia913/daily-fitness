@@ -6,7 +6,7 @@ export interface ClientBlockExerciseRecord {
   sets: number | null;
   reps: string | null;
   weight_kg: number | null;
-  rir: number | null;
+  rpe: number | null;
   tempo: string | null;
   rest_seconds: number | null;
   notes: string | null;
@@ -43,7 +43,7 @@ export interface ClientExerciseDisplay {
   exerciseLetter: string | null;
   notes: string | null;
   tempo: string | null;
-  rir: number | null;
+  rpe: number | null;
   raw?: ClientBlockExerciseRecord | null;
   meta?: Record<string, unknown> | null;
 }

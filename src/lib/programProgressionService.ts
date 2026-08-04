@@ -21,28 +21,22 @@ function coerceIntegerField(field: string, raw: unknown): number | undefined {
   return Number.isNaN(numValue) ? undefined : numValue
 }
 
-/** Map DB row (`rpe`) → TS ProgramProgressionRule (`rir` until Phase 2). */
+/** Map DB row → TS ProgramProgressionRule (column `rpe` = field `rpe`). */
 function mapProgressionRuleFromDb(rule: any): ProgramProgressionRule {
-  const { rpe, weight_reduction_percentage, ...rest } = rule
+  const { weight_reduction_percentage, ...rest } = rule
   return {
     ...rest,
-    rir: rpe ?? rule.rir ?? null,
+    rpe: rest.rpe ?? null,
     drop_percentage: weight_reduction_percentage ?? rule.drop_percentage ?? null,
   } as ProgramProgressionRule
 }
 
 /**
- * Remap TS `rir` → DB column `rpe` before insert/update.
- * Leaves other fields; drops joined `exercise` when present.
+ * Prepare rule for DB insert/update. Drops joined `exercise`; maps drop_percentage.
  */
 function remapProgressionRuleForDb(rule: any): any {
-  const { rir, rpe: existingRpe, drop_percentage, exercise, ...rest } = rule
+  const { drop_percentage, exercise, ...rest } = rule
   const row: any = { ...rest }
-  if (rir !== undefined) {
-    row.rpe = rir
-  } else if (existingRpe !== undefined) {
-    row.rpe = existingRpe
-  }
   if (drop_percentage !== undefined && drop_percentage !== null) {
     row.weight_reduction_percentage = drop_percentage
   }
@@ -81,8 +75,8 @@ export interface ProgramProgressionRule {
   reps?: string | null
   rest_seconds?: number | null
   tempo?: string | null
-  /** Prescribed RPE (1–10). TS field `rir` until Phase 2; DB column is `rpe`. */
-  rir?: number | null
+  /** Prescribed RPE (1–10). DB column `rpe`. */
+  rpe?: number | null
   weight_kg?: number | null
   load_percentage?: number | null
   notes?: string | null
@@ -484,7 +478,7 @@ export class ProgramProgressionService {
             reps: exercise.reps || undefined,
             rest_seconds: exercise.rest_seconds || block.rest_seconds || undefined,
             tempo: exercise.tempo || undefined,
-            rir: exercise.rir || undefined,
+            rpe: exercise.rpe || undefined,
             weight_kg: exercise.weight_kg || undefined,
             load_percentage: exercise.load_percentage || undefined,
             notes: exercise.notes || undefined,
@@ -505,7 +499,7 @@ export class ProgramProgressionService {
             second_exercise_reps: exercise.exercise_letter === 'B' ? exercise.reps : undefined,
             rest_between_pairs: block.rest_seconds || undefined,
             tempo: exercise.tempo || undefined,
-            rir: exercise.rir || undefined,
+            rpe: exercise.rpe || undefined,
             weight_kg: exercise.weight_kg || undefined,
             load_percentage: exercise.load_percentage || undefined,
             notes: exercise.notes || undefined,
@@ -532,7 +526,7 @@ export class ProgramProgressionService {
             reps: exercise.reps || undefined,
             rest_between_pairs: block.rest_seconds || undefined,
             tempo: exercise.tempo || undefined,
-            rir: exercise.rir || undefined,
+            rpe: exercise.rpe || undefined,
             weight_kg: exercise.weight_kg || undefined,
             load_percentage: exercise.load_percentage || undefined,
             notes: exercise.notes || undefined,
@@ -571,7 +565,7 @@ export class ProgramProgressionService {
             drop_percentage: dropPercentage || 20, // Use stored value or default (will be mapped to weight_reduction_percentage)
             rest_seconds: block.rest_seconds || exercise.rest_seconds || undefined,
             tempo: exercise.tempo || undefined,
-            rir: exercise.rir || undefined,
+            rpe: exercise.rpe || undefined,
             weight_kg: (initialDropSet as any)?.weight_kg || exercise.weight_kg || undefined,
             load_percentage: (initialDropSet as any)?.load_percentage || exercise.load_percentage || undefined,
             notes: exercise.notes || undefined,
@@ -594,7 +588,7 @@ export class ProgramProgressionService {
             intra_cluster_rest: clusterConfig?.intra_cluster_rest || undefined,
             rest_seconds: clusterConfig?.inter_set_rest || exercise.rest_seconds || undefined,
             tempo: exercise.tempo || undefined,
-            rir: exercise.rir || undefined,
+            rpe: exercise.rpe || undefined,
             weight_kg: (clusterConfig as any)?.weight_kg || exercise.weight_kg || undefined,
             load_percentage: (clusterConfig as any)?.load_percentage || exercise.load_percentage || undefined,
             notes: exercise.notes || undefined,
@@ -642,7 +636,7 @@ export class ProgramProgressionService {
             compound_exercise_id: !isIsolation ? exercise.exercise_id : undefined,
             rest_between_pairs: block.rest_seconds || undefined,
             tempo: exercise.tempo || undefined,
-            rir: exercise.rir || undefined,
+            rpe: exercise.rpe || undefined,
             // Both exercises use same columns, so copy them for each
             weight_kg: exercise.weight_kg || undefined,
             load_percentage: exercise.load_percentage || undefined,
@@ -839,7 +833,7 @@ export class ProgramProgressionService {
             reps: exercise.reps || undefined,
             rest_seconds: exercise.rest_seconds || undefined,
             tempo: exercise.tempo || undefined,
-            rir: exercise.rir || undefined,
+            rpe: exercise.rpe || undefined,
             notes: exercise.notes || undefined,
           })
         }

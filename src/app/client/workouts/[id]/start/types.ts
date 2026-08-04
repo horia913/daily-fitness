@@ -46,7 +46,7 @@ export type ClientBlockExerciseRecord = {
   sets: number | null;
   reps: string | null;
   weight_kg: number | null;
-  rir: number | null;
+  rpe: number | null;
   tempo: string | null;
   rest_seconds: number | null;
   notes: string | null;

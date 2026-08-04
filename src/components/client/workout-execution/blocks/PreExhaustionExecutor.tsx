@@ -345,14 +345,14 @@ export function PreExhaustionExecutor({
   appendTargetEffortItem(
     prescriptionItems,
     isolationExercise
-      ? (isolationExercise as { rir?: unknown }).rir
+      ? (isolationExercise as { rpe?: unknown }).rpe
       : undefined,
     Flame,
     "Target effort (isolation)",
   );
   appendTargetEffortItem(
     prescriptionItems,
-    compoundExercise ? (compoundExercise as { rir?: unknown }).rir : undefined,
+    compoundExercise ? (compoundExercise as { rpe?: unknown }).rpe : undefined,
     Flame,
     "Target effort (compound)",
   );

@@ -16,7 +16,7 @@ export type SetPrescriptionTargets = {
   reps: string | null
   weight_kg: number | null
   load_percentage: number | null
-  rir: number | null
+  rpe: number | null
   tempo: string | null
   work_seconds: number | null
   distance_meters: number | null
@@ -60,7 +60,7 @@ export function resolveSetPrescriptionTargets(
         | 'reps'
         | 'weight_kg'
         | 'load_percentage'
-        | 'rir'
+        | 'rpe'
         | 'tempo'
       >
     | null
@@ -73,7 +73,7 @@ export function resolveSetPrescriptionTargets(
     reps: pickString(rx?.reps, exercise?.reps ?? blockRepsPerSet ?? null),
     weight_kg: pickNumber(rx?.weight_kg, exercise?.weight_kg),
     load_percentage: pickNumber(rx?.load_percentage, exercise?.load_percentage),
-    rir: pickNumber(rx?.rir, exercise?.rir),
+    rpe: pickNumber(rx?.rpe, exercise?.rpe),
     tempo: pickString(rx?.tempo, exercise?.tempo),
     work_seconds: pickNumber(rx?.work_seconds, null),
     distance_meters: pickNumber(rx?.distance_meters, null),

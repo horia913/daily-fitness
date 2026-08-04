@@ -35,7 +35,7 @@ import {
   LiveCardLogField,
   LiveCardLogButton,
   LiveCardGlue,
-  effortFromPrescribedRir,
+  effortFromPrescribedRpe,
   groupIndexToHue,
   type LiveCardTarget,
 } from "../live-card";
@@ -608,7 +608,7 @@ export function AmrapExecutor({
                   )}
                   name={ex.exercise?.name || `Exercise ${i + 1}`}
                   target={targetsToLiveCardTarget(t)}
-                  effort={effortFromPrescribedRir(t.rir)}
+                  effort={effortFromPrescribedRpe(t.rpe)}
                   logged
                   loggedValue={loggedValue}
                 />

@@ -119,9 +119,9 @@ export default function ExerciseItem({
       details.push(`${exercise.load_percentage}% load`);
     }
     if (exercise.tempo) details.push(`Tempo: ${exercise.tempo}`);
-    if (exercise.rir != null && exercise.rir !== "") {
+    if (exercise.rpe != null && exercise.rpe !== "") {
       details.push(
-        formatPrescribedRpeLabel(exercise.rir) ?? `RPE ${String(exercise.rir).trim()}`,
+        formatPrescribedRpeLabel(exercise.rpe) ?? `RPE ${String(exercise.rpe).trim()}`,
       );
     }
     if (exercise.rpe) details.push(`RPE: ${exercise.rpe}`);

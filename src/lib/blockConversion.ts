@@ -94,8 +94,8 @@ export function convertBlocksToExercises(blocks: any[]): any[] {
       rest_seconds: block.rest_seconds?.toString() || "",
       notes: block.set_notes || "",
       set_name: block.set_name,
-      // Prescribed RPE (`rir`), tempo, notes from first exercise (for blocks that support these)
-      rir: firstExercise?.rir?.toString() || "",
+      // Prescribed RPE, tempo, notes from first exercise (for blocks that support these)
+      rpe: firstExercise?.rpe?.toString() || "",
       // Tempo: for time-based blocks, not stored in time_protocols (not in schema)
       // For other blocks, get from first exercise
       tempo: (!isTimeBasedBlock && firstExercise?.tempo) || "",
@@ -290,7 +290,7 @@ export function convertBlocksToExercises(blocks: any[]): any[] {
           load_percentage: ex.load_percentage?.toString() || "",
           weight_kg: ex.weight_kg?.toString() || "",
           tempo: ex.tempo || "",
-          rir: ex.rir?.toString() || "",
+          rpe: ex.rpe?.toString() || "",
           notes: ex.notes || "",
         })) || [];
     } else if (block.set_type === "superset") {
@@ -318,7 +318,7 @@ export function convertBlocksToExercises(blocks: any[]): any[] {
         (exercise as any).superset_weight_kg =
           secondEx.weight_kg?.toString() || "";
         (exercise as any).superset_tempo = secondEx.tempo || "";
-        (exercise as any).superset_rir = secondEx.rir?.toString() || "";
+        (exercise as any).superset_rpe = secondEx.rpe?.toString() || "";
       }
     } else if (block.set_type === "pre_exhaustion") {
       // Find isolation (letter A) and compound (letter B) exercises
@@ -336,7 +336,7 @@ export function convertBlocksToExercises(blocks: any[]): any[] {
         exercise.weight_kg =
           isolationExercise.weight_kg?.toString() || "";
         exercise.tempo = isolationExercise.tempo || "";
-        exercise.rir = isolationExercise.rir?.toString() || "";
+        exercise.rpe = isolationExercise.rpe?.toString() || "";
         exercise.notes = isolationExercise.notes || "";
       }
 
@@ -348,8 +348,8 @@ export function convertBlocksToExercises(blocks: any[]): any[] {
         (exercise as any).compound_weight_kg =
           compoundExercise.weight_kg?.toString() || "";
         (exercise as any).compound_tempo = compoundExercise.tempo || "";
-        (exercise as any).compound_rir =
-          compoundExercise.rir?.toString() || "";
+        (exercise as any).compound_rpe =
+          compoundExercise.rpe?.toString() || "";
       }
     } else if (block.set_type === "speed_work") {
       const sp =

@@ -3,7 +3,7 @@
 import React, { useMemo, useState, useCallback } from "react";
 import { fetchApi } from "@/lib/apiClient";
 import { useToast } from "@/components/ui/toast-provider";
-import type { BlockGroupLite, PrescribedRirMap } from "./types";
+import type { BlockGroupLite, PrescribedRpeMap } from "./types";
 import styles from "./clientWorkoutCompleteV6.module.css";
 import { buildExerciseSummaryRows } from "./buildExerciseSummary";
 import { ExerciseSummaryRow } from "./ExerciseSummaryRow";
@@ -11,7 +11,7 @@ import { ExerciseSummaryRow } from "./ExerciseSummaryRow";
 export function WorkoutSummarySection(props: {
   blockGroups: BlockGroupLite[];
   prs: Array<{ exercise_id?: string; record_type?: string; record_value?: number | string }>;
-  prescribed?: PrescribedRirMap;
+  prescribed?: PrescribedRpeMap;
   /** Called after a successful RPE PATCH so parent can update blockGroups. */
   onSetRpeUpdated?: (setLogId: string, rpe: number) => void;
 }) {

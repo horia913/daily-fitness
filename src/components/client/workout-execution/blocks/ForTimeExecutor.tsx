@@ -32,7 +32,7 @@ import {
   LiveCardLogButton,
   LiveCardLogTimeHeld,
   LiveCardGlue,
-  effortFromPrescribedRir,
+  effortFromPrescribedRpe,
   groupIndexToHue,
   type LiveCardTarget,
 } from "../live-card";
@@ -563,7 +563,7 @@ export function ForTimeExecutor({
                   badge={String(ex.exercise_order ?? i + 1)}
                   name={ex.exercise?.name || `Exercise ${i + 1}`}
                   target={targetsToLiveCardTarget(t)}
-                  effort={effortFromPrescribedRir(t.rir)}
+                  effort={effortFromPrescribedRpe(t.rpe)}
                   logged
                   loggedValue={loggedValue}
                 />

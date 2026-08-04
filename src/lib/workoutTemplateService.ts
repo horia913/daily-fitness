@@ -1006,7 +1006,7 @@ export class WorkoutTemplateService {
                   sets: exercise.sets,
                   reps: exercise.reps,
                   weight_kg: exercise.weight_kg,
-                  rir: exercise.rir,
+                  rpe: exercise.rpe,
                   tempo: exercise.tempo,
                   rest_seconds: exercise.rest_seconds,
                   notes: exercise.notes,

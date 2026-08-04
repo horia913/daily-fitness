@@ -37,7 +37,7 @@ import {
   LiveCardLog,
   LiveCardLogField,
   LiveCardLogButton,
-  effortFromPrescribedRir,
+  effortFromPrescribedRpe,
   formatLiveRest,
   resolveRestSeconds,
   formatLiveLast,
@@ -991,7 +991,7 @@ export function GiantSetExecutor({
                         exercise.exercise?.name || `Exercise ${exIdx + 1}`
                       }
                       target={targetsToLiveCardTarget(targets)}
-                      effort={effortFromPrescribedRir(targets.rir)}
+                      effort={effortFromPrescribedRpe(targets.rpe)}
                       loadPct={exercise.load_percentage}
                       note={exercise.notes}
                       hint={hint || null}

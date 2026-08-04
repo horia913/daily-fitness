@@ -84,7 +84,7 @@ function straightPrimaryString(rule: CurrentWeekRules): string | null {
 
 function metaRirTempoRest(rule: CurrentWeekRules): string[] {
   const out: string[] = [];
-  if (rule.targetRir != null) out.push(`RIR ${rule.targetRir}`);
+  if (rule.targetRpe != null) out.push(`RPE ${rule.targetRpe}`);
   const tempoTrim = rule.tempo?.trim();
   if (tempoTrim) out.push(`tempo ${tempoTrim}`);
   if (rule.restSeconds != null) out.push(formatRestSeconds(rule.restSeconds));
@@ -93,7 +93,7 @@ function metaRirTempoRest(rule: CurrentWeekRules): string[] {
 
 function metaRirTempo(rule: CurrentWeekRules): string[] {
   const out: string[] = [];
-  if (rule.targetRir != null) out.push(`RIR ${rule.targetRir}`);
+  if (rule.targetRpe != null) out.push(`RPE ${rule.targetRpe}`);
   const tempoTrim = rule.tempo?.trim();
   if (tempoTrim) out.push(`tempo ${tempoTrim}`);
   return out;

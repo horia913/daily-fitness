@@ -56,11 +56,11 @@ describe('canvas actions', () => {
       type: 'ADD_PROPERTY',
       groupId,
       slotId,
-      property: 'rir',
+      property: 'rpe',
     })
     expect(result.ok).toBe(true)
     if (result.ok) {
-      expect(result.workout.groups[0].slots[0].enabledProperties).toContain('rir')
+      expect(result.workout.groups[0].slots[0].enabledProperties).toContain('rpe')
     }
   })
 

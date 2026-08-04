@@ -18,7 +18,7 @@ export type FillPropertyKey =
 
   | 'reps'
 
-  | 'rir'
+  | 'rpe'
 
   | 'work_seconds'
 

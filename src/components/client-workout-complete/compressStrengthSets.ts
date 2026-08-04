@@ -6,12 +6,12 @@ export type CompressLine = {
   weight: number;
   isPR?: boolean;
   setLogId: string;
-  prescribedRir: number | null;
+  prescribedRpe: number | null;
   loggedRpe: number | null;
 };
 
-function effortKey(rir: number | null, rpe: number | null): string {
-  return `${rir ?? "x"}|${rpe ?? "x"}`;
+function effortKey(prescribedRpe: number | null, loggedRpe: number | null): string {
+  return `${prescribedRpe ?? "x"}|${loggedRpe ?? "x"}`;
 }
 
 export function compressSets(lines: CompressLine[]): SetGroup[] {
@@ -22,8 +22,8 @@ export function compressSets(lines: CompressLine[]): SetGroup[] {
       last &&
       last.reps === line.reps &&
       last.weight === line.weight &&
-      effortKey(last.prescribedRir, last.loggedRpe) ===
-        effortKey(line.prescribedRir, line.loggedRpe)
+      effortKey(last.prescribedRpe, last.loggedRpe) ===
+        effortKey(line.prescribedRpe, line.loggedRpe)
     ) {
       last.range.end = line.setIndex;
       last.count++;
@@ -37,7 +37,7 @@ export function compressSets(lines: CompressLine[]): SetGroup[] {
         count: 1,
         containsPR: Boolean(line.isPR),
         setLogIds: [line.setLogId],
-        prescribedRir: line.prescribedRir,
+        prescribedRpe: line.prescribedRpe,
         loggedRpe: line.loggedRpe,
       });
     }

@@ -20,7 +20,7 @@ export interface PrescribedData {
   sets: number | null
   reps: string | null
   weightKg: number | null
-  rir: number | null
+  rpe: number | null
 }
 
 export interface ActualData {
@@ -80,7 +80,7 @@ function prescribedFromBlockExercise(
     sets: ex.sets ?? block.total_sets ?? null,
     reps: ex.reps != null ? String(ex.reps) : null,
     weightKg: ex.weight_kg != null ? Number(ex.weight_kg) : null,
-    rir: ex.rir ?? null,
+    rpe: ex.rpe ?? null,
   }
 }
 
@@ -277,7 +277,7 @@ function buildDayExercises(
         exerciseId: exId,
         exerciseName: exerciseNames.get(exId) ?? 'Unknown Exercise',
         blockType: null,
-        prescribed: { sets: null, reps: null, weightKg: null, rir: null },
+        prescribed: { sets: null, reps: null, weightKg: null, rpe: null },
         actual: actualData,
         status: 'no_data',
       })

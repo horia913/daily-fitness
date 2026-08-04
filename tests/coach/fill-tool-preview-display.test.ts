@@ -13,9 +13,9 @@ describe('fill tool preview display', () => {
     expect(formatPropertyValues('load_pct', values)).toBe('82.5/77.5/87.5%')
   })
 
-  test('formatPropertyPreviewValue uses min RIR for working set', () => {
-    const values = [3, 2, 1]
-    expect(representativeSetValue('rir', values)).toBe(1)
-    expect(formatPropertyPreviewValue('rir', values)).toBe('1')
+  test('formatPropertyPreviewValue uses min RPE for working set', () => {
+    const values = [8, 7, 6]
+    expect(representativeSetValue('rpe', values)).toBe(6)
+    expect(formatPropertyPreviewValue('rpe', values)).toBe('6')
   })
 })

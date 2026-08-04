@@ -17,7 +17,7 @@ import {
   LiveCardNote,
   LiveCardLog,
   LiveCardGlue,
-  effortFromPrescribedRir,
+  effortFromPrescribedRpe,
   groupIndexToHue,
   type LiveCardTarget,
 } from "../live-card";
@@ -147,7 +147,7 @@ export function TabataExecutor({
     1,
     liveSetEntry.setEntry.reps_per_set,
   );
-  const activeEffort = effortFromPrescribedRir(targets.rir);
+  const activeEffort = effortFromPrescribedRpe(targets.rpe);
   const liveTarget: LiveCardTarget = {
     kind: "time",
     seconds: tabataWorkSec,

@@ -9,7 +9,7 @@ import {
 import {
   consolidateRowOutcome,
   repsOutcome,
-  rpeVsPrescribedRirOutcome,
+  rpeVsPrescribedRpeOutcome,
   weightOutcome,
   worstOfOutcomes,
 } from "@/lib/workoutLogSetOutcome";
@@ -103,13 +103,13 @@ function firstRestPauseRow(rows: RestPauseRow[], setEntryId: string): RestPauseR
   return rows.find((r) => r.set_entry_id === setEntryId);
 }
 
-function formatKgRepsRir(weight: number | null, reps: number | null, rir: number | null, rirLabel: "RIR" | "RPE"): string | null {
+function formatKgRepsRpe(weight: number | null, reps: number | null, rpe: number | null, rpeLabel: "RPE"): string | null {
   const parts: string[] = [];
   if (weight != null) parts.push(`${weight} kg`);
   if (reps != null) parts.push(parts.length ? `× ${reps}` : `${reps}`);
   const base = parts.join(" ");
-  if (rir != null) {
-    return base ? `${base} @ ${rirLabel} ${rir}` : `@ ${rirLabel} ${rir}`;
+  if (rpe != null) {
+    return base ? `${base} @ ${rpeLabel} ${rpe}` : `@ ${rpeLabel} ${rpe}`;
   }
   return base || null;
 }
@@ -118,21 +118,21 @@ function formatKgRepsRir(weight: number | null, reps: number | null, rir: number
  * Prescribed column only: after a bare rep count (no kg), append "reps" so values are not ambiguous.
  * When weight is present, `kg × N` is left unchanged (× already signals reps).
  */
-function formatPrescribedKgRepsRir(
+function formatPrescribedKgRepsRpe(
   weight: number | null,
   reps: number | null,
-  rir: number | null,
-  rirLabel: "RIR" | "RPE"
+  rpe: number | null,
+  rpeLabel: "RPE"
 ): string | null {
   if (weight != null) {
-    return formatKgRepsRir(weight, reps, rir, rirLabel);
+    return formatKgRepsRpe(weight, reps, rpe, rpeLabel);
   }
   if (reps != null) {
     const repS = `${reps} reps`;
-    if (rir != null) return `${repS} @ ${rirLabel} ${rir}`;
+    if (rpe != null) return `${repS} @ ${rpeLabel} ${rpe}`;
     return repS;
   }
-  if (rir != null) return `@ ${rirLabel} ${rir}`;
+  if (rpe != null) return `@ ${rpeLabel} ${rpe}`;
   return null;
 }
 
@@ -144,7 +144,7 @@ function evaluateStraightLikeSet(log: WorkoutLogSet, pe: PrescribedExerciseRow |
     return {
       prescribedReps: pe ? repsTargetMin(pe) : null,
       prescribedWeightKg: pe ? prescribedWeightKg(pe) : null,
-      prescribedRir: pe ? prescribedRpe(pe) : null,
+      prescribedRpe: pe ? prescribedRpe(pe) : null,
       outcome: "neutral",
     };
   }
@@ -154,11 +154,11 @@ function evaluateStraightLikeSet(log: WorkoutLogSet, pe: PrescribedExerciseRow |
   return {
     prescribedReps: pR,
     prescribedWeightKg: pW,
-    prescribedRir: pRir,
+    prescribedRpe: pRir,
     outcome: consolidateRowOutcome(
       repsOutcome(actualR, pR),
       weightOutcome(actualW, pW),
-      rpeVsPrescribedRirOutcome(actualRpe, pRir)
+      rpeVsPrescribedRpeOutcome(actualRpe, pRir)
     ),
   };
 }
@@ -183,14 +183,14 @@ function evaluateSupersetSet(
     parts.push({
       weightKg: prescribedWeightKg(peA),
       reps: repsTargetMin(peA),
-      rir: prescribedRpe(peA),
+      rpe: prescribedRpe(peA),
     });
   }
   if (peB && hasAnyPrescription(peB)) {
     parts.push({
       weightKg: prescribedWeightKg(peB),
       reps: repsTargetMin(peB),
-      rir: prescribedRpe(peB),
+      rpe: prescribedRpe(peB),
     });
   }
 
@@ -199,7 +199,7 @@ function evaluateSupersetSet(
       ? consolidateRowOutcome(
           repsOutcome(ra, repsTargetMin(peA)),
           weightOutcome(wa, prescribedWeightKg(peA)),
-          rpeVsPrescribedRirOutcome(actualRpe, prescribedRpe(peA))
+          rpeVsPrescribedRpeOutcome(actualRpe, prescribedRpe(peA))
         )
       : "neutral";
   const outB =
@@ -207,7 +207,7 @@ function evaluateSupersetSet(
       ? consolidateRowOutcome(
           repsOutcome(rb, repsTargetMin(peB)),
           weightOutcome(wb, prescribedWeightKg(peB)),
-          rpeVsPrescribedRirOutcome(actualRpe, prescribedRpe(peB))
+          rpeVsPrescribedRpeOutcome(actualRpe, prescribedRpe(peB))
         )
       : "neutral";
 
@@ -242,11 +242,11 @@ function buildStraightLikeHeader(
 
   if (setType === "straight_set" && pe) {
     const r = repsTargetMin(pe);
-    const rir = prescribedRpe(pe);
+    const prescribed = prescribedRpe(pe);
     const bits: string[] = [];
     if (nSets != null && nSets > 0) bits.push(`${nSets} sets`);
     if (r != null) bits.push(`× ${r} reps`);
-    if (rir != null) bits.push(`@ RIR ${rir}`);
+    if (prescribed != null) bits.push(`@ RPE ${prescribed}`);
     return bits.length ? bits.join(" ") : null;
   }
 
@@ -261,14 +261,14 @@ function buildStraightLikeHeader(
     const seg: string[] = [];
     if (peA && hasAnyPrescription(peA)) {
       const r = repsTargetMin(peA);
-      const rir = prescribedRpe(peA);
-      if (r != null && rir != null) seg.push(`${na} ${r} reps @ RIR ${rir}`);
+      const prescribed = prescribedRpe(peA);
+      if (r != null && prescribed != null) seg.push(`${na} ${r} reps @ RPE ${prescribed}`);
       else if (r != null) seg.push(`${na} ${r} reps`);
     }
     if (peB && hasAnyPrescription(peB)) {
       const r = repsTargetMin(peB);
-      const rir = prescribedRpe(peB);
-      if (r != null && rir != null) seg.push(`${nb} ${r} reps @ RIR ${rir}`);
+      const prescribed = prescribedRpe(peB);
+      if (r != null && prescribed != null) seg.push(`${nb} ${r} reps @ RPE ${prescribed}`);
       else if (r != null) seg.push(`${nb} ${r} reps`);
     }
     if (n > 0 && seg.length) return `${n} rounds: ${seg.join(" + ")}`;
@@ -539,7 +539,7 @@ export function buildPrescribedWorkoutReference(
         setCount: entryMeta?.total_sets ?? null,
         prescribedReps: pe0 ? repsTargetMin(pe0) : null,
         prescribedWeightKg: pe0 ? prescribedWeightKg(pe0) : null,
-        prescribedRir: pe0 ? prescribedRpe(pe0) : null,
+        prescribedRpe: pe0 ? prescribedRpe(pe0) : null,
         sets,
       };
       byBlockId[entryId] = ref;
@@ -638,8 +638,8 @@ export function buildPrescribedWorkoutReference(
 
 export function formatActualStrengthLine(log: WorkoutLogSet, setType: WorkoutLogBlockType): string {
   if (setType === "superset") {
-    const a = formatKgRepsRir(num(log.superset_weight_a), numInt(log.superset_reps_a), null, "RPE");
-    const b = formatKgRepsRir(num(log.superset_weight_b), numInt(log.superset_reps_b), null, "RPE");
+    const a = formatKgRepsRpe(num(log.superset_weight_a), numInt(log.superset_reps_a), null, "RPE");
+    const b = formatKgRepsRpe(num(log.superset_weight_b), numInt(log.superset_reps_b), null, "RPE");
     const segs = [a, b].filter(Boolean) as string[];
     const joined = segs.join(" + ");
     const rp = numInt(log.rpe);
@@ -649,7 +649,7 @@ export function formatActualStrengthLine(log: WorkoutLogSet, setType: WorkoutLog
   const w = num(log.weight);
   const r = numInt(log.reps);
   const rp = numInt(log.rpe);
-  const core = formatKgRepsRir(w, r, null, "RPE");
+  const core = formatKgRepsRpe(w, r, null, "RPE");
   if (rp != null) return core ? `${core} @ RPE ${rp}` : `@ RPE ${rp}`;
   return core ?? "—";
 }
@@ -657,14 +657,14 @@ export function formatActualStrengthLine(log: WorkoutLogSet, setType: WorkoutLog
 export function formatPrescribedStrengthLine(ref: PrescribedSetReference): string | null {
   if (ref.prescribedParts?.length) {
     const segs = ref.prescribedParts
-      .map((p) => formatPrescribedKgRepsRir(p.weightKg, p.reps, p.rir, "RIR"))
+      .map((p) => formatPrescribedKgRepsRpe(p.weightKg, p.reps, p.rpe, "RPE"))
       .filter(Boolean) as string[];
     return segs.length ? segs.join(" + ") : null;
   }
-  return formatPrescribedKgRepsRir(
+  return formatPrescribedKgRepsRpe(
     ref.prescribedWeightKg ?? null,
     ref.prescribedReps ?? null,
-    ref.prescribedRir ?? null,
-    "RIR"
+    ref.prescribedRpe ?? null,
+    "RPE"
   );
 }

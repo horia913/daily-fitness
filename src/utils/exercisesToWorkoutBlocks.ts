@@ -62,7 +62,7 @@ export function exercisesToWorkoutBlocks(
         reps: reps,
         weight_kg: undefined,
         load_percentage: undefined,
-        rir: undefined,
+        rpe: undefined,
         tempo: undefined,
         rest_seconds: undefined,
         notes: undefined,
@@ -167,7 +167,7 @@ export function exercisesToWorkoutBlocks(
           load_percentage: exercise.load_percentage
             ? parseFloat(exercise.load_percentage)
             : undefined,
-          rir: exercise.rir ? parseInt(exercise.rir) : undefined,
+          rpe: exercise.rpe ? parseInt(exercise.rpe) : undefined,
           tempo: exercise.tempo || undefined,
           rest_seconds: exercise.rest_seconds
             ? parseInt(exercise.rest_seconds)

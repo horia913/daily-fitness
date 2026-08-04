@@ -16,7 +16,7 @@ import {
   consolidateRowOutcome,
   isSetOnTarget,
   repsOutcome,
-  rpeVsPrescribedRirOutcome,
+  rpeVsPrescribedRpeOutcome,
   weightOutcome,
   worstOfOutcomes,
 } from "@/lib/workoutLogSetOutcome";
@@ -83,7 +83,7 @@ function strengthOutcome(
   const pRir = pe ? prescribedRpe(pe) : null;
   const reps = repsOutcome(actualReps, pR);
   const weight = weightOutcome(actualWeight, pW);
-  const rpe = rpeVsPrescribedRirOutcome(actualRpe, pRir);
+  const rpe = rpeVsPrescribedRpeOutcome(actualRpe, pRir);
   const consolidated = consolidateRowOutcome(reps, weight, rpe);
   return {
     setNumber,
@@ -115,7 +115,7 @@ function supersetOutcomesForLog(
       ? consolidateRowOutcome(
           repsOutcome(ra, repsTargetMin(peA)),
           weightOutcome(wa, prescribedWeightKg(peA)),
-          rpeVsPrescribedRirOutcome(actualRpe, prescribedRpe(peA))
+          rpeVsPrescribedRpeOutcome(actualRpe, prescribedRpe(peA))
         )
       : ("neutral" as const);
   const outB =
@@ -123,7 +123,7 @@ function supersetOutcomesForLog(
       ? consolidateRowOutcome(
           repsOutcome(rb, repsTargetMin(peB)),
           weightOutcome(wb, prescribedWeightKg(peB)),
-          rpeVsPrescribedRirOutcome(actualRpe, prescribedRpe(peB))
+          rpeVsPrescribedRpeOutcome(actualRpe, prescribedRpe(peB))
         )
       : ("neutral" as const);
 
@@ -213,7 +213,7 @@ function evaluateStraightLikeBlock(
           actualWeightKg: num(log.weight),
           prescribedWeightKg: prescribedWeightKg(pe),
           actualRpe: numInt(log.rpe),
-          prescribedRir: prescribedRpe(pe),
+          prescribedRpe: prescribedRpe(pe),
         })
       ) {
         setsOnTargetCount += 1;
@@ -250,7 +250,7 @@ function evaluateSupersetBlock(
               actualWeightKg: num(log.superset_weight_a),
               prescribedWeightKg: prescribedWeightKg(peA),
               actualRpe: numInt(log.rpe),
-              prescribedRir: prescribedRpe(peA),
+              prescribedRpe: prescribedRpe(peA),
             });
       const okB =
         !peB || !hasAnyPrescription(peB)
@@ -261,7 +261,7 @@ function evaluateSupersetBlock(
               actualWeightKg: num(log.superset_weight_b),
               prescribedWeightKg: prescribedWeightKg(peB),
               actualRpe: numInt(log.rpe),
-              prescribedRir: prescribedRpe(peB),
+              prescribedRpe: prescribedRpe(peB),
             });
       if (okA && okB) setsOnTargetCount += 1;
     }
@@ -303,7 +303,7 @@ function evaluateDropSetBlock(
           actualWeightKg: w,
           prescribedWeightKg: prescribedWeightKg(pe),
           actualRpe: numInt(log.rpe),
-          prescribedRir: prescribedRpe(pe),
+          prescribedRpe: prescribedRpe(pe),
         });
       }
     } else {
@@ -385,7 +385,7 @@ function evaluateClusterBlock(
       actualWeightKg: null,
       prescribedWeightKg: null,
       actualRpe: null,
-      prescribedRir: null,
+      prescribedRpe: null,
     })
       ? 1
       : 0;
@@ -418,7 +418,7 @@ function evaluateGiantSetBlock(
           totalPrescribedSets += 1;
           const r = repsOutcome(ar, repsTargetMin(pe));
           const w = weightOutcome(aw, prescribedWeightKg(pe));
-          const rp = rpeVsPrescribedRirOutcome(numInt(log.rpe), prescribedRpe(pe));
+          const rp = rpeVsPrescribedRpeOutcome(numInt(log.rpe), prescribedRpe(pe));
           const row = consolidateRowOutcome(r, w, rp);
           worst = worstOfOutcomes(worst, row);
           if (
@@ -428,7 +428,7 @@ function evaluateGiantSetBlock(
               actualWeightKg: aw,
               prescribedWeightKg: prescribedWeightKg(pe),
               actualRpe: numInt(log.rpe),
-              prescribedRir: prescribedRpe(pe),
+              prescribedRpe: prescribedRpe(pe),
             })
           ) {
             setsOnTargetCount += 1;
@@ -456,7 +456,7 @@ function evaluateGiantSetBlock(
             actualWeightKg: num(log.weight),
             prescribedWeightKg: prescribedWeightKg(pe),
             actualRpe: numInt(log.rpe),
-            prescribedRir: prescribedRpe(pe),
+            prescribedRpe: prescribedRpe(pe),
           })
         ) {
           setsOnTargetCount += 1;
@@ -536,7 +536,7 @@ function evaluateRestPauseBlock(
         actualWeightKg: w,
         prescribedWeightKg: prescribedWeightKg(pe0),
         actualRpe: numInt(firstPrimaryLog.rpe),
-        prescribedRir: prescribedRpe(pe0),
+        prescribedRpe: prescribedRpe(pe0),
       })
     ) {
       setsOnTargetCount = 1;
@@ -577,7 +577,7 @@ function evaluatePreExhaustionBlock(
           num(log.preexhaust_isolation_weight ?? log.weight),
           prescribedWeightKg(peIso)
         ),
-        rpeVsPrescribedRirOutcome(numInt(log.rpe), prescribedRpe(peIso))
+        rpeVsPrescribedRpeOutcome(numInt(log.rpe), prescribedRpe(peIso))
       );
       if (
         isSetOnTarget({
@@ -586,7 +586,7 @@ function evaluatePreExhaustionBlock(
           actualWeightKg: num(log.preexhaust_isolation_weight ?? log.weight),
           prescribedWeightKg: prescribedWeightKg(peIso),
           actualRpe: numInt(log.rpe),
-          prescribedRir: prescribedRpe(peIso),
+          prescribedRpe: prescribedRpe(peIso),
         })
       ) {
         setsOnTargetCount += 1;
@@ -604,7 +604,7 @@ function evaluatePreExhaustionBlock(
           num(log.preexhaust_compound_weight ?? log.weight),
           prescribedWeightKg(peComp)
         ),
-        rpeVsPrescribedRirOutcome(numInt(log.rpe), prescribedRpe(peComp))
+        rpeVsPrescribedRpeOutcome(numInt(log.rpe), prescribedRpe(peComp))
       );
       if (
         isSetOnTarget({
@@ -613,7 +613,7 @@ function evaluatePreExhaustionBlock(
           actualWeightKg: num(log.preexhaust_compound_weight ?? log.weight),
           prescribedWeightKg: prescribedWeightKg(peComp),
           actualRpe: numInt(log.rpe),
-          prescribedRir: prescribedRpe(peComp),
+          prescribedRpe: prescribedRpe(peComp),
         })
       ) {
         setsOnTargetCount += 1;
@@ -738,7 +738,7 @@ function evaluateEmomBlock(
       actualWeightKg: null,
       prescribedWeightKg: null,
       actualRpe: null,
-      prescribedRir: null,
+      prescribedRpe: null,
     })) {
       setsOnTargetCount += 1;
     }
@@ -806,7 +806,7 @@ function evaluateTabataBlock(
         actualWeightKg: null,
         prescribedWeightKg: null,
         actualRpe: null,
-        prescribedRir: null,
+        prescribedRpe: null,
       })
     ) {
       setsOnTargetCount += 1;
@@ -823,7 +823,7 @@ function evaluateTabataBlock(
           actualWeightKg: null,
           prescribedWeightKg: null,
           actualRpe: null,
-          prescribedRir: null,
+          prescribedRpe: null,
         });
       }));
 

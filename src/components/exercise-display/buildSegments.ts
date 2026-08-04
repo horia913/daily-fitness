@@ -171,7 +171,7 @@ export function buildPrescriptionSegments(
 
   const setsReps = buildSetsReps(slot, group, compact)
   const load = formatLoad(first)
-  const rir = first?.rir != null ? `RIR ${first.rir}` : undefined
+  const rpe = first?.rpe != null ? `RPE ${first.rpe}` : undefined
   const technique = first?.tempo?.trim() || undefined
 
   const restSeconds = slot.rest_seconds ?? group.rest_seconds
@@ -182,7 +182,7 @@ export function buildPrescriptionSegments(
   return {
     setsReps,
     load,
-    rir,
+    rpe,
     technique,
     rest,
     extras: extras.length > 0 ? extras : undefined,

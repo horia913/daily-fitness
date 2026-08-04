@@ -1,5 +1,5 @@
 import type { WorkoutSetLog } from "./workoutSetLogTypes";
-import type { PrescribedRirMap } from "./types";
+import type { PrescribedRpeMap } from "./types";
 
 export function repsFromSet(set: WorkoutSetLog): number {
   const r = set.reps ?? set.amrap_total_reps ?? set.fortime_total_reps ?? 0;
@@ -28,7 +28,7 @@ export function buildCompressLinesForExercise(
   sets: WorkoutSetLog[],
   exerciseId: string,
   isPrForLine: (weight: number, reps: number) => boolean,
-  prescribed?: PrescribedRirMap,
+  prescribed?: PrescribedRpeMap,
 ): import("./compressStrengthSets").CompressLine[] {
   const sorted = [...sets].sort((a, b) => {
     const an = a.set_number ?? 0;
@@ -56,7 +56,7 @@ export function buildCompressLinesForExercise(
       reps,
       isPR: isPrForLine(weight, reps),
       setLogId: set.id,
-      prescribedRir: rx != null && Number(rx) > 0 ? Number(rx) : null,
+      prescribedRpe: rx != null && Number(rx) > 0 ? Number(rx) : null,
       loggedRpe: rpe,
     });
   };

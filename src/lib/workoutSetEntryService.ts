@@ -543,9 +543,9 @@ export class WorkoutSetEntryService {
       if (exerciseData.weight_kg !== undefined && exerciseData.weight_kg !== null) {
         insertData.weight_kg = exerciseData.weight_kg
       }
-      // Column `rpe` stores prescribed RPE (1–10). Legacy TS field on exerciseData is still `rir` until Phase 2.
-      if (exerciseData.rir !== undefined && exerciseData.rir !== null) {
-        insertData.rpe = exerciseData.rir
+      // Column `rpe` stores prescribed RPE (6–10).
+      if (exerciseData.rpe !== undefined && exerciseData.rpe !== null) {
+        insertData.rpe = exerciseData.rpe
       }
       if (exerciseData.tempo !== undefined && exerciseData.tempo !== null && exerciseData.tempo !== '') {
         insertData.tempo = exerciseData.tempo

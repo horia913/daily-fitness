@@ -107,7 +107,7 @@ import {
   LiveCardGroupedExercise,
   LiveCardGlue,
   formatDropTechniqueBody,
-  effortFromPrescribedRir,
+  effortFromPrescribedRpe,
 } from "@/components/client/workout-execution/live-card";
 import { ExerciseDisplay, ExerciseGroupDisplay } from "@/components/exercise-display";
 import {
@@ -659,7 +659,7 @@ export default function UiGalleryPage() {
                   <LiveCardExerciseName name="Leg Press Wide Stance" />
                   <LiveCardPrimary
                     target={{ kind: "reps_only", reps: 6, unit: "reps" }}
-                    effort={effortFromPrescribedRir(10)}
+                    effort={effortFromPrescribedRpe(10)}
                   />
                   <LiveCardStats rest="2:00" tempo="3010" last="6 × 7.5" />
                   <LiveCardLog
@@ -675,7 +675,7 @@ export default function UiGalleryPage() {
                   <LiveCardExerciseName name="Barbell Back Squat" />
                   <LiveCardPrimary
                     target={{ kind: "reps_weight", reps: 4, weight: 105 }}
-                    effort={effortFromPrescribedRir(8)}
+                    effort={effortFromPrescribedRpe(8)}
                   />
                   <LiveCardStats rest="3:00" tempo="20X0" last="4 × 102.5" />
                   <LiveCardTechnique title="Drop set">
@@ -695,7 +695,7 @@ export default function UiGalleryPage() {
                     badge="A1"
                     name="Back Squat"
                     target={{ kind: "reps_weight", reps: 4, weight: 105 }}
-                    effort={effortFromPrescribedRir(8)}
+                    effort={effortFromPrescribedRpe(8)}
                     logSlot={
                       <>
                         <LiveCardLogField label="Weight" value="105" />
@@ -708,7 +708,7 @@ export default function UiGalleryPage() {
                     badge="A2"
                     name="Romanian Deadlift"
                     target={{ kind: "reps_weight", reps: 8, weight: 68 }}
-                    effort={effortFromPrescribedRir(7)}
+                    effort={effortFromPrescribedRpe(7)}
                     logged
                     loggedValue="8 × 68 kg"
                   />

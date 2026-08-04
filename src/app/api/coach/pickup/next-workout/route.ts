@@ -33,7 +33,7 @@ type PickupBlock = {
     weight_kg?: number
     rest_seconds?: number
     load_percentage?: number
-    rir?: number
+    rpe?: number
     tempo?: string
     notes?: string
   }>
@@ -127,7 +127,7 @@ async function buildPickupFallbackFromProgramState(clientId: string) {
         weight_kg: numOrUndef(ex.weight_kg),
         rest_seconds: numOrUndef(ex.rest_seconds),
         load_percentage: numOrUndef(ex.load_percentage),
-        rir: numOrUndef(ex.rir),
+        rpe: numOrUndef(ex.rpe),
         tempo: strOrUndef(ex.tempo),
         notes: strOrUndef(ex.notes),
       })

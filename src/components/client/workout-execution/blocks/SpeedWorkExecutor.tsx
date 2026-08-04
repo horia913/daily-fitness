@@ -24,7 +24,7 @@ import {
   LiveCardLog,
   LiveCardLogDistanceTime,
   LiveCardLogButton,
-  effortFromPrescribedRir,
+  effortFromPrescribedRpe,
   formatLiveRest,
   resolveRestSeconds,
   formatLiveLastDistance,
@@ -220,7 +220,7 @@ export function SpeedWorkExecutor({
       <LoggedSetsList rows={loggedSetRows} label="Logged intervals" />
     ) : null;
 
-  const activeEffort = effortFromPrescribedRir(targets.rir);
+  const activeEffort = effortFromPrescribedRpe(targets.rpe);
   const liveTarget: LiveCardTarget =
     distanceM > 0
       ? {

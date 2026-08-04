@@ -27,26 +27,26 @@ function mapEntryExercise(
     reps: row.reps != null ? String(row.reps) : null,
     weight_kg: row.weight_kg as number | string | null | undefined,
     load_percentage: row.load_percentage as number | string | null | undefined,
-    rir: row.rpe as number | string | null | undefined,
+    rpe: row.rpe as number | string | null | undefined,
   };
 }
 
 function pickPrescriptionFields(
   slot: Record<string, unknown>,
   rx: Record<string, unknown> | null
-): { reps: string | null; weight_kg: unknown; rir: unknown; load_percentage: unknown } {
+): { reps: string | null; weight_kg: unknown; rpe: unknown; load_percentage: unknown } {
   if (rx) {
     return {
       reps: rx.reps != null ? String(rx.reps) : slot.reps != null ? String(slot.reps) : null,
       weight_kg: rx.weight_kg ?? slot.weight_kg,
-      rir: rx.rpe ?? slot.rpe,
+      rpe: rx.rpe ?? slot.rpe,
       load_percentage: rx.load_percentage ?? slot.load_percentage,
     };
   }
   return {
     reps: slot.reps != null ? String(slot.reps) : null,
     weight_kg: slot.weight_kg,
-    rir: slot.rpe,
+    rpe: slot.rpe,
     load_percentage: slot.load_percentage,
   };
 }

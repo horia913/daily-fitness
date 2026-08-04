@@ -24,13 +24,13 @@ function slot(
     measurement: 'reps',
     technique: 'none',
     prescriptions,
-    enabledProperties: ['load', 'rir', 'tempo'],
+    enabledProperties: ['load', 'rpe', 'tempo'],
     exercise: { id, name },
     ...rest,
   }
 }
 
-/** (a) Straight set — %1RM + RIR + rest */
+/** (a) Straight set — %1RM + RPE + rest */
 export const straightSetGroup = mapCanvasGroupToExerciseGroupDisplay(
   {
     id: 'g1',
@@ -41,9 +41,9 @@ export const straightSetGroup = mapCanvasGroupToExerciseGroupDisplay(
     slots: [
       slot('e1', 'Barbell Back Squat', 1, {
         prescriptions: [
-          rx(1, { reps: '8', load_percentage: 75, rir: 2 }),
-          rx(2, { reps: '8', load_percentage: 75, rir: 2 }),
-          rx(3, { reps: '8', load_percentage: 75, rir: 2 }),
+          rx(1, { reps: '8', load_percentage: 75, rpe: 8 }),
+          rx(2, { reps: '8', load_percentage: 75, rpe: 8 }),
+          rx(3, { reps: '8', load_percentage: 75, rpe: 8 }),
         ],
       }),
     ],

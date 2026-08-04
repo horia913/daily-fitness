@@ -5,16 +5,16 @@ import {
   rpeToEffortTier,
 } from "@/lib/workoutEffortLabels";
 
-/** Push one `kind: "target-effort"` row when prescribed RIR/RPE is a positive number. */
+/** Push one `kind: "target-effort"` row when prescribed RPE is in 6–10. */
 export function appendTargetEffortItem(
   items: PrescriptionItem[],
-  rirRaw: unknown,
+  rpeRaw: unknown,
   icon: LucideIcon,
   label = "Target effort",
 ): void {
-  if (rirRaw == null || rirRaw === "") return;
-  const n = Number(rirRaw);
-  if (!Number.isFinite(n) || n <= 0) return;
+  if (rpeRaw == null || rpeRaw === "") return;
+  const n = Number(rpeRaw);
+  if (!Number.isFinite(n) || n < 6) return;
   const tier = rpeToEffortTier(n);
   const tierLabel = clientEffortLabelFromStoredRpe(n);
   const tone: PrescriptionItemTone = tier

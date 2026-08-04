@@ -58,7 +58,7 @@ import {
   getGlobalExerciseIndex,
 } from "@/components/client/workout-execution/ui/ExecProgressSegments";
 import { groupIndexToHue } from "@/components/client/workout-execution/live-card";
-import { enrichWorkoutBlocksPrescribedRir } from "@/lib/enrichWorkoutBlocksPrescribedRir";
+import { enrichWorkoutBlocksPrescribedRpe } from "@/lib/enrichWorkoutBlocksPrescribedRpe";
 import { WorkoutExecutionChromeProvider } from "@/components/client/workout-execution/WorkoutExecutionChromeContext";
 import { fetchPersonalRecords } from "@/lib/personalRecords";
 import {
@@ -2048,7 +2048,7 @@ export default function LiveWorkout() {
               exercise_id: ex.exercise_id,
               sets: ex.sets,
               reps: ex.reps,
-              rir: ex.rir,
+              rpe: ex.rpe,
             })),
           })),
         );
@@ -2088,18 +2088,18 @@ export default function LiveWorkout() {
       }
 
       // Program instance prescriptions (pisp via get_instance_workout_canvas) already
-      // include RIR — skip cppr/master overlay. Standalone assignments still enrich.
+      // include prescribed RPE — skip cppr/master overlay. Standalone assignments still enrich.
       if (!isProgramAssignment) {
         const blockIdsForRir = workoutSetEntries
           .map((b: { id?: string }) => b.id)
           .filter((id): id is string => Boolean(id));
         try {
-          await enrichWorkoutBlocksPrescribedRir(supabase, workoutSetEntries, {
+          await enrichWorkoutBlocksPrescribedRpe(supabase, workoutSetEntries, {
             blockIds: blockIdsForRir,
             workoutAssignmentId: combinedAssignment.id,
           });
         } catch (e) {
-          console.warn("[loadAssignment] enrichWorkoutBlocksPrescribedRir:", e);
+          console.warn("[loadAssignment] enrichWorkoutBlocksPrescribedRpe:", e);
         }
       }
 
@@ -2114,7 +2114,7 @@ export default function LiveWorkout() {
                 name:
                   (e as { exercise?: { name?: string } }).exercise?.name ??
                   (e as { name?: string }).name,
-                rir: e.rir,
+                rpe: e.rpe,
                 primary_muscle_group:
                   (e as { exercise?: { primary_muscle_group?: string } })
                     .exercise?.primary_muscle_group ??
@@ -2126,7 +2126,7 @@ export default function LiveWorkout() {
           2,
         ),
       );
-      console.log("[DEBUG] enrich RIR context:", {
+      console.log("[DEBUG] enrich RPE context:", {
         isProgramAssignment,
         program_assignment_id: (resolvedAssignment as any)
           .program_assignment_id,
@@ -2156,7 +2156,7 @@ export default function LiveWorkout() {
           sets: ex.sets ?? null,
           reps: ex.reps ?? null,
           weight_kg: ex.weight_kg ?? null,
-          rir: ex.rir ?? null,
+          rpe: ex.rpe ?? null,
           tempo: ex.tempo ?? null,
           rest_seconds: ex.rest_seconds ?? null,
           load_percentage: (ex as any).load_percentage ?? null,
@@ -2282,7 +2282,7 @@ export default function LiveWorkout() {
                       : undefined,
                 reps: exercise.reps ?? block.reps_per_set ?? undefined,
                 weight_kg: exercise.weight_kg ?? undefined,
-                rir: exercise.rir ?? undefined,
+                rpe: exercise.rpe ?? undefined,
                 tempo: exercise.tempo ?? undefined,
                 rest_seconds:
                   exercise.rest_seconds ?? block.rest_seconds ?? undefined,
@@ -4933,13 +4933,13 @@ export default function LiveWorkout() {
                                       </span>
                                     </div>
                                   )}
-                                  {(currentExercise?.rir ||
-                                    currentExercise?.rir === 0) && (
+                                  {(currentExercise?.rpe ||
+                                    currentExercise?.rpe === 0) && (
                                     <div className="px-2 py-1 rounded bg-orange-100 dark:bg-orange-900/40 border border-orange-300 dark:border-orange-700">
                                       <span
                                         className={`text-xs font-semibold ${theme.text}`}
                                       >
-                                        RPE: {Number(currentExercise.rir)}
+                                        RPE: {Number(currentExercise.rpe)}
                                       </span>
                                     </div>
                                   )}
@@ -5139,13 +5139,13 @@ export default function LiveWorkout() {
                                 </span>
                               </div>
                             )}
-                            {(currentExercise?.rir ||
-                              currentExercise?.rir === 0) && (
+                            {(currentExercise?.rpe ||
+                              currentExercise?.rpe === 0) && (
                               <div className="px-2 py-1 rounded bg-orange-100 dark:bg-orange-900/40 border border-orange-300 dark:border-orange-700">
                                 <span
                                   className={`text-xs font-semibold ${theme.text}`}
                                 >
-                                  RPE: {Number(currentExercise.rir)}
+                                  RPE: {Number(currentExercise.rpe)}
                                 </span>
                               </div>
                             )}
@@ -5388,13 +5388,13 @@ export default function LiveWorkout() {
                                 </span>
                               </div>
                             )}
-                            {(currentExercise?.rir ||
-                              currentExercise?.rir === 0) && (
+                            {(currentExercise?.rpe ||
+                              currentExercise?.rpe === 0) && (
                               <div className="px-2 py-1 rounded bg-orange-100 dark:bg-orange-900/40 border border-orange-300 dark:border-orange-700">
                                 <span
                                   className={`text-xs font-semibold ${theme.text}`}
                                 >
-                                  RPE: {Number(currentExercise.rir)}
+                                  RPE: {Number(currentExercise.rpe)}
                                 </span>
                               </div>
                             )}
@@ -5890,13 +5890,13 @@ export default function LiveWorkout() {
                                   </span>
                                 </div>
                               )}
-                              {(currentExercise?.rir ||
-                                currentExercise?.rir === 0) && (
+                              {(currentExercise?.rpe ||
+                                currentExercise?.rpe === 0) && (
                                 <div className="px-2 py-1 rounded bg-orange-100 dark:bg-orange-900/40 border border-orange-300 dark:border-orange-700">
                                   <span
                                     className={`text-xs font-semibold ${theme.text}`}
                                   >
-                                    RPE: {Number(currentExercise.rir)}
+                                    RPE: {Number(currentExercise.rpe)}
                                   </span>
                                 </div>
                               )}
@@ -6314,11 +6314,11 @@ export default function LiveWorkout() {
                                   </span>
                                 </div>
                               )}
-                              {(currentExercise?.rir ||
-                                currentExercise?.rir === 0) && (
+                              {(currentExercise?.rpe ||
+                                currentExercise?.rpe === 0) && (
                                 <div className="inline-block rounded-xl px-3 py-1.5 bg-[color:var(--fc-status-warning)]/20">
                                   <span className="text-sm font-semibold text-[color:var(--fc-status-warning)]">
-                                    RPE: {Number(currentExercise.rir)}
+                                    RPE: {Number(currentExercise.rpe)}
                                   </span>
                                 </div>
                               )}

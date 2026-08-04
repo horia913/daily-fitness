@@ -45,7 +45,7 @@ export interface ExerciseRow {
   rest_seconds?: number
   work_seconds?: number
   weight_kg?: number
-  rir?: number
+  rpe?: number
   tempo?: string
   notes?: string
   order_index?: number

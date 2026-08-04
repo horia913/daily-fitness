@@ -40,7 +40,7 @@ import {
   LiveCardLog,
   LiveCardLogField,
   formatClusterTechniqueBody,
-  effortFromPrescribedRir,
+  effortFromPrescribedRpe,
   formatLiveRest,
   resolveRestSeconds,
   formatLiveLast,
@@ -239,7 +239,7 @@ export function ClusterSetExecutor({
     activeSetNumber,
     liveSetEntry.setEntry.reps_per_set,
   );
-  const activeEffort = effortFromPrescribedRir(activeTargets.rir);
+  const activeEffort = effortFromPrescribedRpe(activeTargets.rpe);
   /** Mockup: reps_per_cluster × clusters_per_set with unit "clusters". */
   const liveTarget: LiveCardTarget = {
     kind: "reps_weight",

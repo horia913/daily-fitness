@@ -35,11 +35,11 @@ const EFFORT_OPTIONS: ReadonlyArray<EffortOption> = [
   { key: "max", label: "Max" },
 ];
 
-/** Button click → RPE value (band upper bound). */
+/** Button click → RPE value (band representative). */
 const EFFORT_TO_RPE: Record<EffortTier, number> = {
-  easy: 4,
-  medium: 6,
-  hard: 8,
+  easy: 6,
+  medium: 7,
+  hard: 9,
   max: 10,
 };
 

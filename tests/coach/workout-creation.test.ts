@@ -105,7 +105,7 @@ describe('Workout Creation', () => {
         reps: '10',
         rest_seconds: 60,
         tempo: '2-0-1-0',
-        rir: 2,
+        rpe: 2,
       };
 
       const result = await mockSupabase

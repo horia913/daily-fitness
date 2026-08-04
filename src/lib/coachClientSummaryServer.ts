@@ -47,8 +47,7 @@ function mapEntryExercise(
     reps: row.reps != null ? String(row.reps) : null,
     weight_kg: row.weight_kg as number | string | null | undefined,
     load_percentage: row.load_percentage as number | string | null | undefined,
-    // DB column is `rpe`; PrescribedExerciseRow still uses legacy `rir` until Phase 2.
-    rir: row.rpe as number | string | null | undefined,
+        rpe: row.rpe as number | string | null | undefined,
   };
 }
 
