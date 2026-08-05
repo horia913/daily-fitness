@@ -41,7 +41,6 @@ import {
   groupIndexToHue,
   type LiveCardTarget,
 } from "../live-card";
-import { LoggedEffortInline } from "../ui/LoggedEffortInline";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MoreVertical, Pencil } from "lucide-react";
@@ -120,12 +119,6 @@ export function StraightSetExecutor({
 
   // Next set to log (1-indexed); for display we cap so we never show "Set N of Y" with N > Y
   const currentSetNumber = completedSets + 1;
-  const displaySetNumber =
-    editingSetId && editDraft?.set_number != null
-      ? editDraft.set_number
-      : viewingSetIndex >= 1
-        ? viewingSetIndex
-        : Math.min(currentSetNumber, totalSets);
   const [weight, setWeight] = useState("");
   const [reps, setReps] = useState("");
   const [isLoggingSet, setIsLoggingSet] = useState(false);
@@ -768,8 +761,39 @@ export function StraightSetExecutor({
     });
   };
 
+  const nudgeEditWeight = (delta: number) => {
+    setEditDraft((d) => {
+      if (!d) return d;
+      const cur = parseWeightKgInput(d.weight || "0");
+      const next = Math.max(0, (isNaN(cur) ? 0 : cur) + delta);
+      return { ...d, weight: String(Math.round(next * 2) / 2) };
+    });
+  };
+  const nudgeEditReps = (delta: number) => {
+    setEditDraft((d) => {
+      if (!d) return d;
+      const cur = parseInt(d.reps || "0", 10);
+      const next = Math.max(0, (isNaN(cur) ? 0 : cur) + delta);
+      return { ...d, reps: String(next) };
+    });
+  };
+
+  const saveEditDisabled =
+    isSavingEdit ||
+    !editDraft ||
+    editDraft.weight.trim() === "" ||
+    editDraft.reps.trim() === "" ||
+    isNaN(parseWeightKgInput(editDraft.weight)) ||
+    parseWeightKgInput(editDraft.weight) < 0 ||
+    isNaN(parseInt(editDraft.reps, 10)) ||
+    parseInt(editDraft.reps, 10) <= 0;
+
   // Keep edit surface for already-logged entries.
   const isEditMode = !!editingSetId && !!editDraft;
+  const cardHeading =
+    isEditMode && editDraft
+      ? `Editing Set ${editDraft.set_number}`
+      : `Set ${activeSetNumber} of ${totalSets}`;
   const chrome = useWorkoutExecutionChrome();
   const hideCompactBack = chrome?.hideCompactBack ?? false;
   const totalSetEntries = allSetEntries.length || 1;
@@ -798,9 +822,11 @@ export function StraightSetExecutor({
 
           <LiveCard
             hue={groupIndexToHue(currentSetEntryIndex)}
-            heading={`Set ${activeSetNumber} of ${totalSets}`}
+            heading={cardHeading}
             status={
-              rowsState.doneCount >= totalSets ? "complete" : "logging"
+              !isEditMode && rowsState.doneCount >= totalSets
+                ? "complete"
+                : "logging"
             }
           >
             <div>
@@ -817,46 +843,63 @@ export function StraightSetExecutor({
                 }
               />
             </div>
-            <LiveCardPrimary
-              target={liveTarget}
-              effort={activeEffort}
-              loadPct={loadPercentage}
-            />
-            <LiveCardStats
-              rest={formatLiveRest(restSec)}
-              tempo={tempoLabel}
-              last={lastLabel}
-            />
-            {instructions ? (
-              <LiveCardNote>{instructions}</LiveCardNote>
+            {!isEditMode ? (
+              <>
+                <LiveCardPrimary
+                  target={liveTarget}
+                  effort={activeEffort}
+                  loadPct={loadPercentage}
+                />
+                <LiveCardStats
+                  rest={formatLiveRest(restSec)}
+                  tempo={tempoLabel}
+                  last={lastLabel}
+                />
+                {instructions ? (
+                  <LiveCardNote>{instructions}</LiveCardNote>
+                ) : null}
+              </>
             ) : null}
 
-            {rowsState.rows
-              .filter((row) => row.done)
-              .map((row) => {
-                const logged = loggedSetsList.find(
-                  (s) => Number(s.set_number) === row.setNumber,
-                );
-                return (
-                  <SetUnitRow
-                    key={`done-${row.setNumber}`}
-                    label={`Set ${row.setNumber}`}
-                    done
-                    summary={
-                      <>
-                        {row.reps || "—"} ×{" "}
-                        <span className={setUnitStyles.sxAccent}>
-                          {row.weight || "—"}
-                        </span>{" "}
-                        kg
-                        <LoggedEffortInline rpe={logged?.rpe ?? null} />
-                      </>
-                    }
-                  />
-                );
-              })}
-
-            {activeRow ? (
+            {isEditMode && editDraft ? (
+              <LiveCardLog>
+                <LiveCardLogField
+                  label="Weight"
+                  value={editDraft.weight}
+                  onChange={(value) =>
+                    setEditDraft((d) => (d ? { ...d, weight: value } : null))
+                  }
+                  onIncrement={() => nudgeEditWeight(2.5)}
+                  onDecrement={() => nudgeEditWeight(-2.5)}
+                />
+                <LiveCardLogField
+                  label="Reps"
+                  value={editDraft.reps}
+                  onChange={(value) =>
+                    setEditDraft((d) => (d ? { ...d, reps: value } : null))
+                  }
+                  onIncrement={() => nudgeEditReps(1)}
+                  onDecrement={() => nudgeEditReps(-1)}
+                />
+                <div className="mt-3 flex w-full gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleCancelEdit}
+                    className="h-12 flex-1 rounded-xl text-base font-semibold"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSaveEdit}
+                    disabled={saveEditDisabled}
+                    variant="fc-primary"
+                    className="h-12 flex-1 rounded-xl text-base font-bold uppercase tracking-wider"
+                  >
+                    {isSavingEdit ? "Saving…" : "Save edits"}
+                  </Button>
+                </div>
+              </LiveCardLog>
+            ) : activeRow ? (
               <LiveCardLog>
                 <LiveCardLogField
                   label="Weight"
@@ -886,86 +929,36 @@ export function StraightSetExecutor({
                   disabled={isLoggingSet}
                   onClick={() => void handleLogRow(activeRowIndex)}
                 />
-                {isEditMode ? (
-                  <div className="mt-3 flex gap-2 w-full">
-                    <Button
-                      variant="outline"
-                      onClick={handleCancelEdit}
-                      className="flex-1 h-12 text-base font-semibold rounded-xl"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={handleSaveEdit}
-                      disabled={
-                        isSavingEdit ||
-                        !editDraft ||
-                        editDraft.weight.trim() === "" ||
-                        editDraft.reps.trim() === "" ||
-                        isNaN(parseWeightKgInput(editDraft.weight)) ||
-                        parseWeightKgInput(editDraft.weight) < 0 ||
-                        isNaN(parseInt(editDraft.reps, 10)) ||
-                        parseInt(editDraft.reps, 10) <= 0
-                      }
-                      variant="fc-primary"
-                      className="flex-1 h-12 text-base font-bold uppercase tracking-wider rounded-xl"
-                    >
-                      {isSavingEdit ? "Saving…" : "Save edits"}
-                    </Button>
-                  </div>
-                ) : null}
-              </LiveCardLog>
-            ) : isEditMode ? (
-              <LiveCardLog>
-                <div className="mt-3 flex gap-2 w-full">
-                  <Button
-                    variant="outline"
-                    onClick={handleCancelEdit}
-                    className="flex-1 h-12 text-base font-semibold rounded-xl"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleSaveEdit}
-                    disabled={
-                      isSavingEdit ||
-                      !editDraft ||
-                      editDraft.weight.trim() === "" ||
-                      editDraft.reps.trim() === "" ||
-                      isNaN(parseWeightKgInput(editDraft.weight)) ||
-                      parseWeightKgInput(editDraft.weight) < 0 ||
-                      isNaN(parseInt(editDraft.reps, 10)) ||
-                      parseInt(editDraft.reps, 10) <= 0
-                    }
-                    variant="fc-primary"
-                    className="flex-1 h-12 text-base font-bold uppercase tracking-wider rounded-xl"
-                  >
-                    {isSavingEdit ? "Saving…" : "Save edits"}
-                  </Button>
-                </div>
               </LiveCardLog>
             ) : null}
 
-            {rowsState.rows
-              .filter((row) => !row.done && row.setNumber !== activeRow?.setNumber)
-              .map((row) => (
-                <SetUnitRow
-                  key={`upcoming-${row.setNumber}`}
-                  label={`Set ${row.setNumber}`}
-                  summary={
-                    <span className={setUnitStyles.sxMuted}>
-                      {formatUpcomingSummary(row.setNumber)}
-                    </span>
-                  }
-                  onSelect={() =>
-                    setJumpRowIndex(
-                      rowsState.rows.findIndex((r) => r.setNumber === row.setNumber),
-                    )
-                  }
-                />
-              ))}
+            {!isEditMode
+              ? rowsState.rows
+                  .filter(
+                    (row) =>
+                      !row.done && row.setNumber !== activeRow?.setNumber,
+                  )
+                  .map((row) => (
+                    <SetUnitRow
+                      key={`upcoming-${row.setNumber}`}
+                      label={`Set ${row.setNumber}`}
+                      summary={
+                        <span className={setUnitStyles.sxMuted}>
+                          {formatUpcomingSummary(row.setNumber)}
+                        </span>
+                      }
+                      onSelect={() =>
+                        setJumpRowIndex(
+                          rowsState.rows.findIndex(
+                            (r) => r.setNumber === row.setNumber,
+                          ),
+                        )
+                      }
+                    />
+                  ))
+              : null}
 
-            {rowsState.doneCount < totalSets ? (
+            {!isEditMode && rowsState.doneCount < totalSets ? (
               <button
                 type="button"
                 onClick={fillRemainingTargets}

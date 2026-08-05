@@ -21,7 +21,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, ChevronUp, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SetEffortPicker } from "./SetEffortPicker";
-import { LoggedEffortInline } from "./LoggedEffortInline";
+import {
+  clientEffortLabelFromStoredRpe,
+  rpeToEffortTier,
+  type EffortTier,
+} from "@/lib/workoutEffortLabels";
 import effortStyles from "./setEffortPicker.module.css";
 
 export interface LoggedSetRow {
@@ -48,7 +52,7 @@ interface LoggedSetsListProps {
   rows: LoggedSetRow[];
   /** Header noun: "Logged sets" by default. */
   label?: string;
-  /** Show toggle when more rows than this; default 2. */
+  /** Show toggle when more rows than this; default very high (no collapse in normal use). */
   collapseThreshold?: number;
   className?: string;
 }
@@ -56,7 +60,7 @@ interface LoggedSetsListProps {
 export function LoggedSetsList({
   rows,
   label = "Logged sets",
-  collapseThreshold = 2,
+  collapseThreshold = 99,
   className,
 }: LoggedSetsListProps) {
   const [showAll, setShowAll] = useState(false);
@@ -106,12 +110,17 @@ export function LoggedSetsList({
 
       <ul className="flex flex-col">
         {visibleRows.map((row) => {
-          const hasRpe = row.rpe != null && Number(row.rpe) > 0;
+          const effortTier: EffortTier | null = rpeToEffortTier(row.rpe ?? null);
+          const hasEffort = effortTier != null;
+          const effortLabel = hasEffort
+            ? clientEffortLabelFromStoredRpe(row.rpe ?? null) ?? null
+            : null;
           return (
             <li
               key={row.id}
               className="flex flex-col gap-1.5 border-b border-white/[0.04] py-2.5 last:border-b-0"
             >
+              {/* Title row is always full width (no truncate). */}
               <div className="flex items-center justify-between gap-2">
                 {row.onTitleClick ? (
                   <button
@@ -126,9 +135,8 @@ export function LoggedSetsList({
                       strokeWidth={3}
                       aria-hidden
                     />
-                    <span className="min-w-0 truncate font-medium text-[color:var(--fc-text-primary)] underline decoration-white/25 underline-offset-2">
+                    <span className="min-w-0 font-medium text-[color:var(--fc-text-primary)] underline decoration-white/25 underline-offset-2">
                       {row.title}
-                      {hasRpe ? <LoggedEffortInline rpe={row.rpe} /> : null}
                     </span>
                     <Pencil
                       className="h-3 w-3 shrink-0 text-[color:var(--fc-text-dim)]"
@@ -142,18 +150,34 @@ export function LoggedSetsList({
                       strokeWidth={3}
                       aria-hidden
                     />
-                    <span className="min-w-0 truncate font-medium text-[color:var(--fc-text-primary)]">
+                    <span className="min-w-0 font-medium text-[color:var(--fc-text-primary)]">
                       {row.title}
-                      {hasRpe ? <LoggedEffortInline rpe={row.rpe} /> : null}
                     </span>
                   </span>
                 )}
-                {row.menu ? (
-                  <div className="flex shrink-0 items-center">{row.menu}</div>
+
+                {/* Rated set: small chip stays inline with the title row. */}
+                {hasEffort ? (
+                  <span
+                    className={cn(
+                      "inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide border shrink-0",
+                      effortStyles[effortTier],
+                    )}
+                    style={{
+                      backgroundColor:
+                        "color-mix(in srgb, currentColor 14%, #050608)",
+                      borderColor: "currentColor",
+                    }}
+                    aria-label={`Effort: ${effortLabel ?? ""}`}
+                  >
+                    {effortLabel}
+                  </span>
                 ) : null}
               </div>
-              {!hasRpe ? (
-                <div className={effortStyles.promptBlock}>
+
+              {/* Unrated set: picker goes on its own line below the title row. */}
+              {!hasEffort ? (
+                <div className="flex flex-col items-end gap-1">
                   <p className={effortStyles.promptLabel}>How hard was that?</p>
                   <SetEffortPicker
                     currentRPE={row.rpe ?? null}
@@ -161,13 +185,7 @@ export function LoggedSetsList({
                     disabled={row.disabled}
                   />
                 </div>
-              ) : (
-                <SetEffortPicker
-                  currentRPE={row.rpe ?? null}
-                  onSelect={row.onEffortChange}
-                  disabled={row.disabled}
-                />
-              )}
+              ) : null}
             </li>
           );
         })}

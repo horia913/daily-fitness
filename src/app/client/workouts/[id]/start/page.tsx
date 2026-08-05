@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
@@ -86,9 +86,15 @@ import {
   abandonOtherInProgressSessions,
   closeStaleInProgressSessionsForClient,
 } from "@/lib/workoutSessionLifecycle";
+import {
+  buildWorkoutCompletionHandoff,
+  writeCompletionHandoff,
+  type HandoffPr,
+} from "@/lib/workoutCompletionHandoff";
 export default function LiveWorkout() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const explicitStartIntent = searchParams.get("start") === "1";
   const assignmentId = params.id as string;
   const { addToast } = useToast();
@@ -199,6 +205,8 @@ export default function LiveWorkout() {
   const prCelebrationQueueRef = useRef<PrDetectedPayload[]>([]);
   prCelebrationQueueRef.current = prCelebrationQueue;
   const prCelebrationData = prCelebrationQueue[0] ?? null;
+  /** Session PRs for completion-summary handoff (live detections this workout). */
+  const sessionPrsForHandoffRef = useRef<HandoffPr[]>([]);
   /** Latest body weight (kg) for PR tier multiplier; one fetch per page load */
   const [clientBodyWeightKg, setClientBodyWeightKg] = useState<number | null>(
     null,
@@ -233,6 +241,43 @@ export default function LiveWorkout() {
       });
     }
     if (items.length === 0) return;
+
+    // Resolve exercise_id from live blocks for completion handoff PR list
+    let resolvedId: string | undefined;
+    for (const live of workoutSetEntriesRef.current) {
+      for (const ex of live.setEntry.exercises ?? []) {
+        if (ex.exercise?.name === pr.exercise_name) {
+          resolvedId = ex.exercise_id;
+          break;
+        }
+      }
+      if (resolvedId) break;
+    }
+    if (pr.max_strength) {
+      sessionPrsForHandoffRef.current.push({
+        exercise_id: resolvedId ?? null,
+        exercise_name: pr.exercise_name,
+        record_type: "max_strength",
+        record_value: pr.max_strength.weight,
+        exercises: {
+          id: resolvedId ?? "",
+          name: pr.exercise_name,
+        },
+      });
+    }
+    if (pr.strength_endurance) {
+      sessionPrsForHandoffRef.current.push({
+        exercise_id: resolvedId ?? null,
+        exercise_name: pr.exercise_name,
+        record_type: "strength_endurance",
+        record_value: pr.strength_endurance.volume,
+        exercises: {
+          id: resolvedId ?? "",
+          name: pr.exercise_name,
+        },
+      });
+    }
+
     setPrCelebrationQueue((prev) => [...prev, ...items]);
   }, []);
 
@@ -3908,9 +3953,46 @@ export default function LiveWorkout() {
         );
       }
 
-      // Use full page navigation so it works after tab switch.
-      console.log("[COMPLETE-FLOW] navigating to complete page");
-      window.location.href = `/client/workouts/${completeTargetId}/complete?${params.toString()}`;
+      // Instant summary handoff — complete page renders from this, API runs in background.
+      if (logIdForComplete && assignment) {
+        try {
+          const handoff = buildWorkoutCompletionHandoff({
+            workoutLogId: logIdForComplete,
+            sessionId: sessionId && isUuid(sessionId) ? sessionId : null,
+            assignment: {
+              id: assignment.id,
+              workout_template_id: assignment.workout_template_id,
+              status: assignment.status,
+              name: assignment.name ?? null,
+              notes: assignment.notes ?? null,
+              scheduled_date: assignment.scheduled_date ?? null,
+            },
+            workoutSetEntries: workoutSetEntriesRef.current,
+            loggedSetsBySetEntryId,
+            durationMinutes,
+            personalRecords: sessionPrsForHandoffRef.current,
+            exerciseLookup,
+          });
+          writeCompletionHandoff(handoff);
+        } catch (handoffErr) {
+          console.warn(
+            "⚠️ Unable to write completion handoff (summary will re-fetch)",
+            handoffErr,
+          );
+        }
+      }
+
+      // Soft nav keeps SPA alive so handoff paints instantly. Hard reload only as fallback.
+      const completeUrl = `/client/workouts/${completeTargetId}/complete?${params.toString()}`;
+      console.log("[COMPLETE-FLOW] navigating to complete page (soft)", completeUrl);
+      if (typeof router?.replace === "function") {
+        router.replace(completeUrl);
+      } else {
+        console.warn(
+          "⚠️ router.replace unavailable — falling back to hard navigation",
+        );
+        window.location.href = completeUrl;
+      }
 
       // Update workout session in background — do not await so tab backgrounding doesn't block navigation
       if (sessionId && isUuid(sessionId)) {

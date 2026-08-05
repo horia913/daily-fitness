@@ -42,12 +42,20 @@ import {
 import completeStyles from "@/components/client-workout-complete/clientWorkoutCompleteV6.module.css";
 import type { PrescribedRpeMap } from "@/components/client-workout-complete/types";
 import { prescribedKey } from "@/components/client-workout-complete/setLinesFromLogs";
+import {
+  clearCompletionHandoff,
+  hydrateBlockGroupsFromHandoff,
+  readCompletionHandoff as readSessionCompletionHandoff,
+  type WorkoutCompletionHandoff,
+} from "@/lib/workoutCompletionHandoff";
 
 const WORKOUT_LOG_COMPLETION_SELECT =
   "id, started_at, completed_at, total_duration_minutes, total_sets_completed, total_reps_completed, total_weight_lifted, workout_assignment_id, workout_session_id, notes, workout_sessions ( notes )";
 
-/** Read completion handoff synchronously (effect order: assignment load runs before the effect that clears localStorage). */
-function readCompletionHandoff(searchParams: { get: (key: string) => string | null }) {
+/** Read URL/localStorage completion params (fallback when no sessionStorage handoff). */
+function readUrlCompletionHandoff(searchParams: {
+  get: (key: string) => string | null;
+}) {
   const logIdFromUrl = searchParams.get("logId");
   const sessionIdFromUrl = searchParams.get("sessionId");
   const durationFromUrl = searchParams.get("duration");
@@ -234,42 +242,100 @@ function WorkoutCompleteContent() {
   const assignmentId = params.id as string;
   const { addToast } = useToast();
 
-  const [assignment, setAssignment] = useState<WorkoutAssignment | null>(null);
-  const [resolvedAssignmentId, setResolvedAssignmentId] = useState<string | null>(
-    null
+  // Read handoff once on mount — enables instant summary render.
+  // Keep sticky + sessionStorage until background work starts (Strict Mode remount safe).
+  const [handoffBoot] = useState<WorkoutCompletionHandoff | null>(() =>
+    readSessionCompletionHandoff(),
   );
-  const [loading, setLoading] = useState(true);
+  const usedHandoff = !!handoffBoot;
+
+  const [assignment, setAssignment] = useState<WorkoutAssignment | null>(() =>
+    handoffBoot
+      ? {
+          id: handoffBoot.assignment.id,
+          workout_template_id: handoffBoot.assignment.workout_template_id,
+          client_id: "",
+          status: handoffBoot.assignment.status,
+          notes: handoffBoot.assignment.notes,
+          name: handoffBoot.assignment.name,
+          scheduled_date: handoffBoot.assignment.scheduled_date,
+        }
+      : null,
+  );
+  const [resolvedAssignmentId, setResolvedAssignmentId] = useState<string | null>(
+    () => handoffBoot?.assignmentId ?? null,
+  );
+  const [loading, setLoading] = useState(() => !handoffBoot);
   const [completing, setCompleting] = useState(false);
   const [workoutLog, setWorkoutLog] = useState<any>(null);
-  const [blockGroups, setBlockGroups] = useState<BlockGroup[]>([]);
-  const [workoutStats, setWorkoutStats] = useState({
-    duration: 0,
-    totalSets: 0,
-    totalReps: 0,
-    totalWeight: 0,
-    rating: null as number | null,
-    notes: null as string | null,
-  });
+  const [blockGroups, setBlockGroups] = useState<BlockGroup[]>(() =>
+    handoffBoot
+      ? (hydrateBlockGroupsFromHandoff(
+          handoffBoot.blockGroups,
+        ) as unknown as BlockGroup[])
+      : [],
+  );
+  const [workoutStats, setWorkoutStats] = useState(() =>
+    handoffBoot
+      ? {
+          duration: handoffBoot.totals.durationMinutes,
+          totalSets: handoffBoot.totals.sets,
+          totalReps: handoffBoot.totals.reps,
+          totalWeight: handoffBoot.totals.weight,
+          rating: null as number | null,
+          notes: handoffBoot.assignment.notes ?? null,
+        }
+      : {
+          duration: 0,
+          totalSets: 0,
+          totalReps: 0,
+          totalWeight: 0,
+          rating: null as number | null,
+          notes: null as string | null,
+        },
+  );
   const [workoutLogIdForSummary, setWorkoutLogIdForSummary] = useState<
     string | null
-  >(null);
+  >(() => handoffBoot?.workoutLogId ?? null);
   const [workoutLogIdOverride, setWorkoutLogIdOverride] = useState<string | null>(
-    null
+    () => handoffBoot?.workoutLogId ?? null,
   );
   const [workoutSessionIdOverride, setWorkoutSessionIdOverride] = useState<
     string | null
-  >(null);
-  const [personalRecords, setPersonalRecords] = useState<any[]>([]);
+  >(() => handoffBoot?.sessionId ?? null);
+  const [personalRecords, setPersonalRecords] = useState<any[]>(() =>
+    handoffBoot
+      ? handoffBoot.personalRecords.map((pr) => ({
+          exercise_id: pr.exercise_id,
+          record_type: pr.record_type,
+          record_value: pr.record_value,
+          exercises: pr.exercises ?? {
+            id: pr.exercise_id ?? "",
+            name: pr.exercise_name,
+          },
+        }))
+      : [],
+  );
   const [prescribedRpeMap, setPrescribedRpeMap] = useState<PrescribedRpeMap>(
-    new Map(),
+    () =>
+      handoffBoot
+        ? new Map(handoffBoot.prescribedRpe)
+        : new Map(),
   );
   const [previousLogTotals, setPreviousLogTotals] = useState<{
     total_weight_lifted: number;
     total_sets_completed: number;
     total_reps_completed: number;
   } | null>(null);
-  const [isFirstEverWorkout, setIsFirstEverWorkout] = useState(false);
-  const [coachFirstName, setCoachFirstName] = useState<string | null>(null);
+  /** On handoff path: false until vs-last / first-ever fetches settle (avoid fake "baseline"). */
+  const [comparisonReady, setComparisonReady] = useState(() => !handoffBoot);
+  /** null = unknown (handoff pending); true/false once count known */
+  const [isFirstEverWorkout, setIsFirstEverWorkout] = useState<boolean | null>(
+    () => (handoffBoot ? null : false),
+  );
+  const [coachFirstName, setCoachFirstName] = useState<string | null>(
+    () => handoffBoot?.coachFirstName ?? null,
+  );
   const [programProgression, setProgramProgression] = useState<{
     current_week_number?: number;
     current_day_number?: number;
@@ -278,9 +344,16 @@ function WorkoutCompleteContent() {
   } | null>(null);
   const [nextWorkout, setNextWorkout] = useState<any | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [storedDurationMinutes, setStoredDurationMinutes] = useState<number | undefined>(undefined);
+  const [storedDurationMinutes, setStoredDurationMinutes] = useState<
+    number | undefined
+  >(() => handoffBoot?.totals.durationMinutes);
   const [newAchievementsQueue, setNewAchievementsQueue] = useState<Achievement[]>([]);
   const [achievementModalIndex, setAchievementModalIndex] = useState(0);
+  /** Background extras after instant handoff render: pending | done | error */
+  const [backgroundStatus, setBackgroundStatus] = useState<
+    "idle" | "pending" | "done" | "error"
+  >(() => (handoffBoot ? "pending" : "idle"));
+  const [backgroundError, setBackgroundError] = useState<string | null>(null);
 
   // Guard: prevent updateWorkoutTotals from running more than once per page load
   const completionDoneRef = useRef(false);
@@ -291,7 +364,234 @@ function WorkoutCompleteContent() {
   const completionQueryKey = searchParams.toString();
   useEffect(() => {
     if (!assignmentId) return;
-    const handoff = readCompletionHandoff(searchParams);
+
+    // Instant path: summary already hydrated from handoff — fire server work in background.
+    // Do not clear sticky handoff here (React Strict Mode remount must still see it).
+    if (handoffBoot) {
+      const runBackground = async () => {
+        setBackgroundStatus("pending");
+        setBackgroundError(null);
+        try {
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          if (!user) {
+            setBackgroundError("Not signed in — retry to finish saving.");
+            setBackgroundStatus("error");
+            return;
+          }
+
+          // Soft-refresh assignment only when handoff lacks assignmentId / coach name
+          const needsAssignmentRefresh =
+            !handoffBoot.assignmentId || !handoffBoot.coachFirstName;
+          if (needsAssignmentRefresh) {
+            try {
+              const actualId =
+                handoffBoot.assignmentId ||
+                (await resolveWorkoutAssignmentId(assignmentId, user.id));
+              if (actualId) {
+                setResolvedAssignmentId(actualId);
+                const { data: assignmentData } = await supabase
+                  .from("workout_assignments")
+                  .select(
+                    "*, coach:profiles!workout_assignments_coach_id_fkey(first_name)",
+                  )
+                  .eq("id", actualId)
+                  .eq("client_id", user.id)
+                  .maybeSingle();
+                if (assignmentData) {
+                  setAssignment(assignmentData as WorkoutAssignment);
+                  const coachFn = (assignmentData as any).coach?.first_name;
+                  if (typeof coachFn === "string" && coachFn.trim()) {
+                    setCoachFirstName(coachFn.trim());
+                  }
+                }
+              }
+            } catch {
+              /* non-blocking */
+            }
+          }
+
+          console.log("[COMPLETE-FLOW] background /api/complete-workout", {
+            workout_log_id: handoffBoot.workoutLogId,
+            duration_minutes: handoffBoot.totals.durationMinutes,
+          });
+
+          const completeResponse = await withTimeout(
+            fetchApi("/api/complete-workout", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                workout_log_id: handoffBoot.workoutLogId,
+                client_id: user.id,
+                duration_minutes: handoffBoot.totals.durationMinutes,
+                session_id: handoffBoot.sessionId,
+              }),
+            }),
+            30000,
+            "timeout",
+          );
+
+          if (!completeResponse.ok) {
+            console.error(
+              "❌ background complete-workout API error:",
+              completeResponse.status,
+            );
+            setBackgroundError(
+              "Could not finish saving completion. Your sets are saved — tap Retry.",
+            );
+            setBackgroundStatus("error");
+            return;
+          }
+
+          const result = await completeResponse.json();
+          const updatedLog = result.workout_log;
+          // Handoff totals/sets/reps/volume/duration are authoritative — do NOT overwrite.
+          // Only keep workoutLog for coach notes / metadata the handoff may lack.
+          if (updatedLog) {
+            setWorkoutLog(updatedLog);
+          }
+
+          if (result.program_progression) {
+            setProgramProgression(result.program_progression);
+          }
+
+          const rawNew = result.new_achievements ?? [];
+          if (rawNew.length > 0) {
+            const mapped: Achievement[] = rawNew.map((a: any) => ({
+              id: a.templateId ?? a.template_id,
+              name:
+                a.templateName ?? a.template_name ?? "Achievement",
+              description:
+                a.description ??
+                (a.nextTier
+                  ? `Next: ${a.nextTier?.label} — ${a.currentMetricValue ?? 0}/${a.nextTier?.threshold ?? 0}`
+                  : ""),
+              icon: a.templateIcon ?? a.template_icon ?? "🏆",
+              tier: (a.tier ?? null) as Achievement["tier"],
+              unlocked: true,
+            }));
+            setNewAchievementsQueue(mapped);
+            setAchievementModalIndex(0);
+          }
+
+          const rankChanges = result.leaderboard_rank_changes ?? [];
+          if (rankChanges.length > 0) {
+            const typeLabel = (t: string) => {
+              if (t === "pr_1rm") return "1RM";
+              if (t === "pr_3rm") return "3RM";
+              if (t === "pr_5rm") return "5RM";
+              if (t === "bw_multiple") return "BW Multiple";
+              if (t === "tonnage_week") return "Weekly Tonnage";
+              if (t === "tonnage_month") return "Monthly Tonnage";
+              if (t === "tonnage_all_time") return "All-Time Tonnage";
+              return t;
+            };
+            for (const c of rankChanges) {
+              const label = [c.exercise_name, typeLabel(c.type)]
+                .filter(Boolean)
+                .join(" ");
+              addToast({
+                title: "Leaderboard",
+                description: `You moved up to #${c.new_rank} in ${label}!`,
+                variant: "success",
+                duration: 4000,
+              });
+            }
+          }
+
+          // Merge extras that need separate queries (vs last / next / first-ever)
+          const tid =
+            handoffBoot.assignment.workout_template_id ||
+            assignment?.workout_template_id ||
+            null;
+          const tasks: Promise<unknown>[] = [];
+          if (tid && handoffBoot.workoutLogId) {
+            tasks.push(
+              fetchPreviousSameTemplateTotals(
+                user.id,
+                tid,
+                handoffBoot.workoutLogId,
+              ).then((prev) => {
+                setPreviousLogTotals(prev);
+              }),
+            );
+            tasks.push(
+              fetchCompletedLogCount(user.id).then((c) =>
+                setIsFirstEverWorkout(c === 1),
+              ),
+            );
+          } else {
+            setIsFirstEverWorkout(false);
+          }
+          // Refresh PRs from DB if live handoff had none (still useful)
+          if (
+            handoffBoot.assignmentId &&
+            handoffBoot.personalRecords.length === 0
+          ) {
+            tasks.push(
+              fetchPersonalRecordsForAssignment(
+                handoffBoot.assignmentId,
+                user.id,
+              ).then(setPersonalRecords),
+            );
+          }
+          tasks.push(
+            (async () => {
+              try {
+                const today = new Date().toISOString().split("T")[0];
+                const { data: nextAssignment } = await supabase
+                  .from("workout_assignments")
+                  .select(
+                    `
+                    id,
+                    name,
+                    scheduled_date,
+                    workout_template_id,
+                    template:workout_templates(name, description)
+                  `,
+                  )
+                  .eq("client_id", user.id)
+                  .in("status", ["assigned", "active"])
+                  .gte("scheduled_date", today)
+                  .order("scheduled_date", { ascending: true })
+                  .limit(1)
+                  .maybeSingle();
+                if (nextAssignment) setNextWorkout(nextAssignment);
+              } catch {
+                /* optional */
+              }
+            })(),
+          );
+          await Promise.all(tasks);
+          setComparisonReady(true);
+
+          completionDoneRef.current = true;
+          setBackgroundStatus("done");
+          clearCompletionHandoff();
+        } catch (error: any) {
+          console.error("❌ background completion failed:", error);
+          const isTimeout =
+            error?.message === "timeout" ||
+            error?.message?.includes("Timeout") ||
+            error?.message?.includes("took longer than");
+          setBackgroundError(
+            isTimeout
+              ? "Finishing took too long. Your sets are saved — tap Retry."
+              : error?.message || "Could not finish saving. Tap Retry.",
+          );
+          setBackgroundStatus("error");
+          setComparisonReady(true);
+          setIsFirstEverWorkout((v) => (v == null ? false : v));
+        }
+      };
+
+      void runBackground();
+      return;
+    }
+
+    // Fallback: no handoff — existing fetch-everything path
+    const handoff = readUrlCompletionHandoff(searchParams);
     if (completeTimeoutRef.current) clearTimeout(completeTimeoutRef.current);
     completeTimeoutRef.current = setTimeout(() => {
       completeTimeoutRef.current = null;
@@ -305,7 +605,7 @@ function WorkoutCompleteContent() {
             assignmentData.id,
             handoff.logId,
             handoff.sessionId,
-            handoff.durationMinutes
+            handoff.durationMinutes,
           );
         }
       })
@@ -325,11 +625,15 @@ function WorkoutCompleteContent() {
         completeTimeoutRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once for handoff/fallback
   }, [assignmentId, completionQueryKey]);
 
   useEffect(() => {
     // Primary: URL params (survives reload, works when navigation used window.location.href).
     // Fallback: localStorage for backward compatibility.
+    // Skip clearing when we already hydrated from sessionStorage handoff.
+    if (usedHandoff) return;
+
     const logIdFromUrl = searchParams.get("logId");
     const sessionIdFromUrl = searchParams.get("sessionId");
     const durationFromUrl = searchParams.get("duration");
@@ -357,7 +661,7 @@ function WorkoutCompleteContent() {
     } catch (e) {
       console.warn("⚠️ Could not clear localStorage completion keys:", e);
     }
-  }, [searchParams]);
+  }, [searchParams, usedHandoff]);
 
   const updateWorkoutTotals = async (
     templateId: string | null = null,
@@ -1796,7 +2100,7 @@ function WorkoutCompleteContent() {
                     completionDoneRef.current = false;
                     setLoadError(null);
                     setLoading(true);
-                    const handoff = readCompletionHandoff(searchParams);
+                    const handoff = readUrlCompletionHandoff(searchParams);
                     loadAssignment()
                       .then(async (assignmentData: WorkoutAssignment | null) => {
                         if (assignmentData) {
@@ -1901,7 +2205,8 @@ function WorkoutCompleteContent() {
   const skippedExerciseCount = 0;
   const accent = getCompleteAccent({
     prCount,
-    isFirstEverWorkout,
+    // Neutral until first-ever is known on handoff path (null → treat as not-first)
+    isFirstEverWorkout: isFirstEverWorkout === true,
     skippedExerciseCount,
   });
   const heroTitle = titleForAccent(accent);
@@ -1928,36 +2233,40 @@ function WorkoutCompleteContent() {
     });
   })();
 
-  const hasPrev = previousLogTotals != null;
+  const hasPrev = comparisonReady && previousLogTotals != null;
   const curW = Number(workoutStats.totalWeight) || 0;
   const prevW = hasPrev
     ? Number(previousLogTotals!.total_weight_lifted) || 0
     : 0;
   const dW = hasPrev ? curW - prevW : null;
-  let volDeltaTier: "up" | "same" | "down" | "baseline" = "baseline";
-  if (!hasPrev) volDeltaTier = "baseline";
-  else if (dW != null) {
+  let volDeltaTier: "up" | "same" | "down" | "baseline" = "same";
+  if (!comparisonReady) {
+    volDeltaTier = "same";
+  } else if (!hasPrev) {
+    volDeltaTier = "baseline";
+  } else if (dW != null) {
     if (dW > 0) volDeltaTier = "up";
     else if (dW < 0) volDeltaTier = "down";
     else volDeltaTier = "same";
   }
 
-  const volDeltaNode =
-    volDeltaTier === "baseline" ? (
-      "Your first one — baseline set"
-    ) : volDeltaTier === "same" ? (
-      "Same volume as last session"
-    ) : (
-      <>
-        {volDeltaTier === "up" ? (
-          <ArrowUpRight size={12} aria-hidden />
-        ) : (
-          <ArrowDownRight size={12} aria-hidden />
-        )}
-        {dW != null && dW > 0 ? "+" : dW != null && dW < 0 ? "−" : ""}
-        {dW != null ? `${formatVolume(Math.abs(dW))} kg` : ""} vs last session
-      </>
-    );
+  const volDeltaNode = !comparisonReady ? (
+    <span className="opacity-60">Comparing to last session…</span>
+  ) : volDeltaTier === "baseline" ? (
+    "Your first one — baseline set"
+  ) : volDeltaTier === "same" ? (
+    "Same volume as last session"
+  ) : (
+    <>
+      {volDeltaTier === "up" ? (
+        <ArrowUpRight size={12} aria-hidden />
+      ) : (
+        <ArrowDownRight size={12} aria-hidden />
+      )}
+      {dW != null && dW > 0 ? "+" : dW != null && dW < 0 ? "−" : ""}
+      {dW != null ? `${formatVolume(Math.abs(dW))} kg` : ""} vs last session
+    </>
+  );
 
   const headlineMode =
     strengthLoggedSets.length > 0 && curW > 0 ? "volume" : "reps";
@@ -2074,6 +2383,103 @@ function WorkoutCompleteContent() {
                   coachFirstName={coachFirstName}
                   note={coachNoteText}
                 />
+              ) : null}
+
+              {/* Background completion extras — never blocks the glance summary */}
+              {usedHandoff && backgroundStatus === "pending" ? (
+                <div className={completeStyles.programCompact}>
+                  <p className="text-xs fc-text-dim animate-pulse">
+                    Saving progress · checking unlocks…
+                  </p>
+                </div>
+              ) : null}
+              {usedHandoff && backgroundStatus === "error" ? (
+                <div className={completeStyles.programCompact}>
+                  <p className="text-xs fc-text-dim mb-2">
+                    {backgroundError ||
+                      "Could not finish saving. Your sets are saved."}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="fc-secondary"
+                    className="h-9 text-xs"
+                    onClick={() => {
+                      if (!handoffBoot) return;
+                      setBackgroundStatus("pending");
+                      setBackgroundError(null);
+                      void (async () => {
+                        try {
+                          const {
+                            data: { user },
+                          } = await supabase.auth.getUser();
+                          if (!user) {
+                            setBackgroundError("Not signed in.");
+                            setBackgroundStatus("error");
+                            return;
+                          }
+                          const res = await withTimeout(
+                            fetchApi("/api/complete-workout", {
+                              method: "POST",
+                              headers: {
+                                "Content-Type": "application/json",
+                              },
+                              body: JSON.stringify({
+                                workout_log_id: handoffBoot.workoutLogId,
+                                client_id: user.id,
+                                duration_minutes:
+                                  handoffBoot.totals.durationMinutes,
+                                session_id: handoffBoot.sessionId,
+                              }),
+                            }),
+                            30000,
+                            "timeout",
+                          );
+                          if (!res.ok) {
+                            setBackgroundError(
+                              "Retry failed. Your sets are still saved.",
+                            );
+                            setBackgroundStatus("error");
+                            return;
+                          }
+                          const result = await res.json();
+                          if (result.program_progression) {
+                            setProgramProgression(result.program_progression);
+                          }
+                          const rawNew = result.new_achievements ?? [];
+                          if (rawNew.length > 0) {
+                            setNewAchievementsQueue(
+                              rawNew.map((a: any) => ({
+                                id: a.templateId ?? a.template_id,
+                                name:
+                                  a.templateName ??
+                                  a.template_name ??
+                                  "Achievement",
+                                description: a.description ?? "",
+                                icon:
+                                  a.templateIcon ?? a.template_icon ?? "🏆",
+                                tier: (a.tier ??
+                                  null) as Achievement["tier"],
+                                unlocked: true,
+                              })),
+                            );
+                            setAchievementModalIndex(0);
+                          }
+                          if (result.workout_log) {
+                            setWorkoutLog(result.workout_log);
+                          }
+                          setBackgroundStatus("done");
+                        } catch (e: any) {
+                          setBackgroundError(
+                            e?.message || "Retry failed. Tap again.",
+                          );
+                          setBackgroundStatus("error");
+                        }
+                      })();
+                    }}
+                  >
+                    Retry save
+                  </Button>
+                </div>
               ) : null}
 
               {newAchievementsQueue.length > 0 ? (
