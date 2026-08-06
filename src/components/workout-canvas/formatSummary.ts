@@ -176,22 +176,20 @@ export function formatGroupMetaLabel(group: CanvasGroup): string {
 
 
 
-export function slotLetter(groupIndex: number, slotIndex: number, slotCount: number): string {
-
-  const letter = String.fromCharCode(65 + (groupIndex % 6))
-
-  if (slotCount === 1) return letter
-
-  return `${letter}${slotIndex + 1}`
-
+/** Group index → A–Z (cap at Z). Used for builder canvas badges / labels. */
+function indexToGroupLetter(groupIndex: number): string {
+  const i = Math.min(Math.max(0, Math.floor(groupIndex)), 25)
+  return String.fromCharCode(65 + i)
 }
 
-
+export function slotLetter(groupIndex: number, slotIndex: number, slotCount: number): string {
+  const letter = indexToGroupLetter(groupIndex)
+  if (slotCount === 1) return letter
+  return `${letter}${slotIndex + 1}`
+}
 
 export function groupLetter(groupIndex: number): string {
-
-  return String.fromCharCode(65 + (groupIndex % 6))
-
+  return indexToGroupLetter(groupIndex)
 }
 
 

@@ -1,603 +1,473 @@
 .wrap {
-
   width: 100%;
-
 }
 
-
-
 .nameRow {
-
   display: flex;
-
   flex-direction: column;
-
   align-items: center;
-
   justify-content: center;
-
   gap: 4px;
-
   margin-bottom: 14px;
-
   position: relative;
-
 }
 
 .styleSubtitle {
-
   font-size: 11px;
-
   line-height: 1.3;
-
   color: var(--fc-text-subtle);
-
   font-family: var(--font-body, ui-sans-serif);
-
   text-align: center;
-
   max-width: 420px;
-
 }
-
-
 
 .nameInput {
-
   width: 100%;
-
   max-width: 420px;
-
   text-align: center;
-
   background: transparent;
-
   border: none;
-
   border-bottom: 1px solid transparent;
-
   outline: none;
-
   font-size: 1.25rem;
-
   font-weight: 600;
-
   color: var(--fc-text-primary);
-
   font-family: var(--f-headline, ui-sans-serif);
-
   padding: 4px 8px;
-
 }
-
-
 
 .nameInput:focus {
-
   border-bottom-color: var(--fc-accent);
-
 }
 
+/* Flex-to-fit timeline: cards shrink to fill width; scroll only if mins exceed container */
+.timelineScroll {
+  --week-card-min: 56px;
+  --week-gap: 3px;
+  --week-group-pad-x: 3px;
+  --add-week-w: 44px;
+  --chev: 16px;
+  --r: 13px;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-width: thin;
+  scroll-padding-inline: 4px;
+}
 
-
-.ribbonBar {
-
+.timelineTrack {
   display: flex;
-
-  align-items: stretch;
-
-  height: 50px;
-
-  border-radius: 25px;
-
-  overflow: hidden;
-
-  position: relative;
-
-  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.65);
-
+  align-items: flex-start;
+  width: 100%;
+  min-width: min-content;
+  box-sizing: border-box;
 }
 
-
-
-.sheen {
-
-  position: absolute;
-
-  inset: 0;
-
-  pointer-events: none;
-
-  border-radius: inherit;
-
-  background: linear-gradient(
-
-    180deg,
-
-    rgba(255, 255, 255, 0.28) 0%,
-
-    rgba(255, 255, 255, 0.08) 38%,
-
-    rgba(0, 0, 0, 0.12) 100%
-
-  );
-
-  z-index: 2;
-
+.phaseColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: visible;
+  min-width: 0;
 }
-
-
 
 .blockSegment {
-
+  --seg-color: #2ef2c6;
   position: relative;
-
   display: flex;
-
   align-items: center;
-
-  justify-content: center;
-
+  gap: 6px;
+  box-sizing: border-box;
+  /* Tip overhangs into next column for nesting; column width = week group width */
+  width: calc(100% + var(--chev));
+  height: 40px;
   min-width: 0;
-
+  margin-left: 0;
+  padding: 0 calc(var(--chev) + 6px) 0 14px;
   border: none;
-
   cursor: pointer;
-
-  padding: 0 28px 0 16px;
-
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--seg-color) 78%, white) 0%,
+    var(--seg-color) 48%,
+    color-mix(in srgb, var(--seg-color) 82%, black) 100%
+  );
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--chev)) 0,
+    100% 50%,
+    calc(100% - var(--chev)) 100%,
+    0 100%,
+    var(--chev) 50%
+  );
+  -webkit-clip-path: polygon(
+    0 0,
+    calc(100% - var(--chev)) 0,
+    100% 50%,
+    calc(100% - var(--chev)) 100%,
+    0 100%,
+    var(--chev) 50%
+  );
   transition: filter 0.15s ease;
-
 }
 
-
+.blockSegment::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.3),
+    transparent 46%,
+    rgba(0, 0, 0, 0.15)
+  );
+  clip-path: inherit;
+  -webkit-clip-path: inherit;
+}
 
 .blockSegment:hover {
-
   filter: brightness(1.06);
-
 }
 
+.blockSegmentFirst {
+  padding-left: 14px;
+  border-radius: var(--r) 0 0 var(--r);
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--chev)) 0,
+    100% 50%,
+    calc(100% - var(--chev)) 100%,
+    0 100%
+  );
+  -webkit-clip-path: polygon(
+    0 0,
+    calc(100% - var(--chev)) 0,
+    100% 50%,
+    calc(100% - var(--chev)) 100%,
+    0 100%
+  );
+}
 
+.blockSegmentLast {
+  width: 100%;
+  padding-right: 12px;
+  border-radius: 0 var(--r) var(--r) 0;
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% 100%,
+    0 100%,
+    var(--chev) 50%
+  );
+  -webkit-clip-path: polygon(
+    0 0,
+    100% 0,
+    100% 100%,
+    0 100%,
+    var(--chev) 50%
+  );
+}
+
+.blockSegmentFirst.blockSegmentLast {
+  border-radius: var(--r);
+  width: 100%;
+}
+
+.blockSegmentSolo {
+  width: 100%;
+  padding: 0 12px 0 14px;
+  border-radius: var(--r);
+  clip-path: none;
+  -webkit-clip-path: none;
+}
+
+.blockSegmentSolo::after {
+  border-radius: inherit;
+  clip-path: none;
+  -webkit-clip-path: none;
+}
 
 .blockSegmentActive {
-
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.72);
-
-  z-index: 1;
-
+  z-index: 10;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.85);
+  filter: brightness(1.08);
 }
-
-
-
-.blockSeam {
-
-  position: absolute;
-
-  top: 0;
-
-  right: 0;
-
-  width: 34px;
-
-  height: 100%;
-
-  pointer-events: none;
-
-  z-index: 1;
-
-}
-
-
 
 .blockLabel {
-
   position: relative;
-
   z-index: 3;
-
-  font-size: 13px;
-
-  font-weight: 800;
-
-  color: rgba(8, 10, 8, 0.92);
-
-  letter-spacing: 0.01em;
-
+  flex: 1;
+  min-width: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.8);
   white-space: nowrap;
-
   overflow: hidden;
-
   text-overflow: ellipsis;
-
-  max-width: 100%;
-
-  font-family: var(--font-body, ui-sans-serif);
-
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.12);
-
+  font-family: var(--f-mono, ui-monospace, monospace);
+  text-align: left;
+  pointer-events: none;
 }
-
-
 
 .blockMenuBtn {
-
-  position: absolute;
-
-  top: 50%;
-
-  right: 8px;
-
-  transform: translateY(-50%);
-
+  position: relative;
   z-index: 4;
-
+  flex-shrink: 0;
+  margin-left: auto;
   width: 22px;
-
   height: 22px;
-
   display: flex;
-
   align-items: center;
-
   justify-content: center;
-
   border-radius: 6px;
-
   border: none;
-
-  background: rgba(8, 10, 8, 0.14);
-
-  color: rgba(8, 10, 8, 0.72);
-
+  background: rgba(0, 0, 0, 0.18);
+  color: rgba(0, 0, 0, 0.78);
   cursor: pointer;
-
 }
-
-
 
 .blockMenuBtn:hover {
-
-  background: rgba(8, 10, 8, 0.24);
-
+  background: rgba(0, 0, 0, 0.28);
 }
-
-
 
 .addBlockBtn {
-
+  flex: 0 0 auto;
   flex-shrink: 0;
-
+  align-self: flex-start;
   display: flex;
-
   align-items: center;
-
   gap: 4px;
-
-  padding: 0 14px;
-
-  border: none;
-
+  margin-left: 8px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: var(--r, 13px);
   background: var(--fc-glass-soft);
-
   color: var(--fc-accent);
-
   font-size: 11px;
-
   font-weight: 600;
-
   cursor: pointer;
-
-  border-left: 1px solid var(--fc-hairline);
-
+  border: 1px solid var(--fc-hairline);
 }
-
-
 
 .addBlockBtn:hover {
-
   background: var(--fc-accent-dim);
-
 }
-
-
-
-.weeksDock {
-
-  display: flex;
-
-  align-items: stretch;
-
-  margin-top: 10px;
-
-  min-height: 68px;
-
-}
-
-
 
 .weekBlockGroup {
-
   display: flex;
-
-  align-items: center;
-
-  gap: 6px;
-
-  padding: 6px 8px;
-
-  min-width: 0;
-
+  align-items: stretch;
+  gap: var(--week-gap, 4px);
+  padding: 4px var(--week-group-pad-x, 4px);
+  flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
   border-right: 1px solid var(--fc-hairline);
-
+  min-width: 0;
 }
 
-
-
-.weekBlockGroup:last-child {
-
+.phaseColumn:last-of-type .weekBlockGroup {
   border-right: none;
-
 }
-
-
 
 .weekCardWrap {
-
   position: relative;
-
-  flex-shrink: 0;
-
+  flex: 1 1 0;
+  min-width: var(--week-card-min, 56px);
+  /* Fill phase column so segment width === week-row width (no max gap) */
+  container-type: inline-size;
+  container-name: week-card;
 }
-
-
 
 .weekCell {
-
   position: relative;
-
-  flex-shrink: 0;
-
   display: flex;
-
   flex-direction: column;
-
   align-items: flex-start;
-
   justify-content: center;
-
-  min-width: 96px;
-
-  min-height: 62px;
-
-  padding: 8px 30px 8px 10px;
-
-  border-radius: 10px;
-
+  width: 100%;
+  min-width: 0;
+  min-height: 56px;
+  padding: 6px 4px;
+  border-radius: 8px;
   border: none;
-
   background: transparent;
-
   cursor: pointer;
-
   transition: background 0.15s, box-shadow 0.15s;
-
+  overflow: hidden;
 }
-
-
 
 .weekCell:hover {
-
   background: var(--fc-surface-sunken);
-
 }
-
-
 
 .weekCellActive {
-
   background: color-mix(in srgb, var(--week-block-color, #2ef2c6) 13%, transparent);
-
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--week-block-color, #2ef2c6) 52%, transparent);
-
 }
-
-
 
 .weekCellActive:hover {
-
   background: color-mix(in srgb, var(--week-block-color, #2ef2c6) 13%, transparent);
-
 }
-
-
 
 .weekNum {
-
   font-size: 10px;
-
   font-weight: 600;
-
   text-transform: uppercase;
-
-  letter-spacing: 0.08em;
-
+  letter-spacing: 0.06em;
   color: var(--fc-text-subtle);
-
   font-family: var(--f-mono, ui-monospace, monospace);
-
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
-
-
 
 .weekDate {
-
-  font-size: 11px;
-
+  font-size: 10px;
   color: var(--fc-text-quaternary);
-
   margin-top: 2px;
-
   font-family: var(--f-mono, ui-monospace, monospace);
-
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
-
+@container week-card (max-width: 72px) {
+  .weekNum {
+    font-size: 9px;
+    letter-spacing: 0.04em;
+  }
+  .weekDate {
+    font-size: 8px;
+    margin-top: 1px;
+  }
+  .weekCell {
+    padding: 5px 3px;
+    min-height: 52px;
+  }
+}
 
 .addWeekBtn {
-
-  flex-shrink: 0;
-
+  flex: 0 0 var(--add-week-w, 44px);
+  width: var(--add-week-w, 44px);
+  min-width: var(--add-week-w, 44px);
   display: inline-flex;
-
   align-items: center;
-
-  gap: 4px;
-
-  height: 62px;
-
-  padding: 0 10px;
-
-  border-radius: 10px;
-
+  justify-content: center;
+  gap: 2px;
+  height: 56px;
+  padding: 0 4px;
+  border-radius: 8px;
   border: 1px dashed var(--fc-glass-border);
-
   background: transparent;
-
   color: var(--fc-accent);
-
-  font-size: 10px;
-
+  font-size: 9px;
   font-weight: 600;
-
   cursor: pointer;
-
+  box-sizing: border-box;
 }
-
-
 
 .addWeekBtn:hover {
-
   background: var(--fc-accent-dim);
-
   border-color: color-mix(in srgb, var(--fc-accent) 28%, transparent);
-
 }
-
-
 
 .weekKebab {
-
   position: absolute;
-
   top: -4px;
-
   left: -4px;
-
   width: 16px;
-
   height: 16px;
-
   border-radius: 50%;
-
   display: flex;
-
   align-items: center;
-
   justify-content: center;
-
   border: 1px solid var(--fc-glass-border);
-
   background: var(--fc-surface-card);
-
   color: var(--fc-text-subtle);
-
   cursor: pointer;
-
 }
-
-
 
 .menuPortal {
-
   position: fixed;
-
   z-index: 10050;
-
   min-width: 168px;
-
   border-radius: 11px;
-
   padding: 4px;
-
   background: var(--fc-surface-card);
-
   border: 1px solid var(--fc-glass-border);
-
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65);
-
 }
-
-
 
 .menuRow {
-
   width: 100%;
-
   display: flex;
-
   align-items: center;
-
   gap: 8px;
-
   border-radius: 8px;
-
   padding: 8px;
-
   text-align: left;
-
   font-size: 12px;
-
   color: var(--fc-text-dim);
-
   background: transparent;
-
   border: none;
-
   cursor: pointer;
-
 }
-
-
 
 .menuRow:hover:not(:disabled) {
-
   color: var(--fc-text-primary);
-
   background: var(--fc-hairline);
-
 }
-
-
 
 .menuRow:disabled {
-
   opacity: 0.4;
-
   cursor: default;
-
 }
-
-
 
 .menuDivider {
-
   height: 1px;
-
   margin: 4px 0;
-
   background: var(--fc-hairline);
-
 }
 
+/* GymConsolePhaseBar still uses ribbonBar + blockSegment without phase columns */
+.ribbonBar {
+  --chev: 16px;
+  --r: 13px;
+  display: flex;
+  align-items: stretch;
+  height: 40px;
+  overflow: visible;
+  position: relative;
+  isolation: isolate;
+}
 
+.ribbonBar .blockSegment {
+  flex-grow: 1;
+  flex-basis: 0;
+  width: auto;
+  margin-left: calc(var(--chev) * -1);
+}
+
+.ribbonBar .blockSegmentFirst,
+.ribbonBar .blockSegmentSolo {
+  margin-left: 0;
+}
+
+.ribbonBar .blockSegmentSolo,
+.ribbonBar .blockSegmentLast {
+  width: auto;
+}
+
+.sheen {
+  display: none;
+}
+
+.blockSeam {
+  display: none;
+}

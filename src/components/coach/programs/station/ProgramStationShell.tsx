@@ -17,7 +17,7 @@ import {
   computeBlockStartWeek,
   sumTrainingBlockWeeks,
 } from '@/lib/programs/stationBlockWeeks'
-import { ribbonBlockColor } from '@/lib/programs/periodizationRibbonColors'
+import { ribbonPhaseHexColors } from '@/lib/programs/periodizationPhaseColors'
 import { getScheduleSlot, summarizeDaySlot } from '@/lib/programs/stationScheduleUtils'
 import { countCanvasExercises } from '@/lib/groupModel/canvasTypes'
 import { ProgramDraftProvider, useProgramDraft } from '@/contexts/ProgramDraftContext'
@@ -138,10 +138,11 @@ function ProgramStationInner({ programId }: { programId: string }) {
   )
 
   const activeBlockIndex = trainingBlocks.findIndex((b) => b.id === activeBlock?.id)
-  const blockAccentColor = ribbonBlockColor(
-    activeBlockIndex >= 0 ? activeBlockIndex : 0,
-    Math.max(1, trainingBlocks.length),
-  )
+  const phaseColors = ribbonPhaseHexColors(trainingBlocks, program?.periodization_style)
+  const blockAccentColor =
+    phaseColors[activeBlockIndex >= 0 ? activeBlockIndex : 0] ??
+    phaseColors[0] ??
+    '#2EF2C6'
 
   const isSaving = draft.saveState === 'saving'
   const showSaveSubline = Boolean(
@@ -286,10 +287,6 @@ function ProgramStationInner({ programId }: { programId: string }) {
               setRelativeWeek(block.duration_weeks + 1)
               addToast({ title: 'Week added in working copy. Save to commit.' })
             }}
-            onProgressWeek={(absoluteWeek) => {
-              setWeekFillSourceAbs(absoluteWeek)
-              setWeekFillOpen(true)
-            }}
           />
         ) : (
           <section className={css.wrap} data-testid="recurring-week-label">
@@ -315,6 +312,14 @@ function ProgramStationInner({ programId }: { programId: string }) {
           summaries={daySummaries}
           activeBlockId={activeBlock?.id ?? null}
           blockAccentColor={blockAccentColor}
+          onProgressWeek={
+            isRecurring
+              ? undefined
+              : (absWeek) => {
+                  setWeekFillSourceAbs(absWeek)
+                  setWeekFillOpen(true)
+                }
+          }
         />
       </div>
 

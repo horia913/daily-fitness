@@ -15,6 +15,7 @@ import { useToast } from '@/components/ui/toast-provider'
 import { ProgramDayEditor } from './ProgramDayEditor'
 import { DayTargetPicker } from './DayTargetPicker'
 import { ReplaceSessionDialog } from './ReplaceSessionDialog'
+import { FillProgressionButton } from './FillToolEntryControls'
 import columnCss from './sessionColumns.module.css'
 import shellCss from '@/components/coach/programs/programEditV1.module.css'
 import { cn } from '@/lib/utils'
@@ -25,6 +26,8 @@ export interface SessionColumnsRowProps {
   summaries: DaySlotSummary[]
   activeBlockId: string | null
   blockAccentColor: string
+  /** Progress the currently viewed week (same absolute week as this sessions row). */
+  onProgressWeek?: (absoluteWeek: number) => void
 }
 
 type PendingAction =
@@ -48,6 +51,7 @@ export function SessionColumnsRow({
   summaries,
   activeBlockId,
   blockAccentColor,
+  onProgressWeek,
 }: SessionColumnsRowProps) {
   const draft = useProgramDraft()
   const { addToast } = useToast()
@@ -146,12 +150,20 @@ export function SessionColumnsRow({
         data-testid="session-columns-row"
       >
         <div className={columnCss.rowHeader}>
-          <h2
-            className="text-sm font-bold text-[var(--pe-t1)]"
-            style={{ fontFamily: 'var(--f-headline, Bricolage Grotesque, sans-serif)' }}
-          >
-            Week {absoluteWeek} · Sessions
-          </h2>
+          <div className={columnCss.rowHeaderTitle}>
+            <h2
+              className="text-sm font-bold text-[var(--pe-t1)]"
+              style={{ fontFamily: 'var(--f-headline, Bricolage Grotesque, sans-serif)' }}
+            >
+              Week {absoluteWeek} · Sessions
+            </h2>
+            {onProgressWeek ? (
+              <FillProgressionButton
+                onClick={() => onProgressWeek(absoluteWeek)}
+                accentColor={blockAccentColor}
+              />
+            ) : null}
+          </div>
           <p className={columnCss.hint}>Drag to copy · scroll across the week</p>
         </div>
 

@@ -13,15 +13,27 @@ import {
 } from 'lucide-react'
 import type { TrainingBlock } from '@/types/trainingBlock'
 import { computeBlockWeekRanges } from '@/lib/programs/stationBlockWeeks'
-import { ribbonBlockColor, weekDateLabel } from '@/lib/programs/periodizationRibbonColors'
+import { weekDateLabel } from '@/lib/programs/periodizationRibbonColors'
+import { ribbonPhaseHexColors } from '@/lib/programs/periodizationPhaseColors'
 import {
   formatPhaseDisplayName,
   periodizationStyleLabel,
 } from '@/lib/programs/periodizationStyles'
 import css from './periodizationRibbon.module.css'
 import shellCss from '@/components/coach/programs/programEditV1.module.css'
-import { FillWeekProgressionButton } from './FillToolEntryControls'
 import { cn } from '@/lib/utils'
+
+/** Must match periodizationRibbon.module.css week geometry. */
+const WEEK_CARD_MIN = 56
+const WEEK_GAP = 3
+const WEEK_GROUP_PAD_X = 3
+const ADD_WEEK_W = 44
+
+/** Minimum width of one phase column at compressed card size (scroll only below this total). */
+function phaseColumnMinWidthPx(weekCount: number): number {
+  const n = Math.max(1, weekCount)
+  return WEEK_GROUP_PAD_X * 2 + n * WEEK_CARD_MIN + ADD_WEEK_W + n * WEEK_GAP
+}
 
 export interface PeriodizationRibbonProps {
   programName: string
@@ -39,7 +51,6 @@ export interface PeriodizationRibbonProps {
   onDuplicateBlock: (block: TrainingBlock) => void
   onDuplicateWeek: (block: TrainingBlock, absoluteWeek: number) => void
   onAddWeek: (blockId: string) => void
-  onProgressWeek?: (absoluteWeek: number) => void
   busy?: boolean
 }
 
@@ -61,7 +72,6 @@ export function PeriodizationRibbon({
   onDuplicateBlock,
   onDuplicateWeek,
   onAddWeek,
-  onProgressWeek,
   busy,
 }: PeriodizationRibbonProps) {
   const ranges = computeBlockWeekRanges(trainingBlocks)
@@ -138,6 +148,8 @@ export function PeriodizationRibbon({
     ? trainingBlocks.findIndex((b) => b.id === menuBlock.id)
     : -1
   const styleLabel = periodizationStyleLabel(periodizationStyle)
+  const phaseHex = ribbonPhaseHexColors(trainingBlocks, periodizationStyle)
+  const isSolo = trainingBlocks.length === 1
 
   return (
     <section
@@ -164,160 +176,149 @@ export function PeriodizationRibbon({
         ) : null}
       </div>
 
-      <div className={css.ribbonBar} data-testid="ribbon-bar">
-        {trainingBlocks.map((block, blockIndex) => {
-          const isActive = block.id === activeBlockId
-          const displayName = formatPhaseDisplayName(block.name, block.phase_label, {
-            periodizationStyle,
-            blockOrder: block.block_order,
-          })
-          const color = ribbonBlockColor(blockIndex, trainingBlocks.length)
-          const nextColor =
-            blockIndex < trainingBlocks.length - 1
-              ? ribbonBlockColor(blockIndex + 1, trainingBlocks.length)
-              : null
-          const flexGrow = Math.max(1, block.duration_weeks)
+      <div className={css.timelineScroll} data-testid="ribbon-bar">
+        <div className={css.timelineTrack} data-testid="week-strip">
+          {trainingBlocks.map((block, blockIndex) => {
+            const range = ranges[blockIndex]
+            if (!range) return null
+            const isActive = block.id === activeBlockId
+            const displayName = formatPhaseDisplayName(block.name, block.phase_label, {
+              periodizationStyle,
+              blockOrder: block.block_order,
+            })
+            const color = phaseHex[blockIndex] ?? '#2EF2C6'
+            const weekCount = Math.max(1, block.duration_weeks)
+            const colMin = phaseColumnMinWidthPx(weekCount)
+            const isFirst = !isSolo && blockIndex === 0
+            const isLast = !isSolo && blockIndex === trainingBlocks.length - 1
+            const isActiveBlock = block.id === activeBlockId
 
-          return (
-            <div
-              key={block.id}
-              role="button"
-              tabIndex={0}
-              data-testid={`ribbon-block-${block.id}`}
-              className={cn(css.blockSegment, isActive && css.blockSegmentActive)}
-              style={{
-                flexGrow,
-                flexBasis: 0,
-                background: color,
-              }}
-              onClick={() => onSelectBlock(block.id)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  onSelectBlock(block.id)
-                }
-              }}
-            >
-              <span className={css.blockLabel}>{displayName}</span>
-              {nextColor ? (
-                <span
-                  className={css.blockSeam}
-                  style={{
-                    background: `linear-gradient(90deg, transparent 0%, ${nextColor} 100%)`,
+            return (
+              <div
+                key={block.id}
+                className={css.phaseColumn}
+                style={{
+                  flexGrow: weekCount,
+                  flexShrink: 1,
+                  flexBasis: 0,
+                  minWidth: colMin,
+                }}
+                data-testid={`week-block-${block.id}`}
+              >
+                <div
+                  role="button"
+                  tabIndex={0}
+                  data-testid={`ribbon-block-${block.id}`}
+                  className={cn(
+                    css.blockSegment,
+                    isSolo && css.blockSegmentSolo,
+                    isFirst && css.blockSegmentFirst,
+                    isLast && css.blockSegmentLast,
+                    isActive && css.blockSegmentActive,
+                  )}
+                  style={
+                    {
+                      '--seg-color': color,
+                      zIndex: isActive ? 10 : trainingBlocks.length - blockIndex,
+                    } as React.CSSProperties
+                  }
+                  onClick={() => onSelectBlock(block.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      onSelectBlock(block.id)
+                    }
                   }}
-                  aria-hidden
-                />
-              ) : null}
-              <button
-                ref={(el) => {
-                  triggerRefs.current[`block-${block.id}`] = el
-                }}
-                type="button"
-                className={css.blockMenuBtn}
-                aria-label={`${displayName} menu`}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  if (menu?.kind === 'block' && menu.blockId === block.id) closeMenu()
-                  else openMenu('block', block.id)
-                }}
-              >
-                <MoreHorizontal className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )
-        })}
-        <button
-          type="button"
-          onClick={onAddBlock}
-          data-testid="add-block"
-          className={css.addBlockBtn}
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Add phase
-        </button>
-        <div className={css.sheen} aria-hidden />
-      </div>
+                >
+                  <span className={css.blockLabel}>{displayName}</span>
+                  <button
+                    ref={(el) => {
+                      triggerRefs.current[`block-${block.id}`] = el
+                    }}
+                    type="button"
+                    className={css.blockMenuBtn}
+                    aria-label={`Edit ${displayName}`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (menu?.kind === 'block' && menu.blockId === block.id) closeMenu()
+                      else openMenu('block', block.id)
+                    }}
+                  >
+                    <MoreHorizontal className="w-3.5 h-3.5" />
+                  </button>
+                </div>
 
-      <div className={css.weeksDock} data-testid="week-strip">
-        {trainingBlocks.map((block, blockIndex) => {
-          const range = ranges[blockIndex]
-          if (!range) return null
-          const isActiveBlock = block.id === activeBlockId
-          const weekCount = Math.max(1, block.duration_weeks)
-          const flexGrow = Math.max(1, block.duration_weeks)
+                <div className={css.weekBlockGroup}>
+                  {Array.from({ length: weekCount }, (_, i) => {
+                    const rel = i + 1
+                    const abs = range.startWeek + rel - 1
+                    const weekActive = isActiveBlock && rel === relativeWeek
+                    return (
+                      <div key={rel} className={css.weekCardWrap}>
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={weekActive}
+                          data-testid={`week-${block.id}-${rel}`}
+                          className={cn(css.weekCell, weekActive && css.weekCellActive)}
+                          style={{ '--week-block-color': color } as React.CSSProperties}
+                          onClick={() => onSelectBlockWeek(block.id, rel)}
+                        >
+                          <span className={css.weekNum}>Wk {abs}</span>
+                          <span className={css.weekDate}>{weekDateLabel(abs)}</span>
+                        </button>
+                        {weekActive ? (
+                          <button
+                            ref={(el) => {
+                              triggerRefs.current[`week-${block.id}-${rel}`] = el
+                            }}
+                            type="button"
+                            data-testid={`week-kebab-${block.id}-${rel}`}
+                            className={css.weekKebab}
+                            aria-label="Week actions"
+                            onClick={() => {
+                              if (
+                                menu?.kind === 'week' &&
+                                menu.blockId === block.id &&
+                                menu.rel === rel
+                              ) {
+                                closeMenu()
+                              } else {
+                                openMenu('week', block.id, rel)
+                              }
+                            }}
+                          >
+                            <MoreHorizontal className="w-2.5 h-2.5" />
+                          </button>
+                        ) : null}
+                      </div>
+                    )
+                  })}
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => onAddWeek(block.id)}
+                    data-testid={`add-week-${block.id}`}
+                    className={css.addWeekBtn}
+                  >
+                    <Plus className="w-3 h-3" />
+                    Add
+                  </button>
+                </div>
+              </div>
+            )
+          })}
 
-          return (
-            <div
-              key={block.id}
-              className={css.weekBlockGroup}
-              style={{ flexGrow, flexBasis: 0 }}
-              data-testid={`week-block-${block.id}`}
-            >
-              {Array.from({ length: weekCount }, (_, i) => {
-                const rel = i + 1
-                const abs = range.startWeek + rel - 1
-                const isActive = isActiveBlock && rel === relativeWeek
-                const blockColor = ribbonBlockColor(blockIndex, trainingBlocks.length)
-                return (
-                  <div key={rel} className={css.weekCardWrap}>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={isActive}
-                      data-testid={`week-${block.id}-${rel}`}
-                      className={cn(css.weekCell, isActive && css.weekCellActive)}
-                      style={{ '--week-block-color': blockColor } as React.CSSProperties}
-                      onClick={() => onSelectBlockWeek(block.id, rel)}
-                    >
-                      <span className={css.weekNum}>Wk {rel}</span>
-                      <span className={css.weekDate}>{weekDateLabel(abs)}</span>
-                    </button>
-                    {onProgressWeek ? (
-                      <FillWeekProgressionButton
-                        onClick={() => onProgressWeek(abs)}
-                        accentColor={blockColor}
-                      />
-                    ) : null}
-                    {isActive ? (
-                      <button
-                        ref={(el) => {
-                          triggerRefs.current[`week-${block.id}-${rel}`] = el
-                        }}
-                        type="button"
-                        data-testid={`week-kebab-${block.id}-${rel}`}
-                        className={css.weekKebab}
-                        aria-label="Week actions"
-                        onClick={() => {
-                          if (
-                            menu?.kind === 'week' &&
-                            menu.blockId === block.id &&
-                            menu.rel === rel
-                          ) {
-                            closeMenu()
-                          } else {
-                            openMenu('week', block.id, rel)
-                          }
-                        }}
-                      >
-                        <MoreHorizontal className="w-2.5 h-2.5" />
-                      </button>
-                    ) : null}
-                  </div>
-                )
-              })}
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => onAddWeek(block.id)}
-                data-testid={`add-week-${block.id}`}
-                className={css.addWeekBtn}
-              >
-                <Plus className="w-3 h-3" />
-                Add
-              </button>
-            </div>
-          )
-        })}
+          <button
+            type="button"
+            onClick={onAddBlock}
+            data-testid="add-block"
+            className={css.addBlockBtn}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add phase
+          </button>
+        </div>
       </div>
 
       {menu &&

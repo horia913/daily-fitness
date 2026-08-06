@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Program Builder — Dense Text-Forward Rebalance (Mockup v2)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* Design-system v5 tokens */
+    :root {
+      --bg: #0A0B0D;
+      --well: #050608;
+      --hairline: rgba(255, 255, 255, 0.07);
+      --t1: rgba(255, 255, 255, 0.92);
+      --t2: rgba(255, 255, 255, 0.62);
+      --t3: rgba(255, 255, 255, 0.38);
+      --accent: #2E7BFF;
+      --accent-glow: rgba(46, 123, 255, 0.28);
+      --phase-light: #22E56A;   /* base / foundation */
+      --phase-mod: #FFB020;     /* build / moderate */
+      --phase-hard: #FF5A4D;    /* peak / hard */
+      --phase-deload: #22D3EE;  /* deload */
+      --green: #22E56A;
+      --amber: #FFB020;
+      --orange: #FF7A2F;
+      --f-display: "Archivo", system-ui, sans-serif;
+      --f-mono: "JetBrains Mono", ui-monospace, monospace;
+      --f-body: "Inter", system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #060708;
+      color: var(--t1);
+      font-family: var(--f-body);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .page {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 22px 20px 56px;
+    }
+
+    /* ── Doc chrome ── */
+    .doc-head { margin-bottom: 18px; max-width: 860px; }
+    .eyebrow {
+      font-family: var(--f-mono);
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 0 0 6px;
+    }
+    .doc-head h1 {
+      font-family: var(--f-display);
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin: 0 0 8px;
+    }
+    .doc-head p {
+      margin: 0;
+      color: var(--t2);
+      font-size: 13px;
+      max-width: 760px;
+    }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .pill {
+      font-family: var(--f-mono);
+      font-size: 8px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--hairline);
+      color: var(--t2);
+    }
+    .pill.ok { color: var(--green); border-color: color-mix(in srgb, var(--green) 40%, transparent); }
+
+    /* ── Principle strip ── */
+    .principles {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 900px) { .principles { grid-template-columns: 1fr 1fr; } }
+    .prin {
+      border: 1px solid var(--hairline);
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: var(--bg);
+    }
+    .prin .n {
+      font-family: var(--f-mono);
+      font-size: 8px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+    .prin strong {
+      display: block;
+      font-family: var(--f-display);
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 3px;
+    }
+    .prin span { color: var(--t3); font-size: 11px; }
+
+    /* ── Full builder mock ── */
+    .builder-shell {
+      border: 1px solid var(--hairline);
+      border-radius: 14px;
+      background: var(--bg);
+      overflow: hidden;
+    }
+    .shell-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      background: var(--well);
+      border-bottom: 1px solid var(--hairline);
+    }
+    .shell-label strong {
+      font-family: var(--f-display);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .shell-label em {
+      font-style: normal;
+      font-family: var(--f-mono);
+      font-size: 8px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--green);
+    }
+
+    .builder {
+      padding: 12px 14px 16px;
+      /* no atmospheric blobs */
+    }
+
+    /* Top bar — dense */
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .prog-name {
+      flex: 1;
+      min-width: 0;
+      font-family: var(--f-display);
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: -0.02em;
+    }
+    .prog-sub {
+      font-family: var(--f-mono);
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--t3);
+      margin-top: 2px;
+    }
+    .save {
+      font-family: var(--f-display);
+      font-weight: 800;
+      font-size: 10px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #fff;
+      background: var(--accent);
+      border: none;
+      border-radius: 10px;
+      padding: 8px 14px;
+      box-shadow: 0 3px 14px var(--accent-glow);
+      flex-shrink: 0;
+    }
+
+    /* ════════════════════════════════════════
+       #1 — THIN PERIODIZATION BAND
+       ════════════════════════════════════════ */
+    .phase-band-wrap {
+      margin-bottom: 8px;
+    }
+    .phase-band-meta {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 5px;
+    }
+    .phase-band-meta .title {
+      font-family: var(--f-mono);
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--t3);
+    }
+    .phase-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-family: var(--f-mono);
+      font-size: 8px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--t3);
+    }
+    .phase-legend i {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      margin-right: 4px;
+      vertical-align: -1px;
+    }
+
+    /* Flowing chevron / arrow ribbon — each phase points into the next */
+    .phase-band {
+      --chev: 12px; /* notch depth; nests tip → next segment */
+      display: flex;
+      align-items: stretch;
+      height: 22px; /* THIN — arrows add direction, not height */
+      overflow: visible;
+      background: transparent;
+      isolation: isolate;
+    }
+    .seg {
+      position: relative;
+      display: flex;
+      align-items: center;
+      min-width: 0;
+      height: 100%;
+      margin-left: calc(var(--chev) * -1);
+      padding: 0 calc(var(--chev) + 4px) 0 calc(var(--chev) + 6px);
+      cursor: default;
+      /* Middle: notched left ◀ · pointed right ▶ — nests into next */
+      clip-path: polygon(
+        0 0,
+        calc(100% - var(--chev)) 0,
+        100% 50%,
+        calc(100% - var(--chev)) 100%,
+        0 100%,
+        var(--chev) 50%
+      );
+      -webkit-clip-path: polygon(
+        0 0,
+        calc(100% - var(--chev)) 0,
+        100% 50%,
+        calc(100% - var(--chev)) 100%,
+        0 100%,
+        var(--chev) 50%
+      );
+    }
+    /* First: flat/rounded left start · arrow into next */
+    .seg:first-child {
+      margin-left: 0;
+      padding-left: 10px;
+      border-radius: 4px 0 0 4px;
+      clip-path: polygon(
+        0 0,
+        calc(100% - var(--chev)) 0,
+        100% 50%,
+        calc(100% - var(--chev)) 100%,
+        0 100%
+      );
+      -webkit-clip-path: polygon(
+        0 0,
+        calc(100% - var(--chev)) 0,
+        100% 50%,
+        calc(100% - var(--chev)) 100%,
+        0 100%
+      );
+    }
+    /* Last: receives prior tip · flat trailing edge (journey ends) */
+    .seg:last-child {
+      padding-right: 10px;
+      border-radius: 0 4px 4px 0;
+      clip-path: polygon(
+        0 0,
+        100% 0,
+        100% 100%,
+        0 100%,
+        var(--chev) 50%
+      );
+      -webkit-clip-path: polygon(
+        0 0,
+        100% 0,
+        100% 100%,
+        0 100%,
+        var(--chev) 50%
+      );
+    }
+    /* Earlier segment paints on top so its tip nests cleanly into the next notch */
+    .seg:nth-child(1) { z-index: 4; }
+    .seg:nth-child(2) { z-index: 3; }
+    .seg:nth-child(3) { z-index: 2; }
+    .seg:nth-child(4) { z-index: 1; }
+
+    .seg.light { background: var(--phase-light); flex: 4; }
+    .seg.mod { background: var(--phase-mod); flex: 4; }
+    .seg.hard { background: var(--phase-hard); flex: 3; }
+    .seg.deload { background: var(--phase-deload); flex: 1.2; min-width: 72px; }
+
+    /* Active: brighter + white edge that follows the chevron (drop-shadow respects clip-path) */
+    .seg.active {
+      z-index: 10;
+      filter:
+        brightness(1.12)
+        saturate(1.06)
+        drop-shadow(0 0 0.6px rgba(255, 255, 255, 0.95))
+        drop-shadow(0 0 1.2px rgba(255, 255, 255, 0.75))
+        drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+    }
+    .seg .lab {
+      position: relative;
+      z-index: 1;
+      font-family: var(--f-mono);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: rgba(0, 0, 0, 0.78);
+      pointer-events: none;
+    }
+    .seg.deload .lab { color: rgba(0, 0, 0, 0.72); }
+    .seg.hard .lab { color: rgba(0, 0, 0, 0.82); }
+
+    /* Weeks under band — dense, selected only gets functional ring */
+    .weeks {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 3px;
+      margin-bottom: 12px;
+    }
+    .wk {
+      text-align: center;
+      padding: 5px 2px 4px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      background: transparent;
+    }
+    .wk .n {
+      font-family: var(--f-mono);
+      font-size: 8px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--t3);
+    }
+    .wk .d {
+      font-family: var(--f-display);
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--t2);
+      margin-top: 1px;
+    }
+    .wk.active {
+      background: color-mix(in srgb, var(--phase-light) 10%, transparent);
+      border-color: color-mix(in srgb, var(--phase-light) 55%, transparent);
+    }
+    .wk.active .n { color: color-mix(in srgb, var(--phase-light) 70%, white); }
+    .wk.active .d { color: var(--t1); }
+    /* phase tick under week — thin functional color */
+    .wk .tick {
+      height: 2px;
+      border-radius: 1px;
+      margin: 3px 4px 0;
+      opacity: 0.85;
+    }
+    .wk.p-light .tick { background: var(--phase-light); }
+    .wk.p-mod .tick { background: var(--phase-mod); }
+    .wk.p-hard .tick { background: var(--phase-hard); }
+    .wk.p-deload .tick { background: var(--phase-deload); }
+
+    /* Main workspace: volume rail + day columns */
+    .workspace {
+      display: grid;
+      grid-template-columns: 168px 1fr;
+      gap: 10px;
+      align-items: start;
+    }
+    @media (max-width: 860px) {
+      .workspace { grid-template-columns: 1fr; }
+    }
+
+    /* Volume — text-forward, status color only on numbers */
+    .vol {
+      border: 1px solid var(--hairline);
+      border-radius: 10px;
+      padding: 10px 10px 8px;
+      background: transparent;
+    }
+    .vol-h {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--hairline);
+    }
+    .vol-h .l {
+      font-family: var(--f-mono);
+      font-size: 8px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--t3);
+    }
+    .vol-h .n {
+      font-family: var(--f-display);
+      font-weight: 800;
+      font-size: 20px;
+      letter-spacing: -0.03em;
+      color: var(--t1);
+    }
+    .vol-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 3px 0;
+      font-size: 11px;
+      color: var(--t2);
+    }
+    .vol-row b {
+      font-family: var(--f-display);
+      font-weight: 700;
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+    .vol-row b.ok { color: var(--green); }
+    .vol-row b.low { color: var(--amber); }
+    .vol-row b.over { color: var(--orange); }
+    .vol-foot {
+      margin-top: 8px;
+      padding-top: 6px;
+      border-top: 1px solid var(--hairline);
+      font-family: var(--f-mono);
+      font-size: 8px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--t3);
+    }
+
+    /* Day columns — dense organized cards */
+    .days {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      overflow-x: auto;
+    }
+    .day {
+      border: 1px solid var(--hairline);
+      border-radius: 10px;
+      background: transparent;
+      min-width: 0;
+      overflow: hidden;
+    }
+    .day.focus {
+      border-color: color-mix(in srgb, var(--phase-light) 40%, var(--hairline));
+    }
+    .day-h {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0 8px;
+      padding: 8px 10px 7px;
+      border-bottom: 1px solid var(--hairline);
+      /* thin left functional accent only */
+      border-left: 3px solid var(--phase-light);
+      background: color-mix(in srgb, var(--phase-light) 4%, transparent);
+    }
+    .day.rest .day-h {
+      border-left-color: var(--hairline);
+      background: transparent;
+    }
+    .day-wd {
+      grid-row: 1 / 3;
+      align-self: center;
+      font-family: var(--f-mono);
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--t3);
+      width: 28px;
+    }
+    .day-name {
+      font-family: var(--f-display);
+      font-weight: 700;
+      font-size: 12px;
+      color: var(--t1);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .day-meta {
+      font-size: 10px;
+      color: var(--t3);
+    }
+    .ex-list { padding: 6px 8px 8px; }
+    .ex-row {
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      gap: 6px;
+      padding: 5px 2px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    .ex-row:last-child { border-bottom: none; }
+    .badge {
+      font-family: var(--f-mono);
+      font-size: 8px;
+      font-weight: 600;
+      text-align: center;
+      padding: 2px 0;
+      border-radius: 3px;
+      background: color-mix(in srgb, var(--accent) 18%, transparent);
+      color: color-mix(in srgb, var(--accent) 80%, white);
+      height: fit-content;
+    }
+    .ex-name {
+      font-weight: 600;
+      font-size: 11px;
+      color: var(--t1);
+      line-height: 1.2;
+    }
+    .ex-rx {
+      font-family: var(--f-mono);
+      font-size: 9px;
+      color: var(--t3);
+      margin-top: 1px;
+    }
+    .rest-body {
+      padding: 18px 10px;
+      text-align: center;
+      color: var(--t3);
+      font-size: 11px;
+    }
+
+    /* Annotations */
+    .anno {
+      margin-top: 20px;
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 12px;
+    }
+    @media (max-width: 900px) { .anno { grid-template-columns: 1fr; } }
+    .anno-card {
+      border: 1px solid var(--hairline);
+      border-radius: 12px;
+      padding: 14px 16px;
+      background: var(--bg);
+    }
+    .anno-card h2 {
+      font-family: var(--f-display);
+      font-size: 14px;
+      font-weight: 800;
+      margin: 0 0 10px;
+    }
+    .anno-card ol, .anno-card ul {
+      margin: 0;
+      padding-left: 16px;
+      color: var(--t2);
+      font-size: 12px;
+    }
+    .anno-card li { margin-bottom: 8px; }
+    .anno-card li strong { color: var(--t1); }
+    .callout {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border-left: 3px solid var(--accent);
+      background: rgba(46, 123, 255, 0.07);
+      font-size: 12px;
+      color: var(--t2);
+    }
+    .callout strong { color: var(--t1); }
+    code {
+      font-family: var(--f-mono);
+      font-size: 10px;
+      color: color-mix(in srgb, var(--phase-deload) 70%, white);
+    }
+
+    .vs {
+      margin-top: 12px;
+      border: 1px solid var(--hairline);
+      border-radius: 10px;
+      overflow: hidden;
+      font-size: 11px;
+    }
+    .vs table { width: 100%; border-collapse: collapse; }
+    .vs th, .vs td {
+      padding: 7px 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--hairline);
+      vertical-align: top;
+    }
+    .vs th {
+      font-family: var(--f-mono);
+      font-size: 8px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--t3);
+      background: var(--well);
+    }
+    .vs td:first-child { color: var(--t3); width: 28%; }
+    .vs .bad { color: var(--orange); }
+    .vs .good { color: var(--green); }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="doc-head">
+      <p class="eyebrow">Mockup v2 · no component changes · design-system v5</p>
+      <h1>Program builder — dense, text-forward, thin phase band</h1>
+      <p>
+        Iteration past the previous rail+wash mockup. Pushed further: periodization as a
+        <strong>slim intensity band</strong>, tighter density, color only where it means something.
+        Principles extracted from a clean competitor layout — applied to <em>our</em> tokens and identity, not cloned.
+      </p>
+      <div class="pill-row">
+        <span class="pill ok">Thin phase band = #1 change</span>
+        <span class="pill ok">Saturated but purposeful</span>
+        <span class="pill ok">Not mute / beige / flatten</span>
+        <span class="pill">phase-light · mod · hard · deload</span>
+      </div>
+    </header>
+
+    <div class="principles">
+      <div class="prin">
+        <div class="n">01</div>
+        <strong>Thin periodization band</strong>
+        <span>Phase color as a 22px strip, not a blazing block.</span>
+      </div>
+      <div class="prin">
+        <div class="n">02</div>
+        <strong>Density / text-forward</strong>
+        <span>Tighter padding; white text leads the eye.</span>
+      </div>
+      <div class="prin">
+        <div class="n">03</div>
+        <strong>Color = functional</strong>
+        <span>Intensity, status, selection — no ambient glow.</span>
+      </div>
+      <div class="prin">
+        <div class="n">04</div>
+        <strong>Organized columns</strong>
+        <span>Clean cards; badges as small accents only.</span>
+      </div>
+    </div>
+
+    <div class="builder-shell">
+      <div class="shell-label">
+        <strong>Proposed builder chrome</strong>
+        <em>Full view · review mock</em>
+      </div>
+
+      <div class="builder">
+        <div class="topbar">
+          <div>
+            <div class="prog-name">Hypertrophy Block A</div>
+            <div class="prog-sub">Linear · 12 weeks · Client program</div>
+          </div>
+          <button type="button" class="save">Save</button>
+        </div>
+
+        <!-- THIN PERIODIZATION BAND -->
+        <div class="phase-band-wrap">
+          <div class="phase-band-meta">
+            <span class="title">Periodization · arrow flow</span>
+            <div class="phase-legend">
+              <span><i style="background:var(--phase-light)"></i>Base</span>
+              <span><i style="background:var(--phase-mod)"></i>Build</span>
+              <span><i style="background:var(--phase-hard)"></i>Peak</span>
+              <span><i style="background:var(--phase-deload)"></i>Deload</span>
+            </div>
+          </div>
+          <div class="phase-band" role="img" aria-label="Periodization phases across program timeline">
+            <div class="seg light active" style="flex:4" title="Block 1 · Foundation">
+              <span class="lab">Block 1 · Foundation</span>
+            </div>
+            <div class="seg mod" style="flex:4" title="Block 2 · Build">
+              <span class="lab">Block 2 · Build</span>
+            </div>
+            <div class="seg hard" style="flex:3" title="Block 3 · Peak">
+              <span class="lab">Block 3 · Peak</span>
+            </div>
+            <div class="seg deload" style="flex:1" title="Block 4 · Deload">
+              <span class="lab">Deload</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Weeks: dense grid, tick = phase intensity, only selected rings -->
+        <div class="weeks" aria-label="Week selector">
+          <div class="wk active p-light"><div class="n">Wk 1</div><div class="d">Aug 3</div><div class="tick"></div></div>
+          <div class="wk p-light"><div class="n">Wk 2</div><div class="d">Aug 10</div><div class="tick"></div></div>
+          <div class="wk p-light"><div class="n">Wk 3</div><div class="d">Aug 17</div><div class="tick"></div></div>
+          <div class="wk p-light"><div class="n">Wk 4</div><div class="d">Aug 24</div><div class="tick"></div></div>
+          <div class="wk p-mod"><div class="n">Wk 5</div><div class="d">Aug 31</div><div class="tick"></div></div>
+          <div class="wk p-mod"><div class="n">Wk 6</div><div class="d">Sep 7</div><div class="tick"></div></div>
+          <div class="wk p-mod"><div class="n">Wk 7</div><div class="d">Sep 14</div><div class="tick"></div></div>
+          <div class="wk p-mod"><div class="n">Wk 8</div><div class="d">Sep 21</div><div class="tick"></div></div>
+          <div class="wk p-hard"><div class="n">Wk 9</div><div class="d">Sep 28</div><div class="tick"></div></div>
+          <div class="wk p-hard"><div class="n">Wk 10</div><div class="d">Oct 5</div><div class="tick"></div></div>
+          <div class="wk p-hard"><div class="n">Wk 11</div><div class="d">Oct 12</div><div class="tick"></div></div>
+          <div class="wk p-deload"><div class="n">Wk 12</div><div class="d">Oct 19</div><div class="tick"></div></div>
+        </div>
+
+        <div class="workspace">
+          <aside class="vol" aria-label="Weekly volume">
+            <div class="vol-h">
+              <span class="l">Week volume</span>
+              <span class="n">48</span>
+            </div>
+            <div class="vol-row"><span>Chest</span><b class="ok">14</b></div>
+            <div class="vol-row"><span>Back</span><b class="ok">16</b></div>
+            <div class="vol-row"><span>Shoulders</span><b class="ok">10</b></div>
+            <div class="vol-row"><span>Quads</span><b class="low">8</b></div>
+            <div class="vol-row"><span>Hamstrings</span><b class="ok">12</b></div>
+            <div class="vol-row"><span>Arms</span><b class="over">18</b></div>
+            <div class="vol-foot">Sets · Wk 1 · Foundation</div>
+          </aside>
+
+          <div class="days" aria-label="Session columns">
+            <div class="day focus">
+              <div class="day-h">
+                <div class="day-wd">Mon</div>
+                <div class="day-name">Lower Power</div>
+                <div class="day-meta">4 exercises · Day 1</div>
+              </div>
+              <div class="ex-list">
+                <div class="ex-row">
+                  <span class="badge">A</span>
+                  <div>
+                    <div class="ex-name">Back Squat</div>
+                    <div class="ex-rx">4×5 · RPE 8 · 2:00</div>
+                  </div>
+                </div>
+                <div class="ex-row">
+                  <span class="badge">B</span>
+                  <div>
+                    <div class="ex-name">Romanian Deadlift</div>
+                    <div class="ex-rx">3×8 · Load · Tempo</div>
+                  </div>
+                </div>
+                <div class="ex-row">
+                  <span class="badge">C</span>
+                  <div>
+                    <div class="ex-name">Walking Lunge</div>
+                    <div class="ex-rx">3×10/leg · RPE 7</div>
+                  </div>
+                </div>
+                <div class="ex-row">
+                  <span class="badge">D</span>
+                  <div>
+                    <div class="ex-name">Calf Raise</div>
+                    <div class="ex-rx">3×12 · Rest 60s</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="day">
+              <div class="day-h">
+                <div class="day-wd">Tue</div>
+                <div class="day-name">Push Day</div>
+                <div class="day-meta">5 exercises · Day 2</div>
+              </div>
+              <div class="ex-list">
+                <div class="ex-row">
+                  <span class="badge">A</span>
+                  <div>
+                    <div class="ex-name">Bench Press</div>
+                    <div class="ex-rx">4×6 · RPE 7.5</div>
+                  </div>
+                </div>
+                <div class="ex-row">
+                  <span class="badge">B1</span>
+                  <div>
+                    <div class="ex-name">OHP</div>
+                    <div class="ex-rx">3×8 · Superset</div>
+                  </div>
+                </div>
+                <div class="ex-row">
+                  <span class="badge">B2</span>
+                  <div>
+                    <div class="ex-name">Lateral Raise</div>
+                    <div class="ex-rx">3×12 · Superset</div>
+                  </div>
+                </div>
+                <div class="ex-row">
+                  <span class="badge">C</span>
+                  <div>
+                    <div class="ex-name">Tricep Pushdown</div>
+                    <div class="ex-rx">3×12 · RPE 8</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="day rest">
+              <div class="day-h">
+                <div class="day-wd">Wed</div>
+                <div class="day-name">Rest</div>
+                <div class="day-meta">Day 3</div>
+              </div>
+              <div class="rest-body">No session</div>
+            </div>
+
+            <div class="day">
+              <div class="day-h">
+                <div class="day-wd">Thu</div>
+                <div class="day-name">Pull / Posterior</div>
+                <div class="day-meta">4 exercises · Day 4</div>
+              </div>
+              <div class="ex-list">
+                <div class="ex-row">
+                  <span class="badge">A</span>
+                  <div>
+                    <div class="ex-name">Weighted Pull-up</div>
+                    <div class="ex-rx">4×6 · RPE 8</div>
+                  </div>
+                </div>
+                <div class="ex-row">
+                  <span class="badge">B</span>
+                  <div>
+                    <div class="ex-name">Chest-Supported Row</div>
+                    <div class="ex-rx">3×10 · Load</div>
+                  </div>
+                </div>
+                <div class="ex-row">
+                  <span class="badge">C</span>
+                  <div>
+                    <div class="ex-name">Face Pull</div>
+                    <div class="ex-rx">3×15 · Rest 45s</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="vs">
+      <table>
+        <thead>
+          <tr>
+            <th>Surface</th>
+            <th>Current builder</th>
+            <th>This mockup</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Phase / Block</td>
+            <td class="bad">Full-height glossy solid fill (#2EF2C6 ramp) — label drowned</td>
+            <td class="good">22px chevron ribbon · tip nests into next notch · phase-light → mod → hard → deload · active ring follows arrow shape</td>
+          </tr>
+          <tr>
+            <td>Week tabs</td>
+            <td class="bad">Bright teal ring + competing cyan elsewhere</td>
+            <td class="good">Quiet grid; 2px phase tick; only selected week rings in active phase color</td>
+          </tr>
+          <tr>
+            <td>Volume</td>
+            <td class="bad">Cyan chrome (#19e3c4) on label + total + header wash</td>
+            <td class="good">White display total; green / amber / orange only on status counts</td>
+          </tr>
+          <tr>
+            <td>Day columns</td>
+            <td class="bad">Strong left teal wash; day titles often in accent color</td>
+            <td class="good">3px phase rail + 4% wash; white titles; letter badges as small accents</td>
+          </tr>
+          <tr>
+            <td>Atmosphere</td>
+            <td class="bad">Cyan + orange radial “blobs” on .root::before</td>
+            <td class="good">Removed — no decorative glow fields</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="anno">
+      <div class="anno-card">
+        <h2>Principles applied</h2>
+        <ol>
+          <li>
+            <strong>Thin periodization chevron ribbon (#1).</strong>
+            Each phase is a clip-path arrow that points into the next (base ▸ build ▸ peak ▸ deload).
+            Negative margin nests tip into notch — continuous flowing ribbon, no gaps.
+            Filled with <code>--phase-light</code> / <code>--phase-mod</code> / <code>--phase-hard</code> /
+            <code>--phase-deload</code>. Active: brightness + white drop-shadow edge that follows the chevron.
+          </li>
+          <li>
+            <strong>Density / text-forward.</strong>
+            Tighter gaps (3–10px), smaller mono labels, more weeks visible at once, volume as a compact side rail,
+            exercise rows with mono prescriptions. White/bright type carries hierarchy.
+          </li>
+          <li>
+            <strong>Color = functional.</strong>
+            Appears for: phase intensity (band + week ticks), volume status, selected week, letter badges, Save CTA.
+            No atmospheric blobs, no cyan volume chrome, no full-card teal blaze.
+          </li>
+          <li>
+            <strong>Organized columns.</strong>
+            Hairline dark cards, clear Mon + day name + meta, exercise list with tiny badges — accent, not headline.
+          </li>
+        </ol>
+        <div class="callout">
+          <strong>Not muted:</strong> phase greens / ambers / reds / cyan stay fully saturated inside the thin band;
+          volume status stays vivid; Save keeps blue glow. Energy is concentrated into meaning — thin and loud where it earns it, quiet everywhere else.
+        </div>
+      </div>
+
+      <div class="anno-card">
+        <h2>Build map (when approved)</h2>
+        <ul>
+          <li>
+            <strong>PeriodizationRibbon</strong> — swap full-fill segments for a ~20–24px band;
+            color from phase intensity tokens (or map <code>phase_label</code> → light/mod/hard/deload),
+            not the cool→warm teal ramp as a giant fill.
+          </li>
+          <li>
+            <strong>Week dock</strong> — denser cells; optional 2px intensity tick; quiet inactive text.
+          </li>
+          <li>
+            <strong>ProgramVolumeRail</strong> — drop <code>#19e3c4</code> chrome; keep status on counts.
+          </li>
+          <li>
+            <strong>sessionColumns</strong> — thin left rail + minimal wash; day name = text primary.
+          </li>
+          <li>
+            <strong>stationEditor .root::before</strong> — remove teal/orange atmospherics.
+          </li>
+        </ul>
+        <div class="callout">
+          Review-only file. <strong>No real components modified.</strong>
+          Previous mock: <code>program-builder-hierarchy-rebalance.html</code> (rail+wash).
+          This file: thin band + density push.
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

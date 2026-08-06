@@ -11,6 +11,13 @@
   padding-inline: var(--se-scroll-pad-inline, 16px);
 }
 
+.rowHeaderTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
 .hint {
   font-size: 10px;
   color: var(--fc-text-subtle);
@@ -155,6 +162,95 @@
   font-size: 10px;
   color: var(--fc-text-quaternary);
   margin-top: 2px;
+}
+
+.nameEditBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  margin: 0;
+  padding: 1px 4px 1px 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: text;
+  text-align: left;
+  color: inherit;
+  transition: background 0.12s ease;
+}
+
+.nameEditBtn:hover {
+  background: color-mix(in srgb, var(--fc-text-primary) 6%, transparent);
+}
+
+.nameEditBtn:focus-visible {
+  outline: 1px solid var(--session-accent, var(--fc-accent, #2ef2c6));
+  outline-offset: 1px;
+}
+
+.nameEditTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fc-text-primary);
+  font-family: var(--f-headline, ui-sans-serif);
+  line-height: 1.25;
+}
+
+.nameEditInline {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pe-t1);
+  font-family: var(--f-headline, Bricolage Grotesque, sans-serif);
+  line-height: 1.25;
+}
+
+.nameEditText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nameEditIcon {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+  opacity: 0;
+  color: var(--fc-text-subtle, var(--pe-t3));
+  transition: opacity 0.12s ease;
+}
+
+.nameEditBtn:hover .nameEditIcon,
+.nameEditBtn:focus-visible .nameEditIcon {
+  opacity: 0.7;
+}
+
+.nameInput {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  border-radius: 4px;
+  border: 1px solid var(--session-accent, var(--fc-accent, #2ef2c6));
+  background: color-mix(in srgb, var(--fc-surface-sunken, #111) 80%, transparent);
+  color: var(--fc-text-primary, var(--pe-t1));
+  outline: none;
+}
+
+.nameInputTitle {
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--f-headline, ui-sans-serif);
+  padding: 1px 6px;
+  line-height: 1.25;
+}
+
+.nameInputInline {
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--f-headline, Bricolage Grotesque, sans-serif);
+  padding: 2px 6px;
+  line-height: 1.25;
 }
 
 .sessionBody {

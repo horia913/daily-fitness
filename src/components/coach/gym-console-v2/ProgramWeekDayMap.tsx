@@ -8,7 +8,7 @@ import WorkoutTemplateService, {
 } from '@/lib/workoutTemplateService'
 import { TrainingBlockService } from '@/lib/trainingBlockService'
 import { computeBlockWeekRanges } from '@/lib/programs/stationBlockWeeks'
-import { ribbonBlockColor } from '@/lib/programs/periodizationRibbonColors'
+import { ribbonPhaseHexColors } from '@/lib/programs/periodizationPhaseColors'
 import type { TrainingBlock } from '@/types/trainingBlock'
 import { supabase } from '@/lib/supabase'
 import {
@@ -467,8 +467,9 @@ export function ProgramWeekDayMap({
 
   const activeRibbonColor = useMemo(() => {
     if (!hasBlocks || !activeBlock) return null
-    return ribbonBlockColor(activeBlockIndex, blocks.length)
-  }, [hasBlocks, activeBlock, activeBlockIndex, blocks.length])
+    const colors = ribbonPhaseHexColors(blocks, null)
+    return colors[activeBlockIndex] ?? colors[0] ?? null
+  }, [hasBlocks, activeBlock, activeBlockIndex, blocks])
 
   const activeRange = useMemo(() => {
     if (!activeBlock) return null

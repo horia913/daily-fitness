@@ -46,13 +46,8 @@ function PrescriptionTable({
   const canAddSet = group.rounds_driver === 'fixed' || group.rounds_driver === 'for_time'
 
   const handlePropertyClick = (property: SlotProperty) => {
-    const active = slot.enabledProperties.includes(property)
-    if (active) {
-      onToggleProperty(property)
-    } else {
-      onToggleProperty(property)
-    }
-    setPropertyMenuOpen(false)
+    onToggleProperty(property)
+    // Keep menu open so multiple properties can be toggled in one go.
   }
 
   return (
@@ -373,6 +368,19 @@ function PrescriptionTable({
               {propertyLabel(property)}
             </CanvasMenuItem>
           ))}
+          <div
+            className="mt-1 border-t px-3 pt-2"
+            style={{ borderColor: CANVAS.hairline }}
+          >
+            <button
+              type="button"
+              className="w-full rounded-md py-1.5 text-xs font-medium transition-colors hover:bg-white/5"
+              style={{ color: CANVAS.cyan }}
+              onClick={() => setPropertyMenuOpen(false)}
+            >
+              Done
+            </button>
+          </div>
         </CanvasFloatingMenu>
       </div>
     </div>

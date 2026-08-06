@@ -68,7 +68,8 @@ export function getPresetPhaseTypeOptions(
 ): string[] | null {
   const id = normalizePeriodizationStyle(style)
   if (!id || id === 'block' || id === 'custom') return null
-  return [...PRESET_OPTIONS[id]]
+  // Deload is universal — append after style-specific phases (not used for block/custom).
+  return [...PRESET_OPTIONS[id], 'Deload']
 }
 
 export function blockSequentialLabel(blockOrder: number): string {

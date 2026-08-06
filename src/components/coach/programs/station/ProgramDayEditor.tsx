@@ -14,6 +14,7 @@ import { LibraryWorkoutPicker } from './LibraryWorkoutPicker'
 import { SaveToLibraryDialog } from './SaveToLibraryDialog'
 import { FillToolDialog } from './FillToolDialog'
 import { FillProgressionButton } from './FillToolEntryControls'
+import { DayWorkoutNameEdit, stockDayWorkoutName } from './DayWorkoutNameEdit'
 import entryCss from './fillToolEntries.module.css'
 import type { FillScope } from '@/lib/programs/fillTool'
 import columnCss from './sessionColumns.module.css'
@@ -70,6 +71,18 @@ export function ProgramDayEditor({
   const handleWorkoutChange = (next: import('@/lib/groupModel/canvasTypes').CanvasWorkout) => {
     if (!templateId) return
     draft.updateWorkout(templateId, next)
+  }
+
+  const workoutDisplayName =
+    workout?.name?.trim() ||
+    summary.label?.trim() ||
+    stockDayWorkoutName(programDay)
+
+  const handleRenameWorkout = (nextName: string) => {
+    if (!templateId || !workout) return
+    const trimmed = nextName.trim() || stockDayWorkoutName(programDay)
+    if (trimmed === workout.name) return
+    draft.updateWorkout(templateId, { ...workout, name: trimmed })
   }
 
   const runBuildFromScratch = () => {
@@ -296,13 +309,24 @@ export function ProgramDayEditor({
             {headerPrefix ?? <span className="w-6" />}
             <div className={columnCss.headerText}>
               <p className={columnCss.dayLabel}>{programDayLabel(programDay)}</p>
-              <p className={columnCss.dayDate}>Day {timelineDay}</p>
-              {!isRest && summary.exerciseCount != null && summary.exerciseCount > 0 ? (
-                <p className={columnCss.sessionMeta}>
-                  {summary.label}
-                  {summary.isOptional ? ' · Optional' : ''}
-                </p>
-              ) : null}
+              {!isRest && workout ? (
+                <DayWorkoutNameEdit
+                  programDay={programDay}
+                  value={workoutDisplayName}
+                  onCommit={handleRenameWorkout}
+                  variant="title"
+                  testId={`day-name-${programDay}`}
+                />
+              ) : (
+                <p className={columnCss.dayDate}>{isRest ? 'Rest' : workoutDisplayName}</p>
+              )}
+              <p className={columnCss.sessionMeta}>
+                Day {timelineDay}
+                {!isRest && summary.exerciseCount != null && summary.exerciseCount > 0
+                  ? ` · ${summary.exerciseCount} exercises`
+                  : ''}
+                {summary.isOptional ? ' · Optional' : ''}
+              </p>
             </div>
             {sessionHeaderActions}
           </div>
@@ -320,7 +344,9 @@ export function ProgramDayEditor({
           onOpenChange={setSaveDialogOpen}
           onSave={runSaveToLibrary}
           busy={busy}
-          defaultName={summary.label !== 'Workout' ? summary.label : ''}
+          defaultName={
+            workoutDisplayName !== stockDayWorkoutName(programDay) ? workoutDisplayName : ''
+          }
         />
         {draft.workingCopy && fillOpen ? (
           <FillToolDialog
@@ -359,18 +385,31 @@ export function ProgramDayEditor({
           className={`flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--pe-line)] ${columnCss.sessionEditorHeader}`}
         >
           <div className="min-w-0">
-            <p className={css.eyebrow}>Day editor</p>
-            <h3
-              className="text-base font-semibold text-[var(--pe-t1)] truncate"
-              style={{ fontFamily: 'var(--f-headline, Bricolage Grotesque, sans-serif)' }}
-            >
+            <p className={css.eyebrow}>
               {programDayLabel(programDay)} · Week {absoluteWeek}
-            </h3>
+            </p>
+            {!isRest && workout ? (
+              <DayWorkoutNameEdit
+                programDay={programDay}
+                value={workoutDisplayName}
+                onCommit={handleRenameWorkout}
+                variant="inline"
+                testId={`day-name-${programDay}`}
+              />
+            ) : (
+              <h3
+                className="text-base font-semibold text-[var(--pe-t1)] truncate"
+                style={{ fontFamily: 'var(--f-headline, Bricolage Grotesque, sans-serif)' }}
+              >
+                {isRest ? 'Rest day' : workoutDisplayName}
+              </h3>
+            )}
             {!isRest ? (
               <p className="text-[11px] text-[var(--pe-t3)] mt-0.5">
+                Day {timelineDay}
                 {summary.exerciseCount != null && summary.exerciseCount > 0
-                  ? `${summary.exerciseCount} exercises`
-                  : summary.label}
+                  ? ` · ${summary.exerciseCount} exercises`
+                  : ''}
                 {summary.isOptional ? ' · Optional' : ''}
               </p>
             ) : (
@@ -393,7 +432,9 @@ export function ProgramDayEditor({
         onOpenChange={setSaveDialogOpen}
         onSave={runSaveToLibrary}
         busy={busy}
-        defaultName={summary.label !== 'Workout' ? summary.label : ''}
+        defaultName={
+          workoutDisplayName !== stockDayWorkoutName(programDay) ? workoutDisplayName : ''
+        }
       />
       {draft.workingCopy && fillOpen ? (
         <FillToolDialog

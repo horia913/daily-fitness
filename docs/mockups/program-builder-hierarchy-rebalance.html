@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Program Builder — Hierarchy Rebalance (Mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Design-system v5 tokens (mock) ── */
+    :root {
+      --bg: #0A0B0D;
+      --well: #050608;
+      --hairline: rgba(255, 255, 255, 0.07);
+      --t1: rgba(255, 255, 255, 0.92);
+      --t2: rgba(255, 255, 255, 0.62);
+      --t3: rgba(255, 255, 255, 0.38);
+      --accent: #2E7BFF;
+      --accent-glow: rgba(46, 123, 255, 0.30);
+      --green: #22E56A;
+      --amber: #FFB020;
+      --orange: #FF8A1F;
+      --teal: #2EF2C6;          /* ribbon block 1 */
+      --vol-cyan: #19e3c4;      /* volume rail chrome (current) */
+      --f-display: "Archivo", system-ui, sans-serif;
+      --f-mono: "JetBrains Mono", ui-monospace, monospace;
+      --f-body: "Inter", system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #060708;
+      color: var(--t1);
+      font-family: var(--f-body);
+      line-height: 1.4;
+    }
+
+    .page {
+      max-width: 1480px;
+      margin: 0 auto;
+      padding: 28px 24px 64px;
+    }
+
+    .doc-head { margin-bottom: 28px; max-width: 820px; }
+    .doc-head .eyebrow {
+      font-family: var(--f-mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 0 0 8px;
+    }
+    .doc-head h1 {
+      font-family: var(--f-display);
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin: 0 0 10px;
+    }
+    .doc-head p {
+      margin: 0;
+      color: var(--t2);
+      font-size: 14px;
+      max-width: 720px;
+    }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .pill {
+      font-family: var(--f-mono);
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 5px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--hairline);
+      color: var(--t2);
+    }
+    .pill.ok { color: var(--green); border-color: color-mix(in srgb, var(--green) 40%, transparent); }
+    .pill.warn { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 40%, transparent); }
+
+    .compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 1100px) {
+      .compare { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      border: 1px solid var(--hairline);
+      border-radius: 16px;
+      overflow: hidden;
+      background: var(--bg);
+    }
+    .panel-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--hairline);
+      background: var(--well);
+    }
+    .panel-label strong {
+      font-family: var(--f-display);
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .panel-label span {
+      font-family: var(--f-mono);
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--t3);
+    }
+    .panel.before .tag { color: #FF7A2F; }
+    .panel.after .tag { color: var(--green); }
+
+    /* ── Shared builder chrome (both panels) ── */
+    .builder {
+      position: relative;
+      padding: 16px 14px 18px;
+      min-height: 520px;
+      overflow: hidden;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .prog-name {
+      font-family: var(--f-display);
+      font-weight: 700;
+      font-size: 15px;
+    }
+    .save {
+      font-family: var(--f-display);
+      font-weight: 800;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #fff;
+      background: var(--accent);
+      border: none;
+      border-radius: 12px;
+      padding: 10px 16px;
+      box-shadow: 0 4px 20px var(--accent-glow);
+    }
+
+    .weeks {
+      display: flex;
+      gap: 6px;
+      margin: 10px 0 14px;
+    }
+    .wk {
+      flex: 1;
+      text-align: center;
+      padding: 8px 4px;
+      border-radius: 10px;
+      border: 1px solid var(--hairline);
+      background: transparent;
+    }
+    .wk .n {
+      font-family: var(--f-mono);
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--t3);
+    }
+    .wk .d {
+      font-family: var(--f-display);
+      font-size: 11px;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+
+    .vol {
+      border: 1px solid var(--hairline);
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+    }
+    .vol-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 8px;
+    }
+    .vol-label {
+      font-family: var(--f-mono);
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+    .vol-total {
+      font-family: var(--f-display);
+      font-weight: 800;
+      font-size: 18px;
+    }
+    .vol-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      padding: 3px 0;
+      color: var(--t2);
+    }
+    .vol-row b { font-family: var(--f-display); font-weight: 700; }
+
+    .days {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .day {
+      border: 1px solid var(--hairline);
+      border-radius: 12px;
+      overflow: hidden;
+      min-height: 168px;
+      position: relative;
+      background: transparent;
+    }
+    .day-h {
+      padding: 10px 12px 8px;
+      position: relative;
+      border-bottom: 1px solid var(--hairline);
+    }
+    .day-wd {
+      font-family: var(--f-mono);
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--t3);
+    }
+    .day-name {
+      font-family: var(--f-display);
+      font-weight: 700;
+      font-size: 13px;
+      margin-top: 2px;
+    }
+    .day-meta {
+      font-size: 10px;
+      color: var(--t3);
+      margin-top: 2px;
+    }
+    .ex {
+      padding: 8px 12px;
+      font-size: 12px;
+    }
+    .ex-row {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+    .badge {
+      font-family: var(--f-mono);
+      font-size: 9px;
+      font-weight: 600;
+      padding: 2px 5px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .ex-name { font-weight: 600; font-size: 12px; }
+    .ex-rx {
+      font-family: var(--f-mono);
+      font-size: 10px;
+      color: var(--t3);
+      margin-top: 1px;
+    }
+
+    .anno {
+      margin-top: 28px;
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 20px;
+    }
+    @media (max-width: 900px) {
+      .anno { grid-template-columns: 1fr; }
+    }
+    .anno-card {
+      border: 1px solid var(--hairline);
+      border-radius: 14px;
+      padding: 18px 20px;
+      background: var(--bg);
+    }
+    .anno-card h2 {
+      font-family: var(--f-display);
+      font-size: 16px;
+      font-weight: 800;
+      margin: 0 0 12px;
+    }
+    .anno-card ol, .anno-card ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--t2);
+      font-size: 13px;
+    }
+    .anno-card li { margin-bottom: 10px; }
+    .anno-card li strong { color: var(--t1); }
+    .anno-card .callout {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border-left: 3px solid var(--accent);
+      background: rgba(46, 123, 255, 0.08);
+      font-size: 13px;
+      color: var(--t2);
+    }
+    .anno-card .callout strong { color: var(--t1); }
+
+    /* ══════════════════════════════════════
+       BEFORE — current (saturated competition)
+       ══════════════════════════════════════ */
+    .before .builder::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 40% 30% at 12% 18%, rgba(46, 242, 198, 0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 35% 28% at 88% 22%, rgba(255, 138, 31, 0.10) 0%, transparent 58%);
+      /* exaggerated slightly so the “2 dull circles” read in the mock */
+    }
+
+    .before .block-bar {
+      position: relative;
+      border-radius: 12px;
+      padding: 14px 16px;
+      background: var(--teal);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.35),
+        0 0 28px rgba(46, 242, 198, 0.35);
+      overflow: hidden;
+    }
+    .before .block-bar::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.22), transparent 55%);
+      pointer-events: none;
+    }
+    .before .block-bar .bl {
+      position: relative;
+      font-family: var(--f-display);
+      font-weight: 800;
+      font-size: 15px;
+      color: #06241c; /* nearly lost in blaze */
+    }
+    .before .block-bar .bm {
+      position: relative;
+      font-family: var(--f-mono);
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(6, 36, 28, 0.55);
+      margin-top: 2px;
+    }
+
+    .before .wk.active {
+      background: color-mix(in srgb, var(--teal) 18%, transparent);
+      box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--teal) 70%, transparent);
+    }
+    .before .wk.active .n,
+    .before .wk.active .d { color: var(--teal); }
+
+    .before .vol {
+      background: linear-gradient(90deg, rgba(25, 227, 196, 0.16), rgba(25, 227, 196, 0.03) 48%, transparent);
+      border-color: color-mix(in srgb, var(--vol-cyan) 35%, transparent);
+    }
+    .before .vol-label { color: var(--vol-cyan); }
+    .before .vol-total { color: var(--vol-cyan); }
+    .before .vol-row b.ok { color: var(--green); }
+    .before .vol-row b.low { color: var(--amber); }
+
+    .before .day-h::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--teal) 38%, transparent) 0%,
+        color-mix(in srgb, var(--teal) 16%, transparent) 12%,
+        transparent 28%
+      );
+      pointer-events: none;
+    }
+    .before .day-name { color: var(--teal); }
+    .before .badge {
+      background: color-mix(in srgb, var(--teal) 28%, transparent);
+      color: var(--teal);
+    }
+    .before .ex-name { color: var(--t2); }
+
+    /* ══════════════════════════════════════
+       AFTER — hierarchy rebalance (still saturated)
+       ══════════════════════════════════════ */
+    .after .builder::before {
+      /* atmospheric blobs removed — noise, not signal */
+      content: none;
+    }
+
+    .after .block-bar {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      border-radius: 12px;
+      border: 1px solid color-mix(in srgb, var(--teal) 35%, transparent);
+      background:
+        linear-gradient(
+          90deg,
+          color-mix(in srgb, var(--teal) 22%, transparent) 0%,
+          color-mix(in srgb, var(--teal) 6%, transparent) 42%,
+          transparent 72%
+        ),
+        var(--well);
+      overflow: hidden;
+      box-shadow: none;
+    }
+    .after .block-rail {
+      width: 5px;
+      flex-shrink: 0;
+      background: var(--teal);
+      box-shadow: 0 0 16px color-mix(in srgb, var(--teal) 55%, transparent);
+    }
+    .after .block-body {
+      padding: 12px 14px;
+      flex: 1;
+      min-width: 0;
+    }
+    .after .block-bar .bl {
+      font-family: var(--f-display);
+      font-weight: 800;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+      color: var(--t1); /* TEXT leads */
+    }
+    .after .block-bar .bm {
+      font-family: var(--f-mono);
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--t3);
+      margin-top: 3px;
+    }
+    .after .block-chip {
+      display: inline-flex;
+      align-items: center;
+      margin-left: 8px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-family: var(--f-mono);
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #06241c;
+      background: var(--teal);
+      box-shadow: 0 0 12px color-mix(in srgb, var(--teal) 40%, transparent);
+      vertical-align: 2px;
+    }
+
+    .after .wk { color: var(--t2); }
+    .after .wk.active {
+      background: color-mix(in srgb, var(--teal) 10%, transparent);
+      box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--teal) 55%, transparent);
+    }
+    .after .wk.active .n { color: color-mix(in srgb, var(--teal) 75%, white); }
+    .after .wk.active .d { color: var(--t1); font-weight: 800; }
+    .after .wk:not(.active) .d { color: var(--t2); }
+
+    .after .vol {
+      background: transparent;
+      border-color: var(--hairline);
+    }
+    .after .vol-label { color: var(--t3); }
+    .after .vol-total { color: var(--t1); } /* number leads; not cyan chrome */
+    .after .vol-row b.ok { color: var(--green); }
+    .after .vol-row b.low { color: var(--amber); }
+
+    .after .day-h::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--teal) 18%, transparent) 0%,
+        transparent 18%
+      );
+      pointer-events: none;
+    }
+    .after .day-name { color: var(--t1); } /* text leads */
+    .after .badge {
+      background: color-mix(in srgb, var(--teal) 22%, transparent);
+      color: var(--teal); /* accent support only on chips */
+    }
+    .after .ex-name { color: var(--t1); }
+    .after .day.focus {
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--teal) 55%, transparent);
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 16px;
+      font-size: 12px;
+      color: var(--t3);
+    }
+    .legend i {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      margin-right: 6px;
+      vertical-align: -1px;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="doc-head">
+      <p class="eyebrow">Mockup only · no component changes · design-system v5</p>
+      <h1>Program builder — hierarchy rebalance</h1>
+      <p>
+        Goal: keep the saturated sports-broadcast identity, but stop color from competing with the
+        content the coach actually reads and edits. Text leads. Color supports.
+        This is <em>not</em> a mute / flatten / beige pass.
+      </p>
+      <div class="pill-row">
+        <span class="pill ok">Keep saturation &amp; energy</span>
+        <span class="pill ok">Text-first hierarchy</span>
+        <span class="pill warn">Not a desaturation pass</span>
+        <span class="pill">Tokens: #2EF2C6 · #2E7BFF · #22E56A</span>
+      </div>
+    </header>
+
+    <div class="compare">
+      <!-- ════════ BEFORE ════════ -->
+      <section class="panel before" aria-label="Current builder">
+        <div class="panel-label">
+          <strong>BEFORE — current</strong>
+          <span class="tag">Color overwhelms</span>
+        </div>
+        <div class="builder">
+          <div class="topbar">
+            <div class="prog-name">Hypertrophy Block A</div>
+            <button type="button" class="save">Save</button>
+          </div>
+
+          <!-- Full saturated glossy phase bar — label nearly lost -->
+          <div class="block-bar">
+            <div class="bl">Block 1</div>
+            <div class="bm">Foundation · 4 weeks · Aug 3 – Aug 30</div>
+          </div>
+
+          <div class="weeks">
+            <div class="wk active"><div class="n">Wk 1</div><div class="d">Aug 3</div></div>
+            <div class="wk"><div class="n">Wk 2</div><div class="d">Aug 10</div></div>
+            <div class="wk"><div class="n">Wk 3</div><div class="d">Aug 17</div></div>
+            <div class="wk"><div class="n">Wk 4</div><div class="d">Aug 24</div></div>
+          </div>
+
+          <div class="vol">
+            <div class="vol-head">
+              <span class="vol-label">Weekly volume</span>
+              <span class="vol-total">48</span>
+            </div>
+            <div class="vol-row"><span>Chest</span><b class="ok">14</b></div>
+            <div class="vol-row"><span>Back</span><b class="ok">16</b></div>
+            <div class="vol-row"><span>Quads</span><b class="low">8</b></div>
+          </div>
+
+          <div class="days">
+            <div class="day">
+              <div class="day-h">
+                <div class="day-wd">Mon</div>
+                <div class="day-name">Lower Power</div>
+                <div class="day-meta">Day 1 · 4 exercises</div>
+              </div>
+              <div class="ex">
+                <div class="ex-row">
+                  <span class="badge">A</span>
+                  <div>
+                    <div class="ex-name">Back Squat</div>
+                    <div class="ex-rx">4×5 · RPE 8</div>
+                  </div>
+                </div>
+                <div class="ex-row">
+                  <span class="badge">B</span>
+                  <div>
+                    <div class="ex-name">RDL</div>
+                    <div class="ex-rx">3×8 · Load</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="day">
+              <div class="day-h">
+                <div class="day-wd">Tue</div>
+                <div class="day-name">Push Day</div>
+                <div class="day-meta">Day 2 · 5 exercises</div>
+              </div>
+              <div class="ex">
+                <div class="ex-row">
+                  <span class="badge">A</span>
+                  <div>
+                    <div class="ex-name">Bench Press</div>
+                    <div class="ex-rx">4×6 · RPE 7.5</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="day">
+              <div class="day-h">
+                <div class="day-wd">Wed</div>
+                <div class="day-name">Mon workout</div>
+                <div class="day-meta">Day 3 · Rest</div>
+              </div>
+              <div class="ex" style="color:var(--t3);font-size:11px;padding-top:16px;">Rest day</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ════════ AFTER ════════ -->
+      <section class="panel after" aria-label="Rebalanced builder">
+        <div class="panel-label">
+          <strong>AFTER — rebalanced</strong>
+          <span class="tag">Text leads · color supports</span>
+        </div>
+        <div class="builder">
+          <div class="topbar">
+            <div class="prog-name">Hypertrophy Block A</div>
+            <button type="button" class="save">Save</button>
+          </div>
+
+          <!-- Contained block identity: saturated rail + chip; name in white text -->
+          <div class="block-bar">
+            <div class="block-rail" aria-hidden="true"></div>
+            <div class="block-body">
+              <div class="bl">
+                Block 1
+                <span class="block-chip">Teal</span>
+              </div>
+              <div class="bm">Foundation · 4 weeks · Aug 3 – Aug 30</div>
+            </div>
+          </div>
+
+          <div class="weeks">
+            <div class="wk active"><div class="n">Wk 1</div><div class="d">Aug 3</div></div>
+            <div class="wk"><div class="n">Wk 2</div><div class="d">Aug 10</div></div>
+            <div class="wk"><div class="n">Wk 3</div><div class="d">Aug 17</div></div>
+            <div class="wk"><div class="n">Wk 4</div><div class="d">Aug 24</div></div>
+          </div>
+
+          <div class="vol">
+            <div class="vol-head">
+              <span class="vol-label">Weekly volume</span>
+              <span class="vol-total">48</span>
+            </div>
+            <div class="vol-row"><span>Chest</span><b class="ok">14</b></div>
+            <div class="vol-row"><span>Back</span><b class="ok">16</b></div>
+            <div class="vol-row"><span>Quads</span><b class="low">8</b></div>
+          </div>
+
+          <div class="days">
+            <div class="day focus">
+              <div class="day-h">
+                <div class="day-wd">Mon</div>
+                <div class="day-name">Lower Power</div>
+                <div class="day-meta">Day 1 · 4 exercises</div>
+              </div>
+              <div class="ex">
+                <div class="ex-row">
+                  <span class="badge">A</span>
+                  <div>
+                    <div class="ex-name">Back Squat</div>
+                    <div class="ex-rx">4×5 · RPE 8</div>
+                  </div>
+                </div>
+                <div class="ex-row">
+                  <span class="badge">B</span>
+                  <div>
+                    <div class="ex-name">RDL</div>
+                    <div class="ex-rx">3×8 · Load</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="day">
+              <div class="day-h">
+                <div class="day-wd">Tue</div>
+                <div class="day-name">Push Day</div>
+                <div class="day-meta">Day 2 · 5 exercises</div>
+              </div>
+              <div class="ex">
+                <div class="ex-row">
+                  <span class="badge">A</span>
+                  <div>
+                    <div class="ex-name">Bench Press</div>
+                    <div class="ex-rx">4×6 · RPE 7.5</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="day">
+              <div class="day-h">
+                <div class="day-wd">Wed</div>
+                <div class="day-name">Rest</div>
+                <div class="day-meta">Day 3</div>
+              </div>
+              <div class="ex" style="color:var(--t3);font-size:11px;padding-top:16px;">Rest day</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="legend">
+      <span><i style="background:var(--teal)"></i>Block identity #2EF2C6 (kept)</span>
+      <span><i style="background:var(--accent)"></i>Save CTA #2E7BFF (kept glossy)</span>
+      <span><i style="background:var(--green)"></i>Volume OK / commit green</span>
+      <span><i style="background:var(--amber)"></i>Volume low (status only)</span>
+    </div>
+
+    <div class="anno">
+      <div class="anno-card">
+        <h2>What changed &amp; why</h2>
+        <ol>
+          <li>
+            <strong>Block 1 bar — full blaze → rail + wash + text.</strong>
+            Current: solid glossy <code>#2EF2C6</code> fill with near-black label (label lost in brightness).
+            After: same saturated teal as a <em>5px glowing rail</em> + soft wash (coach status-row pattern from v5),
+            plus a small solid teal chip. The name “Block 1” is large white display type — it <em>reads</em>.
+            Saturation stays; it no longer fills half the viewport as a light source.
+          </li>
+          <li>
+            <strong>Fewer simultaneous cyans.</strong>
+            Before: phase bar + active week + volume chrome (#19e3c4) + day-name teal + letter badges
+            all shout at once. After: teal is reserved for <em>block identity</em>, <em>selected week ring</em>,
+            and <em>letter badges</em>. Day names, volume total, exercise names go to primary text white.
+          </li>
+          <li>
+            <strong>Volume numbers lead; chrome steps back.</strong>
+            Drop the cyan gradient header / cyan total. Keep status colors on per-muscle counts
+            (green OK / amber low) — those earn attention. The “48” is a display number in white, not another teal beacon.
+          </li>
+          <li>
+            <strong>Day columns: accent supports, names lead.</strong>
+            Softer left wash; day title in white (not teal). Letter chips keep saturated teal —
+            small, high-signal accents, not competing headlines.
+          </li>
+          <li>
+            <strong>“2 dull circles” identified &amp; removed in After.</strong>
+            They are <em>not</em> status indicators — atmospheric radials on
+            <code>stationEditor.module.css</code> <code>.root::before</code>
+            (left teal ~4%, right orange ~3.5%). Visual noise that adds cool/warm blobs behind the UI.
+            After panel drops them so the workspace stays immersive without fake “orbs.”
+          </li>
+          <li>
+            <strong>Save CTA unchanged</strong> — glossy blue with glow. Energy lives on the action that commits work,
+            not on every chrome surface.
+          </li>
+        </ol>
+        <div class="callout">
+          <strong>Not muted:</strong> teal rail still glows, active week still rings teal, badges stay aqua,
+          Save stays electric blue, volume status stays green/amber. Hierarchy changed — saturation did not leave the building.
+        </div>
+      </div>
+
+      <div class="anno-card">
+        <h2>Map to shipped code (for when we build)</h2>
+        <ul>
+          <li>
+            <strong>PeriodizationRibbon</strong> —
+            <code>periodizationRibbon.module.css</code> + <code>RIBBON_RAMP</code> full fill →
+            rail + wash treatment (multi-block ramp can stay on rails/chips).
+          </li>
+          <li>
+            <strong>Week dock</strong> (inside ribbon) — keep active ring; quiet inactive labels
+            (date in primary text when selected).
+          </li>
+          <li>
+            <strong>ProgramVolumeRail</strong> — retire hard-coded <code>#19e3c4</code> chrome on
+            label/total/header gradient; keep <code>.ok</code> / <code>.low</code> / <code>.over</code> on counts.
+          </li>
+          <li>
+            <strong>sessionColumns</strong> — soften <code>.header::before</code> wash; day name uses text primary
+            (editable name already added).
+          </li>
+          <li>
+            <strong>stationEditor .root::before</strong> — remove or zero the cyan/orange atmospheric radials.
+          </li>
+        </ul>
+        <div class="callout">
+          This file is review-only. <strong>No real components were modified.</strong>
+          Approve direction → then we implement against these surfaces.
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
