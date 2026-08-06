@@ -5,11 +5,12 @@ import {
   DragDropContext,
   Draggable,
   Droppable,
+  type DraggableProvided,
   type DropResult,
 } from '@hello-pangea/dnd'
 import type { CanvasAction } from '@/lib/groupModel/canvasActions'
 import { applyCanvasAction } from '@/lib/groupModel/canvasActions'
-import type { CanvasWorkout } from '@/lib/groupModel/canvasTypes'
+import type { CanvasExercise, CanvasGroup, CanvasWorkout } from '@/lib/groupModel/canvasTypes'
 import type { ExerciseLibraryItem } from '@/hooks/useExerciseLibrary'
 import { groupColorIndex } from '@/lib/groupModel/canvasTypes'
 import type { Measurement, SlotProperty } from '@/lib/groupModel/types'
@@ -22,6 +23,121 @@ import { FillRampChip } from '@/components/coach/programs/station/FillToolEntryC
 import { cn } from '@/lib/utils'
 
 const GROUP_HINT_KEY = 'canvas-coach-created-group'
+
+function getCloneContainer(): HTMLElement {
+  return document.body
+}
+
+function DragCloneShell({
+  provided,
+  children,
+  borderLeft,
+}: {
+  provided: DraggableProvided
+  children: React.ReactNode
+  borderLeft?: string
+}) {
+  return (
+    <div
+      ref={provided.innerRef}
+      {...provided.draggableProps}
+      {...provided.dragHandleProps}
+      className="rounded-md py-3 px-3 shadow-2xl"
+      style={{
+        ...provided.draggableProps.style,
+        background: CANVAS.bg,
+        color: CANVAS.text,
+        border: `1px solid ${CANVAS.hairline}`,
+        borderLeft: borderLeft ?? `1px solid ${CANVAS.hairline}`,
+        maxWidth: 420,
+        boxSizing: 'border-box',
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
+function GroupDragClone({
+  provided,
+  group,
+  groupIndex,
+  chipFill,
+  chipText,
+}: {
+  provided: DraggableProvided
+  group: CanvasGroup
+  groupIndex: number
+  chipFill: (c: string) => string
+  chipText?: string
+}) {
+  const color = CANVAS.groupColors[groupColorIndex(groupIndex)]
+  const isMulti = group.slots.length > 1
+  const names = group.slots.map((s) => s.exercise?.name ?? 'Exercise').join(' · ')
+  return (
+    <DragCloneShell
+      provided={provided}
+      borderLeft={isMulti ? `2px solid ${color}` : undefined}
+    >
+      <div className="flex items-center gap-2">
+        <span
+          data-group-letter
+          className="text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0"
+          style={{ background: chipFill(color), color: chipText ?? color }}
+        >
+          {groupLetter(groupIndex)}
+        </span>
+        <div className="min-w-0">
+          <div className="font-medium truncate text-sm">{names || 'Group'}</div>
+          <div className="text-xs font-mono mt-0.5 truncate" style={{ color: CANVAS.muted }}>
+            {formatGroupMetaLabel(group)}
+          </div>
+        </div>
+      </div>
+    </DragCloneShell>
+  )
+}
+
+function SlotDragClone({
+  provided,
+  slot,
+  group,
+  groupIndex,
+  slotIndex,
+  chipFill,
+  chipText,
+}: {
+  provided: DraggableProvided
+  slot: CanvasExercise
+  group: CanvasGroup
+  groupIndex: number
+  slotIndex: number
+  chipFill: (c: string) => string
+  chipText?: string
+}) {
+  const color = CANVAS.groupColors[groupColorIndex(groupIndex)]
+  return (
+    <DragCloneShell provided={provided}>
+      <div className="flex items-center gap-2">
+        <span
+          data-group-letter
+          className="text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0"
+          style={{ background: chipFill(color), color: chipText ?? color }}
+        >
+          {slotLetter(groupIndex, slotIndex, group.slots.length)}
+        </span>
+        <div className="min-w-0">
+          <div className="font-medium truncate text-sm">
+            {slot.exercise?.name ?? 'Exercise'}
+          </div>
+          <div className="text-xs font-mono mt-0.5 truncate" style={{ color: CANVAS.muted }}>
+            {formatExerciseSummary(slot, group)}
+          </div>
+        </div>
+      </div>
+    </DragCloneShell>
+  )
+}
 
 export interface WorkoutCanvasProps {
   workout: CanvasWorkout
@@ -77,6 +193,10 @@ export function WorkoutCanvas({
   const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set())
   const [addExerciseOpen, setAddExerciseOpen] = useState(false)
   const [addToGroupId, setAddToGroupId] = useState<string | null>(null)
+  const [replaceTarget, setReplaceTarget] = useState<{
+    groupId: string
+    slotId: string
+  } | null>(null)
   const [exerciseQuery, setExerciseQuery] = useState('')
   const [groupMetaOpen, setGroupMetaOpen] = useState<string | null>(null)
   const [groupMenuOpen, setGroupMenuOpen] = useState<string | null>(null)
@@ -195,11 +315,44 @@ export function WorkoutCanvas({
     setExerciseQuery('')
   }
 
+  const handleReplaceExercise = (exerciseId: string) => {
+    if (!replaceTarget) return
+    const exercise = availableExercises.find((e) => e.id === exerciseId)
+    dispatch({
+      type: 'REPLACE_EXERCISE',
+      groupId: replaceTarget.groupId,
+      slotId: replaceTarget.slotId,
+      exerciseId,
+      exercise: exercise ?? { id: exerciseId, name: 'Exercise' },
+    })
+    setReplaceTarget(null)
+    setExerciseQuery('')
+  }
+
+  const openReplacePicker = (groupId: string, slotId: string) => {
+    setSlotMenuOpen(null)
+    setAddExerciseOpen(false)
+    setAddToGroupId(null)
+    setReplaceTarget({ groupId, slotId })
+    setExerciseQuery('')
+    setExpandedSlots((prev) => {
+      const next = new Set(prev)
+      next.add(slotId)
+      return next
+    })
+  }
+
+  const closeReplacePicker = () => {
+    setReplaceTarget(null)
+    setExerciseQuery('')
+  }
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       if (e.key === 'n' || e.key === 'N') {
         e.preventDefault()
+        setReplaceTarget(null)
         setAddExerciseOpen(true)
         setAddToGroupId(null)
       }
@@ -212,46 +365,82 @@ export function WorkoutCanvas({
     return () => window.removeEventListener('keydown', onKey)
   })
 
-  const renderExerciseSearch = (groupId: string | null, onClose: () => void) => (
-    <div className="relative max-w-xl mt-2">
-      <input
-        autoFocus
-        placeholder="Search exercises…"
-        value={exerciseQuery}
-        onChange={(e) => setExerciseQuery(e.target.value)}
-        className="w-full px-3 py-2 rounded-lg text-sm outline-none font-mono"
-        style={{
-          background: CANVAS.surface,
-          border: `1px solid ${CANVAS.hairline}`,
-          color: CANVAS.text,
-        }}
-      />
-      {(exerciseQuery || filteredExercises.length > 0) && (
-        <ul
-          className="absolute z-20 mt-1 w-full max-h-48 overflow-auto rounded-lg shadow-xl"
+  const renderExerciseSearch = (
+    groupId: string | null,
+    onClose: () => void,
+    options?: { replaceSlotId?: string },
+  ) => {
+    const replaceSlotId = options?.replaceSlotId
+    const isReplace = Boolean(replaceSlotId && groupId)
+    const group = groupId ? workout.groups.find((g) => g.id === groupId) : null
+    const takenIds = new Set(
+      (group?.slots ?? [])
+        .filter((s) => s.id !== replaceSlotId)
+        .map((s) => s.exercise_id),
+    )
+
+    return (
+      <div className="relative max-w-xl mt-2">
+        <input
+          autoFocus
+          placeholder={isReplace ? 'Replace with…' : 'Search exercises…'}
+          value={exerciseQuery}
+          onChange={(e) => setExerciseQuery(e.target.value)}
+          className="w-full px-3 py-2 rounded-lg text-sm outline-none font-mono"
           style={{
-            background: CANVAS.menuSurface,
+            background: CANVAS.surface,
             border: `1px solid ${CANVAS.hairline}`,
+            color: CANVAS.text,
           }}
+        />
+        {(exerciseQuery || filteredExercises.length > 0) && (
+          <ul
+            className="absolute z-20 mt-1 w-full max-h-48 overflow-auto rounded-lg shadow-xl"
+            style={{
+              background: CANVAS.menuSurface,
+              border: `1px solid ${CANVAS.hairline}`,
+            }}
+          >
+            {filteredExercises.map((ex) => {
+              const taken = takenIds.has(ex.id)
+              return (
+                <li key={ex.id}>
+                  <button
+                    type="button"
+                    disabled={taken}
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                    onClick={() => {
+                      if (taken) return
+                      if (isReplace && groupId && replaceSlotId) {
+                        handleReplaceExercise(ex.id)
+                      } else {
+                        handleAddExercise(ex.id, groupId)
+                      }
+                    }}
+                  >
+                    {ex.name}
+                    {taken ? (
+                      <span className="ml-2 text-[10px]" style={{ color: CANVAS.muted }}>
+                        already in group
+                      </span>
+                    ) : null}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+        <button
+          type="button"
+          className="mt-2 text-xs"
+          style={{ color: CANVAS.muted }}
+          onClick={onClose}
         >
-          {filteredExercises.map((ex) => (
-            <li key={ex.id}>
-              <button
-                type="button"
-                className="w-full px-3 py-2 text-left text-sm hover:bg-white/5"
-                onClick={() => handleAddExercise(ex.id, groupId)}
-              >
-                {ex.name}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <button type="button" className="mt-2 text-xs" style={{ color: CANVAS.muted }} onClick={onClose}>
-        Cancel
-      </button>
-    </div>
-  )
+          Cancel
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div
@@ -260,7 +449,27 @@ export function WorkoutCanvas({
       style={{ background: surfaceBg, color: CANVAS.text }}
     >
       <DragDropContext onDragEnd={handleDragEnd}>
-        <Droppable droppableId="groups" type="group">
+        <Droppable
+          droppableId="groups"
+          type="group"
+          getContainerForClone={getCloneContainer}
+          renderClone={(provided, _snapshot, rubric) => {
+            const groupIndex = rubric.source.index
+            const group =
+              workout.groups.find((g) => g.id === rubric.draggableId) ??
+              workout.groups[groupIndex]
+            if (!group) return null
+            return (
+              <GroupDragClone
+                provided={provided}
+                group={group}
+                groupIndex={groupIndex}
+                chipFill={chipFill}
+                chipText={chipText}
+              />
+            )
+          }}
+        >
           {(provided) => (
             <div ref={provided.innerRef} {...provided.droppableProps} className={isStation ? 'space-y-6 px-2 py-4' : 'space-y-8 px-4 py-6'}>
               {workout.groups.map((group, groupIndex) => {
@@ -456,7 +665,32 @@ export function WorkoutCanvas({
                             </div>
                           </CanvasFloatingMenu>
 
-                          <Droppable droppableId={`slots-${group.id}`} type="slot">
+                          <Droppable
+                            droppableId={`slots-${group.id}`}
+                            type="slot"
+                            getContainerForClone={getCloneContainer}
+                            renderClone={(provided, _snapshot, rubric) => {
+                              const slot =
+                                group.slots.find((s) => s.id === rubric.draggableId) ??
+                                group.slots[rubric.source.index]
+                              if (!slot) return null
+                              const slotIndex = Math.max(
+                                0,
+                                group.slots.findIndex((s) => s.id === slot.id),
+                              )
+                              return (
+                                <SlotDragClone
+                                  provided={provided}
+                                  slot={slot}
+                                  group={group}
+                                  groupIndex={groupIndex}
+                                  slotIndex={slotIndex}
+                                  chipFill={chipFill}
+                                  chipText={chipText}
+                                />
+                              )
+                            }}
+                          >
                             {(slotProvided) => (
                               <div ref={slotProvided.innerRef} {...slotProvided.droppableProps} className="space-y-0">
                                 {group.slots.map((slot, slotIndex) => (
@@ -470,6 +704,7 @@ export function WorkoutCanvas({
                                           isStation && 'relative',
                                         )}
                                         style={{
+                                          ...slotDrag.draggableProps.style,
                                           borderTop: `1px solid ${hairline}`,
                                           background: isGroupSelected && isMulti ? `${color}0A` : undefined,
                                         }}
@@ -537,6 +772,12 @@ export function WorkoutCanvas({
                                                 {formatExerciseSummary(slot, group)}
                                               </div>
                                             </button>
+                                            {replaceTarget?.slotId === slot.id &&
+                                            replaceTarget.groupId === group.id
+                                              ? renderExerciseSearch(group.id, closeReplacePicker, {
+                                                  replaceSlotId: slot.id,
+                                                })
+                                              : null}
                                             {expandedSlots.has(slot.id) && (
                                               <PrescriptionTable
                                                 slot={slot}
@@ -650,6 +891,11 @@ export function WorkoutCanvas({
                                               </CanvasMenuItem>
                                             )}
                                             <CanvasMenuItem
+                                              onClick={() => openReplacePicker(group.id, slot.id)}
+                                            >
+                                              Replace exercise…
+                                            </CanvasMenuItem>
+                                            <CanvasMenuItem
                                               onClick={() => {
                                                 dispatch({
                                                   type: 'DELETE_SLOT',
@@ -725,6 +971,11 @@ export function WorkoutCanvas({
                                                 </CanvasMenuItem>
                                               )}
                                               <CanvasMenuItem
+                                                onClick={() => openReplacePicker(group.id, slot.id)}
+                                              >
+                                                Replace exercise…
+                                              </CanvasMenuItem>
+                                              <CanvasMenuItem
                                                 onClick={() => {
                                                   dispatch({
                                                     type: 'DELETE_SLOT',
@@ -758,6 +1009,7 @@ export function WorkoutCanvas({
                                         className="text-xs"
                                         style={{ color: CANVAS.cyan }}
                                         onClick={() => {
+                                          setReplaceTarget(null)
                                           setAddToGroupId(group.id)
                                           setAddExerciseOpen(false)
                                           setExerciseQuery('')
@@ -789,6 +1041,7 @@ export function WorkoutCanvas({
             <button
               type="button"
               onClick={() => {
+                setReplaceTarget(null)
                 setAddExerciseOpen(true)
                 setAddToGroupId(null)
               }}

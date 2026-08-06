@@ -524,7 +524,12 @@
   }
 }
 
-/* Page transition: subtle fade-in on content changes */
+/*
+ * Page transition: opacity-only fade-in.
+ * Do NOT use transform here — animation-fill-mode would leave a persistent
+ * transform on <main>, which makes position:fixed descendants (dnd ghosts,
+ * non-portaled modals) position relative to main instead of the viewport.
+ */
 .fc-page-transition {
   animation: fc-page-enter 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -532,11 +537,9 @@
 @keyframes fc-page-enter {
   from {
     opacity: 0.85;
-    transform: translateY(4px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 

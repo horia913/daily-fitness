@@ -96,9 +96,6 @@ function PrescriptionTable({
             {slot.enabledProperties.includes('tempo') && (
               <th className="text-left py-1 pr-3 font-normal w-[100px]">Tempo</th>
             )}
-            {slot.enabledProperties.includes('rest_after_exercise') && (
-              <th className="text-left py-1 pr-3 font-normal w-[80px]">Rest (s)</th>
-            )}
             {slot.technique === 'drop_set' && (
               <th className="text-left py-1 pr-3 font-normal w-[80px]">Drop %</th>
             )}
@@ -120,7 +117,7 @@ function PrescriptionTable({
         <tbody>
           {[...slot.prescriptions]
             .sort((a, b) => a.set_number - b.set_number)
-            .map((row, rowIndex) => (
+            .map((row) => (
               <tr key={row.id ?? row.set_number} style={{ borderTop: `1px solid ${CANVAS.hairline}` }}>
                 <td className="py-2 pr-2 font-mono w-[34px]">{row.set_number}</td>
                 <td className="py-2 pr-3 w-[120px]">
@@ -220,22 +217,6 @@ function PrescriptionTable({
                     />
                   </td>
                 )}
-                {slot.enabledProperties.includes('rest_after_exercise') && rowIndex === 0 && (
-                  <td className="py-2 pr-3 align-top" rowSpan={slot.prescriptions.length}>
-                    <input
-                      type="number"
-                      min={0}
-                      className="w-14 bg-transparent border-b outline-none font-mono"
-                      style={{ borderColor: CANVAS.hairline }}
-                      value={slot.rest_seconds ?? ''}
-                      onChange={(e) =>
-                        onUpdateSlot({
-                          rest_seconds: e.target.value ? Number(e.target.value) : null,
-                        })
-                      }
-                    />
-                  </td>
-                )}
                 {slot.technique === 'cluster' && (
                   <td className="py-2 pr-3">
                     <input
@@ -327,6 +308,33 @@ function PrescriptionTable({
             ))}
         </tbody>
       </table>
+      {slot.enabledProperties.includes('rest_after_exercise') && (
+        <div className="mt-3 flex items-baseline gap-2 text-sm" style={{ color: CANVAS.text }}>
+          <label
+            htmlFor={`rest-all-sets-${slot.id}`}
+            className="text-xs shrink-0"
+            style={{ color: CANVAS.muted }}
+          >
+            Rest (all sets)
+          </label>
+          <input
+            id={`rest-all-sets-${slot.id}`}
+            type="number"
+            min={0}
+            className="w-14 bg-transparent border-b outline-none font-mono tabular-nums"
+            style={{ borderColor: CANVAS.hairline, color: CANVAS.text }}
+            value={slot.rest_seconds ?? ''}
+            onChange={(e) =>
+              onUpdateSlot({
+                rest_seconds: e.target.value ? Number(e.target.value) : null,
+              })
+            }
+          />
+          <span className="text-xs" style={{ color: CANVAS.muted }}>
+            s
+          </span>
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-3 mt-3">
         {canAddSet && (
           <button type="button" onClick={onAddSet} className="text-xs" style={{ color: CANVAS.cyan }}>

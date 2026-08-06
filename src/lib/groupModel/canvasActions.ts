@@ -25,6 +25,13 @@ export type CanvasAction =
   | { type: 'UNGROUP'; groupId: string }
   | { type: 'REMOVE_FROM_GROUP'; groupId: string; slotId: string }
   | { type: 'DELETE_SLOT'; groupId: string; slotId: string }
+  | {
+      type: 'REPLACE_EXERCISE'
+      groupId: string
+      slotId: string
+      exerciseId: string
+      exercise: CanvasExercise['exercise']
+    }
   | { type: 'DUPLICATE_SLOT'; groupId: string; slotId: string }
   | { type: 'ADD_SET'; groupId: string }
   | { type: 'REMOVE_SET'; groupId: string; setNumber: number }
@@ -272,6 +279,35 @@ export function applyCanvasAction(workout: CanvasWorkout, action: CanvasAction):
       return {
         ok: true,
         workout: mapGroup(workout, action.groupId, (g) => ({ ...g, slots })),
+      }
+    }
+
+    case 'REPLACE_EXERCISE': {
+      const group = findGroup(workout, action.groupId)
+      if (!group) return { ok: false, error: 'Group not found.' }
+      const slot = group.slots.find((s) => s.id === action.slotId)
+      if (!slot) return { ok: false, error: 'Exercise not found.' }
+      if (
+        group.slots.some(
+          (s) => s.id !== action.slotId && s.exercise_id === action.exerciseId,
+        )
+      ) {
+        return { ok: false, error: 'That exercise is already in this group.' }
+      }
+      return {
+        ok: true,
+        workout: mapGroup(workout, action.groupId, (g) => ({
+          ...g,
+          slots: g.slots.map((s) =>
+            s.id === action.slotId
+              ? {
+                  ...s,
+                  exercise_id: action.exerciseId,
+                  exercise: action.exercise ?? { id: action.exerciseId, name: 'Exercise' },
+                }
+              : s,
+          ),
+        })),
       }
     }
 
