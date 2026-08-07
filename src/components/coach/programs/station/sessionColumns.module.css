@@ -18,6 +18,68 @@
   min-width: 0;
 }
 
+.weekHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.weekActionsBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 8px;
+  color: var(--fill-entry-accent, var(--fc-accent));
+  background: color-mix(in srgb, var(--fill-entry-accent, var(--fc-accent)) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fill-entry-accent, var(--fc-accent)) 28%, transparent);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.weekActionsBtn:hover {
+  background: color-mix(in srgb, var(--fill-entry-accent, var(--fc-accent)) 18%, transparent);
+  border-color: color-mix(in srgb, var(--fill-entry-accent, var(--fc-accent)) 42%, transparent);
+}
+
+.weekActionsMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  min-width: 220px;
+  border-radius: 11px;
+  padding: 4px;
+  background: var(--pe-card-2, var(--fc-surface-card));
+  border: 1px solid var(--pe-line, var(--fc-glass-border));
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65);
+}
+
+.weekActionsItem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+  padding: 8px;
+  text-align: left;
+  font-size: 12px;
+  color: var(--pe-t1, var(--fc-text-dim));
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.weekActionsItem:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
 .hint {
   font-size: 10px;
   color: var(--fc-text-subtle);

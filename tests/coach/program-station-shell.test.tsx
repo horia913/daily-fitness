@@ -180,7 +180,6 @@ describe('PeriodizationRibbon', () => {
         onDeleteBlock={noop}
         onMoveBlock={noop}
         onDuplicateBlock={noop}
-        onDuplicateWeek={noop}
         onAddWeek={noop}
       />,
     )
@@ -188,32 +187,7 @@ describe('PeriodizationRibbon', () => {
     expect(screen.getByTestId('ribbon-bar')).toBeInTheDocument()
     expect(screen.getByTestId('week-strip')).toBeInTheDocument()
     expect(screen.getByTestId('ribbon-block-b1')).toBeInTheDocument()
-  })
-
-  test('duplicate week button invokes handler from active week menu', () => {
-    const onDuplicateWeek = jest.fn()
-    const blocks = [block('b1', 4, 1)]
-    render(
-      <PeriodizationRibbon
-        programName="Test"
-        onProgramNameChange={jest.fn()}
-        trainingBlocks={blocks}
-        activeBlockId="b1"
-        relativeWeek={1}
-        onSelectBlock={jest.fn()}
-        onSelectBlockWeek={jest.fn()}
-        onAddBlock={jest.fn()}
-        onEditBlock={jest.fn()}
-        onDeleteBlock={jest.fn()}
-        onMoveBlock={jest.fn()}
-        onDuplicateBlock={jest.fn()}
-        onDuplicateWeek={onDuplicateWeek}
-        onAddWeek={jest.fn()}
-      />,
-    )
-    fireEvent.click(screen.getByTestId('week-kebab-b1-1'))
-    fireEvent.click(screen.getByTestId('duplicate-week'))
-    expect(onDuplicateWeek).toHaveBeenCalledWith(blocks[0], 1)
+    expect(screen.queryByTestId('week-kebab-b1-1')).not.toBeInTheDocument()
   })
 
   test('per-block add week button invokes handler', () => {
@@ -232,7 +206,6 @@ describe('PeriodizationRibbon', () => {
         onDeleteBlock={jest.fn()}
         onMoveBlock={jest.fn()}
         onDuplicateBlock={jest.fn()}
-        onDuplicateWeek={jest.fn()}
         onAddWeek={onAddWeek}
       />,
     )

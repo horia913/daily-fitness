@@ -7,7 +7,7 @@ import {
   Droppable,
   type DropResult,
 } from '@hello-pangea/dnd'
-import { GripVertical } from 'lucide-react'
+import { GripVertical, Copy, MoreHorizontal } from 'lucide-react'
 import type { DaySlotSummary } from '@/lib/programs/stationScheduleUtils'
 import { programDayLabel } from '@/lib/programs/stationScheduleUtils'
 import { useProgramDraft } from '@/contexts/ProgramDraftContext'
@@ -28,6 +28,10 @@ export interface SessionColumnsRowProps {
   blockAccentColor: string
   /** Progress the currently viewed week (same absolute week as this sessions row). */
   onProgressWeek?: (absoluteWeek: number) => void
+  /** Duplicate current week across all weeks in its phase. */
+  onDuplicateWeek?: () => void
+  /** Open targeted copy picker for the current week. */
+  onRequestCopyWeek?: () => void
 }
 
 type PendingAction =
@@ -52,15 +56,34 @@ export function SessionColumnsRow({
   activeBlockId,
   blockAccentColor,
   onProgressWeek,
+  onDuplicateWeek,
+  onRequestCopyWeek,
 }: SessionColumnsRowProps) {
   const draft = useProgramDraft()
   const { addToast } = useToast()
   const [pendingReplace, setPendingReplace] = useState<PendingAction>(null)
   const [picker, setPicker] = useState<PickerMode>(null)
+  const [weekMenuOpen, setWeekMenuOpen] = useState(false)
 
   useEffect(() => {
     setPicker(null)
+    setWeekMenuOpen(false)
   }, [absoluteWeek])
+
+  useEffect(() => {
+    if (!weekMenuOpen) return
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as Node
+      const root = document.getElementById('session-week-actions-menu')
+      const trigger = document.getElementById('session-week-actions-trigger')
+      if (root?.contains(t) || trigger?.contains(t)) return
+      setWeekMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [weekMenuOpen])
+
+  const showWeekActions = Boolean(onDuplicateWeek || onRequestCopyWeek)
 
   const targetOccupied = useCallback(
     (week: number, day: number) => {
@@ -157,12 +180,75 @@ export function SessionColumnsRow({
             >
               Week {absoluteWeek} · Sessions
             </h2>
-            {onProgressWeek ? (
-              <FillProgressionButton
-                onClick={() => onProgressWeek(absoluteWeek)}
-                accentColor={blockAccentColor}
-              />
-            ) : null}
+            <div
+              className={columnCss.weekHeaderActions}
+              style={
+                blockAccentColor
+                  ? ({ '--fill-entry-accent': blockAccentColor } as CSSProperties)
+                  : undefined
+              }
+            >
+              {onProgressWeek ? (
+                <FillProgressionButton
+                  onClick={() => onProgressWeek(absoluteWeek)}
+                  accentColor={blockAccentColor}
+                />
+              ) : null}
+              {showWeekActions ? (
+                <>
+                  <button
+                    id="session-week-actions-trigger"
+                    type="button"
+                    className={columnCss.weekActionsBtn}
+                    aria-label="Week actions"
+                    aria-expanded={weekMenuOpen}
+                    data-testid="session-week-actions"
+                    onClick={() => setWeekMenuOpen((v) => !v)}
+                  >
+                    <MoreHorizontal className="h-3.5 w-3.5" />
+                  </button>
+                  {weekMenuOpen ? (
+                    <div
+                      id="session-week-actions-menu"
+                      role="menu"
+                      className={columnCss.weekActionsMenu}
+                      data-testid="session-week-actions-menu"
+                    >
+                      {onRequestCopyWeek ? (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          data-testid="copy-week-to"
+                          className={columnCss.weekActionsItem}
+                          onClick={() => {
+                            setWeekMenuOpen(false)
+                            onRequestCopyWeek()
+                          }}
+                        >
+                          <Copy className="h-3 w-3" />
+                          Copy to week…
+                        </button>
+                      ) : null}
+                      {onDuplicateWeek ? (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          data-testid="duplicate-week"
+                          className={columnCss.weekActionsItem}
+                          onClick={() => {
+                            setWeekMenuOpen(false)
+                            onDuplicateWeek()
+                          }}
+                        >
+                          <Copy className="h-3 w-3" />
+                          Duplicate to all weeks in phase
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
           </div>
           <p className={columnCss.hint}>Drag to copy · scroll across the week</p>
         </div>

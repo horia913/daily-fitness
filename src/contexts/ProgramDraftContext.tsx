@@ -33,6 +33,7 @@ import {
   duplicateGroupInDraft,
   duplicateTrainingBlockInDraft,
   duplicateWeekInDraft,
+  copyWeekToWeeksInDraft,
   insertLibraryWorkoutIntoDraft,
   moveDayInDraft,
   reorderBlocksInDraft,
@@ -110,6 +111,11 @@ interface ProgramDraftContextValue {
   duplicateBlock: (block: TrainingBlock) => void
   addWeek: (blockId: string) => void
   duplicateWeek: (block: TrainingBlock, sourceAbsoluteWeek: number) => void
+  copyWeekToWeeks: (
+    block: TrainingBlock,
+    sourceAbsoluteWeek: number,
+    targetAbsWeeks: number[],
+  ) => void
 }
 
 const ProgramDraftContext = createContext<ProgramDraftContextValue | null>(null)
@@ -387,6 +393,8 @@ export function ProgramDraftProvider(props: ProgramDraftProviderProps) {
       addWeek: (blockId) => mutate((d) => addWeekToBlockInDraft(d, blockId)),
       duplicateWeek: (block, sourceAbsoluteWeek) =>
         mutate((d) => duplicateWeekInDraft(d, block, sourceAbsoluteWeek)),
+      copyWeekToWeeks: (block, sourceAbsoluteWeek, targetAbsWeeks) =>
+        mutate((d) => copyWeekToWeeksInDraft(d, block, sourceAbsoluteWeek, targetAbsWeeks)),
     }),
     [
       loading,

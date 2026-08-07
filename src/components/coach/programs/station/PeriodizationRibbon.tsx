@@ -24,15 +24,15 @@ import shellCss from '@/components/coach/programs/programEditV1.module.css'
 import { cn } from '@/lib/utils'
 
 /** Must match periodizationRibbon.module.css week geometry. */
-const WEEK_CARD_MIN = 56
+const WEEK_CARD_W = 48
 const WEEK_GAP = 3
 const WEEK_GROUP_PAD_X = 3
-const ADD_WEEK_W = 44
+const ADD_WEEK_W = 40
 
-/** Minimum width of one phase column at compressed card size (scroll only below this total). */
+/** Minimum width of one phase column at compact card size (scroll only below this total). */
 function phaseColumnMinWidthPx(weekCount: number): number {
   const n = Math.max(1, weekCount)
-  return WEEK_GROUP_PAD_X * 2 + n * WEEK_CARD_MIN + ADD_WEEK_W + n * WEEK_GAP
+  return WEEK_GROUP_PAD_X * 2 + n * WEEK_CARD_W + ADD_WEEK_W + n * WEEK_GAP
 }
 
 export interface PeriodizationRibbonProps {
@@ -49,12 +49,11 @@ export interface PeriodizationRibbonProps {
   onDeleteBlock: (blockId: string) => void
   onMoveBlock: (blockId: string, direction: 'left' | 'right') => void
   onDuplicateBlock: (block: TrainingBlock) => void
-  onDuplicateWeek: (block: TrainingBlock, absoluteWeek: number) => void
   onAddWeek: (blockId: string) => void
   busy?: boolean
 }
 
-type MenuKind = 'block' | 'week'
+type MenuKind = 'block'
 
 export function PeriodizationRibbon({
   programName,
@@ -70,7 +69,6 @@ export function PeriodizationRibbon({
   onDeleteBlock,
   onMoveBlock,
   onDuplicateBlock,
-  onDuplicateWeek,
   onAddWeek,
   busy,
 }: PeriodizationRibbonProps) {
@@ -78,32 +76,28 @@ export function PeriodizationRibbon({
   const [menu, setMenu] = useState<{
     kind: MenuKind
     blockId: string
-    rel?: number
     pos: { top: number; left: number }
   } | null>(null)
   const triggerRefs = useRef<Record<string, HTMLButtonElement | null>>({})
 
   const closeMenu = useCallback(() => setMenu(null), [])
 
-  const openMenu = useCallback(
-    (kind: MenuKind, blockId: string, rel?: number) => {
-      const key = kind === 'block' ? `block-${blockId}` : `week-${blockId}-${rel}`
-      const el = triggerRefs.current[key]
-      if (!el) return
-      const r = el.getBoundingClientRect()
-      const menuWidth = 168
-      let left = r.right - menuWidth
-      if (left < 8) left = 8
-      if (left + menuWidth > window.innerWidth - 8) {
-        left = window.innerWidth - menuWidth - 8
-      }
-      let top = r.bottom + 6
-      const maxTop = window.innerHeight - 280
-      if (top > maxTop) top = Math.max(8, r.top - 6 - 260)
-      setMenu({ kind, blockId, rel, pos: { top, left } })
-    },
-    [],
-  )
+  const openMenu = useCallback((kind: MenuKind, blockId: string) => {
+    const key = `block-${blockId}`
+    const el = triggerRefs.current[key]
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const menuWidth = 220
+    let left = r.right - menuWidth
+    if (left < 8) left = 8
+    if (left + menuWidth > window.innerWidth - 8) {
+      left = window.innerWidth - menuWidth - 8
+    }
+    let top = r.bottom + 6
+    const maxTop = window.innerHeight - 320
+    if (top > maxTop) top = Math.max(8, r.top - 6 - 300)
+    setMenu({ kind, blockId, pos: { top, left } })
+  }, [])
 
   useEffect(() => {
     if (!menu) return
@@ -124,24 +118,21 @@ export function PeriodizationRibbon({
 
   useLayoutEffect(() => {
     if (!menu) return
-    const key =
-      menu.kind === 'block'
-        ? `block-${menu.blockId}`
-        : `week-${menu.blockId}-${menu.rel}`
+    const key = `block-${menu.blockId}`
     const el = triggerRefs.current[key]
     if (!el) return
     const r = el.getBoundingClientRect()
-    const menuWidth = 168
+    const menuWidth = 220
     let left = r.right - menuWidth
     if (left < 8) left = 8
     if (left + menuWidth > window.innerWidth - 8) {
       left = window.innerWidth - menuWidth - 8
     }
     let top = r.bottom + 6
-    const maxTop = window.innerHeight - 280
-    if (top > maxTop) top = Math.max(8, r.top - 6 - 260)
+    const maxTop = window.innerHeight - 320
+    if (top > maxTop) top = Math.max(8, r.top - 6 - 300)
     setMenu((prev) => (prev ? { ...prev, pos: { top, left } } : null))
-  }, [menu?.blockId, menu?.kind, menu?.rel, trainingBlocks.length])
+  }, [menu?.blockId, menu?.kind, trainingBlocks.length])
 
   const menuBlock = menu ? trainingBlocks.find((b) => b.id === menu.blockId) : null
   const menuBlockIndex = menuBlock
@@ -198,9 +189,7 @@ export function PeriodizationRibbon({
                 key={block.id}
                 className={css.phaseColumn}
                 style={{
-                  flexGrow: weekCount,
-                  flexShrink: 1,
-                  flexBasis: 0,
+                  flex: '0 0 auto',
                   minWidth: colMin,
                 }}
                 data-testid={`week-block-${block.id}`}
@@ -267,30 +256,6 @@ export function PeriodizationRibbon({
                           <span className={css.weekNum}>Wk {abs}</span>
                           <span className={css.weekDate}>{weekDateLabel(abs)}</span>
                         </button>
-                        {weekActive ? (
-                          <button
-                            ref={(el) => {
-                              triggerRefs.current[`week-${block.id}-${rel}`] = el
-                            }}
-                            type="button"
-                            data-testid={`week-kebab-${block.id}-${rel}`}
-                            className={css.weekKebab}
-                            aria-label="Week actions"
-                            onClick={() => {
-                              if (
-                                menu?.kind === 'week' &&
-                                menu.blockId === block.id &&
-                                menu.rel === rel
-                              ) {
-                                closeMenu()
-                              } else {
-                                openMenu('week', block.id, rel)
-                              }
-                            }}
-                          >
-                            <MoreHorizontal className="w-2.5 h-2.5" />
-                          </button>
-                        ) : null}
                       </div>
                     )
                   })}
@@ -402,24 +367,7 @@ export function PeriodizationRibbon({
                   Delete phase
                 </button>
               </>
-            ) : (
-              <button
-                type="button"
-                role="menuitem"
-                disabled={busy}
-                data-testid="duplicate-week"
-                className={css.menuRow}
-                onClick={() => {
-                  closeMenu()
-                  const range = ranges[menuBlockIndex]
-                  if (!range || menu.rel == null) return
-                  onDuplicateWeek(menuBlock, range.startWeek + menu.rel - 1)
-                }}
-              >
-                <Copy className="w-3 h-3" />
-                Duplicate week
-              </button>
-            )}
+            ) : null}
           </div>,
           document.body,
         )}

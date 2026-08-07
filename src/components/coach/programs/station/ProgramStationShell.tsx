@@ -19,12 +19,15 @@ import {
 } from '@/lib/programs/stationBlockWeeks'
 import { ribbonPhaseHexColors } from '@/lib/programs/periodizationPhaseColors'
 import { getScheduleSlot, summarizeDaySlot } from '@/lib/programs/stationScheduleUtils'
+import { weeksWithScheduledContent } from '@/lib/programs/programDraftMutations'
 import { countCanvasExercises } from '@/lib/groupModel/canvasTypes'
 import { ProgramDraftProvider, useProgramDraft } from '@/contexts/ProgramDraftContext'
 import { ProgramStationHeader } from './ProgramStationHeader'
 import { ProgramSettingsDialog } from './ProgramSettingsDialog'
 import { PeriodizationRibbon } from './PeriodizationRibbon'
 import { SessionColumnsRow } from './SessionColumnsRow'
+import { WeekTargetPicker } from './WeekTargetPicker'
+import { ReplaceWeekCopyDialog } from './ReplaceWeekCopyDialog'
 import { FillToolDialog } from './FillToolDialog'
 import { DraftResumeDialog } from './DraftResumeDialog'
 import { LeaveConfirmDialog } from './LeaveConfirmDialog'
@@ -73,6 +76,16 @@ function ProgramStationInner({ programId }: { programId: string }) {
   const [volumeCollapsed, setVolumeCollapsed] = useState(false)
   const [weekFillOpen, setWeekFillOpen] = useState(false)
   const [weekFillSourceAbs, setWeekFillSourceAbs] = useState(1)
+  const [weekCopy, setWeekCopy] = useState<{
+    block: TrainingBlock
+    sourceAbsWeek: number
+  } | null>(null)
+  const [weekCopyPending, setWeekCopyPending] = useState<{
+    block: TrainingBlock
+    sourceAbsWeek: number
+    targets: number[]
+    occupied: number[]
+  } | null>(null)
 
   const program = draft.workingCopy?.program ?? null
   const trainingBlocks = draft.workingCopy?.trainingBlocks ?? []
@@ -182,6 +195,33 @@ function ProgramStationInner({ programId }: { programId: string }) {
     return () => window.removeEventListener('beforeunload', onBeforeUnload)
   }, [draft.isDirty])
 
+  const applyWeekCopy = useCallback(
+    (block: TrainingBlock, sourceAbsWeek: number, targets: number[]) => {
+      draft.copyWeekToWeeks(block, sourceAbsWeek, targets)
+      const n = targets.length
+      addToast({
+        title: `Week copied to ${n} week${n === 1 ? '' : 's'} in working copy. Save to commit.`,
+      })
+    },
+    [draft, addToast],
+  )
+
+  const requestWeekCopyTargets = useCallback(
+    (block: TrainingBlock, sourceAbsWeek: number, targets: number[]) => {
+      if (targets.length === 0) return
+      const occupied = weeksWithScheduledContent(
+        draft.workingCopy?.schedule ?? [],
+        targets,
+      )
+      if (occupied.length > 0) {
+        setWeekCopyPending({ block, sourceAbsWeek, targets, occupied })
+        return
+      }
+      applyWeekCopy(block, sourceAbsWeek, targets)
+    },
+    [draft.workingCopy?.schedule, applyWeekCopy],
+  )
+
   const openSettings = () => {
     if (!program) return
     setSettingsDraft({ ...program })
@@ -275,10 +315,6 @@ function ProgramStationInner({ programId }: { programId: string }) {
               draft.duplicateBlock(block)
               addToast({ title: 'Phase duplicated in working copy. Save to commit.' })
             }}
-            onDuplicateWeek={(block, absWeek) => {
-              draft.duplicateWeek(block, absWeek)
-              addToast({ title: 'Week duplicated in working copy. Save to commit.' })
-            }}
             onAddWeek={(blockId) => {
               const block = trainingBlocks.find((b) => b.id === blockId)
               if (!block) return
@@ -318,6 +354,21 @@ function ProgramStationInner({ programId }: { programId: string }) {
               : (absWeek) => {
                   setWeekFillSourceAbs(absWeek)
                   setWeekFillOpen(true)
+                }
+          }
+          onDuplicateWeek={
+            isRecurring || !activeBlock
+              ? undefined
+              : () => {
+                  draft.duplicateWeek(activeBlock, absoluteWeek)
+                  addToast({ title: 'Week duplicated in working copy. Save to commit.' })
+                }
+          }
+          onRequestCopyWeek={
+            isRecurring || !activeBlock
+              ? undefined
+              : () => {
+                  setWeekCopy({ block: activeBlock, sourceAbsWeek: absoluteWeek })
                 }
           }
         />
@@ -387,6 +438,35 @@ function ProgramStationInner({ programId }: { programId: string }) {
             setLeaveOpen(false)
             router.push(exitHref)
           }
+        }}
+      />
+
+      {draft.workingCopy && weekCopy ? (
+        <WeekTargetPicker
+          open
+          onOpenChange={(open) => {
+            if (!open) setWeekCopy(null)
+          }}
+          draft={draft.workingCopy}
+          title={`Copy week ${weekCopy.sourceAbsWeek} to…`}
+          excludeWeek={weekCopy.sourceAbsWeek}
+          onConfirm={(targets) => {
+            const { block, sourceAbsWeek } = weekCopy
+            setWeekCopy(null)
+            requestWeekCopyTargets(block, sourceAbsWeek, targets)
+          }}
+        />
+      ) : null}
+
+      <ReplaceWeekCopyDialog
+        open={weekCopyPending != null}
+        occupiedWeeks={weekCopyPending?.occupied ?? []}
+        onCancel={() => setWeekCopyPending(null)}
+        onConfirm={() => {
+          if (!weekCopyPending) return
+          const { block, sourceAbsWeek, targets } = weekCopyPending
+          setWeekCopyPending(null)
+          applyWeekCopy(block, sourceAbsWeek, targets)
         }}
       />
 

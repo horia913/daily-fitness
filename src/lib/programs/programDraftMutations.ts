@@ -492,10 +492,52 @@ export function duplicateWeekInDraft(
 ): ProgramDraftState {
   const blockStart = computeBlockStartWeek(draft.trainingBlocks, activeBlock.id)
   const blockEnd = blockStart + activeBlock.duration_weeks - 1
+  const targets: number[] = []
+  for (let week = blockStart; week <= blockEnd; week++) {
+    if (week !== sourceAbsoluteWeek) targets.push(week)
+  }
+  return copyWeekToWeeksInDraft(draft, activeBlock, sourceAbsoluteWeek, targets)
+}
+
+/** Absolute weeks that already have at least one scheduled workout. */
+export function weeksWithScheduledContent(
+  schedule: ProgramSchedule[],
+  weeks: number[],
+): number[] {
+  const set = new Set(weeks)
+  const occupied = new Set<number>()
+  for (const row of schedule) {
+    const w = row.week_number ?? 1
+    if (set.has(w) && row.template_id) occupied.add(w)
+  }
+  return [...occupied].sort((a, b) => a - b)
+}
+
+/**
+ * Copy source week's days into specific target absolute weeks only.
+ * Empty source days clear the corresponding target days (same as duplicate week).
+ */
+export function copyWeekToWeeksInDraft(
+  draft: ProgramDraftState,
+  activeBlock: TrainingBlock,
+  sourceAbsoluteWeek: number,
+  targetAbsWeeks: number[],
+): ProgramDraftState {
+  const targets = [...new Set(targetAbsWeeks.filter((w) => w !== sourceAbsoluteWeek))].sort(
+    (a, b) => a - b,
+  )
+  if (targets.length === 0) return draft
+
+  const ranges = computeBlockWeekRanges(draft.trainingBlocks)
+  const blockIdForWeek = (week: number): string => {
+    const range = ranges.find((r) => week >= r.startWeek && week <= r.endWeek)
+    return range?.blockId ?? activeBlock.id
+  }
+
   let next = markStructureDirty(cloneProgramDraft(draft))
 
-  for (let week = blockStart; week <= blockEnd; week++) {
-    if (week === sourceAbsoluteWeek) continue
+  for (const week of targets) {
+    const targetBlockId = blockIdForWeek(week)
     for (let day = 1; day <= 7; day++) {
       const sourceSlot = getScheduleSlot(next.schedule, sourceAbsoluteWeek, day)
       if (!sourceSlot?.template_id) {
@@ -511,7 +553,7 @@ export function duplicateWeekInDraft(
         sourceSlot.template_id,
         week,
         day,
-        activeBlock.id,
+        targetBlockId,
         Boolean(sourceSlot.is_optional),
       )
     }
