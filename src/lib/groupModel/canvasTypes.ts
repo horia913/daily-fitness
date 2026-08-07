@@ -93,7 +93,8 @@ export function createDefaultExercise(
     measurement: 'reps',
     technique: 'none',
     prescriptions,
-    enabledProperties: ['load', 'rest_after_exercise'],
+    /** New slots: RPE + Rest on; load off (coach can add via + Add property). Sets/reps always shown. */
+    enabledProperties: ['rpe', 'rest_after_exercise'],
     rest_seconds: DEFAULT_REST_SECONDS,
     exercise: exercise ?? null,
   }

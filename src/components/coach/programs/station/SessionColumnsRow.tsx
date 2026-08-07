@@ -1,13 +1,13 @@
 'use client'
 
-import React, { useCallback, useEffect, useState, type CSSProperties } from 'react'
+import React, { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import {
   DragDropContext,
   Draggable,
   Droppable,
   type DropResult,
 } from '@hello-pangea/dnd'
-import { GripVertical, Copy, MoreHorizontal } from 'lucide-react'
+import { GripVertical, Copy, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { DaySlotSummary } from '@/lib/programs/stationScheduleUtils'
 import { programDayLabel } from '@/lib/programs/stationScheduleUtils'
 import { useProgramDraft } from '@/contexts/ProgramDraftContext'
@@ -19,6 +19,9 @@ import { FillProgressionButton } from './FillToolEntryControls'
 import columnCss from './sessionColumns.module.css'
 import shellCss from '@/components/coach/programs/programEditV1.module.css'
 import { cn } from '@/lib/utils'
+
+/** Matches .column width + .scroll gap — one day step for ←/→. */
+const COLUMN_SCROLL_STEP = 600 + 14
 
 export interface SessionColumnsRowProps {
   coachId: string
@@ -64,6 +67,30 @@ export function SessionColumnsRow({
   const [pendingReplace, setPendingReplace] = useState<PendingAction>(null)
   const [picker, setPicker] = useState<PickerMode>(null)
   const [weekMenuOpen, setWeekMenuOpen] = useState(false)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+
+  const updateScrollEdges = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) {
+      setCanScrollLeft(false)
+      setCanScrollRight(false)
+      return
+    }
+    const max = el.scrollWidth - el.clientWidth
+    setCanScrollLeft(el.scrollLeft > 1)
+    setCanScrollRight(max > 1 && el.scrollLeft < max - 1)
+  }, [])
+
+  const scrollByColumn = useCallback(
+    (dir: -1 | 1) => {
+      const el = scrollRef.current
+      if (!el) return
+      el.scrollBy({ left: dir * COLUMN_SCROLL_STEP, behavior: 'smooth' })
+    },
+    [],
+  )
 
   useEffect(() => {
     setPicker(null)
@@ -82,6 +109,46 @@ export function SessionColumnsRow({
     document.addEventListener('mousedown', onDoc)
     return () => document.removeEventListener('mousedown', onDoc)
   }, [weekMenuOpen])
+
+  /** Wheel → horizontal on the day strip only (no DnD conflict; page scroll at H edges). */
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+
+    const onWheel = (e: WheelEvent) => {
+      const max = el.scrollWidth - el.clientWidth
+      if (max <= 0) return
+
+      const preferHorizontal =
+        e.shiftKey || Math.abs(e.deltaY) >= Math.abs(e.deltaX)
+      const dx = e.deltaX + (preferHorizontal ? e.deltaY : 0)
+      if (dx === 0) return
+
+      const atStart = el.scrollLeft <= 0
+      const atEnd = el.scrollLeft >= max - 1
+      if ((dx < 0 && atStart) || (dx > 0 && atEnd)) return
+
+      e.preventDefault()
+      el.scrollLeft += dx
+      updateScrollEdges()
+    }
+
+    el.addEventListener('wheel', onWheel, { passive: false })
+    el.addEventListener('scroll', updateScrollEdges, { passive: true })
+    updateScrollEdges()
+
+    const ro =
+      typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(() => updateScrollEdges())
+        : null
+    ro?.observe(el)
+
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('scroll', updateScrollEdges)
+      ro?.disconnect()
+    }
+  }, [updateScrollEdges, summaries.length])
 
   const showWeekActions = Boolean(onDuplicateWeek || onRequestCopyWeek)
 
@@ -188,6 +255,28 @@ export function SessionColumnsRow({
                   : undefined
               }
             >
+              <div className={columnCss.hScrollNav} role="group" aria-label="Scroll week days">
+                <button
+                  type="button"
+                  className={columnCss.hScrollBtn}
+                  aria-label="Scroll days left"
+                  data-testid="session-scroll-left"
+                  disabled={!canScrollLeft}
+                  onClick={() => scrollByColumn(-1)}
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  className={columnCss.hScrollBtn}
+                  aria-label="Scroll days right"
+                  data-testid="session-scroll-right"
+                  disabled={!canScrollRight}
+                  onClick={() => scrollByColumn(1)}
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
               {onProgressWeek ? (
                 <FillProgressionButton
                   onClick={() => onProgressWeek(absoluteWeek)}
@@ -254,7 +343,11 @@ export function SessionColumnsRow({
         </div>
 
         <DragDropContext onDragEnd={onDragEnd}>
-          <div className={columnCss.scroll} data-testid="session-columns-scroll">
+          <div
+            ref={scrollRef}
+            className={columnCss.scroll}
+            data-testid="session-columns-scroll"
+          >
             {summaries.map((summary, index) => {
               const programDay = index + 1
               const isRest = summary.isRest
