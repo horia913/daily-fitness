@@ -98,9 +98,6 @@ export default function ProgramsDashboardContent() {
     todayYmdForTimezone(profile?.timezone),
   );
   const [assignNotes, setAssignNotes] = useState<string>("");
-  const [assignProgressionMode, setAssignProgressionMode] = useState<
-    "auto" | "coach_managed"
-  >("coach_managed");
   const [clientSearchQuery, setClientSearchQuery] = useState<string>("");
 
   const coachId = user?.id || "";
@@ -214,7 +211,6 @@ export default function ProgramsDashboardContent() {
           coachId,
           assignStartDate,
           assignNotes,
-          assignProgressionMode,
         );
 
       await invalidateProgramsList();
@@ -290,7 +286,6 @@ export default function ProgramsDashboardContent() {
     coachId,
     assignStartDate,
     assignNotes,
-    assignProgressionMode,
     invalidateProgramsList,
     queryClient,
     user?.id,
@@ -647,50 +642,6 @@ export default function ProgramsDashboardContent() {
                   rows={3}
                   className={`${styles.fieldInput} ${styles.fieldTextarea}`}
                 />
-              </div>
-
-              <div style={{ marginTop: 20 }}>
-                <span className={styles.fieldLabel}>Progression Mode</span>
-                <label
-                  className={`${styles.progressionOption} ${
-                    assignProgressionMode === "coach_managed"
-                      ? styles.progressionOptionSelected
-                      : ""
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="progressionMode"
-                    checked={assignProgressionMode === "coach_managed"}
-                    onChange={() => setAssignProgressionMode("coach_managed")}
-                  />
-                  <div>
-                    <p className={styles.progressionTitle}>Coach-managed</p>
-                    <p className={styles.progressionHint}>
-                      You review and advance weekly
-                    </p>
-                  </div>
-                </label>
-                <label
-                  className={`${styles.progressionOption} ${
-                    assignProgressionMode === "auto"
-                      ? styles.progressionOptionSelected
-                      : ""
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="progressionMode"
-                    checked={assignProgressionMode === "auto"}
-                    onChange={() => setAssignProgressionMode("auto")}
-                  />
-                  <div>
-                    <p className={styles.progressionTitle}>Automatic</p>
-                    <p className={styles.progressionHint}>
-                      Weeks unlock when completed
-                    </p>
-                  </div>
-                </label>
               </div>
             </div>
 

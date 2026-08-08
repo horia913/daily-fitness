@@ -2,7 +2,7 @@
  * POST /api/coach/week-review
  *
  * Saves a coach week note to coach_week_reviews (action = 'note').
- * Does not modify program_assignments, coach_unlocked_week, or program_progress.
+ * Does not modify program_assignments or program week unlock.
  *
  * Body: { programAssignmentId: string, weekNumber: number, coachNotes?: string, performanceSummary?: unknown }
  */

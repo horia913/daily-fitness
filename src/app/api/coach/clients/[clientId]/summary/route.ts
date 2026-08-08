@@ -297,8 +297,6 @@ export async function GET(
       programDurationWeeks: null,
       mealCompliance7dPct: null,
       lastCheckinDate: null,
-      weekReviewNeeded: false,
-      completedWeekNumber: null,
       activeProgramId: null,
       activeProgramAssignmentId: null,
       subscriptionEndDate: null,
@@ -387,9 +385,6 @@ export async function GET(
       name: string;
       currentWeek: number | null;
       durationWeeks: number | null;
-      progressionMode: string | null;
-      coachUnlockedWeek: number | null;
-      weekReviewNeeded: boolean;
       reviewWeekNumber: number | null;
       behindOnWeeklyWorkouts: boolean;
       programProgressPercent: number | null;
@@ -477,10 +472,7 @@ export async function GET(
         name: nm,
         currentWeek: cw,
         durationWeeks: dw,
-        progressionMode: null,
-        coachUnlockedWeek: null,
-        weekReviewNeeded: metrics.weekReviewNeeded === true,
-        reviewWeekNumber: metrics.completedWeekNumber ?? null,
+        reviewWeekNumber: cw,
         behindOnWeeklyWorkouts: goal > 0 && cur < goal,
         programProgressPercent,
       };

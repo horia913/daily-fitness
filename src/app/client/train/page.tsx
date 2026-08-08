@@ -360,17 +360,6 @@ export default function TrainPage() {
 
                   <TrainWeekProgress weeklyProgress={weeklyProgress} />
 
-                  {programWeek.isWeekCompleteAwaitingReview ? (
-                    <div className={styles.weekComplete}>
-                      <p className={styles.weekCompleteTitle}>
-                        All workouts this week completed
-                      </p>
-                      <p className={styles.weekCompleteSub}>
-                        Next week unlocks on your calendar when it begins.
-                      </p>
-                    </div>
-                  ) : null}
-
                   <div className={styles.sectionHead}>
                     <div className={styles.sectionTitleWrap}>
                       <span className={styles.sectionAccentBar} aria-hidden />

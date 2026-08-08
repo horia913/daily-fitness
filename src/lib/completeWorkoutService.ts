@@ -287,7 +287,6 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
     program_id: string
     start_date: string | null
     status: string | null
-    progression_mode: string | null
     pause_status: string | null
     paused_at: string | null
     pause_accumulated_days: number | null
@@ -303,7 +302,7 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
     const { data: assignment } = await supabaseAdmin
       .from('program_assignments')
       .select(
-        'id, client_id, program_id, start_date, status, progression_mode, pause_status, paused_at, pause_accumulated_days, timezone_snapshot'
+        'id, client_id, program_id, start_date, status, pause_status, paused_at, pause_accumulated_days, timezone_snapshot'
       )
       .eq('id', programAssignmentId)
       .single()
@@ -335,8 +334,6 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
             allSlots,
             completedSlots,
             {
-              progression_mode:
-                assignment.progression_mode === 'coach_managed' ? 'coach_managed' : 'auto',
               start_date: assignment.start_date,
               totalWeeksCap,
               pause_status: assignment.pause_status ?? 'active',

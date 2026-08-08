@@ -2,6 +2,10 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchApi } from '@/lib/apiClient'
 import { formatSaveError } from '@/lib/groupModel/canvasSave'
 import { saveInstanceWorkoutFromCanvas } from '@/lib/programInstance/instanceCanvasSave'
+import {
+  assertNoLockedWeekEdits,
+  loadPastWeekLockSnapshot,
+} from '@/lib/programInstance/instancePastWeekLock'
 import type { ProgramCommitResult, ProgramDraftState } from '@/types/programDraft'
 import {
   blocksNewSinceBaseline,
@@ -202,6 +206,7 @@ async function commitInstanceSchedule(
 
 /**
  * Persist a client-instance Station draft — instance tables only, never master.
+ * Re-loads past-week lock snapshot and rejects edits to completed locked weeks.
  */
 export async function commitInstanceProgramDraft(
   supabase: SupabaseClient,
@@ -212,6 +217,14 @@ export async function commitInstanceProgramDraft(
   const clientId = working.clientId
   if (!assignmentId || !clientId) {
     return { success: false, error: 'Missing client instance context' }
+  }
+
+  const lock = await loadPastWeekLockSnapshot(supabase, assignmentId)
+  if (lock) {
+    const gate = assertNoLockedWeekEdits(lock, baseline, working)
+    if (!gate.ok) {
+      return { success: false, error: gate.error }
+    }
   }
 
   const contentCommittedIds: string[] = []

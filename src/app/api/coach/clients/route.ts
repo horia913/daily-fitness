@@ -286,8 +286,6 @@ export async function GET() {
           programDurationWeeks: null,
           mealCompliance7dPct: null,
           lastCheckinDate: null,
-          weekReviewNeeded: false,
-          completedWeekNumber: null,
           activeProgramId: null,
           activeProgramAssignmentId: null,
           subscriptionEndDate: null,

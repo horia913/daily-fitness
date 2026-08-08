@@ -1466,7 +1466,6 @@ export class WorkoutTemplateService {
     coachId: string | undefined,
     startDate: string,
     notes?: string,
-    progressionMode?: 'auto' | 'coach_managed'
   ): Promise<AssignProgramToClientsResult> {
     const successful: AssignProgramToClientsResult['successful'] = []
     const failed: AssignProgramToClientsResult['failed'] = []
@@ -1493,7 +1492,8 @@ export class WorkoutTemplateService {
           p_client_id: clientId,
           p_coach_id: coachId,
           p_start_date: startDate,
-          p_progression_mode: progressionMode ?? 'auto',
+          // Always automatic — coach_managed mode removed; RPC column retained for now.
+          p_progression_mode: 'auto',
           p_timezone_snapshot: timezoneSnapshot,
           p_notes: notes ?? null,
         })

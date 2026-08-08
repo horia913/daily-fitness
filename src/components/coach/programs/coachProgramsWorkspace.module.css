@@ -322,35 +322,6 @@
   color: var(--fc-text-primary);
 }
 
-.progressionOption {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 2px;
-  cursor: pointer;
-  border-bottom: 1px solid var(--fc-hairline);
-}
-
-.progressionOption:last-child {
-  border-bottom: none;
-}
-
-.progressionOptionSelected {
-  background: color-mix(in srgb, var(--fc-accent) 6%, transparent);
-}
-
-.progressionTitle {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--fc-text-primary);
-}
-
-.progressionHint {
-  font-size: 11px;
-  color: var(--fc-text-dim);
-  margin-top: 2px;
-}
-
 .modalGhostBtn {
   height: 36px;
   padding: 0 14px;

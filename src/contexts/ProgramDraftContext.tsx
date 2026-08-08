@@ -21,6 +21,14 @@ import { loadProgramDraftBaseline } from '@/lib/programs/programDraftBaseline'
 import { commitProgramDraft } from '@/lib/programs/programDraftCommit'
 import { loadInstanceProgramDraftBaseline } from '@/lib/programInstance/instanceProgramDraftBaseline'
 import { commitInstanceProgramDraft } from '@/lib/programInstance/instanceProgramDraftCommit'
+import {
+  isWeekLocked,
+  type PastWeekLockSnapshot,
+} from '@/lib/programInstance/instancePastWeekLock'
+import {
+  loadClientInstanceEditorContext,
+  type ClientProgressSnapshot,
+} from '@/lib/programInstance/instanceClientProgressStatus'
 import type { ProgramEditorMode } from '@/types/programDraft'
 import {
   addTrainingBlockToDraft,
@@ -61,6 +69,11 @@ interface ProgramDraftContextValue {
   baseline: ProgramDraftState | null
   workingCopy: ProgramDraftState | null
   editorMode: ProgramEditorMode
+  /** Client mode only — past weeks with completions (not current foundation week). */
+  pastWeekLock: PastWeekLockSnapshot | null
+  isWeekLocked: (absoluteWeek: number) => boolean
+  /** Client mode only — done/missed/current/upcoming for weeks + days. */
+  clientProgress: ClientProgressSnapshot | null
   saveState: ProgramSaveUiState
   saveError: string | null
   categories: Array<{ id: string; name: string }>
@@ -165,6 +178,8 @@ export function ProgramDraftProvider(props: ProgramDraftProviderProps) {
   const [loading, setLoading] = useState(true)
   const [baseline, setBaseline] = useState<ProgramDraftState | null>(null)
   const [workingCopy, setWorkingCopyState] = useState<ProgramDraftState | null>(null)
+  const [pastWeekLock, setPastWeekLock] = useState<PastWeekLockSnapshot | null>(null)
+  const [clientProgress, setClientProgress] = useState<ClientProgressSnapshot | null>(null)
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([])
   const [saveState, setSaveState] = useState<ProgramSaveUiState>('idle')
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -200,17 +215,24 @@ export function ProgramDraftProvider(props: ProgramDraftProviderProps) {
 
       let withCat: ProgramDraftState
       if (editorMode === 'client' && assignmentId && clientId) {
-        const base = await loadInstanceProgramDraftBaseline({
-          supabase: supabaseClient,
-          assignmentId,
-          clientId,
-          programId,
-          coachId,
-          clientName,
-          clientAvatarUrl,
-        })
+        const [base, editorCtx] = await Promise.all([
+          loadInstanceProgramDraftBaseline({
+            supabase: supabaseClient,
+            assignmentId,
+            clientId,
+            programId,
+            coachId,
+            clientName,
+            clientAvatarUrl,
+          }),
+          loadClientInstanceEditorContext(supabaseClient, assignmentId),
+        ])
+        setPastWeekLock(editorCtx?.lock ?? null)
+        setClientProgress(editorCtx?.progress ?? null)
         withCat = { ...base, categoryId: 'none' }
       } else {
+        setPastWeekLock(null)
+        setClientProgress(null)
         const base = await loadProgramDraftBaseline(supabaseClient, programId, coachId, 'none')
         withCat = { ...base, categoryId: 'none', editorMode: 'master' }
       }
@@ -332,12 +354,20 @@ export function ProgramDraftProvider(props: ProgramDraftProviderProps) {
     [workingCopy, setWorkingCopy],
   )
 
+  const isWeekLockedFn = useCallback(
+    (absoluteWeek: number) => isWeekLocked(pastWeekLock, absoluteWeek),
+    [pastWeekLock],
+  )
+
   const value = useMemo<ProgramDraftContextValue>(
     () => ({
       loading,
       baseline,
       workingCopy,
       editorMode,
+      pastWeekLock,
+      isWeekLocked: isWeekLockedFn,
+      clientProgress,
       saveState,
       saveError,
       categories,
@@ -401,6 +431,9 @@ export function ProgramDraftProvider(props: ProgramDraftProviderProps) {
       baseline,
       workingCopy,
       editorMode,
+      pastWeekLock,
+      isWeekLockedFn,
+      clientProgress,
       saveState,
       saveError,
       categories,

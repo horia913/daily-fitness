@@ -15,6 +15,8 @@ export interface DayTargetPickerProps {
   excludeDay?: number
   /** Only show days that already have a workout (for copy-group). */
   requireWorkout?: boolean
+  /** Absolute weeks that cannot be targets (client past-week lock). */
+  lockedWeeks?: ReadonlySet<number>
   onSelect: (target: { week: number; day: number; templateId: string | null }) => void
 }
 
@@ -26,6 +28,7 @@ export function DayTargetPicker({
   excludeWeek,
   excludeDay,
   requireWorkout,
+  lockedWeeks,
   onSelect,
 }: DayTargetPickerProps) {
   const targets = useMemo(() => {
@@ -37,12 +40,14 @@ export function DayTargetPicker({
       templateId: string | null
       label: string
       blockName: string
+      locked: boolean
     }> = []
 
     for (const range of ranges) {
       const block = [...blockById.values()].find((b) => b.id === range.blockId)
       const blockName = block?.name ?? 'Phase'
       for (let week = range.startWeek; week <= range.endWeek; week++) {
+        const locked = lockedWeeks?.has(week) ?? false
         for (let day = 1; day <= 7; day++) {
           if (week === excludeWeek && day === excludeDay) continue
           const slot = getScheduleSlot(draft.schedule, week, day)
@@ -54,13 +59,14 @@ export function DayTargetPicker({
             day,
             templateId,
             blockName,
-            label: `${programDayLabel(day)} · Wk ${week}${workoutName ? ` · ${workoutName}` : ' · Rest'}`,
+            locked,
+            label: `${programDayLabel(day)} · Wk ${week}${workoutName ? ` · ${workoutName}` : ' · Rest'}${locked ? ' · Locked' : ''}`,
           })
         }
       }
     }
     return rows
-  }, [draft, excludeWeek, excludeDay, requireWorkout])
+  }, [draft, excludeWeek, excludeDay, requireWorkout, lockedWeeks])
 
   if (!open) return null
 
@@ -93,11 +99,22 @@ export function DayTargetPicker({
                 key={`${t.week}-${t.day}`}
                 type="button"
                 data-testid={`target-${t.week}-${t.day}`}
+                disabled={t.locked}
+                title={
+                  t.locked
+                    ? "This week is completed and locked to preserve the client's history"
+                    : undefined
+                }
                 onClick={() => {
+                  if (t.locked) return
                   onSelect({ week: t.week, day: t.day, templateId: t.templateId })
                   onOpenChange(false)
                 }}
-                className="flex w-full flex-col rounded-lg px-3 py-2.5 text-left hover:bg-white/[0.04]"
+                className={`flex w-full flex-col rounded-lg px-3 py-2.5 text-left ${
+                  t.locked
+                    ? 'cursor-not-allowed opacity-55'
+                    : 'hover:bg-white/[0.04]'
+                }`}
               >
                 <span className="text-sm font-medium text-[var(--pe-t1)]">{t.label}</span>
                 <span className="text-[10px] uppercase tracking-wider text-[var(--pe-t3)]">

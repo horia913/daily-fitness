@@ -81,8 +81,7 @@ async function main() {
         pause_status: a.pause_status,
         paused_at: a.paused_at,
         timezone_snapshot: a.timezone_snapshot,
-        progression_mode: a.progression_mode === 'coach_managed' ? 'coach_managed' : 'auto',
-        coach_unlocked_week: a.coach_unlocked_week,
+        totalWeeksCap: totalWeeks > 0 ? totalWeeks : null,
       },
       tz
     )

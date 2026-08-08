@@ -289,7 +289,7 @@
   width: 100%;
   box-sizing: border-box;
   min-height: 44px;
-  padding: 4px 3px;
+  padding: 4px 3px 7px;
   border-radius: 7px;
   border: none;
   background: transparent;
@@ -310,6 +310,71 @@
 
 .weekCellActive:hover {
   background: color-mix(in srgb, var(--week-block-color, #2ef2c6) 13%, transparent);
+}
+
+.weekCellLocked {
+  opacity: 0.72;
+}
+
+.weekCellLocked .weekNum,
+.weekCellLocked .weekDate {
+  color: var(--fc-text-quaternary, var(--fc-text-subtle));
+}
+
+/* Client progress status — thin bar under week card (does not recolor phase segments). */
+.weekStatusBar {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 3px;
+  height: 3px;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.weekStatusDone {
+  background: color-mix(in srgb, var(--fc-status-success, #22c55e) 88%, white);
+}
+
+.weekStatusMissed {
+  background: color-mix(in srgb, var(--fc-status-error, #ef4444) 88%, white);
+}
+
+.weekStatusCurrent {
+  background: color-mix(in srgb, var(--fc-status-warning, #f59e0b) 90%, white);
+}
+
+.progressLegend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 14px;
+  margin-top: 8px;
+  padding: 0 8px;
+}
+
+.progressLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--fc-text-subtle);
+  font-family: var(--font-body, ui-sans-serif);
+}
+
+.progressLegendDot {
+  display: inline-block;
+  width: 8px;
+  height: 3px;
+  border-radius: 999px;
+}
+
+.progressLegendHint {
+  font-size: 10px;
+  color: var(--fc-text-quaternary, var(--fc-text-subtle));
+  opacity: 0.85;
 }
 
 .weekNum {

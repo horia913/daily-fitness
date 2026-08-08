@@ -42,6 +42,10 @@ import css from '@/components/coach/programs/programEditV1.module.css'
 import { cn } from '@/lib/utils'
 import { formatGroupMetaLabel } from '@/components/workout-canvas/formatSummary'
 import type { ProgramEditorMode } from '@/types/programDraft'
+import {
+  PAST_WEEK_LOCK_REASON,
+  assertNoLockedWeekEdits,
+} from '@/lib/programInstance/instancePastWeekLock'
 
 export type ProgramStationShellProps =
   | { mode?: 'master'; programId: string }
@@ -197,6 +201,11 @@ function ProgramStationInner({ programId }: { programId: string }) {
 
   const applyWeekCopy = useCallback(
     (block: TrainingBlock, sourceAbsWeek: number, targets: number[]) => {
+      const lockedTargets = targets.filter((w) => draft.isWeekLocked(w))
+      if (lockedTargets.length > 0 || draft.isWeekLocked(sourceAbsWeek)) {
+        addToast({ title: PAST_WEEK_LOCK_REASON, variant: 'destructive' })
+        return
+      }
       draft.copyWeekToWeeks(block, sourceAbsWeek, targets)
       const n = targets.length
       addToast({
@@ -209,17 +218,22 @@ function ProgramStationInner({ programId }: { programId: string }) {
   const requestWeekCopyTargets = useCallback(
     (block: TrainingBlock, sourceAbsWeek: number, targets: number[]) => {
       if (targets.length === 0) return
-      const occupied = weeksWithScheduledContent(
-        draft.workingCopy?.schedule ?? [],
-        targets,
-      )
-      if (occupied.length > 0) {
-        setWeekCopyPending({ block, sourceAbsWeek, targets, occupied })
+      const allowed = targets.filter((w) => !draft.isWeekLocked(w))
+      if (allowed.length === 0) {
+        addToast({ title: PAST_WEEK_LOCK_REASON, variant: 'destructive' })
         return
       }
-      applyWeekCopy(block, sourceAbsWeek, targets)
+      const occupied = weeksWithScheduledContent(
+        draft.workingCopy?.schedule ?? [],
+        allowed,
+      )
+      if (occupied.length > 0) {
+        setWeekCopyPending({ block, sourceAbsWeek, targets: allowed, occupied })
+        return
+      }
+      applyWeekCopy(block, sourceAbsWeek, allowed)
     },
-    [draft.workingCopy?.schedule, applyWeekCopy],
+    [draft, applyWeekCopy, addToast],
   )
 
   const openSettings = () => {
@@ -323,6 +337,11 @@ function ProgramStationInner({ programId }: { programId: string }) {
               setRelativeWeek(block.duration_weeks + 1)
               addToast({ title: 'Week added in working copy. Save to commit.' })
             }}
+            lockedWeeks={draft.pastWeekLock?.lockedWeeks}
+            weekProgressStatus={
+              isClientMode ? draft.clientProgress?.weekStatus : undefined
+            }
+            showProgressLegend={Boolean(isClientMode && draft.clientProgress)}
           />
         ) : (
           <section className={css.wrap} data-testid="recurring-week-label">
@@ -349,7 +368,7 @@ function ProgramStationInner({ programId }: { programId: string }) {
           activeBlockId={activeBlock?.id ?? null}
           blockAccentColor={blockAccentColor}
           onProgressWeek={
-            isRecurring
+            isRecurring || draft.isWeekLocked(absoluteWeek)
               ? undefined
               : (absWeek) => {
                   setWeekFillSourceAbs(absWeek)
@@ -357,7 +376,7 @@ function ProgramStationInner({ programId }: { programId: string }) {
                 }
           }
           onDuplicateWeek={
-            isRecurring || !activeBlock
+            isRecurring || !activeBlock || draft.isWeekLocked(absoluteWeek)
               ? undefined
               : () => {
                   draft.duplicateWeek(activeBlock, absoluteWeek)
@@ -365,7 +384,7 @@ function ProgramStationInner({ programId }: { programId: string }) {
                 }
           }
           onRequestCopyWeek={
-            isRecurring || !activeBlock
+            isRecurring || !activeBlock || draft.isWeekLocked(absoluteWeek)
               ? undefined
               : () => {
                   setWeekCopy({ block: activeBlock, sourceAbsWeek: absoluteWeek })
@@ -450,6 +469,7 @@ function ProgramStationInner({ programId }: { programId: string }) {
           draft={draft.workingCopy}
           title={`Copy week ${weekCopy.sourceAbsWeek} to…`}
           excludeWeek={weekCopy.sourceAbsWeek}
+          lockedWeeks={draft.pastWeekLock?.lockedWeeks}
           onConfirm={(targets) => {
             const { block, sourceAbsWeek } = weekCopy
             setWeekCopy(null)
@@ -476,6 +496,17 @@ function ProgramStationInner({ programId }: { programId: string }) {
           onOpenChange={setWeekFillOpen}
           draft={draft.workingCopy}
           onApply={(next, result) => {
+            if (draft.editorMode === 'client' && draft.pastWeekLock && draft.baseline) {
+              const gate = assertNoLockedWeekEdits(
+                draft.pastWeekLock,
+                draft.baseline,
+                next,
+              )
+              if (!gate.ok) {
+                addToast({ title: gate.error, variant: 'destructive' })
+                return
+              }
+            }
             draft.setWorkingCopy(next)
             addToast({
               title: `Filled ${result.writtenCount} cells${result.skipped ? ` · ${result.skipped} skipped` : ''}. Save to commit.`,

@@ -76,8 +76,6 @@ export interface ProgramWeekState {
   currentWeekNumber: number
   /** Foundation Mon–Sun current week X (display / phase / roadmap row context). */
   displayWeekNumber: number
-  progressionMode: 'auto' | 'coach_managed'
-  isWeekCompleteAwaitingReview: boolean
   coachFeedback: { notes: string; reviewedAt: string } | null
   /** B.1 coach pause — mirrors program_assignments.pause_status */
   pauseStatus: 'active' | 'paused'
@@ -121,8 +119,6 @@ export async function buildProgramWeekState(
     totalSlots: 0,
     currentWeekNumber: 1,
     displayWeekNumber: 1,
-    progressionMode: 'auto',
-    isWeekCompleteAwaitingReview: false,
     coachFeedback: null,
     pauseStatus: 'active',
     pauseReason: null,
@@ -166,8 +162,6 @@ export async function buildProgramWeekState(
         totalSlots,
         currentWeekNumber: totalWeeks,
         displayWeekNumber: weekRes?.currentWeek ?? totalWeeks,
-        progressionMode: completedAssignment.progression_mode ?? 'auto',
-        isWeekCompleteAwaitingReview: false,
         coachFeedback: null,
         pauseStatus: 'active',
         pauseReason: null,
@@ -237,8 +231,6 @@ export async function buildProgramWeekState(
           pause_status: state.assignment?.pause_status ?? null,
           paused_at: state.assignment?.paused_at ?? null,
           timezone_snapshot: state.assignment?.timezone_snapshot ?? null,
-          progression_mode: state.assignment?.progression_mode,
-          coach_unlocked_week: state.assignment?.coach_unlocked_week ?? null,
           totalWeeksCap: resolved?.totalWeeks ?? null,
         })
   const displayWeekNumber = unlockedWeekMax
@@ -320,18 +312,9 @@ export async function buildProgramWeekState(
     programName = 'Training Program'
   }
 
-  const progressionMode = (state.assignment.progression_mode === 'coach_managed' ? 'coach_managed' : 'auto') as 'auto' | 'coach_managed'
-
-  // In coach_managed mode, check if all required slots in the current week are done
-  const requiredCurrentWeekSlots = currentWeekSlots.filter(s => !s.is_optional)
-  const allRequiredCurrentWeekComplete = requiredCurrentWeekSlots.length > 0 &&
-    requiredCurrentWeekSlots.every(s => slotKey(s) != null && completedKeys.has(slotKey(s)!))
-  const isWeekCompleteAwaitingReview =
-    progressionMode === 'coach_managed' && allRequiredCurrentWeekComplete && !state.isCompleted
-
-  // Fetch latest coach review notes for the current week
+  // Coach week notes (available on any assignment — not mode-gated).
   let coachFeedback: { notes: string; reviewedAt: string } | null = null
-  if (progressionMode === 'coach_managed' && state.assignment.id) {
+  if (state.assignment.id) {
     const { data: review } = await supabase
       .from('coach_week_reviews')
       .select('coach_notes, reviewed_at')
@@ -365,8 +348,6 @@ export async function buildProgramWeekState(
     totalSlots: state.totalSlots,
     currentWeekNumber: unlockedWeekMax,
     displayWeekNumber,
-    progressionMode,
-    isWeekCompleteAwaitingReview,
     coachFeedback,
     pauseStatus,
     pauseReason: state.assignment.pause_reason ?? null,

@@ -61,9 +61,7 @@ export type ProgramCardJson = {
   name: string;
   currentWeek: number | null;
   durationWeeks: number | null;
-  progressionMode: string | null;
-  coachUnlockedWeek: number | null;
-  weekReviewNeeded: boolean;
+  /** Optional week to open in WeekReviewModal; defaults to currentWeek */
   reviewWeekNumber: number | null;
   behindOnWeeklyWorkouts: boolean;
   programProgressPercent: number | null;
@@ -285,7 +283,6 @@ export default function CoachClientDailyReview({
 
   const reviewWeek =
     program?.reviewWeekNumber ??
-    program?.coachUnlockedWeek ??
     program?.currentWeek ??
     1;
 

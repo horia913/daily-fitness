@@ -66,8 +66,6 @@ interface ProgramAssignment {
   end_date?: string
   status: string
   created_at: string
-  progression_mode?: string | null
-  coach_unlocked_week?: number | null
   pause_status?: string | null
   paused_at?: string | null
   pause_accumulated_days?: number | null
@@ -96,8 +94,6 @@ type ActiveProgramSummary = {
   assignmentId: string
   programId: string
   programName: string
-  progressionMode: string
-  coachUnlockedWeek: number | null
   displayWeek: number
   requiredCount: number
   completedCount: number
@@ -115,8 +111,6 @@ type CoachTrainingRpcPayload = {
     programName?: string
     durationWeeks?: number | null
     displayWeek?: number
-    progressionMode?: string
-    coachUnlockedWeek?: number | null
     requiredSlotsThisWeek?: number
     completedRequiredThisWeek?: number
     weekDays?: unknown
@@ -449,10 +443,6 @@ async function fetchCoachClientTrainingPage(
               (ap.programName && String(ap.programName)) ||
               active.workout_programs?.name ||
               'Program',
-            progressionMode:
-              ap.progressionMode ?? active.progression_mode ?? 'auto',
-            coachUnlockedWeek:
-              ap.coachUnlockedWeek ?? null,
             displayWeek: dw,
             requiredCount,
             completedCount,
@@ -479,7 +469,6 @@ async function fetchCoachClientTrainingPage(
             resolveInstanceWeekForAssignment(supabase, active.id),
           ])
 
-          const mode = active.progression_mode ?? 'auto'
           const displayWeek =
             foundation?.foundationWeek ?? weekRes?.currentWeek ?? 1
 
@@ -546,8 +535,6 @@ async function fetchCoachClientTrainingPage(
             assignmentId: active.id,
             programId: active.program_id,
             programName: active.workout_programs?.name || 'Program',
-            progressionMode: mode,
-            coachUnlockedWeek: null,
             displayWeek,
             requiredCount,
             completedCount,
@@ -1057,10 +1044,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
 
   const overallProgramPct = activeProgramSummary?.programCompletionPct ?? 0
 
-  const reviewWeekNumber =
-    activeProgramSummary != null
-      ? activeProgramSummary.coachUnlockedWeek ?? activeProgramSummary.displayWeek
-      : 1
+  const reviewWeekNumber = activeProgramSummary?.displayWeek ?? 1
 
   const otherPrograms = activeProgramSummary
     ? programs.filter((p) => p.id !== activeProgramSummary.assignmentId)

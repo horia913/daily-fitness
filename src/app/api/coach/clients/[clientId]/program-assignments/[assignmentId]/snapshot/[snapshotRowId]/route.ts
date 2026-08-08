@@ -10,6 +10,11 @@ import {
   validateApiAuth,
   createForbiddenResponse,
 } from '@/lib/apiAuth'
+import {
+  isWeekLocked,
+  loadPastWeekLockSnapshot,
+  PAST_WEEK_LOCK_REASON,
+} from '@/lib/programInstance/instancePastWeekLock'
 
 type RouteCtx = {
   params: Promise<{
@@ -84,6 +89,14 @@ export async function PATCH(request: NextRequest, ctx: RouteCtx) {
     }
 
     const weekNum = Number(row.week_number) || Math.max(1, Math.ceil((Number(row.day_number) || 1) / 7))
+    const lock = await loadPastWeekLockSnapshot(supabaseAdmin, assignmentId)
+    if (isWeekLocked(lock, weekNum)) {
+      return NextResponse.json(
+        { error: PAST_WEEK_LOCK_REASON, code: 'WEEK_LOCKED', week: weekNum },
+        { status: 409 },
+      )
+    }
+
     const programDayRaw = row.program_day
     const programDay =
       typeof programDayRaw === 'number' && programDayRaw >= 1 && programDayRaw <= 7

@@ -43,8 +43,6 @@ export interface ProgramAssignment {
   start_date: string | null
   total_days: number | null
   created_at: string
-  progression_mode: 'auto' | 'coach_managed'
-  coach_unlocked_week: number | null
   /** B.1 — coach pause (CHECK: active | paused) */
   pause_status?: 'active' | 'paused'
   paused_at?: string | null
@@ -128,7 +126,7 @@ export async function getActiveProgramAssignment(
 ): Promise<ProgramAssignment | null> {
   const { data, error } = await supabase
     .from('program_assignments')
-    .select('id, program_id, client_id, name, status, start_date, total_days, created_at, progression_mode, coach_unlocked_week, pause_status, paused_at, pause_accumulated_days, timezone_snapshot, pause_reason')
+    .select('id, program_id, client_id, name, status, start_date, total_days, created_at, pause_status, paused_at, pause_accumulated_days, timezone_snapshot, pause_reason')
     .eq('client_id', clientId)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
@@ -153,7 +151,7 @@ export async function getRecentlyCompletedProgramAssignment(
 ): Promise<ProgramAssignment | null> {
   const { data, error } = await supabase
     .from('program_assignments')
-    .select('id, program_id, client_id, name, status, start_date, total_days, created_at, progression_mode, coach_unlocked_week, pause_status, paused_at, pause_accumulated_days, timezone_snapshot, pause_reason')
+    .select('id, program_id, client_id, name, status, start_date, total_days, created_at, pause_status, paused_at, pause_accumulated_days, timezone_snapshot, pause_reason')
     .eq('client_id', clientId)
     .eq('status', 'completed')
     .order('created_at', { ascending: false })
@@ -630,19 +628,12 @@ export function computeUnlockedWeekMax(
   slots: ProgramScheduleSlot[],
   _completedSlots: CompletedSlot[],
   assignment?: Partial<AssignmentWeekFields> & {
-    progression_mode?: string
-    coach_unlocked_week?: number | null
     /** N from resolver (instance phases) — caps calendar week X. */
     totalWeeksCap?: number | null
   },
   clientTimezone?: string
 ): number {
   if (slots.length === 0) return 1
-
-  // @deprecated retained for signature compatibility, no longer read.
-  void assignment?.progression_mode
-  // @deprecated retained for signature compatibility, no longer read.
-  void assignment?.coach_unlocked_week
 
   const capFromSlots = Math.max(...slots.map((s) => s.week_number))
   const capRaw = assignment?.totalWeeksCap
@@ -676,8 +667,6 @@ export function assertWeekUnlocked(
   slots: ProgramScheduleSlot[],
   completedSlots: CompletedSlot[],
   assignment?: Partial<AssignmentWeekFields> & {
-    progression_mode?: string
-    coach_unlocked_week?: number | null
     totalWeeksCap?: number | null
   },
   clientTimezone?: string

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
-import { MoreVertical, Dumbbell, Library } from 'lucide-react'
+import { MoreVertical, Dumbbell, Library, Lock } from 'lucide-react'
 import type { DaySlotSummary } from '@/lib/programs/stationScheduleUtils'
 import { programDayLabel, programTimelineDay } from '@/lib/programs/stationScheduleUtils'
 import { WorkoutCanvasCore } from '@/components/workout-canvas/WorkoutCanvasCore'
@@ -15,10 +15,16 @@ import { SaveToLibraryDialog } from './SaveToLibraryDialog'
 import { FillToolDialog } from './FillToolDialog'
 import { FillProgressionButton } from './FillToolEntryControls'
 import { DayWorkoutNameEdit, stockDayWorkoutName } from './DayWorkoutNameEdit'
+import { PAST_WEEK_LOCK_REASON, assertNoLockedWeekEdits } from '@/lib/programInstance/instancePastWeekLock'
+import {
+  CLIENT_PROGRESS_STATUS_LABEL,
+  type ClientProgressStatus,
+} from '@/lib/programInstance/instanceClientProgressStatus'
 import entryCss from './fillToolEntries.module.css'
 import type { FillScope } from '@/lib/programs/fillTool'
 import columnCss from './sessionColumns.module.css'
 import css from '@/components/coach/programs/programEditV1.module.css'
+import { cn } from '@/lib/utils'
 
 export interface ProgramDayEditorProps {
   coachId: string
@@ -34,6 +40,10 @@ export interface ProgramDayEditorProps {
   accentColor?: string
   /** Prefix slot (e.g. drag handle) rendered at the start of the embedded header row. */
   headerPrefix?: React.ReactNode
+  /** View-only: completed past week (client mode). */
+  locked?: boolean
+  /** Client-mode day progress (done/missed/current); omit for upcoming/rest. */
+  progressStatus?: ClientProgressStatus
 }
 
 export function ProgramDayEditor({
@@ -49,6 +59,8 @@ export function ProgramDayEditor({
   embedded,
   accentColor,
   headerPrefix,
+  locked = false,
+  progressStatus,
 }: ProgramDayEditorProps) {
   const { addToast } = useToast()
   const draft = useProgramDraft()
@@ -68,8 +80,12 @@ export function ProgramDayEditor({
   const workout = templateId && draft.workingCopy ? draft.workingCopy.workouts[templateId] : null
   const timelineDay = programTimelineDay(absoluteWeek, programDay)
 
+  const toastLocked = () => {
+    addToast({ title: PAST_WEEK_LOCK_REASON, variant: 'destructive' })
+  }
+
   const handleWorkoutChange = (next: import('@/lib/groupModel/canvasTypes').CanvasWorkout) => {
-    if (!templateId) return
+    if (locked || !templateId) return
     draft.updateWorkout(templateId, next)
   }
 
@@ -79,18 +95,26 @@ export function ProgramDayEditor({
     stockDayWorkoutName(programDay)
 
   const handleRenameWorkout = (nextName: string) => {
-    if (!templateId || !workout) return
+    if (locked || !templateId || !workout) return
     const trimmed = nextName.trim() || stockDayWorkoutName(programDay)
     if (trimmed === workout.name) return
     draft.updateWorkout(templateId, { ...workout, name: trimmed })
   }
 
   const runBuildFromScratch = () => {
+    if (locked) {
+      toastLocked()
+      return
+    }
     draft.buildDay(absoluteWeek, programDay, activeBlockId)
     addToast({ title: 'Empty workout added — start adding exercises. Save to commit.' })
   }
 
   const runInsertFromLibrary = async (libraryId: string) => {
+    if (locked) {
+      toastLocked()
+      return
+    }
     setBusy(true)
     try {
       const libraryWorkout = await loadWorkoutForCanvas(supabase, libraryId)
@@ -132,6 +156,10 @@ export function ProgramDayEditor({
   }
 
   const runClearDay = () => {
+    if (locked) {
+      toastLocked()
+      return
+    }
     if (!window.confirm('Clear this day? The schedule slot will be removed (rest day).')) return
     draft.clearDay(absoluteWeek, programDay)
     setMenuOpen(false)
@@ -139,6 +167,10 @@ export function ProgramDayEditor({
   }
 
   const openFill = (scope: FillScope, groupId?: string, slotId?: string) => {
+    if (locked) {
+      toastLocked()
+      return
+    }
     setFillScope(scope)
     setFillGroupId(groupId)
     setFillSlotId(slotId)
@@ -147,6 +179,10 @@ export function ProgramDayEditor({
   }
 
   const openPicker = (mode: 'add' | 'replace') => {
+    if (locked) {
+      toastLocked()
+      return
+    }
     setPickerMode(mode)
     setPickerOpen(true)
     setMenuOpen(false)
@@ -162,7 +198,7 @@ export function ProgramDayEditor({
     return () => document.removeEventListener('mousedown', onDoc)
   }, [menuOpen])
 
-  const kebabMenu = !isRest ? (
+  const kebabMenu = !isRest && !locked ? (
     <div className="relative shrink-0" ref={kebabRef}>
       <button
         type="button"
@@ -233,7 +269,16 @@ export function ProgramDayEditor({
     </div>
   ) : null
 
-  const sessionHeaderActions = !isRest ? (
+  const sessionHeaderActions = locked ? (
+    <span
+      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--pe-t3)]"
+      title={PAST_WEEK_LOCK_REASON}
+      data-testid="day-locked-badge"
+    >
+      <Lock className="h-3 w-3" aria-hidden />
+      Locked
+    </span>
+  ) : !isRest ? (
     <div className={entryCss.headerActions}>
       <FillProgressionButton onClick={() => openFill('day')} accentColor={accentColor} />
       {kebabMenu}
@@ -242,7 +287,27 @@ export function ProgramDayEditor({
     kebabMenu
   )
 
-  const editorBody = isRest ? (
+  const editorBody = locked ? (
+    isRest ? (
+      <div className={embedded ? columnCss.restBody : undefined}>
+        <p className={columnCss.restLabel}>Rest</p>
+        <p className="text-[12px] text-[var(--pe-t3)] max-w-xs">{PAST_WEEK_LOCK_REASON}</p>
+      </div>
+    ) : workout ? (
+      <div className="relative" data-testid="day-locked-canvas">
+        <div className="pointer-events-none select-none opacity-90">
+          <WorkoutCanvasCore
+            key={`${absoluteWeek}-${programDay}-${templateId}-ro`}
+            coachId={coachId}
+            workout={workout}
+            visualVariant="station"
+          />
+        </div>
+      </div>
+    ) : (
+      <p className="text-sm text-[var(--pe-t3)] p-4">Workout not loaded in working copy.</p>
+    )
+  ) : isRest ? (
     <div className={embedded ? columnCss.restBody : undefined} data-testid="rest-day-add-workout">
       {embedded ? (
         <>
@@ -301,6 +366,28 @@ export function ProgramDayEditor({
     <p className="text-sm text-[var(--pe-t3)] p-4">Workout not loaded in working copy.</p>
   )
 
+  const dayProgressBadge =
+    progressStatus && progressStatus !== 'upcoming' ? (
+      <span
+        className={cn(
+          columnCss.dayProgressBadge,
+          progressStatus === 'done' && columnCss.dayProgressDone,
+          progressStatus === 'missed' && columnCss.dayProgressMissed,
+          progressStatus === 'current' && columnCss.dayProgressCurrent,
+        )}
+        title={CLIENT_PROGRESS_STATUS_LABEL[progressStatus]}
+        aria-label={CLIENT_PROGRESS_STATUS_LABEL[progressStatus]}
+        data-testid={`day-progress-${programDay}`}
+      >
+        <span className={columnCss.dayProgressSwatch} aria-hidden />
+        <span className={columnCss.dayProgressLabel}>
+          {progressStatus === 'current'
+            ? 'Now'
+            : CLIENT_PROGRESS_STATUS_LABEL[progressStatus]}
+        </span>
+      </span>
+    ) : null
+
   if (embedded) {
     return (
       <>
@@ -309,7 +396,7 @@ export function ProgramDayEditor({
             {headerPrefix ?? <span className="w-6" />}
             <div className={columnCss.headerText}>
               <p className={columnCss.dayLabel}>{programDayLabel(programDay)}</p>
-              {!isRest && workout ? (
+              {!isRest && workout && !locked ? (
                 <DayWorkoutNameEdit
                   programDay={programDay}
                   value={workoutDisplayName}
@@ -328,6 +415,7 @@ export function ProgramDayEditor({
                 {summary.isOptional ? ' · Optional' : ''}
               </p>
             </div>
+            {dayProgressBadge}
             {sessionHeaderActions}
           </div>
           <div className={columnCss.sessionBody}>{editorBody}</div>
@@ -354,6 +442,17 @@ export function ProgramDayEditor({
             onOpenChange={setFillOpen}
             draft={draft.workingCopy}
             onApply={(next, result) => {
+              if (draft.editorMode === 'client' && draft.pastWeekLock && draft.baseline) {
+                const gate = assertNoLockedWeekEdits(
+                  draft.pastWeekLock,
+                  draft.baseline,
+                  next,
+                )
+                if (!gate.ok) {
+                  addToast({ title: gate.error, variant: 'destructive' })
+                  return
+                }
+              }
               draft.setWorkingCopy(next)
               addToast({
                 title: `Filled ${result.writtenCount} cells${result.skipped ? ` · ${result.skipped} skipped` : ''}. Save to commit.`,
@@ -388,7 +487,7 @@ export function ProgramDayEditor({
             <p className={css.eyebrow}>
               {programDayLabel(programDay)} · Week {absoluteWeek}
             </p>
-            {!isRest && workout ? (
+            {!isRest && workout && !locked ? (
               <DayWorkoutNameEdit
                 programDay={programDay}
                 value={workoutDisplayName}
@@ -416,6 +515,7 @@ export function ProgramDayEditor({
               <p className="text-[11px] text-[var(--pe-t3)] mt-0.5">Rest day</p>
             )}
           </div>
+          {dayProgressBadge}
           {sessionHeaderActions}
         </div>
         <div className={`p-4 ${columnCss.sessionEditorBody}`}>{editorBody}</div>
@@ -442,6 +542,17 @@ export function ProgramDayEditor({
           onOpenChange={setFillOpen}
           draft={draft.workingCopy}
           onApply={(next, result) => {
+            if (draft.editorMode === 'client' && draft.pastWeekLock && draft.baseline) {
+              const gate = assertNoLockedWeekEdits(
+                draft.pastWeekLock,
+                draft.baseline,
+                next,
+              )
+              if (!gate.ok) {
+                addToast({ title: gate.error, variant: 'destructive' })
+                return
+              }
+            }
             draft.setWorkingCopy(next)
             addToast({
               title: `Filled ${result.writtenCount} cells${result.skipped ? ` · ${result.skipped} skipped` : ''}. Save to commit.`,

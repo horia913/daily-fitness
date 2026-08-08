@@ -231,7 +231,7 @@ export async function GET(request: NextRequest) {
       supabase
         .from('program_assignments')
         .select(
-          'id, client_id, program_id, name, start_date, status, progression_mode, pause_status, paused_at, pause_accumulated_days, timezone_snapshot, updated_at'
+          'id, client_id, program_id, name, start_date, status, pause_status, paused_at, pause_accumulated_days, timezone_snapshot, updated_at'
         )
         .in('client_id', clientIds)
         .eq('status', 'active')

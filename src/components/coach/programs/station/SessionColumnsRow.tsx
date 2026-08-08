@@ -7,7 +7,7 @@ import {
   Droppable,
   type DropResult,
 } from '@hello-pangea/dnd'
-import { GripVertical, Copy, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react'
+import { GripVertical, Copy, MoreHorizontal, ChevronLeft, ChevronRight, Lock } from 'lucide-react'
 import type { DaySlotSummary } from '@/lib/programs/stationScheduleUtils'
 import { programDayLabel } from '@/lib/programs/stationScheduleUtils'
 import { useProgramDraft } from '@/contexts/ProgramDraftContext'
@@ -16,6 +16,11 @@ import { ProgramDayEditor } from './ProgramDayEditor'
 import { DayTargetPicker } from './DayTargetPicker'
 import { ReplaceSessionDialog } from './ReplaceSessionDialog'
 import { FillProgressionButton } from './FillToolEntryControls'
+import {
+  CURRENT_WEEK_COMPLETIONS_WARNING,
+  PAST_WEEK_LOCK_REASON,
+} from '@/lib/programInstance/instancePastWeekLock'
+import { clientProgressDayKey } from '@/lib/programInstance/instanceClientProgressStatus'
 import columnCss from './sessionColumns.module.css'
 import shellCss from '@/components/coach/programs/programEditV1.module.css'
 import { cn } from '@/lib/utils'
@@ -64,6 +69,13 @@ export function SessionColumnsRow({
 }: SessionColumnsRowProps) {
   const draft = useProgramDraft()
   const { addToast } = useToast()
+  const weekLocked = draft.isWeekLocked(absoluteWeek)
+  const showCurrentWeekWarning =
+    draft.editorMode === 'client' &&
+    draft.pastWeekLock != null &&
+    draft.pastWeekLock.foundationWeek === absoluteWeek &&
+    draft.pastWeekLock.currentWeekHasCompletions
+  const lockedWeeks = draft.pastWeekLock?.lockedWeeks
   const [pendingReplace, setPendingReplace] = useState<PendingAction>(null)
   const [picker, setPicker] = useState<PickerMode>(null)
   const [weekMenuOpen, setWeekMenuOpen] = useState(false)
@@ -150,7 +162,8 @@ export function SessionColumnsRow({
     }
   }, [updateScrollEdges, summaries.length])
 
-  const showWeekActions = Boolean(onDuplicateWeek || onRequestCopyWeek)
+  const showWeekActions =
+    !weekLocked && Boolean(onDuplicateWeek || onRequestCopyWeek)
 
   const targetOccupied = useCallback(
     (week: number, day: number) => {
@@ -165,11 +178,19 @@ export function SessionColumnsRow({
   )
 
   const runCopy = (sourceDay: number, targetWeek: number, targetDay: number) => {
+    if (weekLocked || draft.isWeekLocked(targetWeek)) {
+      addToast({ title: PAST_WEEK_LOCK_REASON, variant: 'destructive' })
+      return
+    }
     draft.copyDay(absoluteWeek, sourceDay, targetWeek, targetDay, activeBlockId)
     addToast({ title: 'Session copied in working copy. Save to commit.' })
   }
 
   const runMove = (sourceDay: number, targetWeek: number, targetDay: number) => {
+    if (weekLocked || draft.isWeekLocked(targetWeek)) {
+      addToast({ title: PAST_WEEK_LOCK_REASON, variant: 'destructive' })
+      return
+    }
     if (targetWeek === absoluteWeek && sourceDay === targetDay) return
     draft.moveDay(absoluteWeek, sourceDay, targetWeek, targetDay, activeBlockId)
     addToast({ title: 'Session moved in working copy. Save to commit.' })
@@ -181,6 +202,10 @@ export function SessionColumnsRow({
     targetWeek: number,
     targetDay: number,
   ) => {
+    if (weekLocked || draft.isWeekLocked(targetWeek)) {
+      addToast({ title: PAST_WEEK_LOCK_REASON, variant: 'destructive' })
+      return
+    }
     if (kind === 'copy' && targetWeek === absoluteWeek && sourceDay === targetDay) return
     if (targetOccupied(targetWeek, targetDay)) {
       setPendingReplace({ kind, sourceDay, targetWeek, targetDay })
@@ -191,6 +216,7 @@ export function SessionColumnsRow({
   }
 
   const onDragEnd = (result: DropResult) => {
+    if (weekLocked) return
     if (!result.destination) return
     const sourceDay = Number(result.draggableId.replace('session-day-', ''))
     const targetDay = Number(result.destination.droppableId.replace('session-drop-', ''))
@@ -203,6 +229,11 @@ export function SessionColumnsRow({
 
   const handlePickerSelect = (target: { week: number; day: number; templateId: string | null }) => {
     if (!picker) return
+    if (weekLocked || draft.isWeekLocked(target.week)) {
+      addToast({ title: PAST_WEEK_LOCK_REASON, variant: 'destructive' })
+      setPicker(null)
+      return
+    }
     if (picker.kind === 'move-day') {
       requestCopyOrMove('move', picker.sourceDay, target.week, target.day)
     } else if (picker.kind === 'copy-day') {
@@ -246,7 +277,29 @@ export function SessionColumnsRow({
               style={{ fontFamily: 'var(--f-headline, Bricolage Grotesque, sans-serif)' }}
             >
               Week {absoluteWeek} · Sessions
+              {weekLocked ? (
+                <span
+                  className="ml-2 inline-flex items-center gap-1 align-middle text-[10px] font-semibold uppercase tracking-wide text-[var(--pe-t3)]"
+                  title={PAST_WEEK_LOCK_REASON}
+                >
+                  <Lock className="h-3 w-3" aria-hidden />
+                  Locked
+                </span>
+              ) : null}
             </h2>
+            {showCurrentWeekWarning ? (
+              <p
+                className="mt-1 max-w-xl text-[11px] text-[var(--pe-warning,#FFC822)]"
+                data-testid="current-week-completions-warning"
+                role="status"
+              >
+                {CURRENT_WEEK_COMPLETIONS_WARNING}
+              </p>
+            ) : weekLocked ? (
+              <p className="mt-1 max-w-xl text-[11px] text-[var(--pe-t3)]" role="status">
+                {PAST_WEEK_LOCK_REASON}
+              </p>
+            ) : null}
             <div
               className={columnCss.weekHeaderActions}
               style={
@@ -277,7 +330,7 @@ export function SessionColumnsRow({
                   <ChevronRight className="h-3.5 w-3.5" />
                 </button>
               </div>
-              {onProgressWeek ? (
+              {onProgressWeek && !weekLocked ? (
                 <FillProgressionButton
                   onClick={() => onProgressWeek(absoluteWeek)}
                   accentColor={blockAccentColor}
@@ -339,7 +392,11 @@ export function SessionColumnsRow({
               ) : null}
             </div>
           </div>
-          <p className={columnCss.hint}>Drag to copy · scroll across the week</p>
+          <p className={columnCss.hint}>
+            {weekLocked
+              ? 'View only — completed history is locked'
+              : 'Drag to copy · scroll across the week'}
+          </p>
         </div>
 
         <DragDropContext onDragEnd={onDragEnd}>
@@ -352,7 +409,8 @@ export function SessionColumnsRow({
               const programDay = index + 1
               const isRest = summary.isRest
 
-              const dragHandle = !isRest ? (
+              const dragHandle =
+                !isRest && !weekLocked ? (
                 <Draggable draggableId={`session-day-${programDay}`} index={0}>
                   {(dragProvided) => (
                     <button
@@ -371,7 +429,11 @@ export function SessionColumnsRow({
               ) : null
 
               return (
-                <Droppable key={programDay} droppableId={`session-drop-${programDay}`}>
+                <Droppable
+                  key={programDay}
+                  droppableId={`session-drop-${programDay}`}
+                  isDropDisabled={weekLocked}
+                >
                   {(dropProvided, dropSnapshot) => (
                     <div
                       ref={dropProvided.innerRef}
@@ -393,21 +455,44 @@ export function SessionColumnsRow({
                         embedded
                         accentColor={blockAccentColor}
                         headerPrefix={dragHandle}
-                        onMoveTo={() =>
-                          setPicker({ kind: 'move-day', sourceDay: programDay })
+                        locked={weekLocked}
+                        progressStatus={
+                          draft.editorMode === 'client'
+                            ? draft.clientProgress?.dayStatus.get(
+                                clientProgressDayKey(absoluteWeek, programDay),
+                              )
+                            : undefined
                         }
-                        onCopyTo={() =>
-                          setPicker({ kind: 'copy-day', sourceDay: programDay })
+                        onMoveTo={
+                          weekLocked
+                            ? undefined
+                            : () => setPicker({ kind: 'move-day', sourceDay: programDay })
                         }
-                        onDuplicateGroup={(groupId) => {
-                          if (!summary.templateId) return
-                          draft.duplicateGroup(summary.templateId, groupId)
-                          addToast({
-                            title: 'Group duplicated in working copy. Save to commit.',
-                          })
-                        }}
-                        onCopyGroupToDay={(groupId) =>
-                          setPicker({ kind: 'copy-group', sourceDay: programDay, groupId })
+                        onCopyTo={
+                          weekLocked
+                            ? undefined
+                            : () => setPicker({ kind: 'copy-day', sourceDay: programDay })
+                        }
+                        onDuplicateGroup={
+                          weekLocked
+                            ? undefined
+                            : (groupId) => {
+                                if (!summary.templateId) return
+                                draft.duplicateGroup(summary.templateId, groupId)
+                                addToast({
+                                  title: 'Group duplicated in working copy. Save to commit.',
+                                })
+                              }
+                        }
+                        onCopyGroupToDay={
+                          weekLocked
+                            ? undefined
+                            : (groupId) =>
+                                setPicker({
+                                  kind: 'copy-group',
+                                  sourceDay: programDay,
+                                  groupId,
+                                })
                         }
                       />
                       {dropProvided.placeholder}
@@ -443,6 +528,7 @@ export function SessionColumnsRow({
         excludeWeek={picker ? absoluteWeek : undefined}
         excludeDay={picker?.sourceDay}
         requireWorkout={picker?.kind === 'copy-group'}
+        lockedWeeks={lockedWeeks}
         onSelect={handlePickerSelect}
       />
     </>

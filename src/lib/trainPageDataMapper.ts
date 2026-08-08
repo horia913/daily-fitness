@@ -68,9 +68,11 @@ export interface TrainPageRpcResponse {
   currentProgramWeek?: number | null
   currentProgramWeekClamped?: boolean
   durationWeeks?: number | null
+  /** @deprecated unused — unlock is calendar/foundation; column may still be returned by RPC */
   progressionMode?: string | null
+  /** @deprecated unused — unlock is calendar/foundation */
   coachUnlockedWeek?: number | null
-  /** Latest coach review notes for the current week (coach_managed mode) */
+  /** Latest coach review notes for the current week */
   coachReviewNotes?: string | null
   coachReviewDate?: string | null
   /** When RPC includes B.1 pause fields (camelCase or snake_case) */
@@ -103,8 +105,6 @@ const emptyState: ProgramWeekState = {
   totalSlots: 0,
   currentWeekNumber: 1,
   displayWeekNumber: 1,
-  progressionMode: 'auto',
-  isWeekCompleteAwaitingReview: false,
   coachFeedback: null,
   pauseStatus: 'active',
   pauseReason: null,
@@ -327,7 +327,6 @@ export async function rpcResponseToProgramWeekState(
   }
 
   const assignmentForUnlock = {
-    progression_mode: data.progressionMode ?? 'auto',
     start_date: assignmentStartDate,
     pause_accumulated_days: pauseAccumulatedDays,
     pause_status: pauseStatusEarly,
@@ -353,14 +352,9 @@ export async function rpcResponseToProgramWeekState(
     completedSlots.map((c) => c.program_day_assignment_id).filter((id): id is string => !!id),
   )
 
-  // In coach_managed mode, the client can stay on a week indefinitely — date-window
-  // filtering would hide completions that happened after the calculated window expired.
-  // Use all-time completions since each instance slot is unique per week.
-  const progressionModeRaw = data.progressionMode ?? 'auto'
+  // "This week done" uses the calendar date-window for the current foundation week.
   let completedKeysCurrentWeek: Set<string>
-  if (progressionModeRaw === 'coach_managed') {
-    completedKeysCurrentWeek = completedKeysAllTime
-  } else if (assignmentStartDate) {
+  if (assignmentStartDate) {
     const { startIso, endIso } = zonedUtcBoundsForProgramWeek(
       assignmentStartDate,
       unlockedWeekMax,
@@ -446,17 +440,6 @@ export async function rpcResponseToProgramWeekState(
     slots.find((s) => slotKey(s) != null && !completedKeysAllTime.has(slotKey(s)!)) ?? null
   const isCompleted = nextSlot === null && completedSlots.length > 0
 
-  const progressionMode = (data.progressionMode === 'coach_managed' ? 'coach_managed' : 'auto') as 'auto' | 'coach_managed'
-
-  // In coach_managed mode, check if all required slots in the current week are done
-  const requiredCurrentWeekSlots = currentWeekSlots.filter(s => !s.is_optional)
-  const allRequiredCurrentWeekComplete = requiredCurrentWeekSlots.length > 0 &&
-    requiredCurrentWeekSlots.every(
-      (s) => slotKey(s) != null && completedKeysAllTime.has(slotKey(s)!),
-    )
-  const isWeekCompleteAwaitingReview =
-    progressionMode === 'coach_managed' && allRequiredCurrentWeekComplete && !isCompleted
-
   const coachFeedback = data.coachReviewNotes
     ? { notes: data.coachReviewNotes, reviewedAt: data.coachReviewDate ?? '' }
     : null
@@ -507,8 +490,6 @@ export async function rpcResponseToProgramWeekState(
       totalSlots,
       currentWeekNumber: unlockedWeekMax,
       displayWeekNumber,
-      progressionMode,
-      isWeekCompleteAwaitingReview,
       coachFeedback,
       pauseStatus,
       pauseReason,

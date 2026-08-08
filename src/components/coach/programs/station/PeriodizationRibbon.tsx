@@ -6,6 +6,7 @@ import {
   Copy,
   ChevronLeft,
   ChevronRight,
+  Lock,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -19,6 +20,10 @@ import {
   formatPhaseDisplayName,
   periodizationStyleLabel,
 } from '@/lib/programs/periodizationStyles'
+import {
+  CLIENT_PROGRESS_STATUS_LABEL,
+  type ClientProgressStatus,
+} from '@/lib/programInstance/instanceClientProgressStatus'
 import css from './periodizationRibbon.module.css'
 import shellCss from '@/components/coach/programs/programEditV1.module.css'
 import { cn } from '@/lib/utils'
@@ -50,6 +55,12 @@ export interface PeriodizationRibbonProps {
   onMoveBlock: (blockId: string, direction: 'left' | 'right') => void
   onDuplicateBlock: (block: TrainingBlock) => void
   onAddWeek: (blockId: string) => void
+  /** Absolute weeks that are view-only (client past-week lock). */
+  lockedWeeks?: ReadonlySet<number>
+  /** Client-mode progress status by absolute week (done/missed/current/upcoming). */
+  weekProgressStatus?: ReadonlyMap<number, ClientProgressStatus>
+  /** Show a tiny status legend under the ribbon (client mode). */
+  showProgressLegend?: boolean
   busy?: boolean
 }
 
@@ -70,6 +81,9 @@ export function PeriodizationRibbon({
   onMoveBlock,
   onDuplicateBlock,
   onAddWeek,
+  lockedWeeks,
+  weekProgressStatus,
+  showProgressLegend,
   busy,
 }: PeriodizationRibbonProps) {
   const ranges = computeBlockWeekRanges(trainingBlocks)
@@ -242,18 +256,53 @@ export function PeriodizationRibbon({
                     const rel = i + 1
                     const abs = range.startWeek + rel - 1
                     const weekActive = isActiveBlock && rel === relativeWeek
+                    const weekLocked = lockedWeeks?.has(abs) ?? false
+                    const progress = weekProgressStatus?.get(abs) ?? 'upcoming'
+                    const progressTitle =
+                      progress === 'upcoming'
+                        ? undefined
+                        : weekLocked && progress === 'done'
+                          ? `${CLIENT_PROGRESS_STATUS_LABEL.done} · locked (history preserved)`
+                          : CLIENT_PROGRESS_STATUS_LABEL[progress]
                     return (
                       <div key={rel} className={css.weekCardWrap}>
                         <button
                           type="button"
                           role="tab"
                           aria-selected={weekActive}
+                          title={
+                            weekLocked
+                              ? "This week is completed and locked to preserve the client's history"
+                              : progressTitle
+                          }
                           data-testid={`week-${block.id}-${rel}`}
-                          className={cn(css.weekCell, weekActive && css.weekCellActive)}
+                          data-week-locked={weekLocked ? 'true' : undefined}
+                          data-week-progress={progress !== 'upcoming' ? progress : undefined}
+                          className={cn(
+                            css.weekCell,
+                            weekActive && css.weekCellActive,
+                            weekLocked && css.weekCellLocked,
+                          )}
                           style={{ '--week-block-color': color } as React.CSSProperties}
                           onClick={() => onSelectBlockWeek(block.id, rel)}
                         >
-                          <span className={css.weekNum}>Wk {abs}</span>
+                          {progress !== 'upcoming' ? (
+                            <span
+                              className={cn(
+                                css.weekStatusBar,
+                                progress === 'done' && css.weekStatusDone,
+                                progress === 'missed' && css.weekStatusMissed,
+                                progress === 'current' && css.weekStatusCurrent,
+                              )}
+                              aria-hidden
+                            />
+                          ) : null}
+                          <span className={css.weekNum}>
+                            {weekLocked ? (
+                              <Lock className="inline-block h-2.5 w-2.5 mr-0.5 align-[-1px]" aria-hidden />
+                            ) : null}
+                            Wk {abs}
+                          </span>
                           <span className={css.weekDate}>{weekDateLabel(abs)}</span>
                         </button>
                       </div>
@@ -371,6 +420,36 @@ export function PeriodizationRibbon({
           </div>,
           document.body,
         )}
+
+      {showProgressLegend ? (
+        <div
+          className={css.progressLegend}
+          data-testid="client-progress-legend"
+          aria-label="Client progress legend"
+        >
+          {(
+            [
+              ['done', CLIENT_PROGRESS_STATUS_LABEL.done],
+              ['missed', CLIENT_PROGRESS_STATUS_LABEL.missed],
+              ['current', CLIENT_PROGRESS_STATUS_LABEL.current],
+            ] as const
+          ).map(([key, label]) => (
+            <span key={key} className={css.progressLegendItem}>
+              <span
+                className={cn(
+                  css.progressLegendDot,
+                  key === 'done' && css.weekStatusDone,
+                  key === 'missed' && css.weekStatusMissed,
+                  key === 'current' && css.weekStatusCurrent,
+                )}
+                aria-hidden
+              />
+              {label}
+            </span>
+          ))}
+          <span className={css.progressLegendHint}>Upcoming = no accent</span>
+        </div>
+      ) : null}
     </section>
   )
 }

@@ -13,6 +13,8 @@ export interface WeekTargetPickerProps {
   title: string
   /** Source absolute week — excluded from targets. */
   excludeWeek: number
+  /** Absolute weeks that cannot be overwrite targets (client past-week lock). */
+  lockedWeeks?: ReadonlySet<number>
   onConfirm: (targetAbsWeeks: number[]) => void
 }
 
@@ -22,6 +24,7 @@ export function WeekTargetPicker({
   draft,
   title,
   excludeWeek,
+  lockedWeeks,
   onConfirm,
 }: WeekTargetPickerProps) {
   const [selected, setSelected] = useState<Set<number>>(() => new Set())
@@ -35,7 +38,12 @@ export function WeekTargetPicker({
     const blockById = new Map(draft.trainingBlocks.map((b) => [b.id, b]))
     return ranges.map((range) => {
       const block = blockById.get(range.blockId)
-      const weeks: Array<{ week: number; label: string; occupied: boolean }> = []
+      const weeks: Array<{
+        week: number
+        label: string
+        occupied: boolean
+        locked: boolean
+      }> = []
       for (let week = range.startWeek; week <= range.endWeek; week++) {
         if (week === excludeWeek) continue
         const occupied = [1, 2, 3, 4, 5, 6, 7].some((day) =>
@@ -45,6 +53,7 @@ export function WeekTargetPicker({
           week,
           label: `Wk ${week} · ${weekDateLabel(week)}`,
           occupied,
+          locked: lockedWeeks?.has(week) ?? false,
         })
       }
       return {
@@ -53,7 +62,7 @@ export function WeekTargetPicker({
         weeks,
       }
     }).filter((g) => g.weeks.length > 0)
-  }, [draft, excludeWeek])
+  }, [draft, excludeWeek, lockedWeeks])
 
   const selectedList = useMemo(
     () => [...selected].sort((a, b) => a - b),
@@ -61,6 +70,7 @@ export function WeekTargetPicker({
   )
 
   const toggle = (week: number) => {
+    if (lockedWeeks?.has(week)) return
     setSelected((prev) => {
       const next = new Set(prev)
       if (next.has(week)) next.delete(week)
@@ -109,19 +119,34 @@ export function WeekTargetPicker({
                     <label
                       key={w.week}
                       data-testid={`week-target-${w.week}`}
-                      className="flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-white/[0.04]"
+                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 ${
+                        w.locked
+                          ? 'cursor-not-allowed opacity-55'
+                          : 'cursor-pointer hover:bg-white/[0.04]'
+                      }`}
+                      title={
+                        w.locked
+                          ? "This week is completed and locked to preserve the client's history"
+                          : undefined
+                      }
                     >
                       <input
                         type="checkbox"
                         className="h-4 w-4 accent-[var(--fc-accent,#2E7BFF)]"
                         checked={checked}
+                        disabled={w.locked}
                         onChange={() => toggle(w.week)}
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-medium text-[var(--pe-t1)]">
                           {w.label}
+                          {w.locked ? ' · Locked' : ''}
                         </span>
-                        {w.occupied ? (
+                        {w.locked ? (
+                          <span className="text-[10px] text-[var(--pe-t3)]">
+                            Completed history — cannot overwrite
+                          </span>
+                        ) : w.occupied ? (
                           <span className="text-[10px] text-[var(--pe-warning,#FFC822)]">
                             Has workouts — will replace
                           </span>

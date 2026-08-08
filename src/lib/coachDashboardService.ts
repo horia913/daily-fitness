@@ -8,7 +8,6 @@ import { supabase } from './supabase';
 import { dbToUiScale } from './wellnessService';
 import {
   resolveInstanceWeeksForAssignments,
-  isCoachSkipNote,
 } from '@/lib/programInstanceResolver';
 import { normalizeClientTimezone } from '@/lib/clientZonedCalendar';
 import { resolveFoundationCurrentWeek } from '@/lib/progression/resolveFoundationWeek';
@@ -143,10 +142,6 @@ export interface ClientMetrics {
   programDurationWeeks: number | null;
   mealCompliance7dPct: number | null;
   lastCheckinDate: string | null;
-  /** Coach-managed progression: true when client has completed all required days and needs review */
-  weekReviewNeeded: boolean;
-  /** The week number that is complete and awaiting review */
-  completedWeekNumber: number | null;
   /** The program_id for the active assignment (needed for review modal) */
   activeProgramId: string | null;
   /** The assignment ID (needed for review modal) */
@@ -226,7 +221,7 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
     // Batch fetch active programs (first row per client via order + dedupe below)
     const { data: activePrograms, error: programsError } = await db
       .from('program_assignments')
-      .select('id, client_id, program_id, name, start_date, status, progression_mode, pause_status, paused_at, pause_accumulated_days, timezone_snapshot')
+      .select('id, client_id, program_id, name, start_date, status, pause_status, paused_at, pause_accumulated_days, timezone_snapshot')
       .in('client_id', clientIds)
       .eq('status', 'active')
       .order('updated_at', { ascending: false });
@@ -242,7 +237,6 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
       name: string | null;
       start_date: string;
       status: string;
-      progression_mode: string | null;
       pause_status: string | null;
       paused_at: string | null;
       pause_accumulated_days: number | null;
@@ -305,45 +299,6 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
       const day = new Date((row as { completed_at: string }).completed_at).toISOString().slice(0, 10);
       if (!mealDaysByClient.has(cid)) mealDaysByClient.set(cid, new Set());
       mealDaysByClient.get(cid)!.add(day);
-    }
-
-    // Batch: detect which coach_managed assignments need a week review
-    const coachManagedAssignments = programRows.filter(r => r.progression_mode === 'coach_managed');
-    const reviewNeededByAssignment = new Map<string, number>(); // assignment_id -> completed week number
-    if (coachManagedAssignments.length > 0) {
-      const cmIds = coachManagedAssignments.map(a => a.id);
-      const [{ data: scheduleRows }, { data: completionRows }] = await Promise.all([
-        db.from('program_day_assignments').select('id, program_assignment_id, week_number, is_optional').in('program_assignment_id', cmIds),
-        db.from('program_day_completions').select('program_assignment_id, program_day_assignment_id, notes').in('program_assignment_id', cmIds),
-      ]);
-      const scheduleByAssignment = new Map<string, typeof scheduleRows>();
-      for (const s of (scheduleRows ?? [])) {
-        const list = scheduleByAssignment.get(s.program_assignment_id) ?? [];
-        list.push(s);
-        scheduleByAssignment.set(s.program_assignment_id, list);
-      }
-      const completionsByAssignment = new Map<string, { done: Set<string>; skipped: Set<string> }>();
-      for (const c of (completionRows ?? [])) {
-        const entry = completionsByAssignment.get(c.program_assignment_id) ?? { done: new Set<string>(), skipped: new Set<string>() };
-        if (c.program_day_assignment_id) {
-          if (isCoachSkipNote(c.notes)) entry.skipped.add(c.program_day_assignment_id);
-          else entry.done.add(c.program_day_assignment_id);
-        }
-        completionsByAssignment.set(c.program_assignment_id, entry);
-      }
-      for (const a of coachManagedAssignments) {
-        const currentWeek = currentWeekByAssignment.get(a.id) ?? 1;
-        const slots = (scheduleByAssignment.get(a.id) ?? []).filter(s => s.week_number === currentWeek);
-        const required = slots.filter(s => !s.is_optional);
-        if (required.length === 0) continue;
-        const comp = completionsByAssignment.get(a.id) ?? { done: new Set<string>(), skipped: new Set<string>() };
-        const effectiveRequired = required.filter(s => !comp.skipped.has(s.id));
-        if (effectiveRequired.length === 0) continue;
-        const allDone = effectiveRequired.every(s => comp.done.has(s.id));
-        if (allDone) {
-          reviewNeededByAssignment.set(a.id, currentWeek);
-        }
-      }
     }
 
     // Batch fetch all wellness logs for streak calculation (last 365 days)
@@ -528,7 +483,6 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
       const lastCheckinDate = lastCompleteCheckinByClient.get(clientId) ?? null;
 
       const assignmentRow = firstProgramByClient.get(clientId);
-      const reviewWeek = assignmentRow ? reviewNeededByAssignment.get(assignmentRow.id) : undefined;
 
       const subEnd: string | null = null;
       const subExpiring = false;
@@ -549,8 +503,6 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
         programDurationWeeks,
         mealCompliance7dPct,
         lastCheckinDate,
-        weekReviewNeeded: reviewWeek != null,
-        completedWeekNumber: reviewWeek ?? null,
         activeProgramId: assignmentRow?.program_id ?? null,
         activeProgramAssignmentId: assignmentRow?.id ?? null,
         subscriptionEndDate: subEnd,
